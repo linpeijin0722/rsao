@@ -85,6 +85,7 @@ export default function Page() {
     [choice, setChoice] = useState<string | null>(null),
     [qty, setQty] = useState(1),
     [notice, setNotice] = useState(false),
+    [videoNotice, setVideoNotice] = useState(false),
     [textOk, setTextOk] = useState(false),
     [payment, setPayment] = useState(""),
     [busy, setBusy] = useState(false),
@@ -129,11 +130,15 @@ export default function Page() {
     ),
     daySlots = slots.filter((s) => dk(s.slot_start) === date),
     phase =
-      screen === "items"
+      screen === "slots"
         ? 1
-        : screen === "payment" || screen === "done"
+        : screen === "items"
           ? 2
-          : 0,
+          : screen === "payment"
+            ? 3
+            : screen === "done"
+              ? 4
+              : 0,
     total =
       (method?.base_price || 0) +
       cart.reduce((a, l) => {
@@ -187,6 +192,22 @@ export default function Page() {
     setChoice(i.option_mode === "single_required" ? null : "base");
     setQty(1);
   }
+  function changeBase(item: Item, amount: number) {
+    const key = `${item.id}:base`;
+    setCart((current) => {
+      const old = current.find((line) => line.key === key);
+      const nextQty = Math.max(0, (old?.qty || 0) + amount);
+      if (!nextQty) return current.filter((line) => line.key !== key);
+      if (old)
+        return current.map((line) =>
+          line.key === key ? { ...line, qty: nextQty } : line,
+        );
+      return [
+        ...current,
+        { key, itemId: item.id, subId: null, qty: nextQty },
+      ];
+    });
+  }
   function add() {
     if (!modalItem) return;
     if (modalItem.option_mode === "single_required" && !choice)
@@ -206,7 +227,7 @@ export default function Page() {
     setError("");
     if (screen === "slots") {
       if (!slot) return setError("請選擇日期與時段");
-      setScreen("items");
+      setVideoNotice(true);
     } else if (screen === "items") {
       if (!cart.length) return setError("請至少選擇一個諮詢項目");
       setScreen("payment");
@@ -256,6 +277,8 @@ export default function Page() {
       setBusy(false);
     }
   }
+  const steps = ["諮詢方式", "確認時間", "諮詢項目", "付款方式", "進行付款"],
+    stepStart = Math.max(0, Math.min(phase - 1, steps.length - 3));
   if (auth !== "ready")
     return (
       <main className="loginGate">
@@ -268,15 +291,17 @@ export default function Page() {
       <section className="app">
         <nav className="stepBar">
           <div className="stepTrail">
-            {["諮詢方式", "諮詢項目", "付款方式"].map((x, i) => (
-              <span className="stepUnit" key={x}>
-                {i > 0 && <i>›</i>}
+            {stepStart > 0 && <i className="stepLead">›</i>}
+            {steps.slice(stepStart, stepStart + 3).map((x, offset) => {
+              const i = stepStart + offset;
+              return <span className="stepUnit" key={x}>
+                {offset > 0 && <i>›</i>}
                 <small className={phase === i ? "active" : phase > i ? "done" : ""}>
                   {x}
                 </small>
-              </span>
-            ))}
-            <i className="stepMore">…</i>
+              </span>;
+            })}
+            {stepStart + 3 < steps.length && <i className="stepMore">…</i>}
           </div>
           <div className="account">
             <button onClick={() => setMenu(!menu)}>
@@ -295,6 +320,10 @@ export default function Page() {
             )}
           </div>
         </nav>
+        <div className="bookingBrand">
+          <h1>林阿嫂線上諮詢預約系統</h1>
+          <p>✓ 已通過 LINE 登入驗證</p>
+        </div>
         <div className="content">
           {error && <div className="error">{error}</div>}
           {screen === "method" && (
@@ -310,11 +339,16 @@ export default function Page() {
                     onClick={() => choose(m)}
                   >
                     <b>{m.title}</b>
-                    <p>{m.description}</p>
                     {m.code === "video" ? (
-                      <strong>+{money(m.base_price)}</strong>
+                      <>
+                        <p className="methodMeta">◷ 30分鐘</p>
+                        <strong>+{money(m.base_price)}</strong>
+                      </>
                     ) : (
-                      <small>約7–30天內收到結果</small>
+                      <>
+                        <p className="methodWarning">不指定時間，請詳看下一頁說明</p>
+                        <small>約7–30天內收到結果</small>
+                      </>
                     )}
                   </button>
                 ))}
@@ -413,12 +447,13 @@ export default function Page() {
                         <strong>{money(i.price)}</strong>
                       </div>
                       <div className="addRow">
-                        {baseQty > 0 && (
-                          <span className="qtyBadge">{baseQty}</span>
+                        {i.sub_items.length === 0 && baseQty > 0 && (
+                          <button className="minusButton" onClick={() => changeBase(i, -1)}>−</button>
                         )}
+                        {i.sub_items.length === 0 && <span className="itemQty">{baseQty}</span>}
                         <button
                           className="plusButton"
-                          onClick={() => openItem(i)}
+                          onClick={() => i.sub_items.length ? openItem(i) : changeBase(i, 1)}
                         >
                           ＋
                         </button>
@@ -549,6 +584,19 @@ export default function Page() {
               >
                 我已了解
               </button>
+            </div>
+          </div>
+        )}
+        {videoNotice && (
+          <div className="modalBackdrop">
+            <div className="modal reminderModal">
+              <h2>▣ 視訊諮詢預約提醒</h2>
+              <p>我們會在時間到時主動發送通話邀請給您，請留意訊息通知。</p>
+              <div className="reminderNote">
+                <b>視訊後補充問題注意事項</b>
+                <span>須於預約時段後 8 小時內提出。</span>
+              </div>
+              <button onClick={() => { setVideoNotice(false); setScreen("items"); }}>我知道了</button>
             </div>
           </div>
         )}

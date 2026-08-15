@@ -3,6 +3,7 @@ import "./globals.css";
 import "./admin/admin.css";
 import "./admin/v17.css";
 import "./v18.css";
+import "./v19.css";
 import "./shop.css";
 
 export const metadata: Metadata = {
