@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publicSupabase } from "@/lib/supabase";
+import { verifyLineSession } from "@/lib/line-session";
+import { cookies } from "next/headers";
 
 export async function POST(request: NextRequest) {
   try {
+    const lineUid = verifyLineSession((await cookies()).get("line_session")?.value);
+    if (!lineUid) return NextResponse.json({ error: "LINE 登入已失效，請重新登入" }, { status: 401 });
     const body = await request.json();
     if (!body.name?.trim() || !/^09\d{8}$/.test(body.phone ?? "") || !body.methodId || !Array.isArray(body.items) || body.items.length === 0 || !body.paymentMethod) {
       return NextResponse.json({ error: "請完整填寫姓名、手機、項目與付款方式" }, { status: 400 });
@@ -11,7 +15,7 @@ export async function POST(request: NextRequest) {
       p_method_id: body.methodId,
       p_customer_name: body.name.trim(),
       p_customer_phone: body.phone,
-      p_line_user_id: body.lineId || null,
+      p_line_user_id: lineUid,
       p_slot_start: body.slotStart || null,
       p_payment_method: body.paymentMethod,
       p_items: body.items,
