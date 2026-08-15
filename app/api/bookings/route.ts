@@ -8,13 +8,13 @@ export async function POST(request: NextRequest) {
     const lineUid = verifyLineSession((await cookies()).get("line_session")?.value);
     if (!lineUid) return NextResponse.json({ error: "LINE 登入已失效，請重新登入" }, { status: 401 });
     const body = await request.json();
-    if (!body.name?.trim() || !/^09\d{8}$/.test(body.phone ?? "") || !body.methodId || !Array.isArray(body.items) || body.items.length === 0 || !body.paymentMethod) {
-      return NextResponse.json({ error: "請完整填寫姓名、手機、項目與付款方式" }, { status: 400 });
+    if (!body.methodId || !Array.isArray(body.items) || body.items.length === 0 || !body.paymentMethod) {
+      return NextResponse.json({ error: "請完整選擇諮詢項目與付款方式" }, { status: 400 });
     }
     const { data, error } = await publicSupabase().rpc("create_booking", {
       p_method_id: body.methodId,
-      p_customer_name: body.name.trim(),
-      p_customer_phone: body.phone,
+      p_customer_name: "",
+      p_customer_phone: "",
       p_line_user_id: lineUid,
       p_slot_start: body.slotStart || null,
       p_payment_method: body.paymentMethod,
