@@ -6,6 +6,7 @@
 
 1. 在「林阿嫂」的新 Supabase Project 開啟 SQL Editor，執行 `supabase/schema.sql` 全部內容。
    若已經執行過初版 SQL，接著再執行 `supabase/002_line_login_shared_items.sql`。
+   更新簡化付款流程後，再執行 `supabase/003_simple_checkout.sql`。
 2. 複製 `.env.example` 為 `.env.local`，填入該 Project 的 URL 與 anon key。
 3. 執行 `npm install`，再執行 `npm run dev`。
 4. 到 Supabase 的 `availability` 新增老師開放時間；系統會依 25 分鐘自動切出時段。
