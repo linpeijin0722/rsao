@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./admin/admin.css";
+import "./shop.css";
 
 export const metadata: Metadata = {
   title: "林阿嫂線上諮詢預約",
