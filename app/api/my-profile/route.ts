@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyLineSession } from "@/lib/line-session";
 import { adminSupabase } from "@/lib/supabase";
+import { lunarProfile } from "@/lib/lunar-profile";
 
 const fields =
   "line_display_name,line_picture_url,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen,profile_completed_at";
@@ -42,10 +43,15 @@ function derived(dateValue: string) {
     related = Number(
       parts.find((p: any) => p.type === "relatedYear")?.value ||
         dateValue.slice(0, 4),
-    );
+    ),
+    stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"],
+    branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"],
+    month = String(parts.find((p: any) => p.type === "month")?.value || "").replace(/\D/g, "").padStart(2, "0"),
+    day = String(parts.find((p: any) => p.type === "day")?.value || "").replace(/\D/g, "").padStart(2, "0"),
+    cycle = related - 4;
   return {
-    lunar_birth_text: formatter.format(date),
-    zodiac: zodiacNames[(related - 4) % 12],
+    lunar_birth_text: `民國${related - 1911}${stems[cycle % 10]}${branches[cycle % 12]}年 ${month}月${day}日`,
+    zodiac: zodiacNames[cycle % 12],
   };
 }
 export async function GET() {
@@ -73,7 +79,7 @@ export async function POST(request: NextRequest) {
     !birth_shichen
   )
     return NextResponse.json({ error: "請完整填寫所有欄位" }, { status: 400 });
-  const calculated = derived(birth_date),
+  const calculated = lunarProfile(birth_date),
     { data, error } = await x.db
       .from("customers")
       .update({

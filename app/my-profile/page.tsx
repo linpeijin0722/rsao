@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { lunarProfile } from "@/lib/lunar-profile";
 const shichen = [
   "子時（23:00–00:59）",
   "丑時（01:00–02:59）",
@@ -53,8 +54,13 @@ function calculate(value: string) {
       "雞",
       "狗",
       "豬",
-    ];
-  return { lunar_birth_text: f.format(date), zodiac: animals[(year - 4) % 12] };
+    ],
+    stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"],
+    branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"],
+    month = String(parts.find((p: any) => p.type === "month")?.value || "").replace(/\D/g, "").padStart(2, "0"),
+    day = String(parts.find((p: any) => p.type === "day")?.value || "").replace(/\D/g, "").padStart(2, "0"),
+    cycle = year - 4;
+  return { lunar_birth_text: `民國${year - 1911}${stems[cycle % 10]}${branches[cycle % 12]}年 ${month}月${day}日`, zodiac: animals[cycle % 12] };
 }
 export default function MyProfile() {
   const [form, setForm] = useState<any>(empty),
@@ -77,7 +83,7 @@ export default function MyProfile() {
     });
   }, []);
   function birth(value: string) {
-    setForm((v: any) => ({ ...v, birth_date: value, ...calculate(value) }));
+    setForm((v: any) => ({ ...v, birth_date: value, ...lunarProfile(value) }));
   }
   async function save() {
     setSaving(true);
@@ -116,11 +122,11 @@ export default function MyProfile() {
       </header>
       <section className="profileForm">
         <label>
-          <span>全名</span>
+            <span>姓名</span>
           <input
             value={form.full_name || ""}
             onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-            placeholder="請輸入真實姓名"
+              placeholder="請填寫真實姓名"
           />
         </label>
         <label>
@@ -136,11 +142,14 @@ export default function MyProfile() {
           </select>
         </label>
         <label className="profileAddress">
-          <span>完整地址</span>
-          <textarea
+            <span>地址</span>
+            <input
+              type="text"
+              name="street-address"
+              autoComplete="street-address"
             value={form.full_address || ""}
             onChange={(e) => setForm({ ...form, full_address: e.target.value })}
-            placeholder="縣市、區域、路段、門牌、樓層"
+              placeholder="請填寫完整地址"
           />
         </label>
         <label>
