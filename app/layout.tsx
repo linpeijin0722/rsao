@@ -14,6 +14,7 @@ import "./v28.css";
 import "./v29.css";
 import "./v30.css";
 import "./v31.css";
+import "./v32.css";
 import "./shop.css";
 
 export const metadata: Metadata = {

@@ -1,0 +1,179 @@
+.videoBookingSection > .staffMonthNav {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+.videoBookingSection > .staffCalendar {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+.staffBookingSection > .dailyBookings {
+  margin-left: 20px !important;
+  margin-right: 20px !important;
+}
+.staffBookingSection .dailyBookings .staffBookingTable {
+  width: 100% !important;
+}
+.textBookingSection > .staffFilters {
+  padding: 4px 0 14px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+.profilePage {
+  width: min(100% - 28px, 620px);
+  margin: 0 auto;
+  padding: 22px 0 60px;
+  color: #211d1a;
+}
+.profilePage > header {
+  position: relative;
+  padding: 5px 0 20px;
+  text-align: center;
+}
+.profilePage > header > button {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: transparent;
+  color: #342a23;
+  font-size: 34px;
+}
+.profilePage > header > div {
+  display: grid;
+  justify-items: center;
+}
+.profilePage > header img,
+.profilePage > header div > span {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #a98657;
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+}
+.profilePage h1 {
+  margin: 13px 0 3px;
+  font-size: 27px;
+}
+.profilePage header p {
+  margin: 0;
+  color: #857970;
+  font-size: 13px;
+}
+.profileForm {
+  overflow: hidden;
+  border: 1px solid #e1d8cf;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 5px 22px #4b33220b;
+}
+.profileForm label,
+.profileReadOnly {
+  display: grid;
+  grid-template-columns: 115px minmax(0, 1fr);
+  align-items: center;
+  min-height: 62px;
+  border-top: 1px solid #eee7e0;
+}
+.profileForm label:first-child {
+  border-top: 0;
+}
+.profileForm label > span,
+.profileReadOnly > span {
+  padding: 15px;
+  font-weight: 700;
+  color: #473a32;
+}
+.profileForm input,
+.profileForm select,
+.profileForm textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 61px;
+  padding: 13px 15px;
+  border: 0;
+  border-left: 1px solid #eee7e0;
+  background: #fff;
+  color: #211d1a;
+  font: inherit;
+  outline: none;
+}
+.profileForm textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+.profileForm input:focus,
+.profileForm select:focus,
+.profileForm textarea:focus {
+  background: #fffaf4;
+}
+.profileReadOnly b {
+  min-height: 61px;
+  padding: 20px 15px;
+  border-left: 1px solid #eee7e0;
+  background: #f7f5f2;
+  color: #786c63;
+  font-size: 14px;
+}
+.profileSave {
+  display: block;
+  width: calc(100% - 28px);
+  margin: 18px 14px 14px;
+  padding: 14px;
+  border: 0;
+  border-radius: 9px;
+  background: #8b1f35;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 800;
+}
+.profileSave:disabled {
+  opacity: 0.55;
+}
+.profileSuccess,
+.profileError {
+  margin: 14px 14px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+.profileSuccess {
+  background: #e9f7ed;
+  color: #197441;
+}
+.profileError {
+  background: #fff0f1;
+  color: #a91d2d;
+}
+@media (max-width: 720px) {
+  .staffBookingSection > .dailyBookings {
+    margin-left: 12px !important;
+    margin-right: 12px !important;
+  }
+  .profilePage {
+    width: min(100% - 20px, 620px);
+    padding-top: 12px;
+  }
+  .profileForm label,
+  .profileReadOnly {
+    grid-template-columns: 96px minmax(0, 1fr);
+  }
+  .profileForm label > span,
+  .profileReadOnly > span {
+    padding: 12px;
+    font-size: 14px;
+  }
+  .profileForm input,
+  .profileForm select,
+  .profileForm textarea,
+  .profileReadOnly b {
+    padding-left: 12px;
+    padding-right: 10px;
+    font-size: 14px;
+  }
+}

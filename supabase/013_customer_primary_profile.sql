@@ -1,0 +1,10 @@
+begin;
+alter table public.customers add column if not exists full_name text;
+alter table public.customers add column if not exists gender text;
+alter table public.customers add column if not exists full_address text;
+alter table public.customers add column if not exists birth_date date;
+alter table public.customers add column if not exists lunar_birth_text text;
+alter table public.customers add column if not exists zodiac text;
+alter table public.customers add column if not exists birth_shichen text;
+alter table public.customers add column if not exists profile_completed_at timestamptz;
+commit;

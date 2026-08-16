@@ -99,6 +99,18 @@ export default function Page() {
   useEffect(() => {
     (async () => {
       try {
+        const requirePrimaryProfile = async () => {
+          const response = await fetch("/api/my-profile", {
+            cache: "no-store",
+          });
+          const result = await response.json();
+          if (!response.ok) throw Error(result.error || "無法讀取個人資料");
+          if (!result.complete) {
+            location.replace("/my-profile?setup=1");
+            return false;
+          }
+          return true;
+        };
         const [sessionResponse, catalogResponse] = await Promise.all([
             fetch("/api/line/session", { cache: "no-store" }),
             fetch("/api/catalog"),
@@ -110,6 +122,7 @@ export default function Page() {
         setTextFull(Boolean(catalog.textFull));
         if (sessionResponse.ok) {
           setProfile(await sessionResponse.json());
+          if (!(await requirePrimaryProfile())) return;
           setAuth("ready");
           return;
         }
@@ -128,6 +141,7 @@ export default function Page() {
           aj = await ar.json();
         if (!ar.ok) throw Error(aj.error);
         setProfile(aj);
+        if (!(await requirePrimaryProfile())) return;
         setAuth("ready");
       } catch (e) {
         setError(e instanceof Error ? e.message : "載入失敗");
@@ -401,6 +415,9 @@ export default function Page() {
             </button>
             {menu && (
               <div className="accountMenu">
+                <button onClick={() => (location.href = "/my-profile")}>
+                  我的資料
+                </button>
                 <button onClick={() => (location.href = "/my-bookings")}>
                   我的預約
                 </button>
