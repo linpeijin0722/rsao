@@ -41,7 +41,9 @@ export default function Staff() {
     [editLines, setEditLines] = useState<any[]>([]),
     [statusFilter, setStatusFilter] = useState("all"),
     [dataFilter, setDataFilter] = useState("all"),
-    [sortBy, setSortBy] = useState("paid_time");
+    [sortBy, setSortBy] = useState("paid_time"),
+    [addPicker, setAddPicker] = useState<any>(null),
+    [pickedSubId, setPickedSubId] = useState("");
   async function load() {
     const r = await fetch("/api/staff/bookings"),
       j = await r.json();
@@ -97,12 +99,12 @@ export default function Staff() {
     }, [rows, statusFilter, dataFilter, sortBy]),
     video = useMemo(
       () =>
-        filtered.filter(
+        rows.filter(
           (x) =>
             x.consultation_methods?.code === "video" &&
             x.status !== "cancelled",
         ),
-      [filtered],
+      [rows],
     ),
     text = useMemo(
       () => filtered.filter((x) => x.consultation_methods?.code === "text"),
@@ -140,22 +142,58 @@ export default function Staff() {
     );
     setEditLines(
       (x.booking_details || []).map((d: any) => ({
+        lineKey: d.id,
         itemId: d.item_id,
         subId: d.booking_detail_sub_items?.[0]?.sub_item_id || "",
         qty: d.quantity || 1,
       })),
     );
   }
-  function qty(itemId: string, amount: number) {
+  function qty(itemId: string, amount: number, lineKey?: string) {
     setEditLines((v) => {
-      const old = v.find((x) => x.itemId === itemId);
-      if (!old && amount > 0) return [...v, { itemId, subId: "", qty: 1 }];
+      const old = lineKey
+        ? v.find((x) => x.lineKey === lineKey)
+        : v.find((x) => x.itemId === itemId && !x.subId);
+      if (!old && amount > 0)
+        return [
+          ...v,
+          { lineKey: crypto.randomUUID(), itemId, subId: "", qty: 1 },
+        ];
       if (!old) return v;
       const n = old.qty + amount;
       return n < 1
-        ? v.filter((x) => x.itemId !== itemId)
-        : v.map((x) => (x.itemId === itemId ? { ...x, qty: n } : x));
+        ? v.filter((x) => x.lineKey !== old.lineKey)
+        : v.map((x) => (x.lineKey === old.lineKey ? { ...x, qty: n } : x));
     });
+  }
+  function startAdd(item: any) {
+    if (!item.sub_items?.length) return qty(item.id, 1);
+    setPickedSubId("");
+    setAddPicker(item);
+  }
+  function confirmAdd() {
+    if (!pickedSubId) return alert("請先選擇子項目");
+    setEditLines((value) => {
+      const old = value.find(
+        (line) => line.itemId === addPicker.id && line.subId === pickedSubId,
+      );
+      return old
+        ? value.map((line) =>
+            line.lineKey === old.lineKey
+              ? { ...line, subId: pickedSubId, qty: line.qty + 1 }
+              : line,
+          )
+        : [
+            ...value,
+            {
+              lineKey: crypto.randomUUID(),
+              itemId: addPicker.id,
+              subId: pickedSubId,
+              qty: 1,
+            },
+          ];
+    });
+    setAddPicker(null);
   }
   async function saveEdit() {
     if (!editLines.length) return alert("請至少選擇一個項目");
@@ -198,41 +236,8 @@ export default function Staff() {
     <main className="staffPage">
       <h1>預約工作後台</h1>
       {error && <div className="error">{error}</div>}
-      <div className="staffFilters">
-        <label>
-          訂單狀態
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="all">全部</option>
-            <option value="paid">已付款</option>
-            <option value="pending">待付款</option>
-            <option value="cancelled">已取消</option>
-            <option value="expired">已失效</option>
-          </select>
-        </label>
-        <label>
-          資料回傳
-          <select
-            value={dataFilter}
-            onChange={(e) => setDataFilter(e.target.value)}
-          >
-            <option value="all">全部</option>
-            <option value="returned">已回傳</option>
-            <option value="missing">尚未回傳</option>
-          </select>
-        </label>
-        <label>
-          排序
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-            <option value="paid_time">付款時間</option>
-            <option value="reservation_time">預約時間</option>
-          </select>
-        </label>
-      </div>
-      <section>
-        <h2>視訊預約月曆</h2>
+      <section className="staffBookingSection videoBookingSection">
+        <h2 className="staffSectionTitle">視訊預約</h2>
         <div className="staffMonthNav">
           <button
             onClick={() => {
@@ -278,59 +283,71 @@ export default function Staff() {
         {selectedDate && (
           <div className="dailyBookings">
             <h3>{selectedDate} 的預約</h3>
-            {daily.map((x) => {
-              const complete = x.booking_details?.every(
-                  (d: any) => d.booking_detail_profiles?.length,
-                ),
-                paid = x.payment_status === "paid",
-                status =
-                  x.status === "cancelled"
-                    ? x.cancellation_reason === "自行取消"
-                      ? "已取消"
-                      : "已失效"
-                    : paid
-                      ? "已付款"
-                      : "未付款",
-                profiles = x.booking_details.flatMap(
-                  (d: any) =>
-                    d.booking_detail_profiles
-                      ?.map((p: any) => p.consultation_profiles)
-                      .filter(Boolean) || [],
-                );
-              return (
-                <article className="dailyBookingRow" key={x.id}>
-                  <b>
-                    {new Date(x.slot_start).toLocaleTimeString("zh-TW", {
-                      timeZone: "Asia/Taipei",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </b>
-                  <button
-                    className="customerButton"
-                    onClick={() => setUserView(x.customers)}
-                  >
-                    {x.customers?.line_picture_url && (
-                      <img src={x.customers.line_picture_url} alt="" />
-                    )}
-                    <span>{x.customers?.line_display_name}</span>
-                  </button>
-                  <span className="statusBadge">{status}</span>
-                  {paid &&
-                    (complete ? (
-                      <button onClick={() => setDataView(profiles)}>
-                        已回傳資料
-                      </button>
+            <div className="staffBookingTable">
+              <div className="staffTableHead">
+                <b>視訊時間</b>
+                <b>用戶</b>
+                <b>付款狀態</b>
+                <b>資料回傳</b>
+                <b>訂單編號</b>
+                <b>操作</b>
+              </div>
+              {daily.map((x) => {
+                const complete = x.booking_details?.every(
+                    (d: any) => d.booking_detail_profiles?.length,
+                  ),
+                  paid = x.payment_status === "paid",
+                  status = statusText(x),
+                  profiles = x.booking_details.flatMap(
+                    (d: any) =>
+                      d.booking_detail_profiles
+                        ?.map((p: any) => p.consultation_profiles)
+                        .filter(Boolean) || [],
+                  );
+                return (
+                  <article className="staffTableRow" key={x.id}>
+                    <span>
+                      {new Date(x.slot_start).toLocaleTimeString("zh-TW", {
+                        timeZone: "Asia/Taipei",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    <button
+                      className="customerButton"
+                      onClick={() => setUserView(x.customers)}
+                    >
+                      {x.customers?.line_picture_url && (
+                        <img src={x.customers.line_picture_url} alt="" />
+                      )}
+                      <span>{x.customers?.line_display_name}</span>
+                    </button>
+                    <b className={`staffState ${statusKey(x)}`}>{status}</b>
+                    {paid ? (
+                      complete ? (
+                        <button
+                          className="returned"
+                          onClick={() => setDataView(profiles)}
+                        >
+                          已回傳
+                        </button>
+                      ) : (
+                        <button
+                          className="missing"
+                          onClick={() => remind(x.booking_no)}
+                        >
+                          尚未回傳
+                        </button>
+                      )
                     ) : (
-                      <button onClick={() => remind(x.booking_no)}>
-                        未回傳資料・通知
-                      </button>
-                    ))}
-                  <small>{x.booking_no}</small>
-                  <button onClick={() => openEdit(x)}>修改</button>
-                </article>
-              );
-            })}
+                      <span>—</span>
+                    )}
+                    <small>{x.booking_no}</small>
+                    <button onClick={() => openEdit(x)}>修改</button>
+                  </article>
+                );
+              })}
+            </div>
           </div>
         )}
       </section>
@@ -373,8 +390,41 @@ export default function Staff() {
           </div>
         </div>
       )}
-      <section>
-        <h2>文字諮詢（依付款時間）</h2>
+      <section className="staffBookingSection textBookingSection">
+        <h2 className="staffSectionTitle">文字預約</h2>
+        <div className="staffFilters">
+          <label>
+            訂單狀態
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="all">全部</option>
+              <option value="paid">已付款</option>
+              <option value="pending">待付款</option>
+              <option value="cancelled">已取消</option>
+              <option value="expired">已失效</option>
+            </select>
+          </label>
+          <label>
+            資料回傳
+            <select
+              value={dataFilter}
+              onChange={(e) => setDataFilter(e.target.value)}
+            >
+              <option value="all">全部</option>
+              <option value="returned">已回傳</option>
+              <option value="missing">尚未回傳</option>
+            </select>
+          </label>
+          <label>
+            排序
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+              <option value="paid_time">付款時間</option>
+              <option value="reservation_time">預約時間</option>
+            </select>
+          </label>
+        </div>
         <div className="staffBookingTable">
           <div className="staffTableHead">
             <b>付款時間</b>
@@ -504,7 +554,7 @@ export default function Staff() {
                   const i = items.find((item) => item.id === line.itemId);
                   if (!i) return null;
                   return (
-                    <article key={i.id}>
+                    <article key={line.lineKey}>
                       <div>
                         <b>{i.title}</b>
                         {i.sub_items?.length > 0 && (
@@ -513,7 +563,7 @@ export default function Staff() {
                             onChange={(e) =>
                               setEditLines((v) =>
                                 v.map((x) =>
-                                  x.itemId === i.id
+                                  x.lineKey === line.lineKey
                                     ? { ...x, subId: e.target.value }
                                     : x,
                                 ),
@@ -530,14 +580,18 @@ export default function Staff() {
                         )}
                       </div>
                       <div className="staffQty">
-                        <button onClick={() => qty(i.id, -1)}>−</button>
+                        <button onClick={() => qty(i.id, -1, line.lineKey)}>
+                          −
+                        </button>
                         <b>{line.qty}</b>
-                        <button onClick={() => qty(i.id, 1)}>＋</button>
+                        <button onClick={() => qty(i.id, 1, line.lineKey)}>
+                          ＋
+                        </button>
                         <button
                           className="removeLine"
                           onClick={() =>
                             setEditLines((v) =>
-                              v.filter((x) => x.itemId !== i.id),
+                              v.filter((x) => x.lineKey !== line.lineKey),
                             )
                           }
                         >
@@ -557,7 +611,7 @@ export default function Staff() {
                       <b>{i.title}</b>
                       <button
                         className="staffAddButton"
-                        onClick={() => qty(i.id, 1)}
+                        onClick={() => startAdd(i)}
                       >
                         ＋
                       </button>
@@ -569,6 +623,42 @@ export default function Staff() {
             <button onClick={saveEdit}>儲存並發送 LINE 通知</button>
             <button className="cancel" onClick={() => setEditing(null)}>
               取消
+            </button>
+          </div>
+        </div>
+      )}
+      {addPicker && (
+        <div
+          className="modalBackdrop addSubBackdrop"
+          onClick={() => setAddPicker(null)}
+        >
+          <div
+            className="modal staffSubPicker"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="staffModalClose"
+              aria-label="關閉"
+              onClick={() => setAddPicker(null)}
+            >
+              ×
+            </button>
+            <h2>{addPicker.title}</h2>
+            <p>請選擇子項目</p>
+            <div className="staffSubOptions">
+              {addPicker.sub_items.map((sub: any) => (
+                <button
+                  key={sub.id}
+                  className={pickedSubId === sub.id ? "selected" : ""}
+                  onClick={() => setPickedSubId(sub.id)}
+                >
+                  <b>{sub.title}</b>
+                  <span>NT$ {Number(sub.price).toLocaleString()}</span>
+                </button>
+              ))}
+            </div>
+            <button className="confirmSubAdd" onClick={confirmAdd}>
+              確認加入
             </button>
           </div>
         </div>

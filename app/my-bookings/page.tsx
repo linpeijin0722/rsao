@@ -58,7 +58,7 @@ export default function Mine() {
   }
   if (selected) {
     const x = selected,
-      missing = x.status !== "cancelled" && !complete(x);
+      missing = x.payment_status === "paid" && !complete(x);
     return (
       <main className="dataPage minePage mineDetail">
         <button className="mineBack" onClick={() => setSelected(null)}>
@@ -85,17 +85,37 @@ export default function Mine() {
               </a>
             </div>
           )}
-          <p>
-            訂單編號：<b>{x.booking_no}</b>
-          </p>
-          {x.slot_start && (
-            <p>
-              預約時間：
-              {new Date(x.slot_start).toLocaleString("zh-TW", {
-                timeZone: "Asia/Taipei",
-              })}
-            </p>
-          )}
+          <div className="mineInfoGrid">
+            <div>
+              <small>訂單編號</small>
+              <b>{x.booking_no}</b>
+            </div>
+            {x.slot_start && (
+              <div>
+                <small>預約時間</small>
+                <b>
+                  {new Date(x.slot_start).toLocaleString("zh-TW", {
+                    timeZone: "Asia/Taipei",
+                    month: "numeric",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </b>
+              </div>
+            )}
+            <div>
+              <small>付款方式</small>
+              <b>
+                {x.payment_status === "paid"
+                  ? x.payment_method === "credit_card"
+                    ? "信用卡"
+                    : "轉帳"
+                  : "尚未付款"}
+              </b>
+            </div>
+          </div>
+          <h2 className="mineItemsTitle">預約項目</h2>
           <div className="mineItems">
             {x.booking_details?.map((d: any, i: number) => (
               <span key={i}>{d.item_title}</span>
@@ -113,11 +133,15 @@ export default function Mine() {
               <button onClick={() => cancel(x.booking_no)}>取消預約</button>
             </div>
           )}
-          {!missing && x.status !== "cancelled" && (
-            <a href={`/booking-data?order=${encodeURIComponent(x.booking_no)}`}>
-              查看諮詢者資料
-            </a>
-          )}
+          {x.payment_status === "paid" &&
+            !missing &&
+            x.status !== "cancelled" && (
+              <a
+                href={`/booking-data?order=${encodeURIComponent(x.booking_no)}`}
+              >
+                查看諮詢者資料
+              </a>
+            )}
         </section>
       </main>
     );
@@ -132,7 +156,7 @@ export default function Mine() {
           const date = x.slot_start
               ? new Date(x.slot_start)
               : new Date(x.paid_at || x.created_at),
-            missing = x.status !== "cancelled" && !complete(x);
+            missing = x.payment_status === "paid" && !complete(x);
           return (
             <button
               className="mineSummary"

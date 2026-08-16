@@ -1,0 +1,243 @@
+.staffBookingSection {
+  padding: 0 !important;
+  margin: 0 0 36px !important;
+  border: 1px solid #d9d0c6 !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+  background: #fff !important;
+}
+.staffBookingSection > .staffSectionTitle {
+  margin: 0 0 20px !important;
+  padding: 15px 20px !important;
+  color: #fff !important;
+  font-size: 22px !important;
+}
+.videoBookingSection > .staffSectionTitle {
+  background: #315e57 !important;
+}
+.textBookingSection > .staffSectionTitle {
+  background: #6b4935 !important;
+}
+.staffBookingSection > .staffMonthNav,
+.staffBookingSection > .staffCalendar,
+.staffBookingSection > .dailyBookings {
+  margin-left: 20px;
+  margin-right: 20px;
+}
+.textBookingSection > .staffFilters,
+.textBookingSection > .staffBookingTable {
+  margin-left: 20px;
+  margin-right: 20px;
+}
+.textBookingSection > .staffBookingTable {
+  margin-bottom: 20px;
+}
+.staffBookingSection .dailyBookings {
+  margin-bottom: 20px;
+}
+.staffBookingSection .dailyBookings > h3 {
+  margin: 18px 0 10px;
+}
+.staffModalClose {
+  width: 30px !important;
+  height: 30px !important;
+  right: 10px !important;
+  top: 10px !important;
+  border-radius: 4px !important;
+  font-size: 22px !important;
+}
+.addSubBackdrop {
+  z-index: 1100 !important;
+}
+.staffSubPicker {
+  position: relative;
+  width: min(460px, 92vw) !important;
+  max-height: 80vh;
+  overflow: auto;
+  padding: 24px !important;
+}
+.staffSubPicker h2 {
+  padding-right: 32px;
+}
+.staffSubOptions {
+  display: grid;
+  gap: 9px;
+  margin: 15px 0;
+}
+.staffSubOptions > button {
+  display: flex !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  width: 100%;
+  padding: 14px !important;
+  margin: 0 !important;
+  border: 1px solid #d7c8b7 !important;
+  border-radius: 9px !important;
+  background: #fff !important;
+  color: #24201c !important;
+  text-align: left !important;
+}
+.staffSubOptions > button.selected {
+  border: 2px solid #8b1f35 !important;
+  background: #fff4f5 !important;
+}
+.staffSubOptions span {
+  color: #8b1f35;
+  white-space: nowrap;
+}
+.confirmSubAdd {
+  width: 100% !important;
+  background: #8b1f35 !important;
+  color: #fff !important;
+}
+.minePage {
+  width: min(100% - 28px, 620px) !important;
+  padding: 22px 0 50px !important;
+}
+.minePage > h1 {
+  font-size: 25px !important;
+  margin: 0 0 18px !important;
+}
+.mineList {
+  gap: 10px !important;
+}
+.mineSummary {
+  grid-template-columns: 58px minmax(0, 1fr) 14px !important;
+  gap: 12px !important;
+  padding: 14px !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+.mineDate {
+  padding: 6px 4px !important;
+}
+.mineDate b {
+  font-size: 22px !important;
+}
+.mineDate small {
+  font-size: 12px !important;
+}
+.mineSummaryBody {
+  gap: 4px !important;
+}
+.mineSummaryBody > .mineStatus {
+  justify-self: start;
+  font-size: 13px !important;
+  padding: 3px 8px !important;
+}
+.mineSummaryBody > b {
+  font-size: 17px !important;
+}
+.mineSummaryBody small {
+  font-size: 13px !important;
+}
+.mineSummaryBody strong {
+  font-size: 13px !important;
+}
+.mineArrow {
+  font-size: 22px !important;
+}
+.mineDetail > .mineBack {
+  font-size: 14px !important;
+  padding: 8px 0 !important;
+}
+.mineDetail > section {
+  padding: 20px !important;
+  border-radius: 14px !important;
+}
+.mineDetailTop {
+  margin-bottom: 14px !important;
+  padding-bottom: 12px;
+}
+.mineDetailTop h1 {
+  font-size: 22px !important;
+  margin: 4px 0 0 !important;
+}
+.mineDetailTop > div > small {
+  font-size: 13px;
+  color: #777;
+}
+.mineDetailTop > b {
+  font-size: 18px;
+  color: #8b1f35;
+}
+.mineInfoGrid {
+  display: grid;
+  gap: 0;
+  border: 1px solid #e7e0d8;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.mineInfoGrid > div {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 10px;
+  padding: 11px 13px;
+  border-top: 1px solid #eee;
+}
+.mineInfoGrid > div:first-child {
+  border-top: 0;
+}
+.mineInfoGrid small {
+  color: #777;
+  font-size: 13px;
+}
+.mineInfoGrid b {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.mineItemsTitle {
+  font-size: 16px !important;
+  margin: 18px 0 8px !important;
+}
+.mineDetail .mineItems {
+  display: grid;
+  gap: 6px;
+}
+.mineDetail .mineItems span {
+  padding: 9px 11px !important;
+  font-size: 14px !important;
+  background: #f7f4f0 !important;
+  border-radius: 7px;
+}
+.importantDataAlert {
+  padding: 14px !important;
+  margin: 12px 0 16px !important;
+}
+.importantDataAlert h2 {
+  font-size: 18px !important;
+  margin: 0 0 7px !important;
+}
+.importantDataAlert p {
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  margin: 0 0 10px !important;
+}
+.importantDataAlert a {
+  font-size: 15px !important;
+  padding: 10px !important;
+}
+.mineActions button {
+  font-size: 15px !important;
+  padding: 11px 14px !important;
+}
+@media (max-width: 720px) {
+  .staffBookingSection > .staffMonthNav,
+  .staffBookingSection > .staffCalendar,
+  .staffBookingSection > .dailyBookings,
+  .textBookingSection > .staffFilters,
+  .textBookingSection > .staffBookingTable {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+  .staffBookingSection > .staffSectionTitle {
+    font-size: 19px !important;
+    padding: 13px 15px !important;
+  }
+  .minePage {
+    width: min(100% - 20px, 620px) !important;
+  }
+  .mineDetail > section {
+    padding: 16px !important;
+  }
+}
