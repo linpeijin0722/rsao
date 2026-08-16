@@ -37,14 +37,19 @@
   color: #fff;
   font-weight: 700;
 }
-.stepUnit small.done { color: #786f6a; }
+.stepUnit small.done {
+  color: #786f6a;
+}
 .stepMore {
   margin-left: 6px;
   color: #514944;
   font-size: 22px;
   font-style: normal;
 }
-.stepBar .account { flex: none; margin-left: 0; }
+.stepBar .account {
+  flex: none;
+  margin-left: 0;
+}
 .bookingCalendar {
   width: 100%;
   min-width: 0;
@@ -64,10 +69,24 @@
 }
 .bookingCalendar .monthNav b,
 .bookingCalendar .calHeads,
-.bookingCalendar .calDays { min-width: 0; width: 100%; }
+.bookingCalendar .calDays {
+  min-width: 0;
+  width: 100%;
+}
 @media (max-width: 390px) {
-  .stepBar { gap: 5px; padding: 0 9px; }
-  .stepUnit small { padding: 7px 6px; font-size: 12px; }
-  .stepUnit i { margin: 0 2px; font-size: 21px; }
-  .stepMore { margin-left: 3px; }
+  .stepBar {
+    gap: 5px;
+    padding: 0 9px;
+  }
+  .stepUnit small {
+    padding: 7px 6px;
+    font-size: 12px;
+  }
+  .stepUnit i {
+    margin: 0 2px;
+    font-size: 21px;
+  }
+  .stepMore {
+    margin-left: 3px;
+  }
 }

@@ -4,18 +4,41 @@
   --ink: #171512;
   --warm-bg: #f3efe7;
 }
-body { background: #dfddd8; color: var(--ink); }
-.app { background: var(--warm-bg); box-shadow: 0 0 34px #201b1526; }
+body {
+  background: #dfddd8;
+  color: var(--ink);
+}
+.app {
+  background: var(--warm-bg);
+  box-shadow: 0 0 34px #201b1526;
+}
 .stepBar {
   height: 70px;
   background: linear-gradient(115deg, #111415, #24211d 58%, #0d0e0e);
   border-bottom: 1px solid #3a3329;
 }
-.stepTrail { justify-content: flex-start; }
-.stepUnit i, .stepMore { color: #a98a59; }
-.stepBar span + span::before { display: none !important; content: none !important; }
-.stepLead { color: #a98a59; font-size: 25px; font-style: normal; margin-right: 3px; }
-.stepUnit small { color: #d3c6ad; font-size: 13px; font-weight: 650; }
+.stepTrail {
+  justify-content: flex-start;
+}
+.stepUnit i,
+.stepMore {
+  color: #a98a59;
+}
+.stepBar span + span::before {
+  display: none !important;
+  content: none !important;
+}
+.stepLead {
+  color: #a98a59;
+  font-size: 25px;
+  font-style: normal;
+  margin-right: 3px;
+}
+.stepUnit small {
+  color: #d3c6ad;
+  font-size: 13px;
+  font-weight: 650;
+}
 .stepUnit small.active {
   color: #f1d59e;
   background: transparent;
@@ -33,20 +56,43 @@ body { background: #dfddd8; color: var(--ink); }
   border-radius: 3px;
   background: #c49a59;
 }
-.stepUnit small.done { color: #a99b84; }
-.stepBar .account > button { background: #b69255; color: #15120e; }
+.stepUnit small.done {
+  color: #a99b84;
+}
+.stepBar .account > button {
+  background: #b69255;
+  color: #15120e;
+}
 .bookingBrand {
   padding: 27px 18px 25px;
   text-align: center;
   background: #fffdfa;
   border-bottom: 1px solid #ded7cb;
 }
-.bookingBrand h1 { margin: 0 0 7px; font-size: 23px; letter-spacing: .03em; }
-.bookingBrand p { margin: 0; color: #24835c; font-size: 14px; font-weight: 700; }
-.content { padding-top: 27px; }
-.title { padding-left: 17px; border-left: 5px solid #9a7840; }
-.title h2 { font-size: 25px; }
-.methodCards.big { gap: 18px; }
+.bookingBrand h1 {
+  margin: 0 0 7px;
+  font-size: 23px;
+  letter-spacing: 0.03em;
+}
+.bookingBrand p {
+  margin: 0;
+  color: #24835c;
+  font-size: 14px;
+  font-weight: 700;
+}
+.content {
+  padding-top: 27px;
+}
+.title {
+  padding-left: 17px;
+  border-left: 5px solid #9a7840;
+}
+.title h2 {
+  font-size: 25px;
+}
+.methodCards.big {
+  gap: 18px;
+}
 .methodCards.big button {
   min-height: 188px;
   padding: 31px 30px;
@@ -62,12 +108,33 @@ body { background: #dfddd8; color: var(--ink); }
   background: #fffaf0;
   box-shadow: 0 0 0 3px #b18a4d22;
 }
-.methodCards.big b { font-size: 25px; }
-.methodCards.big .methodMeta { margin: 8px 0 14px; color: #4d4943; font-size: 16px; }
-.methodCards.big .methodWarning { margin: 8px 0 14px; color: #a23d2e; font-size: 14px; font-weight: 650; }
-.methodCards.big strong { padding: 0; background: transparent; color: #8b672e; font-size: 23px; }
-.methodCards.big small { color: #736557; font-size: 14px; }
-.items.cartItems { gap: 18px; }
+.methodCards.big b {
+  font-size: 25px;
+}
+.methodCards.big .methodMeta {
+  margin: 8px 0 14px;
+  color: #4d4943;
+  font-size: 16px;
+}
+.methodCards.big .methodWarning {
+  margin: 8px 0 14px;
+  color: #a23d2e;
+  font-size: 14px;
+  font-weight: 650;
+}
+.methodCards.big strong {
+  padding: 0;
+  background: transparent;
+  color: #8b672e;
+  font-size: 23px;
+}
+.methodCards.big small {
+  color: #736557;
+  font-size: 14px;
+}
+.items.cartItems {
+  gap: 18px;
+}
 .items.cartItems article {
   position: relative;
   min-height: 165px;
@@ -77,8 +144,13 @@ body { background: #dfddd8; color: var(--ink); }
   background: #f8f5ef;
   box-shadow: 0 3px 10px #352a1d12;
 }
-.itemMain.full { padding-right: 112px; }
-.itemMain.full b { font-size: 21px; line-height: 1.45; }
+.itemMain.full {
+  padding-right: 112px;
+}
+.itemMain.full b {
+  font-size: 21px;
+  line-height: 1.45;
+}
 .itemMain.full p {
   display: -webkit-box;
   overflow: hidden;
@@ -88,32 +160,98 @@ body { background: #dfddd8; color: var(--ink); }
   font-size: 17px;
   line-height: 1.65;
 }
-.itemMain.full strong { position: absolute; top: 27px; right: 25px; color: #96713a; font-size: 21px; }
-.addRow { position: absolute; right: 22px; bottom: 22px; gap: 0; overflow: hidden; border: 1px solid #d1c8ba; border-radius: 23px; background: #fff; }
-.plusButton, .minusButton {
+.itemMain.full strong {
+  position: absolute;
+  top: 27px;
+  right: 25px;
+  color: #96713a;
+  font-size: 21px;
+}
+.addRow {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #d1c8ba;
+  border-radius: 23px;
+  background: #fff;
+}
+.plusButton,
+.minusButton {
   width: 45px;
   height: 45px;
   border: 0;
   border-radius: 50%;
   font-size: 25px;
 }
-.plusButton { background: #a78348; color: #fff; }
-.minusButton { background: #f2efe9; color: #877c6c; }
-.itemQty { display: grid; place-items: center; width: 42px; font-size: 18px; font-weight: 700; }
-.cartPreview { margin-top: 19px; padding-top: 12px; }
-.bookingCalendar, .dayTimes, .payments button, .summary {
+.plusButton {
+  background: #a78348;
+  color: #fff;
+}
+.minusButton {
+  background: #f2efe9;
+  color: #877c6c;
+}
+.itemQty {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  font-size: 18px;
+  font-weight: 700;
+}
+.cartPreview {
+  margin-top: 19px;
+  padding-top: 12px;
+}
+.bookingCalendar,
+.dayTimes,
+.payments button,
+.summary {
   background: #fbf8f2;
   border-color: #c9c0b3;
   box-shadow: 0 3px 10px #352a1d10;
 }
-.bookingCalendar .calDays .available { background: #eadcc5; color: #64491f; }
-.bookingCalendar .calDays .selected, .times button.selected, .payments button.selected { background: #9b7840; color: #fff; }
-.burgundy, .confirmAdd, .modal > button, .next { background: #a78348 !important; }
-.modal { border: 1px solid #a98a59; border-radius: 24px; }
-.modalBackdrop { background: #11110dc7; }
-.itemDetailModal h2 { padding-bottom: 15px; border-bottom: 1px solid #ddd4c5; font-size: 25px; }
-.itemDetailModal p { white-space: pre-line; font-size: 18px; line-height: 1.85; }
-.itemDetailModal > strong { display: block; margin: 20px 0; color: #9a753b; text-align: right; font-size: 21px; }
+.bookingCalendar .calDays .available {
+  background: #eadcc5;
+  color: #64491f;
+}
+.bookingCalendar .calDays .selected,
+.times button.selected,
+.payments button.selected {
+  background: #9b7840;
+  color: #fff;
+}
+.burgundy,
+.confirmAdd,
+.modal > button,
+.next {
+  background: #a78348 !important;
+}
+.modal {
+  border: 1px solid #a98a59;
+  border-radius: 24px;
+}
+.modalBackdrop {
+  background: #11110dc7;
+}
+.itemDetailModal h2 {
+  padding-bottom: 15px;
+  border-bottom: 1px solid #ddd4c5;
+  font-size: 25px;
+}
+.itemDetailModal p {
+  white-space: pre-line;
+  font-size: 18px;
+  line-height: 1.85;
+}
+.itemDetailModal > strong {
+  display: block;
+  margin: 20px 0;
+  color: #9a753b;
+  text-align: right;
+  font-size: 21px;
+}
 .paymentAmountDock {
   position: fixed;
   z-index: 9;
@@ -126,16 +264,45 @@ body { background: #dfddd8; color: var(--ink); }
   border-radius: 0;
   box-shadow: 0 -4px 16px #271e1520;
 }
-.paymentAmountDock p { margin: 0; }
-.paymentAmountDock + * { margin-bottom: 70px; }
-.app { font-size: 18px; }
-.title h2 { font-size: 27px; }
-.stepUnit small { font-size: 15px; font-weight: 800; }
-.reminderModal h2 { padding-bottom: 15px; border-bottom: 1px solid #ddd4c5; text-align: center; }
-.reminderModal > p { font-weight: 650; line-height: 1.75; }
-.reminderNote { margin: 18px 0; padding: 15px; border: 1px solid #d8cdbd; border-radius: 14px; }
-.reminderNote b, .reminderNote span { display: block; }
-.reminderNote span { margin-top: 6px; color: #6f6559; }
+.paymentAmountDock p {
+  margin: 0;
+}
+.paymentAmountDock + * {
+  margin-bottom: 70px;
+}
+.app {
+  font-size: 18px;
+}
+.title h2 {
+  font-size: 27px;
+}
+.stepUnit small {
+  font-size: 15px;
+  font-weight: 800;
+}
+.reminderModal h2 {
+  padding-bottom: 15px;
+  border-bottom: 1px solid #ddd4c5;
+  text-align: center;
+}
+.reminderModal > p {
+  font-weight: 650;
+  line-height: 1.75;
+}
+.reminderNote {
+  margin: 18px 0;
+  padding: 15px;
+  border: 1px solid #d8cdbd;
+  border-radius: 14px;
+}
+.reminderNote b,
+.reminderNote span {
+  display: block;
+}
+.reminderNote span {
+  margin-top: 6px;
+  color: #6f6559;
+}
 .textConsultationInfo {
   padding: 24px;
   border: 1px solid #c9c0b3;
@@ -143,16 +310,46 @@ body { background: #dfddd8; color: var(--ink); }
   background: #fbf8f2;
   box-shadow: 0 3px 10px #352a1d10;
 }
-.textConsultationInfo h3 { margin-top: 0; font-size: 22px; }
-.textConsultationInfo li { margin: 13px 0; font-size: 17px; line-height: 1.7; }
-.alertModal { text-align: center; }
-.alertModal p { margin: 24px 0; font-size: 18px; line-height: 1.75; }
-.total b, .summary strong { color: #94703a !important; }
+.textConsultationInfo h3 {
+  margin-top: 0;
+  font-size: 22px;
+}
+.textConsultationInfo li {
+  margin: 13px 0;
+  font-size: 17px;
+  line-height: 1.7;
+}
+.alertModal {
+  text-align: center;
+}
+.alertModal p {
+  margin: 24px 0;
+  font-size: 18px;
+  line-height: 1.75;
+}
+.total b,
+.summary strong {
+  color: #94703a !important;
+}
 @media (max-width: 430px) {
-  .bookingBrand h1 { font-size: 20px; }
-  .stepUnit small { font-size: 11px; padding: 6px 5px; }
-  .stepUnit i { margin: 0 1px; }
-  .methodCards.big button { min-height: 170px; padding: 25px 23px; }
-  .itemMain.full { padding-right: 92px; }
-  .itemMain.full strong { right: 20px; }
+  .bookingBrand h1 {
+    font-size: 20px;
+  }
+  .stepUnit small {
+    font-size: 11px;
+    padding: 6px 5px;
+  }
+  .stepUnit i {
+    margin: 0 1px;
+  }
+  .methodCards.big button {
+    min-height: 170px;
+    padding: 25px 23px;
+  }
+  .itemMain.full {
+    padding-right: 92px;
+  }
+  .itemMain.full strong {
+    right: 20px;
+  }
 }

@@ -1,0 +1,49 @@
+.dataPage {
+  max-width: 720px;
+  margin: auto;
+  padding: 25px;
+  font-size: 17px;
+}
+.dataPage section {
+  background: #fff;
+  padding: 22px;
+  border: 1px solid #ddd;
+  border-radius: 16px;
+  margin: 16px 0;
+}
+.dataGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.dataPage label {
+  display: grid;
+  gap: 5px;
+}
+.dataPage input,
+.dataPage select,
+.dataPage textarea {
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+.dataPage textarea {
+  width: 100%;
+  min-height: 90px;
+  margin: 12px 0;
+}
+.dataPage button {
+  padding: 13px 20px;
+  background: #8a3045;
+  color: white;
+  border: 0;
+  border-radius: 9px;
+}
+.assign {
+  margin: 13px 0;
+}
+@media (max-width: 600px) {
+  .dataGrid {
+    grid-template-columns: 1fr;
+  }
+}

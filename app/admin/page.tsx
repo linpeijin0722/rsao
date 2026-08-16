@@ -413,7 +413,9 @@ export default function Admin() {
                   onClick={() => setDate(d)}
                 >
                   {Number(d.slice(-2))}
-                  {holidays.some((h) => h.holiday_date === d) && <b className="holidayX">×</b>}
+                  {holidays.some((h) => h.holiday_date === d) && (
+                    <b className="holidayX">×</b>
+                  )}
                 </button>
               ) : (
                 <span key={i} />

@@ -1,1 +1,19 @@
-.timeHeader,.weekRow{grid-template-columns:54px repeat(32,25px)!important;min-width:900px!important}.ruleActions .primary{margin-left:0!important}.calDays button:disabled{color:#c8c3c0;background:#f2f1f0;cursor:not-allowed}.monthNav button:disabled{opacity:.25}.daySlots button b{font-size:14px}
+.timeHeader,
+.weekRow {
+  grid-template-columns: 54px repeat(32, 25px) !important;
+  min-width: 900px !important;
+}
+.ruleActions .primary {
+  margin-left: 0 !important;
+}
+.calDays button:disabled {
+  color: #c8c3c0;
+  background: #f2f1f0;
+  cursor: not-allowed;
+}
+.monthNav button:disabled {
+  opacity: 0.25;
+}
+.daySlots button b {
+  font-size: 14px;
+}

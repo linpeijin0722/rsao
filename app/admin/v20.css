@@ -1,12 +1,19 @@
-.adminPage { max-width: 825px; }
-.weekChart { width: 100%; overflow: hidden; }
+.adminPage {
+  max-width: 825px;
+}
+.weekChart {
+  width: 100%;
+  overflow: hidden;
+}
 .timeHeader,
 .weekRow {
   grid-template-columns: 54px repeat(32, minmax(0, 1fr)) !important;
   min-width: 0 !important;
   width: 100%;
 }
-.calDays button { position: relative; }
+.calDays button {
+  position: relative;
+}
 .calDays button.hasOpen:not(.holiday) {
   background: #45a36d;
   color: #fff;

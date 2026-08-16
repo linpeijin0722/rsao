@@ -5,11 +5,25 @@ import { cookies } from "next/headers";
 
 export async function POST(request: NextRequest) {
   try {
-    const lineUid = verifyLineSession((await cookies()).get("line_session")?.value);
-    if (!lineUid) return NextResponse.json({ error: "LINE 登入已失效，請重新登入" }, { status: 401 });
+    const lineUid = verifyLineSession(
+      (await cookies()).get("line_session")?.value,
+    );
+    if (!lineUid)
+      return NextResponse.json(
+        { error: "LINE 登入已失效，請重新登入" },
+        { status: 401 },
+      );
     const body = await request.json();
-    if (!body.methodId || !Array.isArray(body.items) || body.items.length === 0 || !body.paymentMethod) {
-      return NextResponse.json({ error: "請完整選擇諮詢項目與付款方式" }, { status: 400 });
+    if (
+      !body.methodId ||
+      !Array.isArray(body.items) ||
+      body.items.length === 0 ||
+      !body.paymentMethod
+    ) {
+      return NextResponse.json(
+        { error: "請完整選擇諮詢項目與付款方式" },
+        { status: 400 },
+      );
     }
     const { data, error } = await publicSupabase().rpc("create_booking", {
       p_method_id: body.methodId,
@@ -23,6 +37,9 @@ export async function POST(request: NextRequest) {
     if (error) throw error;
     return NextResponse.json({ booking: data });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "預約建立失敗" }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "預約建立失敗" },
+      { status: 500 },
+    );
   }
 }

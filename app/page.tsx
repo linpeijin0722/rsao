@@ -398,7 +398,7 @@ export default function Page() {
             </button>
             {menu && (
               <div className="accountMenu">
-                <button onClick={() => alert("我的預約功能即將開放")}>
+                <button onClick={() => (location.href = "/my-bookings")}>
                   我的預約
                 </button>
               </div>

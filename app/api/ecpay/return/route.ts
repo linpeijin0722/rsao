@@ -1,4 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { bookingNoFromTradeNo } from "@/lib/ecpay";
 export async function POST(request: NextRequest) {
-  return NextResponse.redirect(new URL("/?payment=returned", request.url), 303);
+  const form = await request.formData(),
+    order = bookingNoFromTradeNo(String(form.get("MerchantTradeNo") || ""));
+  return NextResponse.redirect(
+    new URL(
+      `/payment-complete?order=${encodeURIComponent(order)}`,
+      request.url,
+    ),
+    303,
+  );
 }

@@ -1,2 +1,484 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
-:root{--text:#292421;--muted:#81766f;--accent:#8a5145;--accent-light:#f7ede9;--bg:#f4f1ee;--card:#fff;--line:#e5ded9}*{box-sizing:border-box}body{margin:0;background:#e9e5e1;color:var(--text);font-family:"Noto Sans TC","Source Han Sans TC","思源黑體",sans-serif}button,input{font:inherit}.shell{min-height:100vh;display:flex;justify-content:center}.app{width:min(100%,480px);min-height:100vh;background:var(--bg);box-shadow:0 0 32px #382b2520;position:relative;padding-bottom:84px}header{height:76px;background:#fff;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid var(--line)}header h1{font-size:20px;margin:0;font-weight:700;letter-spacing:.02em}.account{margin-left:auto;position:relative}.account>button{width:42px;height:42px;border:0;border-radius:50%;padding:0;overflow:hidden;background:#dccbc3;color:#6b4037;font-weight:700}.account img{width:100%;height:100%;object-fit:cover}.accountMenu{position:absolute;right:0;top:50px;width:130px;background:white;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px #30231e22;padding:6px;z-index:10}.accountMenu button{width:100%;padding:10px;border:0;background:white;text-align:left;border-radius:7px}.accountMenu button:hover{background:var(--bg)}nav{height:56px;background:#fff;display:flex;border-bottom:1px solid var(--line)}nav span{flex:1;display:grid;place-items:center;font-size:13px;color:#aaa09a;position:relative}nav span.active{color:var(--accent);font-weight:700}nav span.active:after{content:"";height:3px;background:var(--accent);position:absolute;left:22%;right:22%;bottom:0;border-radius:3px}nav span.done{color:#5f5753}.content{padding:24px 20px}.title{margin-bottom:20px}.title h2{font-size:22px;margin:0 0 6px}.title p{font-size:13px;color:var(--muted);margin:0}.methodCards,.items,.payments{display:grid;gap:12px}.methodCards button{background:var(--card);border:1.5px solid var(--line);border-radius:14px;text-align:left;padding:20px;color:var(--text)}.methodCards button.selected{border-color:var(--accent);background:#fffaf8;box-shadow:0 0 0 3px #8a514512}.methodCards b{display:block;font-size:18px}.methodCards p{font-size:13px;color:var(--muted);margin:7px 0 12px}.methodCards strong{display:inline-block;color:#9a3e31;background:#fbe9e4;padding:6px 10px;border-radius:7px;font-size:14px}.methodCards small{color:#755d55}.slotPicker{background:white;border:1px solid var(--line);border-radius:14px;overflow:hidden}.slotPicker section{padding:18px}.slotPicker section+section{border-top:1px solid var(--line)}.slotPicker h3{font-size:15px;margin:0 0 13px}.dates{display:flex;gap:8px;overflow:auto;padding-bottom:2px}.dates button,.times button{padding:11px 13px;border:1px solid var(--line);border-radius:9px;background:white;color:var(--text);white-space:nowrap}.dates button.selected,.times button.selected{background:var(--accent);border-color:var(--accent);color:white}.times{display:flex;gap:9px;flex-wrap:wrap}.times p{font-size:13px;color:var(--muted)}.noSlots{background:white;border:1px solid var(--line);border-radius:14px;text-align:center;padding:38px 20px}.noSlots p{font-size:13px;color:var(--muted)}.items article{background:white;border:1px solid var(--line);border-radius:14px;padding:17px}.itemMain{display:flex;justify-content:space-between;gap:12px}.itemMain b{font-size:16px}.itemMain p{font-size:12px;color:var(--muted);line-height:1.55}.itemMain strong{color:var(--accent);white-space:nowrap}.counter{display:flex;justify-content:flex-end;align-items:center}.counter button{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:white;color:var(--accent);font-size:18px}.counter span{width:38px;text-align:center;font-weight:600}.subs{border-top:1px solid var(--line);margin-top:14px;padding-top:4px}.subs label{display:flex;gap:8px;align-items:start;padding-top:11px;font-size:13px}.subs span{flex:1}.subs small{display:block;color:var(--muted)}.subs b{color:var(--accent)}.disabled{opacity:.4}.total,.summary p{display:flex;justify-content:space-between}.total{font-size:17px;padding:18px 4px}.total b{font-size:22px;color:var(--accent)}.payments button{display:flex;justify-content:space-between;align-items:center;padding:18px;background:white;border:1.5px solid var(--line);border-radius:12px;color:var(--text);text-align:left}.payments button.selected{border-color:var(--accent);background:var(--accent-light)}.payments button span{font-size:22px;color:#a79c95}.summary{margin-top:18px;background:white;border:1px solid var(--line);border-radius:14px;padding:8px 17px}.summary p{font-size:13px;padding:8px 0;border-bottom:1px solid var(--line);gap:10px}.summary p:last-child{border:0}.summary strong{font-size:19px;color:var(--accent)}.error{background:#fff0ec;color:#a13f30;border:1px solid #efd0c8;border-radius:9px;padding:11px;margin-bottom:15px;font-size:13px}.success{text-align:center;padding:50px 10px}.success>div{display:grid;place-items:center;margin:auto;width:62px;height:62px;border-radius:50%;background:#5d8069;color:white;font-size:28px}.success>strong{display:inline-block;background:white;border:1px solid var(--line);padding:10px 17px;border-radius:8px}.success p{color:var(--muted)}footer{position:fixed;bottom:0;width:min(100%,480px);display:flex;gap:10px;padding:14px 20px;background:#ffffffed;border-top:1px solid var(--line);backdrop-filter:blur(8px)}footer button{height:48px;border-radius:11px;font-weight:600}.back{width:31%;background:white;border:1px solid var(--line);color:var(--text)}.next{flex:1;border:0;background:var(--accent);color:white}.next:disabled{opacity:.45}.modalBackdrop{position:fixed;inset:0;z-index:20;background:#21191699;display:grid;place-items:center;padding:22px}.modal{width:min(100%,410px);background:white;border-radius:16px;padding:25px}.modal h2{margin-top:0}.modal ul{padding-left:21px;color:#554c47}.modal li{margin:12px 0;line-height:1.6}.modal button,.loginGate button{width:100%;border:0;border-radius:10px;padding:13px;background:var(--accent);color:white}.loginGate{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:var(--bg);padding:25px}.loginGate h1{font-size:22px}.loginGate p{font-size:14px;color:var(--muted)}.loginGate button{max-width:260px;margin-top:14px}@media(max-width:360px){header h1{font-size:18px}.content{padding-left:16px;padding-right:16px}}
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap");
+:root {
+  --text: #292421;
+  --muted: #81766f;
+  --accent: #8a5145;
+  --accent-light: #f7ede9;
+  --bg: #f4f1ee;
+  --card: #fff;
+  --line: #e5ded9;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: #e9e5e1;
+  color: var(--text);
+  font-family: "Noto Sans TC", "Source Han Sans TC", "思源黑體", sans-serif;
+}
+button,
+input {
+  font: inherit;
+}
+.shell {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+}
+.app {
+  width: min(100%, 480px);
+  min-height: 100vh;
+  background: var(--bg);
+  box-shadow: 0 0 32px #382b2520;
+  position: relative;
+  padding-bottom: 84px;
+}
+header {
+  height: 76px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+header h1 {
+  font-size: 20px;
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.account {
+  margin-left: auto;
+  position: relative;
+}
+.account > button {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  overflow: hidden;
+  background: #dccbc3;
+  color: #6b4037;
+  font-weight: 700;
+}
+.account img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.accountMenu {
+  position: absolute;
+  right: 0;
+  top: 50px;
+  width: 130px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px #30231e22;
+  padding: 6px;
+  z-index: 10;
+}
+.accountMenu button {
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  background: white;
+  text-align: left;
+  border-radius: 7px;
+}
+.accountMenu button:hover {
+  background: var(--bg);
+}
+nav {
+  height: 56px;
+  background: #fff;
+  display: flex;
+  border-bottom: 1px solid var(--line);
+}
+nav span {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  color: #aaa09a;
+  position: relative;
+}
+nav span.active {
+  color: var(--accent);
+  font-weight: 700;
+}
+nav span.active:after {
+  content: "";
+  height: 3px;
+  background: var(--accent);
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  bottom: 0;
+  border-radius: 3px;
+}
+nav span.done {
+  color: #5f5753;
+}
+.content {
+  padding: 24px 20px;
+}
+.title {
+  margin-bottom: 20px;
+}
+.title h2 {
+  font-size: 22px;
+  margin: 0 0 6px;
+}
+.title p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+.methodCards,
+.items,
+.payments {
+  display: grid;
+  gap: 12px;
+}
+.methodCards button {
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  text-align: left;
+  padding: 20px;
+  color: var(--text);
+}
+.methodCards button.selected {
+  border-color: var(--accent);
+  background: #fffaf8;
+  box-shadow: 0 0 0 3px #8a514512;
+}
+.methodCards b {
+  display: block;
+  font-size: 18px;
+}
+.methodCards p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 7px 0 12px;
+}
+.methodCards strong {
+  display: inline-block;
+  color: #9a3e31;
+  background: #fbe9e4;
+  padding: 6px 10px;
+  border-radius: 7px;
+  font-size: 14px;
+}
+.methodCards small {
+  color: #755d55;
+}
+.slotPicker {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.slotPicker section {
+  padding: 18px;
+}
+.slotPicker section + section {
+  border-top: 1px solid var(--line);
+}
+.slotPicker h3 {
+  font-size: 15px;
+  margin: 0 0 13px;
+}
+.dates {
+  display: flex;
+  gap: 8px;
+  overflow: auto;
+  padding-bottom: 2px;
+}
+.dates button,
+.times button {
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: white;
+  color: var(--text);
+  white-space: nowrap;
+}
+.dates button.selected,
+.times button.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+.times {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.times p {
+  font-size: 13px;
+  color: var(--muted);
+}
+.noSlots {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  text-align: center;
+  padding: 38px 20px;
+}
+.noSlots p {
+  font-size: 13px;
+  color: var(--muted);
+}
+.items article {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 17px;
+}
+.itemMain {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.itemMain b {
+  font-size: 16px;
+}
+.itemMain p {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.itemMain strong {
+  color: var(--accent);
+  white-space: nowrap;
+}
+.counter {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+.counter button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: white;
+  color: var(--accent);
+  font-size: 18px;
+}
+.counter span {
+  width: 38px;
+  text-align: center;
+  font-weight: 600;
+}
+.subs {
+  border-top: 1px solid var(--line);
+  margin-top: 14px;
+  padding-top: 4px;
+}
+.subs label {
+  display: flex;
+  gap: 8px;
+  align-items: start;
+  padding-top: 11px;
+  font-size: 13px;
+}
+.subs span {
+  flex: 1;
+}
+.subs small {
+  display: block;
+  color: var(--muted);
+}
+.subs b {
+  color: var(--accent);
+}
+.disabled {
+  opacity: 0.4;
+}
+.total,
+.summary p {
+  display: flex;
+  justify-content: space-between;
+}
+.total {
+  font-size: 17px;
+  padding: 18px 4px;
+}
+.total b {
+  font-size: 22px;
+  color: var(--accent);
+}
+.payments button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px;
+  background: white;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  color: var(--text);
+  text-align: left;
+}
+.payments button.selected {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+.payments button span {
+  font-size: 22px;
+  color: #a79c95;
+}
+.summary {
+  margin-top: 18px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 8px 17px;
+}
+.summary p {
+  font-size: 13px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  gap: 10px;
+}
+.summary p:last-child {
+  border: 0;
+}
+.summary strong {
+  font-size: 19px;
+  color: var(--accent);
+}
+.error {
+  background: #fff0ec;
+  color: #a13f30;
+  border: 1px solid #efd0c8;
+  border-radius: 9px;
+  padding: 11px;
+  margin-bottom: 15px;
+  font-size: 13px;
+}
+.success {
+  text-align: center;
+  padding: 50px 10px;
+}
+.success > div {
+  display: grid;
+  place-items: center;
+  margin: auto;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: #5d8069;
+  color: white;
+  font-size: 28px;
+}
+.success > strong {
+  display: inline-block;
+  background: white;
+  border: 1px solid var(--line);
+  padding: 10px 17px;
+  border-radius: 8px;
+}
+.success p {
+  color: var(--muted);
+}
+footer {
+  position: fixed;
+  bottom: 0;
+  width: min(100%, 480px);
+  display: flex;
+  gap: 10px;
+  padding: 14px 20px;
+  background: #ffffffed;
+  border-top: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+}
+footer button {
+  height: 48px;
+  border-radius: 11px;
+  font-weight: 600;
+}
+.back {
+  width: 31%;
+  background: white;
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+.next {
+  flex: 1;
+  border: 0;
+  background: var(--accent);
+  color: white;
+}
+.next:disabled {
+  opacity: 0.45;
+}
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: #21191699;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+}
+.modal {
+  width: min(100%, 410px);
+  background: white;
+  border-radius: 16px;
+  padding: 25px;
+}
+.modal h2 {
+  margin-top: 0;
+}
+.modal ul {
+  padding-left: 21px;
+  color: #554c47;
+}
+.modal li {
+  margin: 12px 0;
+  line-height: 1.6;
+}
+.modal button,
+.loginGate button {
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  padding: 13px;
+  background: var(--accent);
+  color: white;
+}
+.loginGate {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: var(--bg);
+  padding: 25px;
+}
+.loginGate h1 {
+  font-size: 22px;
+}
+.loginGate p {
+  font-size: 14px;
+  color: var(--muted);
+}
+.loginGate button {
+  max-width: 260px;
+  margin-top: 14px;
+}
+@media (max-width: 360px) {
+  header h1 {
+    font-size: 18px;
+  }
+  .content {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
