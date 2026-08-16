@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
               action: {
                 type: "uri",
                 label: "查看訂單狀態",
-                uri: `${site}/my-bookings`,
+                uri: `${site}/my-bookings?order=${encodeURIComponent(data.booking_no)}`,
               },
             },
             {

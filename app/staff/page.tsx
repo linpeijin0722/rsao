@@ -361,8 +361,15 @@ export default function Staff() {
               <img src={userView.line_picture_url} alt="" />
             )}
             <h2>{userView.line_display_name}</h2>
-            <p>LINE UID</p>
-            <code>{userView.line_user_id}</code>
+            <div className="staffCustomerProfile">
+              <div><span>姓名</span><b>{userView.full_name || "尚未填寫"}</b></div>
+              <div><span>性別</span><b>{userView.gender || "尚未填寫"}</b></div>
+              <div><span>地址</span><b>{userView.full_address || "尚未填寫"}</b></div>
+              <div><span>國曆生日</span><b>{userView.birth_date || "尚未填寫"}</b></div>
+              <div><span>農曆生日</span><b>{userView.lunar_birth_text || "尚未填寫"}</b></div>
+              <div><span>生肖</span><b>{userView.zodiac || "尚未填寫"}</b></div>
+              <div><span>出生時辰</span><b>{userView.birth_shichen || "尚未填寫"}</b></div>
+            </div>
             <button onClick={() => setUserView(null)}>關閉</button>
           </div>
         </div>

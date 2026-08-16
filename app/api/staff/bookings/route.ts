@@ -9,7 +9,7 @@ export async function GET() {
   const { data, error } = await adminSupabase()
     .from("bookings")
     .select(
-      "id,booking_no,slot_start,total_price,payment_method,payment_status,status,cancellation_reason,paid_at,created_at,customers(id,line_user_id,line_display_name,line_picture_url),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,quantity,booking_detail_sub_items(sub_item_id,sub_item_title),booking_detail_profiles(profile_id,consultation_profiles(*)))",
+      "id,booking_no,slot_start,total_price,payment_method,payment_status,status,cancellation_reason,paid_at,created_at,customers(id,line_user_id,line_display_name,line_picture_url,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,quantity,booking_detail_sub_items(sub_item_id,sub_item_title),booking_detail_profiles(profile_id,consultation_profiles(*)))",
     )
     .order("created_at", { ascending: false });
   if (error)
@@ -169,7 +169,7 @@ export async function PATCH(request: NextRequest) {
           action: {
             type: "uri",
             label: "查看預約",
-            uri: `${site}/my-bookings`,
+            uri: `${site}/my-bookings?order=${encodeURIComponent(b.booking_no)}`,
           },
         },
       ],

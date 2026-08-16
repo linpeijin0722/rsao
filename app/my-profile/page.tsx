@@ -136,10 +136,9 @@ export default function MyProfile() {
             <span>我</span>
           )}
           <h1>{form.line_display_name || "個人資料"}</h1>
-          <p>資料僅供命理諮詢使用</p>
         </div>
       </header>
-      <p className="profileAccuracy">請務必填寫正確資料</p>
+      <div className="profileAccuracy"><span>資料僅供命理諮詢使用</span><strong>請務必填寫正確資料</strong></div>
       <section className="profileForm">
         <label>
             <span>姓名</span>

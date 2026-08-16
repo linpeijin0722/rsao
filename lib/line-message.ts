@@ -42,8 +42,8 @@ export function bookingFlex(args: {
       height: "sm",
       action: {
         type: "uri",
-        label: "查看我的預約",
-        uri: `${args.site}/my-bookings`,
+        label: "查看預約",
+        uri: `${args.site}/my-bookings?order=${encodeURIComponent(args.bookingNo)}`,
       },
     },
   ];

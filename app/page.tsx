@@ -100,6 +100,20 @@ export default function Page() {
   useEffect(() => {
     (async () => {
       try {
+        const cacheKey = "lin_a_sao_line_ready",
+          cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const value = JSON.parse(cached);
+          if (Date.now() - value.savedAt < 10 * 60 * 1000) {
+            setProfile(value.profile || null);
+            setAuth("ready");
+          }
+        }
+        const remember = (value: any) =>
+          sessionStorage.setItem(
+            cacheKey,
+            JSON.stringify({ profile: value, savedAt: Date.now() }),
+          );
         const requirePrimaryProfile = async () => {
           const response = await fetch("/api/my-profile", {
             cache: "no-store",
@@ -122,8 +136,10 @@ export default function Page() {
         setItems(catalog.items);
         setTextFull(Boolean(catalog.textFull));
         if (sessionResponse.ok) {
-          setProfile(await sessionResponse.json());
+          const sessionProfile = await sessionResponse.json();
+          setProfile(sessionProfile);
           if (!(await requirePrimaryProfile())) return;
+          remember(sessionProfile);
           setAuth("ready");
           return;
         }
@@ -143,6 +159,7 @@ export default function Page() {
         if (!ar.ok) throw Error(aj.error);
         setProfile(aj);
         if (!(await requirePrimaryProfile())) return;
+        remember(aj);
         setAuth("ready");
       } catch (e) {
         setError(e instanceof Error ? e.message : "載入失敗");
@@ -373,7 +390,6 @@ export default function Page() {
   if (auth !== "ready")
     return (
       <main className="loginGate">
-        <h1>林阿嫂線上諮詢預約</h1>
         <p>{auth === "loading" ? "正在確認 LINE 登入…" : error}</p>
       </main>
     );

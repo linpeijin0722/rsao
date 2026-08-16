@@ -11,6 +11,10 @@ const status = (x: any) =>
 const complete = (x: any) =>
   Boolean(x.booking_details?.length) &&
   x.booking_details.every((d: any) => d.booking_detail_profiles?.length);
+const itemText = (detail: any) => {
+  const subs = detail.booking_detail_sub_items?.map((x: any) => x.sub_item_title).filter(Boolean) || [];
+  return `${detail.item_title}${subs.length ? `－${subs.join("、")}` : ""}${detail.quantity > 1 ? ` × ${detail.quantity}` : ""}`;
+};
 export default function Mine() {
   const [rows, setRows] = useState<any[]>([]),
     [selected, setSelected] = useState<any>(null),
@@ -19,7 +23,11 @@ export default function Mine() {
   const load = () =>
     fetch("/api/my-bookings").then(async (r) => {
       const j = await r.json();
-      r.ok ? setRows(j.bookings) : setError(j.error);
+      if (r.ok) {
+        setRows(j.bookings);
+        const order = new URLSearchParams(location.search).get("order");
+        if (order) setSelected(j.bookings.find((x: any) => x.booking_no === order) || null);
+      } else setError(j.error);
       setLoading(false);
     });
   useEffect(() => {
@@ -49,12 +57,14 @@ export default function Mine() {
     form.submit();
   }
   async function cancel(no: string) {
-    if (!confirm("確定取消這筆待付款預約？")) return;
-    await fetch("/api/my-bookings", {
+    const current = rows.find((x) => x.booking_no === no), paid = current?.payment_status === "paid";
+    if (!confirm(paid ? "確定取消這筆已付款預約？取消後請聯絡客服確認退款事宜。" : "確定取消這筆預約？")) return;
+    const response = await fetch("/api/my-bookings", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ bookingNo: no }),
     });
+    if (!response.ok) return setError((await response.json()).error);
     setSelected(null);
     load();
   }
@@ -69,7 +79,7 @@ export default function Mine() {
         <section>
           <div className="mineDetailTop">
             <div>
-              <small>{x.consultation_methods?.title}</small>
+              <span className={`methodTag ${x.consultation_methods?.code}`}>{x.consultation_methods?.code === "video" ? "視訊諮詢" : "文字諮詢"}</span>
               <h1>{status(x)}</h1>
             </div>
             <b>NT$ {Number(x.total_price).toLocaleString()}</b>
@@ -120,7 +130,7 @@ export default function Mine() {
           <h2 className="mineItemsTitle">預約項目</h2>
           <div className="mineItems">
             {x.booking_details?.map((d: any, i: number) => (
-              <span key={i}>{d.item_title}</span>
+              <span key={i}>{itemText(d)}</span>
             ))}
           </div>
           {x.status === "cancelled" && (
@@ -135,6 +145,7 @@ export default function Mine() {
               <button onClick={() => cancel(x.booking_no)}>取消預約</button>
             </div>
           )}
+          {x.status !== "cancelled" && x.payment_status === "paid" && <button className="mineCancelPaid" onClick={() => cancel(x.booking_no)}>取消預約</button>}
           {x.payment_status === "paid" &&
             !missing &&
             x.status !== "cancelled" && (
@@ -187,9 +198,9 @@ export default function Mine() {
                 >
                   {status(x)}
                 </span>
-                <b>{x.consultation_methods?.title}</b>
+                <span className={`methodTag ${x.consultation_methods?.code}`}>{x.consultation_methods?.code === "video" ? "視訊諮詢" : "文字諮詢"}</span>
                 <small>
-                  {x.booking_details?.map((d: any) => d.item_title).join("、")}
+                  {x.booking_details?.map(itemText).join("、")}
                 </small>
                 {missing && <strong>！尚未填寫諮詢者資料</strong>}
               </span>

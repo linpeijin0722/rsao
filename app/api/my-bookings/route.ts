@@ -19,7 +19,7 @@ export async function GET() {
     { data } = await db
       .from("bookings")
       .select(
-        "booking_no,slot_start,total_price,payment_method,payment_status,status,created_at,paid_at,expires_at,cancellation_reason,consultation_methods(title,code),booking_details(id,item_title,booking_detail_profiles(profile_id))",
+        "booking_no,slot_start,total_price,payment_method,payment_status,status,created_at,paid_at,expires_at,cancellation_reason,consultation_methods(title,code),booking_details(id,item_title,quantity,booking_detail_sub_items(sub_item_title),booking_detail_profiles(profile_id))",
       )
       .eq("customer_id", c?.id || "")
       .order("created_at", { ascending: false });
@@ -35,15 +35,13 @@ export async function POST(request: NextRequest) {
       .select("id")
       .eq("line_user_id", uid)
       .single();
-  await db
+  const { data: booking } = await db.from("bookings").select("id,payment_status,status").eq("booking_no", bookingNo).eq("customer_id", c?.id || "").single();
+  if (!booking || !["pending_payment", "confirmed"].includes(booking.status)) return NextResponse.json({ error: "此預約已取消、完成或不存在" }, { status: 400 });
+  const update: Record<string,string> = { status: "cancelled", cancellation_reason: "自行取消" };
+  if (booking.payment_status !== "paid") update.payment_status = "failed";
+  const { error } = await db
     .from("bookings")
-    .update({
-      status: "cancelled",
-      payment_status: "failed",
-      cancellation_reason: "自行取消",
-    })
-    .eq("booking_no", bookingNo)
-    .eq("customer_id", c?.id || "")
-    .eq("payment_status", "pending");
+    .update(update).eq("id", booking.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true });
 }
