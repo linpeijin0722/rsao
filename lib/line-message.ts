@@ -34,7 +34,7 @@ export function bookingFlex(args: {
       style: "primary",
       height: "sm",
       color: "#8A3045",
-      action: { type: "uri", label: "填寫諮詢者資料（必填）", uri: dataUrl },
+      action: { type: "uri", label: "點此提供問事資料", uri: dataUrl },
     },
     {
       type: "button",
@@ -63,12 +63,12 @@ export function bookingFlex(args: {
     header: {
       type: "box",
       layout: "vertical",
-      backgroundColor: "#231F1B",
+      backgroundColor: "#EAF7EE",
       contents: [
         {
           type: "text",
-          text: "預約付款完成",
-          color: "#E5C98E",
+          text: "已付款",
+          color: "#218548",
           weight: "bold",
           size: "xl",
         },
@@ -93,9 +93,11 @@ export function bookingFlex(args: {
         },
         {
           type: "text",
-          text: "請務必填寫每個諮詢項目的諮詢者資料。",
+          text: "重要提醒：請務必填寫問事資料！這是提供給阿嫂老師觀靈的重要資料，完成填寫後才能進行後續諮詢。",
           wrap: true,
-          color: "#666666",
+          color: "#B42332",
+          weight: "bold",
+          size: "md",
         },
       ],
     },

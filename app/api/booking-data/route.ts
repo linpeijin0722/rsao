@@ -14,7 +14,7 @@ async function context(order: string) {
   if (!c) return null;
   const { data: b } = await db
     .from("bookings")
-    .select("id,booking_no,booking_details(id,item_title)")
+    .select("id,booking_no,payment_status,booking_details(id,item_title,quantity,booking_items(code),booking_detail_sub_items(sub_item_title))")
     .eq("booking_no", order)
     .eq("customer_id", c.id)
     .single();
@@ -33,8 +33,8 @@ export async function GET(r: NextRequest) {
     .eq("customer_id", x.c.id)
     .order("created_at");
   const { data: links } = await x.db
-    .from("booking_detail_profiles")
-    .select("booking_detail_id,profile_id")
+    .from("booking_consultation_answers")
+    .select("booking_detail_id,profile_id,questions")
     .in(
       "booking_detail_id",
       (x.b.booking_details || []).map((d: any) => d.id),
@@ -53,6 +53,8 @@ export async function POST(r: NextRequest) {
       { error: "找不到訂單或登入已失效" },
       { status: 401 },
     );
+  if (x.b.payment_status !== "paid")
+    return NextResponse.json({ error: "完成付款後才能填寫問事資料" }, { status: 400 });
   let profileId = body.profileId;
   if (body.profile) {
     const { data, error } = await x.db
@@ -70,9 +72,15 @@ export async function POST(r: NextRequest) {
     );
     if (!valid)
       return NextResponse.json({ error: "項目不屬於此訂單" }, { status: 400 });
-    await x.db
-      .from("booking_detail_profiles")
-      .upsert({ booking_detail_id: body.detailId, profile_id: profileId });
+    const questions = Array.isArray(body.questions)
+      ? body.questions.map((value: unknown) => String(value || "").trim()).slice(0, 3)
+      : [];
+    await x.db.from("booking_consultation_answers").upsert(
+      { booking_detail_id: body.detailId, profile_id: profileId, questions, updated_at: new Date().toISOString() },
+      { onConflict: "booking_detail_id" },
+    );
+    /* 保留舊後台的完成狀態判斷。 */
+    await x.db.from("booking_detail_profiles").upsert({ booking_detail_id: body.detailId, profile_id: profileId });
   }
   return NextResponse.json({ ok: true, profileId });
 }

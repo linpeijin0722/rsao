@@ -91,6 +91,7 @@ export default function Page() {
     [videoNotice, setVideoNotice] = useState(false),
     [textConfirm, setTextConfirm] = useState(false),
     [alertMessage, setAlertMessage] = useState(""),
+    [deceasedPending, setDeceasedPending] = useState<Item | null>(null),
     [healthWarned, setHealthWarned] = useState(false),
     [textOk, setTextOk] = useState(false),
     [busy, setBusy] = useState(false),
@@ -291,6 +292,10 @@ export default function Page() {
     }
   }
   function addSimple(item: Item) {
+    if (item.code === "deceased-relative") {
+      setDeceasedPending(item);
+      return;
+    }
     if (
       item.code === "health" &&
       !healthWarned &&
@@ -739,6 +744,16 @@ export default function Page() {
               <h2>提醒</h2>
               <p>{alertMessage}</p>
               <button onClick={() => setAlertMessage("")}>我知道了</button>
+            </div>
+          </div>
+        )}
+        {deceasedPending && (
+          <div className="modalBackdrop">
+            <div className="modal alertModal">
+              <h2>預約前溫馨提醒</h2>
+              <p>此項諮詢目前沒有提供代替您向過世親友帶話或傳話的服務喔！若您已了解並可以接受，再繼續加入預約。</p>
+              <button onClick={() => { const item = deceasedPending; setDeceasedPending(null); changeBase(item, 1); }}>我了解，繼續預約</button>
+              <button className="cancel" onClick={() => setDeceasedPending(null)}>返回</button>
             </div>
           </div>
         )}

@@ -1,197 +1,28 @@
 "use client";
 import { useEffect, useState } from "react";
-export default function BookingData() {
-  const [order, setOrder] = useState(""),
-    [data, setData] = useState<any>(null),
-    [form, setForm] = useState({
-      relationship: "本人",
-      name: "",
-      gender: "",
-      birth_date: "",
-      birth_time: "",
-      birth_shichen: "",
-      lunar_birth_text: "",
-      is_lunar: false,
-      notes: "",
-    }),
-    [msg, setMsg] = useState("");
-  const shichen = [
-    "子時（23:00–01:00）",
-    "丑時（01:00–03:00）",
-    "寅時（03:00–05:00）",
-    "卯時（05:00–07:00）",
-    "辰時（07:00–09:00）",
-    "巳時（09:00–11:00）",
-    "午時（11:00–13:00）",
-    "未時（13:00–15:00）",
-    "申時（15:00–17:00）",
-    "酉時（17:00–19:00）",
-    "戌時（19:00–21:00）",
-    "亥時（21:00–23:00）",
-    "不確定",
-  ];
-  function changeBirthDate(value: string) {
-    let lunar = "";
-    if (value)
-      lunar = new Intl.DateTimeFormat("zh-TW-u-ca-chinese", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }).format(new Date(`${value}T12:00:00`));
-    setForm({ ...form, birth_date: value, lunar_birth_text: lunar });
-  }
-  async function load(o = order) {
-    const r = await fetch(`/api/booking-data?order=${encodeURIComponent(o)}`),
-      j = await r.json();
-    if (r.ok) setData(j);
-    else setMsg(j.error);
-  }
-  useEffect(() => {
-    const o = new URLSearchParams(location.search).get("order") || "";
-    setOrder(o);
-    load(o);
-  }, []);
-  async function add() {
-    const r = await fetch("/api/booking-data", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ order, profile: form }),
-      }),
-      j = await r.json();
-    if (!r.ok) return setMsg(j.error);
-    setForm({ ...form, name: "", notes: "" });
-    load();
-  }
-  async function assign(detailId: string, profileId: string) {
-    await fetch("/api/booking-data", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ order, detailId, profileId }),
-    });
-    load();
-  }
-  return (
-    <main className="dataPage">
-      <h1>填寫諮詢者資料</h1>
-      <p>
-        訂單編號：<b>{order}</b>
-      </p>
-      {msg && <div className="error">{msg}</div>}
-      <section>
-        <h2>新增本人／家人</h2>
-        <div className="dataGrid">
-          <label>
-            關係
-            <select
-              value={form.relationship}
-              onChange={(e) =>
-                setForm({ ...form, relationship: e.target.value })
-              }
-            >
-              <option>本人</option>
-              <option>配偶</option>
-              <option>父母</option>
-              <option>子女</option>
-              <option>其他家人</option>
-            </select>
-          </label>
-          <label>
-            姓名
-            <input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </label>
-          <label>
-            性別
-            <select
-              value={form.gender}
-              onChange={(e) => setForm({ ...form, gender: e.target.value })}
-            >
-              <option value="">請選擇</option>
-              <option>男</option>
-              <option>女</option>
-              <option>其他</option>
-            </select>
-          </label>
-          <label>
-            出生日期
-            <input
-              type="date"
-              value={form.birth_date}
-              onChange={(e) => changeBirthDate(e.target.value)}
-            />
-          </label>
-          <label>
-            自動換算農曆
-            <input
-              value={form.lunar_birth_text}
-              readOnly
-              placeholder="選擇出生日期後自動換算"
-            />
-          </label>
-          <label>
-            出生時辰
-            <select
-              value={form.birth_shichen}
-              onChange={(e) =>
-                setForm({ ...form, birth_shichen: e.target.value })
-              }
-            >
-              <option value="">請選擇時辰</option>
-              {shichen.map((x) => (
-                <option key={x}>{x}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            出生時間
-            <input
-              type="time"
-              value={form.birth_time}
-              onChange={(e) => setForm({ ...form, birth_time: e.target.value })}
-            />
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={form.is_lunar}
-              onChange={(e) => setForm({ ...form, is_lunar: e.target.checked })}
-            />{" "}
-            農曆生日
-          </label>
-        </div>
-        <textarea
-          placeholder="其他補充資料"
-          value={form.notes}
-          onChange={(e) => setForm({ ...form, notes: e.target.value })}
-        />
-        <button onClick={add} disabled={!form.name}>
-          新增資料
-        </button>
-      </section>
-      <section>
-        <h2>指定每個諮詢項目</h2>
-        {data?.booking?.booking_details?.map((d: any) => (
-          <label className="assign" key={d.id}>
-            <b>{d.item_title}</b>
-            <select
-              value={
-                data.links.find((x: any) => x.booking_detail_id === d.id)
-                  ?.profile_id || ""
-              }
-              onChange={(e) => assign(d.id, e.target.value)}
-            >
-              <option value="">請選擇諮詢者（必填）</option>
-              {data.profiles.map((p: any) => (
-                <option key={p.id} value={p.id}>
-                  {p.relationship}－{p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        ))}
-      </section>
-    </main>
-  );
+const times=["子時（23:00–01:00）","丑時（01:00–03:00）","寅時（03:00–05:00）","卯時（05:00–07:00）","辰時（07:00–09:00）","巳時（09:00–11:00）","午時（11:00–13:00）","未時（13:00–15:00）","申時（15:00–17:00）","酉時（17:00–19:00）","戌時（19:00–21:00）","亥時（21:00–23:00）","不確定"];
+const empty={profile_type:"person",relationship:"本人",relationship_detail:"",name:"",gender:"",birth_date:"",lunar_birth_text:"",zodiac:"",birth_shichen:"",address:"",death_date:"",lunar_death_text:"",death_shichen:"",owner_profile_id:"",photo_data:"",notes:""};
+const lunar=(v:string)=>v?new Intl.DateTimeFormat("zh-TW-u-ca-chinese",{year:"numeric",month:"long",day:"numeric"}).format(new Date(`${v}T12:00:00`)):"";
+const zodiac=(v:string)=>{const a=["猴","雞","狗","豬","鼠","牛","虎","兔","龍","蛇","馬","羊"];return v?a[new Date(`${v}T12:00:00`).getFullYear()%12]:""};
+export default function BookingData(){
+ const [order,setOrder]=useState(""),[data,setData]=useState<any>(null),[form,setForm]=useState<any>(empty),[showForm,setShowForm]=useState(false),[msg,setMsg]=useState(""),[saving,setSaving]=useState(false);
+ async function load(o=order){const r=await fetch(`/api/booking-data?order=${encodeURIComponent(o)}`),j=await r.json();if(r.ok)setData(j);else setMsg(j.error)}
+ useEffect(()=>{const o=new URLSearchParams(location.search).get("order")||"";setOrder(o);void load(o)},[]);
+ function date(field:"birth_date"|"death_date",v:string){setForm({...form,[field]:v,[field==="birth_date"?"lunar_birth_text":"lunar_death_text"]:lunar(v),...(field==="birth_date"?{zodiac:zodiac(v)}:{})})}
+ function photo(file?:File){if(!file)return;if(file.size>900000)return setMsg("照片請選擇 900KB 以下的檔案");const r=new FileReader();r.onload=()=>setForm({...form,photo_data:String(r.result)});r.readAsDataURL(file)}
+ async function add(){setSaving(true);const r=await fetch("/api/booking-data",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({order,profile:form})}),j=await r.json();setSaving(false);if(!r.ok)return setMsg(j.error);setForm(empty);setShowForm(false);setMsg("資料已儲存，下次可直接選取");void load()}
+ async function assign(detailId:string,profileId:string,questions:string[]){const r=await fetch("/api/booking-data",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({order,detailId,profileId,questions})}),j=await r.json();setMsg(r.ok?"此項目的問事資料已儲存":j.error);void load()}
+ const profiles=data?.profiles||[],details=data?.booking?.booking_details||[];
+ return <main className="dataPage questionPage"><header><button onClick={()=>history.back()}>‹</button><div><h1>提供問事資料</h1><p>訂單編號：{order}</p></div></header><div className="questionImportant"><b>請務必完整填寫</b><span>這些資料將提供給阿嫂老師觀靈使用；每個預約項目都要指定諮詢者並填寫問題。</span></div>{msg&&<div className="questionMessage">{msg}</div>}
+ <section className="profilePicker"><div className="sectionHead"><div><h2>自己／家人／親友資料</h2><p>儲存一次，下次預約即可快速選取。</p></div><button onClick={()=>setShowForm(!showForm)}>＋ 新增資料</button></div><div className="savedProfiles">{profiles.map((p:any)=><article key={p.id}>{p.photo_data?<img src={p.photo_data} alt=""/>:<span>{p.profile_type==="pet"?"寵":"人"}</span>}<div><b>{p.name}</b><small>{p.relationship}{p.relationship_detail?`・${p.relationship_detail}`:""}</small></div></article>)}</div></section>
+ {showForm&&<div className="modalBackdrop"><div className="modal profileModal"><button className="closeProfile" onClick={()=>setShowForm(false)}>×</button><h2>新增可快速選取的資料</h2><div className="profileKinds"><button className={form.profile_type==="person"?"selected":""} onClick={()=>setForm({...empty,profile_type:"person"})}>本人／親友</button><button className={form.profile_type==="deceased"?"selected":""} onClick={()=>setForm({...empty,profile_type:"deceased",relationship:"過世親人"})}>過世親人</button><button className={form.profile_type==="pet"?"selected":""} onClick={()=>setForm({...empty,profile_type:"pet",relationship:"往生寵物"})}>往生寵物</button></div><div className="profileFields">
+ {form.profile_type==="pet"&&<><label className="wide">先選取寵物主人<select value={form.owner_profile_id} onChange={e=>setForm({...form,owner_profile_id:e.target.value})}><option value="">請選擇主人</option>{profiles.filter((p:any)=>p.profile_type==="person").map((p:any)=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label className="wide">寵物照片<input type="file" accept="image/*" onChange={e=>photo(e.target.files?.[0])}/></label></>}
+ {form.profile_type!=="pet"&&<label>他是我的…<input placeholder="例如：母親、朋友" value={form.relationship_detail} onChange={e=>setForm({...form,relationship_detail:e.target.value})}/></label>}
+ <label>{form.profile_type==="pet"?"寵物姓名":"姓名"}<input value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label>
+ {form.profile_type!=="pet"&&<><label>性別<select value={form.gender} onChange={e=>setForm({...form,gender:e.target.value})}><option value="">請選擇</option><option>男</option><option>女</option><option>其他</option></select></label><label>國曆生日<input type="date" value={form.birth_date} onChange={e=>date("birth_date",e.target.value)}/></label><label>農曆生日<input readOnly value={form.lunar_birth_text}/></label><label>生肖<input readOnly value={form.zodiac}/></label><label>出生時辰<select value={form.birth_shichen} onChange={e=>setForm({...form,birth_shichen:e.target.value})}><option value="">請選擇</option>{times.map(x=><option key={x}>{x}</option>)}</select></label></>}
+ {form.profile_type==="person"&&<label className="wide">完整地址<textarea value={form.address} onChange={e=>setForm({...form,address:e.target.value})}/></label>}
+ {form.profile_type!=="person"&&<><label className="wide">{form.profile_type==="pet"?"寵物資料":"生前住址"}{form.profile_type==="pet"?null:<textarea value={form.address} onChange={e=>setForm({...form,address:e.target.value})}/>}</label><label>國曆往生日期<input type="date" value={form.death_date} onChange={e=>date("death_date",e.target.value)}/></label><label>農曆往生日期<input readOnly value={form.lunar_death_text}/></label><label>往生時辰<select value={form.death_shichen} onChange={e=>setForm({...form,death_shichen:e.target.value})}><option value="">請選擇</option>{times.map(x=><option key={x}>{x}</option>)}</select></label><label className="wide">備註<textarea placeholder="例如：只記得大約年份" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/></label></>}
+ </div><button className="saveProfile" disabled={!form.name||saving} onClick={()=>void add()}>{saving?"儲存中…":"儲存資料"}</button></div></div>}
+ <section className="answerSection"><h2>逐項指定問事資料</h2><p>每個項目最多可填三個具體問題；沒有問題可以留白。</p>{details.map((d:any)=>{const old=data?.links?.find((x:any)=>x.booking_detail_id===d.id);return <Answer key={d.id} detail={d} profiles={profiles} initialProfile={old?.profile_id||""} initialQuestions={old?.questions||[]} save={assign}/>})}</section></main>
 }
+function Answer({detail,profiles,initialProfile,initialQuestions,save}:any){const [profileId,setProfileId]=useState(initialProfile),[questions,setQuestions]=useState<string[]>([0,1,2].map(i=>initialQuestions[i]||""));const code=detail.booking_items?.code||"",kind=code==="deceased-relative"?"deceased":code.includes("pet")?"pet":"person",allowed=profiles.filter((p:any)=>p.profile_type===kind);return <article className="answerCard"><div className="answerTitle"><span>{detail.item_title}</span><small>{detail.booking_detail_sub_items?.map((s:any)=>s.sub_item_title).join("、")}</small></div><label>這個項目是為誰諮詢？<select value={profileId} onChange={e=>setProfileId(e.target.value)}><option value="">請選擇資料</option>{allowed.map((p:any)=><option key={p.id} value={p.id}>{p.name}（{p.relationship_detail||p.relationship}）</option>)}</select></label>{!allowed.length&&<p className="needProfile">請先在上方新增{kind==="deceased"?"過世親人":kind==="pet"?"往生寵物":"本人／親友"}資料。</p>}<div className="questions"><b>想詢問的問題</b>{questions.map((q,i)=><textarea key={i} placeholder={`問題 ${i+1}（無問題可留白）`} value={q} onChange={e=>setQuestions(questions.map((x,n)=>n===i?e.target.value:x))}/>)}</div><button disabled={!profileId} onClick={()=>void save(detail.id,profileId,questions)}>儲存這個項目</button></article>}
