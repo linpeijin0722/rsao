@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyLineSession } from "@/lib/line-session";
 import { adminSupabase } from "@/lib/supabase";
+import { lunarProfile } from "@/lib/lunar-profile";
 async function context(order: string) {
   const uid = verifyLineSession((await cookies()).get("line_session")?.value);
   if (!uid) return null;
@@ -14,7 +15,7 @@ async function context(order: string) {
   if (!c) return null;
   const { data: b } = await db
     .from("bookings")
-    .select("id,booking_no,payment_status,booking_details(id,item_title,quantity,booking_items(code),booking_detail_sub_items(sub_item_title))")
+    .select("id,booking_no,payment_status,data_submitted_at,booking_details(id,item_title,quantity,booking_items(code),booking_detail_sub_items(sub_item_title))")
     .eq("booking_no", order)
     .eq("customer_id", c.id)
     .single();
@@ -36,6 +37,16 @@ export async function GET(r: NextRequest) {
     .select("*")
     .eq("customer_id", x.c.id)
     .order("created_at");
+  for (const profile of profiles || []) {
+    const update: Record<string,string> = {};
+    if (profile.birth_date) {
+      const calculated = lunarProfile(profile.birth_date);
+      if (profile.lunar_birth_text !== calculated.lunar_birth_text) update.lunar_birth_text = calculated.lunar_birth_text;
+      if (profile.zodiac !== calculated.zodiac) update.zodiac = calculated.zodiac;
+    }
+    if (profile.death_date) update.lunar_death_text = lunarProfile(profile.death_date).lunar_birth_text;
+    if (Object.keys(update).length) { Object.assign(profile, update); await x.db.from("consultation_profiles").update(update).eq("id", profile.id); }
+  }
   const { data: links } = await x.db
     .from("booking_consultation_answers")
     .select("booking_detail_id,profile_id,questions")
@@ -60,6 +71,13 @@ export async function POST(r: NextRequest) {
     );
   if (x.b.payment_status !== "paid")
     return NextResponse.json({ error: "完成付款後才能填寫問事資料" }, { status: 400 });
+  if (body.action === "submit") {
+    const detailIds=(x.b.booking_details||[]).map((d:any)=>d.id),{data:answers}=await x.db.from("booking_consultation_answers").select("booking_detail_id").in("booking_detail_id",detailIds);
+    if (!detailIds.length || new Set((answers||[]).map((a:any)=>a.booking_detail_id)).size !== detailIds.length) return NextResponse.json({error:"請先儲存每一個項目的問事資料"},{status:400});
+    await x.db.from("bookings").update({data_submitted_at:new Date().toISOString()}).eq("id",x.b.id);
+    return NextResponse.json({ok:true,submitted:true});
+  }
+  if (x.b.data_submitted_at) return NextResponse.json({error:"資料已送出，如需修改請透過 LINE 聯絡助理"},{status:400});
   let profileId = body.profileId;
   if (body.profile) {
     const profile = { ...body.profile };

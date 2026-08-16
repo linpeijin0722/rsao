@@ -9,7 +9,7 @@ export async function GET() {
   const { data, error } = await adminSupabase()
     .from("bookings")
     .select(
-      "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,status,cancellation_reason,paid_at,created_at,customers(id,line_user_id,line_display_name,line_picture_url,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,quantity,booking_detail_sub_items(sub_item_id,sub_item_title),booking_detail_profiles(profile_id,consultation_profiles(*)))",
+      "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,data_submitted_at,status,cancellation_reason,paid_at,created_at,customers(id,line_user_id,line_display_name,line_picture_url,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,quantity,booking_detail_sub_items(sub_item_id,sub_item_title),booking_detail_profiles(profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes)),booking_consultation_answers(questions,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes)))",
     )
     .order("created_at", { ascending: false });
   if (error)
@@ -19,7 +19,15 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
-  const { bookingNo, action } = await request.json();
+  const body = await request.json(), { bookingNo, action } = body;
+  if (action === "update_consultation_profile") {
+    const db=adminSupabase(),allowed=["name","relationship_detail","gender","birth_date","lunar_birth_text","zodiac","birth_shichen","address","death_date","lunar_death_text","death_shichen","notes"];
+    if (!body?.profileId) return NextResponse.json({error:"缺少資料"},{status:400});
+    const profileUpdate=Object.fromEntries(allowed.filter(k=>k in body.profile).map(k=>[k,body.profile[k]||null]));
+    const {error}=await db.from("consultation_profiles").update({...profileUpdate,updated_at:new Date().toISOString()}).eq("id",body.profileId);
+    if(body.answerId)await db.from("booking_consultation_answers").update({questions:(body.questions||[]).slice(0,3),updated_at:new Date().toISOString()}).eq("id",body.answerId);
+    return error?NextResponse.json({error:error.message},{status:400}):NextResponse.json({ok:true});
+  }
   if (action !== "mark_paid") return NextResponse.json({ error: "不支援的操作" }, { status: 400 });
   const db = adminSupabase();
   const { data, error } = await db.from("bookings").update({

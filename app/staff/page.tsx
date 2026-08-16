@@ -81,6 +81,13 @@ export default function Staff() {
     if (!r.ok) return alert(j.error || "設定失敗");
     setEditing(null); await load(); alert("已標記為手動收款");
   }
+  async function editReturned(profile: any) {
+    const name=prompt("姓名",profile.name||""); if(name===null)return;
+    const relationship_detail=prompt("他是我的…",profile.relationship_detail||""); if(relationship_detail===null)return;
+    const notes=prompt("備註",profile.notes||""); if(notes===null)return;
+    const r=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"update_consultation_profile",profileId:profile.id,profile:{...profile,name,relationship_detail,notes},questions:profile.questions||[]})});
+    const j=await r.json(); if(!r.ok)return alert(j.error||"儲存失敗"); alert("資料已更新");setDataView([]);await load();
+  }
   const filtered = useMemo(() => {
       const result = rows.filter((x) => {
         if (statusFilter !== "all" && statusKey(x) !== statusFilter)
@@ -305,12 +312,7 @@ export default function Staff() {
                   ),
                   paid = x.payment_status === "paid",
                   status = statusText(x),
-                  profiles = x.booking_details.flatMap(
-                    (d: any) =>
-                      d.booking_detail_profiles
-                        ?.map((p: any) => p.consultation_profiles)
-                        .filter(Boolean) || [],
-                  );
+                  profiles = x.booking_details.flatMap((d: any) => d.booking_consultation_answers?.map((a:any)=>({ ...a.consultation_profiles, questions:a.questions, item_title:d.item_title })) || []);
                 return (
                   <article className="staffTableRow" key={x.id}>
                     <span>
@@ -396,8 +398,8 @@ export default function Staff() {
                 <p>
                   {p.gender}　{p.birth_date}　{p.birth_shichen || p.birth_time}
                 </p>
-                <p>農曆：{p.lunar_birth_text || "未填"}</p>
-                {p.notes && <p>{p.notes}</p>}
+                <p>農曆：{p.lunar_birth_text || "未填"}</p>{p.item_title&&<p><b>項目：{p.item_title}</b></p>}{p.questions?.filter(Boolean).map((q:string,n:number)=><p key={n}>問題 {n+1}：{q}</p>)}
+                {p.notes && <p>{p.notes}</p>}<button onClick={()=>void editReturned(p)}>編輯這筆資料</button>
               </article>
             ))}
             <button onClick={() => setDataView([])}>關閉</button>
@@ -474,12 +476,7 @@ export default function Staff() {
                       className="returned"
                       onClick={() =>
                         setDataView(
-                          x.booking_details.flatMap(
-                            (d: any) =>
-                              d.booking_detail_profiles
-                                ?.map((p: any) => p.consultation_profiles)
-                                .filter(Boolean) || [],
-                          ),
+                          x.booking_details.flatMap((d:any)=>d.booking_consultation_answers?.map((a:any)=>({ ...a.consultation_profiles, questions:a.questions, item_title:d.item_title })) || []),
                         )
                       }
                     >
