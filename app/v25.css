@@ -1,0 +1,40 @@
+.textSettingsBlock {
+  border: 2px solid #6d3d32 !important;
+  background: #fffaf8 !important;
+  padding-top: 0 !important;
+  overflow: hidden;
+}
+.textSettingsBlock > h2 {
+  margin: 0 -20px 18px !important;
+  padding: 16px 20px;
+  background: #6d3d32;
+  color: #fff;
+}
+.textSettingsBlock .ruleActions {
+  padding: 10px 0 15px;
+  border-bottom: 1px solid #eadbd5;
+}
+.textSettingsBlock > .adminGrid {
+  margin-top: 15px;
+}
+.textSettingsBlock p {
+  line-height: 1.6;
+}
+.adminPage .calendar {
+  max-width: 270px;
+}
+.adminPage .calHeads,
+.adminPage .calDays {
+  gap: 3px;
+}
+.adminPage .calDays button {
+  font-size: 12px;
+}
+.staffCalendar {
+  max-width: 290px !important;
+}
+.staffDays button,
+.staffDays span {
+  border-radius: 7px !important;
+  font-size: 12px;
+}

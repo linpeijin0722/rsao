@@ -1,0 +1,66 @@
+.dailyBookingRow {
+  display: grid;
+  grid-template-columns: 70px 1.2fr 85px 1.2fr 1.3fr 60px;
+  gap: 8px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  margin: 8px 0;
+}
+.dailyBookingRow > button {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+}
+.customerButton {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.customerButton img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.statusBadge {
+  padding: 6px;
+  border-radius: 7px;
+  background: #eee;
+  text-align: center;
+  font-weight: 700;
+}
+.userInfoModal {
+  text-align: center;
+}
+.userInfoModal > img {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.userInfoModal code {
+  display: block;
+  overflow-wrap: anywhere;
+  margin: 12px;
+}
+.returnedDataModal {
+  max-height: 86vh;
+  overflow: auto;
+}
+.returnedDataModal article {
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 9px;
+  margin: 9px 0;
+}
+@media (max-width: 760px) {
+  .dailyBookingRow {
+    grid-template-columns: 60px 1fr 80px;
+  }
+  .dailyBookingRow small {
+    grid-column: 1/-1;
+  }
+}

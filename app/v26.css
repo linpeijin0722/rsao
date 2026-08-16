@@ -1,0 +1,60 @@
+.bookingCalHeads,
+.bookingCalDays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+  width: 100%;
+}
+.bookingCalHeads b {
+  text-align: center;
+  font-size: 12px;
+  color: #81766f;
+}
+.bookingCalDays button,
+.bookingCalDays span {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 9px;
+}
+.bookingCalDays .available {
+  background: #eadcc5;
+  color: #64491f;
+  font-weight: 700;
+}
+.bookingCalDays .unavailable {
+  background: #efeeec;
+  color: #bbb;
+}
+.bookingCalDays .selected {
+  background: #8a5145;
+  color: #fff;
+  outline: 2px solid #dab8c0;
+}
+.app {
+  font-size: 16.5px;
+}
+.title h2 {
+  font-size: 24px;
+}
+.itemMain.full b {
+  font-size: 19px;
+}
+.itemMain.full p {
+  font-size: 15px;
+}
+.stepUnit small {
+  font-size: 13px;
+}
+.cartModal {
+  max-height: 88vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.importantConfirm p {
+  font-size: 17px;
+  line-height: 1.8;
+}
+.modalBackdrop {
+  overflow-y: auto;
+}

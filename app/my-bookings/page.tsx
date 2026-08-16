@@ -43,7 +43,7 @@ export default function Mine() {
     load();
   }
   return (
-    <main className="dataPage">
+    <main className="dataPage minePage">
       <h1>我的預約</h1>
       {error && <div className="error">{error}</div>}
       {rows.map((x) => (
@@ -53,7 +53,9 @@ export default function Mine() {
             訂單編號：<b>{x.booking_no}</b>
           </p>
           <p>
-            <b>
+            <b
+              className={`mineStatus ${x.status === "cancelled" ? "expired" : x.payment_status === "paid" ? "paid" : "pending"}`}
+            >
               {x.status === "cancelled"
                 ? "已失效"
                 : x.payment_status === "paid"
@@ -69,6 +71,11 @@ export default function Mine() {
               })}
             </p>
           )}
+          <div className="mineItems">
+            {x.booking_details?.map((d: any, i: number) => (
+              <span key={i}>{d.item_title}</span>
+            ))}
+          </div>
           {x.status === "cancelled" && (
             <details>
               <summary>查看失效原因</summary>

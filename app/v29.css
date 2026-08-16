@@ -1,0 +1,51 @@
+.minePage {
+  max-width: 560px;
+}
+.minePage > section {
+  position: relative;
+  padding: 20px !important;
+  border-left: 5px solid #9b7840 !important;
+  box-shadow: 0 4px 13px #33261912;
+}
+.minePage section h2 {
+  padding-right: 100px;
+}
+.mineStatus {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+.mineStatus.paid {
+  background: #e8f6ed;
+  color: #267548;
+}
+.mineStatus.pending {
+  background: #fff0df;
+  color: #b46025;
+}
+.mineStatus.expired {
+  background: #eee;
+  color: #777;
+}
+.mineItems {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.mineItems span {
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #f3efe8;
+}
+.minePage button,
+.minePage a {
+  display: inline-block;
+  margin: 5px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #8a5145;
+  color: #fff;
+  text-decoration: none;
+}

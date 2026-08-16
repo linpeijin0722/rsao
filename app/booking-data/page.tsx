@@ -9,10 +9,37 @@ export default function BookingData() {
       gender: "",
       birth_date: "",
       birth_time: "",
+      birth_shichen: "",
+      lunar_birth_text: "",
       is_lunar: false,
       notes: "",
     }),
     [msg, setMsg] = useState("");
+  const shichen = [
+    "子時（23:00–01:00）",
+    "丑時（01:00–03:00）",
+    "寅時（03:00–05:00）",
+    "卯時（05:00–07:00）",
+    "辰時（07:00–09:00）",
+    "巳時（09:00–11:00）",
+    "午時（11:00–13:00）",
+    "未時（13:00–15:00）",
+    "申時（15:00–17:00）",
+    "酉時（17:00–19:00）",
+    "戌時（19:00–21:00）",
+    "亥時（21:00–23:00）",
+    "不確定",
+  ];
+  function changeBirthDate(value: string) {
+    let lunar = "";
+    if (value)
+      lunar = new Intl.DateTimeFormat("zh-TW-u-ca-chinese", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }).format(new Date(`${value}T12:00:00`));
+    setForm({ ...form, birth_date: value, lunar_birth_text: lunar });
+  }
   async function load(o = order) {
     const r = await fetch(`/api/booking-data?order=${encodeURIComponent(o)}`),
       j = await r.json();
@@ -92,8 +119,30 @@ export default function BookingData() {
             <input
               type="date"
               value={form.birth_date}
-              onChange={(e) => setForm({ ...form, birth_date: e.target.value })}
+              onChange={(e) => changeBirthDate(e.target.value)}
             />
+          </label>
+          <label>
+            自動換算農曆
+            <input
+              value={form.lunar_birth_text}
+              readOnly
+              placeholder="選擇出生日期後自動換算"
+            />
+          </label>
+          <label>
+            出生時辰
+            <select
+              value={form.birth_shichen}
+              onChange={(e) =>
+                setForm({ ...form, birth_shichen: e.target.value })
+              }
+            >
+              <option value="">請選擇時辰</option>
+              {shichen.map((x) => (
+                <option key={x}>{x}</option>
+              ))}
+            </select>
           </label>
           <label>
             出生時間

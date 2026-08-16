@@ -12,6 +12,8 @@ export default function Staff() {
     [month, setMonth] = useState(new Date().toISOString().slice(0, 7)),
     [selectedDate, setSelectedDate] = useState(""),
     [editing, setEditing] = useState<any>(null),
+    [userView, setUserView] = useState<any>(null),
+    [dataView, setDataView] = useState<any[]>([]),
     [editTime, setEditTime] = useState(""),
     [editLines, setEditLines] = useState<any[]>([]);
   async function load() {
@@ -203,22 +205,101 @@ export default function Staff() {
         {selectedDate && (
           <div className="dailyBookings">
             <h3>{selectedDate} 的預約</h3>
-            {daily.map((x) => (
-              <button key={x.id} onClick={() => openEdit(x)}>
-                <b>
-                  {new Date(x.slot_start).toLocaleTimeString("zh-TW", {
-                    timeZone: "Asia/Taipei",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </b>
-                <span>{x.customers?.line_display_name}</span>
-                <small>{x.booking_no}</small>
-              </button>
-            ))}
+            {daily.map((x) => {
+              const complete = x.booking_details?.every(
+                  (d: any) => d.booking_detail_profiles?.length,
+                ),
+                paid = x.payment_status === "paid",
+                status =
+                  x.status === "cancelled"
+                    ? x.cancellation_reason === "自行取消"
+                      ? "已取消"
+                      : "已失效"
+                    : paid
+                      ? "已付款"
+                      : "未付款",
+                profiles = x.booking_details.flatMap(
+                  (d: any) =>
+                    d.booking_detail_profiles
+                      ?.map((p: any) => p.consultation_profiles)
+                      .filter(Boolean) || [],
+                );
+              return (
+                <article className="dailyBookingRow" key={x.id}>
+                  <b>
+                    {new Date(x.slot_start).toLocaleTimeString("zh-TW", {
+                      timeZone: "Asia/Taipei",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </b>
+                  <button
+                    className="customerButton"
+                    onClick={() => setUserView(x.customers)}
+                  >
+                    {x.customers?.line_picture_url && (
+                      <img src={x.customers.line_picture_url} alt="" />
+                    )}
+                    <span>{x.customers?.line_display_name}</span>
+                  </button>
+                  <span className="statusBadge">{status}</span>
+                  {paid &&
+                    (complete ? (
+                      <button onClick={() => setDataView(profiles)}>
+                        已回傳資料
+                      </button>
+                    ) : (
+                      <button onClick={() => remind(x.booking_no)}>
+                        未回傳資料・通知
+                      </button>
+                    ))}
+                  <small>{x.booking_no}</small>
+                  <button onClick={() => openEdit(x)}>修改</button>
+                </article>
+              );
+            })}
           </div>
         )}
       </section>
+      {userView && (
+        <div className="modalBackdrop" onClick={() => setUserView(null)}>
+          <div
+            className="modal userInfoModal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {userView.line_picture_url && (
+              <img src={userView.line_picture_url} alt="" />
+            )}
+            <h2>{userView.line_display_name}</h2>
+            <p>LINE UID</p>
+            <code>{userView.line_user_id}</code>
+            <button onClick={() => setUserView(null)}>關閉</button>
+          </div>
+        </div>
+      )}
+      {dataView.length > 0 && (
+        <div className="modalBackdrop" onClick={() => setDataView([])}>
+          <div
+            className="modal returnedDataModal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2>已回傳的諮詢者資料</h2>
+            {dataView.map((p: any, i: number) => (
+              <article key={p.id || i}>
+                <b>
+                  {p.relationship}－{p.name}
+                </b>
+                <p>
+                  {p.gender}　{p.birth_date}　{p.birth_shichen || p.birth_time}
+                </p>
+                <p>農曆：{p.lunar_birth_text || "未填"}</p>
+                {p.notes && <p>{p.notes}</p>}
+              </article>
+            ))}
+            <button onClick={() => setDataView([])}>關閉</button>
+          </div>
+        </div>
+      )}
       <section>
         <h2>文字諮詢（依付款時間）</h2>
         <div className="staffTable">
@@ -234,8 +315,14 @@ export default function Staff() {
                   {x.payment_status === "paid" ? "已付款" : "未付款"}／
                   {x.payment_method}
                 </span>
-                <span>{complete ? "資料已回傳" : "資料未回傳"}</span>
-                {!complete && (
+                <span>
+                  {x.payment_status === "paid"
+                    ? complete
+                      ? "資料已回傳"
+                      : "資料未回傳"
+                    : "—"}
+                </span>
+                {x.payment_status === "paid" && !complete && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -266,24 +353,27 @@ export default function Staff() {
             </header>
             <div className="bookingStatus">
               <b>{editing.payment_status === "paid" ? "已付款" : "未付款"}</b>
-              <b>
-                {editing.booking_details?.every(
-                  (d: any) => d.booking_detail_profiles?.length,
-                )
-                  ? "諮詢者資料已填"
-                  : "諮詢者資料未填"}
-              </b>
+              {editing.payment_status === "paid" && (
+                <b>
+                  {editing.booking_details?.every(
+                    (d: any) => d.booking_detail_profiles?.length,
+                  )
+                    ? "諮詢者資料已填"
+                    : "諮詢者資料未填"}
+                </b>
+              )}
             </div>
-            {!editing.booking_details?.every(
-              (d: any) => d.booking_detail_profiles?.length,
-            ) && (
-              <button
-                className="remindButton"
-                onClick={() => remind(editing.booking_no)}
-              >
-                通知客人填寫資料
-              </button>
-            )}
+            {editing.payment_status === "paid" &&
+              !editing.booking_details?.every(
+                (d: any) => d.booking_detail_profiles?.length,
+              ) && (
+                <button
+                  className="remindButton"
+                  onClick={() => remind(editing.booking_no)}
+                >
+                  通知客人填寫資料
+                </button>
+              )}
             {editing.consultation_methods?.code === "video" && (
               <label className="editTime">
                 預約時間
@@ -302,7 +392,6 @@ export default function Staff() {
                   <article key={i.id}>
                     <div>
                       <b>{i.title}</b>
-                      <small>{i.description}</small>
                       {line && i.sub_items?.length > 0 && (
                         <select
                           value={line.subId}

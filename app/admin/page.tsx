@@ -99,6 +99,10 @@ export default function Admin() {
     if (r.ok) load();
     else setError((await r.json()).error);
   }
+  function confirmTextEnabled(value: boolean) {
+    if (window.confirm(`確定要${value ? "開啟" : "關閉"}文字諮詢預約嗎？`))
+      setTextCap({ ...textCap, enabled: value });
+  }
   async function dayLoad(id = methodId, d = date) {
     if (!id) return;
     const r = await fetch(`/api/admin/day?methodId=${id}&date=${d}`),
@@ -260,13 +264,13 @@ export default function Admin() {
         <div className="ruleActions">
           <button
             className={!textCap.enabled ? "closeMode" : ""}
-            onClick={() => setTextCap({ ...textCap, enabled: false })}
+            onClick={() => confirmTextEnabled(false)}
           >
             關閉
           </button>
           <button
             className={textCap.enabled ? "openMode" : ""}
-            onClick={() => setTextCap({ ...textCap, enabled: true })}
+            onClick={() => confirmTextEnabled(true)}
           >
             開啟
           </button>

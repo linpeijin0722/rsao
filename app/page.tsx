@@ -89,6 +89,7 @@ export default function Page() {
     [qty, setQty] = useState(1),
     [notice, setNotice] = useState(false),
     [videoNotice, setVideoNotice] = useState(false),
+    [textConfirm, setTextConfirm] = useState(false),
     [alertMessage, setAlertMessage] = useState(""),
     [textOk, setTextOk] = useState(false),
     [payment, setPayment] = useState(""),
@@ -283,7 +284,7 @@ export default function Page() {
     setError("");
     if (screen === "slots") {
       if (method?.code === "text") {
-        setScreen("items");
+        setTextConfirm(true);
         return;
       }
       if (!slot) {
@@ -491,12 +492,12 @@ export default function Page() {
                         ›
                       </button>
                     </div>
-                    <div className="calHeads">
+                    <div className="bookingCalHeads">
                       {["一", "二", "三", "四", "五", "六", "日"].map((x) => (
                         <b key={x}>{x}</b>
                       ))}
                     </div>
-                    <div className="calDays">
+                    <div className="bookingCalDays">
                       {calendar.map((d, i) =>
                         d ? (
                           <button
@@ -739,6 +740,25 @@ export default function Page() {
               <h2>提醒</h2>
               <p>{alertMessage}</p>
               <button onClick={() => setAlertMessage("")}>我知道了</button>
+            </div>
+          </div>
+        )}
+        {textConfirm && (
+          <div className="modalBackdrop">
+            <div className="modal importantConfirm">
+              <h2>請再次確認</h2>
+              <p>文字諮詢說明非常重要，請務必完整閱讀並確認了解後再預約。</p>
+              <button
+                onClick={() => {
+                  setTextConfirm(false);
+                  setScreen("items");
+                }}
+              >
+                我已詳閱並同意
+              </button>
+              <button className="cancel" onClick={() => setTextConfirm(false)}>
+                返回閱讀
+              </button>
             </div>
           </div>
         )}

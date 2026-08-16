@@ -49,22 +49,20 @@ export async function POST(r: NextRequest) {
       updated_at: new Date().toISOString(),
     });
   if (!error && Array.isArray(b.weekly))
-    await db
-      .from("text_weekly_release_rules")
-      .upsert(
-        b.weekly.map(
-          (x: {
-            weekday: number;
-            enabled: boolean;
-            release_count: number | string;
-          }) => ({
-            weekday: x.weekday,
-            enabled: Boolean(x.enabled),
-            release_count: Number(x.release_count) || 0,
-            updated_at: new Date().toISOString(),
-          }),
-        ),
-      );
+    await db.from("text_weekly_release_rules").upsert(
+      b.weekly.map(
+        (x: {
+          weekday: number;
+          enabled: boolean;
+          release_count: number | string;
+        }) => ({
+          weekday: x.weekday,
+          enabled: Boolean(x.enabled),
+          release_count: Number(x.release_count) || 0,
+          updated_at: new Date().toISOString(),
+        }),
+      ),
+    );
   return error
     ? NextResponse.json({ error: error.message }, { status: 400 })
     : NextResponse.json({ ok: true });
