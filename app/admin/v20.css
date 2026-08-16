@@ -31,3 +31,54 @@
   font-size: 14px;
   line-height: 1;
 }
+.textSettingsBlock {
+  border: 2px solid #8a5145;
+  background: #fffaf8;
+}
+.consultationDivider {
+  margin-top: 25px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: #27343b;
+  color: #fff;
+}
+.consultationDivider h2,
+.consultationDivider p {
+  margin: 0;
+}
+.consultationDivider p {
+  margin-top: 5px;
+  color: #d7e0e4;
+}
+.weeklyReleaseGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 7px;
+  margin: 14px 0;
+}
+.weeklyReleaseGrid label {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+  padding: 10px 6px;
+  border: 1px solid #ddd;
+  border-radius: 9px;
+  text-align: center;
+  background: #f5f4f3;
+}
+.weeklyReleaseGrid label.enabled {
+  border-color: #318b5b;
+  background: #edf8f1;
+}
+.weeklyReleaseGrid input[type="number"] {
+  width: 100%;
+  margin: 0;
+}
+.weeklyReleaseGrid small {
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .weeklyReleaseGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}

@@ -9,7 +9,7 @@ export async function GET() {
   const { data, error } = await adminSupabase()
     .from("bookings")
     .select(
-      "id,booking_no,slot_start,total_price,payment_method,payment_status,status,paid_at,created_at,customers(line_user_id,line_display_name),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,booking_detail_profiles(profile_id))",
+      "id,booking_no,slot_start,total_price,payment_method,payment_status,status,paid_at,created_at,customers(line_user_id,line_display_name,line_picture_url),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,quantity,booking_detail_sub_items(sub_item_id,sub_item_title),booking_detail_profiles(profile_id))",
     )
     .order("created_at", { ascending: false });
   if (error)
@@ -42,28 +42,69 @@ export async function PATCH(request: NextRequest) {
       .eq("id", b.id);
   }
   let titles: string[] = [];
-  if (Array.isArray(body.itemIds) && body.itemIds.length) {
+  if (Array.isArray(body.lines) && body.lines.length) {
+    const itemIds = body.lines.map((x: { itemId: string }) => x.itemId),
+      subIds = body.lines
+        .map((x: { subId?: string }) => x.subId)
+        .filter(Boolean);
     const { data: items } = await db
       .from("booking_items")
       .select("id,title,price")
-      .in("id", body.itemIds)
+      .in("id", itemIds)
       .eq("is_active", true);
+    const { subItems } = await (async () => {
+      const { data } = subIds.length
+        ? await db
+            .from("sub_items")
+            .select("id,item_id,title,price")
+            .in("id", subIds)
+        : { data: [] };
+      return { subItems: data || [] };
+    })();
     await db.from("booking_details").delete().eq("booking_id", b.id);
     if (items?.length) {
-      await db
-        .from("booking_details")
-        .insert(
-          items.map((i) => ({
+      let subtotal = 0;
+      for (const line of body.lines as {
+        itemId: string;
+        subId?: string;
+        qty: number;
+      }[]) {
+        const item = items.find((i) => i.id === line.itemId);
+        if (!item) continue;
+        const sub = subItems.find(
+            (s) => s.id === line.subId && s.item_id === item.id,
+          ),
+          qty = Math.max(1, Number(line.qty) || 1),
+          unit = sub?.price ?? item.price;
+        const { data: detail } = await db
+          .from("booking_details")
+          .insert({
             booking_id: b.id,
-            item_id: i.id,
-            item_title: i.title,
-            unit_price: i.price,
-            quantity: 1,
-            line_total: i.price,
-          })),
-        );
-      const subtotal = items.reduce((n, i) => n + i.price, 0),
-        method = b.consultation_methods as unknown as { base_price: number };
+            item_id: item.id,
+            item_title: item.title,
+            unit_price: unit,
+            quantity: qty,
+            line_total: unit * qty,
+          })
+          .select("id")
+          .single();
+        if (sub && detail)
+          await db
+            .from("booking_detail_sub_items")
+            .insert({
+              booking_detail_id: detail.id,
+              sub_item_id: sub.id,
+              sub_item_title: sub.title,
+              unit_price: sub.price,
+              quantity: qty,
+              line_total: sub.price * qty,
+            });
+        subtotal += unit * qty;
+        titles.push(`${sub?.title || item.title} x${qty}`);
+      }
+      const method = b.consultation_methods as unknown as {
+        base_price: number;
+      };
       await db
         .from("bookings")
         .update({
@@ -72,7 +113,6 @@ export async function PATCH(request: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", b.id);
-      titles = items.map((i) => i.title);
     }
   }
   if (!titles.length) {

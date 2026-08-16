@@ -16,42 +16,187 @@
 .staffPage section {
   background: #fff;
   border-radius: 15px;
-  padding: 20px;
+  padding: 22px;
   margin: 16px 0;
 }
-.videoCalendar {
+.staffMonthNav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 25px;
+  margin: 15px;
+}
+.staffMonthNav button {
+  border: 0;
+  background: #fff;
+  font-size: 27px;
+}
+.staffCalendar {
+  max-width: 650px;
+  margin: auto;
+}
+.staffWeek,
+.staffDays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
+  gap: 7px;
 }
-.videoCalendar article,
-.staffTable article {
+.staffWeek b {
+  text-align: center;
+}
+.staffDays button,
+.staffDays span {
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 10px;
+}
+.staffDays .booked {
+  background: #43a36d;
+  color: #fff;
+  font-weight: 700;
+}
+.staffDays .empty {
+  background: #e3e1df;
+  color: #aaa;
+}
+.staffDays .selected {
+  outline: 3px solid #82384b;
+}
+.dailyBookings {
+  max-width: 650px;
+  margin: 20px auto;
+}
+.dailyBookings > button {
+  width: 100%;
   display: grid;
-  gap: 4px;
-  padding: 12px;
+  grid-template-columns: 80px 1fr 1fr;
+  gap: 10px;
+  text-align: left;
+  padding: 14px;
+  margin: 7px 0;
   border: 1px solid #ddd;
-  border-radius: 9px;
+  border-radius: 10px;
+  background: #fff;
 }
 .staffTable {
   display: grid;
   gap: 9px;
 }
 .staffTable article {
-  grid-template-columns: 1.3fr 1fr 1fr 1fr auto;
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr 1fr auto;
+  gap: 9px;
   align-items: center;
+  padding: 13px;
+  border: 1px solid #ddd;
+  border-radius: 9px;
+  cursor: pointer;
 }
-.staffTable button {
+.staffTable button,
+.remindButton {
   background: #8a3045;
   color: #fff;
   border: 0;
   padding: 9px;
   border-radius: 7px;
 }
+.staffEditModal {
+  max-height: 92vh;
+  overflow: auto;
+  width: min(94vw, 680px);
+}
+.staffEditModal header {
+  display: flex;
+  height: auto;
+  gap: 13px;
+  padding: 0 0 15px;
+  background: #fff;
+}
+.staffEditModal header img,
+.avatarFallback {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.avatarFallback {
+  display: grid;
+  place-items: center;
+  background: #ddd;
+}
+.staffEditModal header h2,
+.staffEditModal header p {
+  margin: 0;
+}
+.bookingStatus {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+.bookingStatus b {
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #eee;
+}
+.editTime {
+  display: grid;
+  gap: 5px;
+  margin: 14px 0;
+}
+.editTime input {
+  padding: 11px;
+}
+.staffEditItems {
+  display: grid;
+  gap: 8px;
+}
+.staffEditItems article {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+}
+.staffEditItems article > div:first-child {
+  display: grid;
+  gap: 5px;
+  flex: 1;
+}
+.staffEditItems small {
+  color: #777;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.staffEditItems select {
+  padding: 9px;
+}
+.staffQty {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.staffQty button {
+  width: 35px;
+  height: 35px;
+  border: 1px solid #ddd;
+  border-radius: 50%;
+  background: #fff;
+  color: #8a3045;
+}
+.staffEditModal > button {
+  margin-top: 10px;
+}
 @media (max-width: 700px) {
-  .videoCalendar {
-    grid-template-columns: 1fr 1fr;
-  }
   .staffTable article {
     grid-template-columns: 1fr;
+  }
+  .dailyBookings > button {
+    grid-template-columns: 60px 1fr;
+  }
+  .staffPage {
+    padding: 15px;
   }
 }

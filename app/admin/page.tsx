@@ -44,11 +44,18 @@ export default function Admin() {
     [note, setNote] = useState("");
   const [textCap, setTextCap] = useState<any>({
       enabled: true,
+      mode: "monthly",
+      release_time: "15:00",
       monthly_limit: "",
-      weekly_release_day: "",
-      weekly_release_count: "",
     }),
-    [textUsed, setTextUsed] = useState(0);
+    [textUsed, setTextUsed] = useState(0),
+    [weeklyRelease, setWeeklyRelease] = useState<any[]>(
+      days.map((_, i) => ({
+        weekday: i + 1,
+        enabled: false,
+        release_count: 0,
+      })),
+    );
   async function load() {
     const r = await fetch("/api/admin/schedule"),
       j = await r.json();
@@ -65,6 +72,15 @@ export default function Admin() {
         const y = await x.json();
         setTextCap(y.settings);
         setTextUsed(y.used);
+        setWeeklyRelease(
+          y.weekly?.length
+            ? y.weekly
+            : days.map((_: string, i: number) => ({
+                weekday: i + 1,
+                enabled: false,
+                release_count: 0,
+              })),
+        );
       }
     });
   }
@@ -75,8 +91,9 @@ export default function Admin() {
       body: JSON.stringify({
         enabled: textCap.enabled,
         monthlyLimit: textCap.monthly_limit ?? "",
-        weeklyDay: textCap.weekly_release_day ?? "",
-        weeklyCount: textCap.weekly_release_count ?? "",
+        mode: textCap.mode,
+        releaseTime: textCap.release_time,
+        weekly: weeklyRelease,
       }),
     });
     if (r.ok) load();
@@ -237,8 +254,8 @@ export default function Admin() {
         <h1>時段管理後台</h1>
       </header>
       {error && <div className="error">{error}</div>}
-      <section className="adminCard">
-        <h2>文字諮詢名額</h2>
+      <section className="adminCard textSettingsBlock">
+        <h2>文字諮詢設定</h2>
         <p>本月目前預約：{textUsed} 筆</p>
         <div className="ruleActions">
           <button
@@ -256,49 +273,90 @@ export default function Admin() {
         </div>
         <div className="adminGrid">
           <label>
-            每月名額
-            <input
-              type="number"
-              min="0"
-              value={textCap.monthly_limit ?? ""}
-              onChange={(e) =>
-                setTextCap({ ...textCap, monthly_limit: e.target.value })
-              }
-              placeholder="不限"
-            />
-          </label>
-          <label>
-            每週釋出星期
+            名額規則
             <select
-              value={textCap.weekly_release_day ?? ""}
-              onChange={(e) =>
-                setTextCap({ ...textCap, weekly_release_day: e.target.value })
-              }
+              value={textCap.mode}
+              onChange={(e) => setTextCap({ ...textCap, mode: e.target.value })}
             >
-              <option value="">不使用</option>
-              {days.map((d, i) => (
-                <option value={i + 1} key={d}>
-                  週{d}
-                </option>
-              ))}
+              <option value="monthly">每月開放名額</option>
+              <option value="weekly">每週釋出名額</option>
             </select>
           </label>
           <label>
-            每次釋出名額
+            釋出時間
             <input
-              type="number"
-              min="0"
-              value={textCap.weekly_release_count ?? ""}
+              type="time"
+              value={String(textCap.release_time || "15:00").slice(0, 5)}
               onChange={(e) =>
-                setTextCap({ ...textCap, weekly_release_count: e.target.value })
+                setTextCap({ ...textCap, release_time: e.target.value })
               }
             />
           </label>
         </div>
+        {textCap.mode === "monthly" && (
+          <div className="adminGrid">
+            <label>
+              該月總名額
+              <input
+                type="number"
+                min="0"
+                value={textCap.monthly_limit ?? ""}
+                onChange={(e) =>
+                  setTextCap({ ...textCap, monthly_limit: e.target.value })
+                }
+                placeholder="不限"
+              />
+            </label>
+            <p>系統會依當月天數計算平均值，每天到指定時間自動累計釋出。</p>
+          </div>
+        )}
+        {textCap.mode === "weekly" && (
+          <div className="weeklyReleaseGrid">
+            {weeklyRelease.map((rule, i) => (
+              <label
+                className={rule.enabled ? "enabled" : ""}
+                key={rule.weekday}
+              >
+                <span>
+                  <input
+                    type="checkbox"
+                    checked={rule.enabled}
+                    onChange={(e) =>
+                      setWeeklyRelease((v) =>
+                        v.map((x, j) =>
+                          j === i ? { ...x, enabled: e.target.checked } : x,
+                        ),
+                      )
+                    }
+                  />
+                  週{days[i]}
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  value={rule.release_count}
+                  onChange={(e) =>
+                    setWeeklyRelease((v) =>
+                      v.map((x, j) =>
+                        j === i ? { ...x, release_count: e.target.value } : x,
+                      ),
+                    )
+                  }
+                  disabled={!rule.enabled}
+                />
+                <small>位</small>
+              </label>
+            ))}
+          </div>
+        )}
         <button className="holidayButton" onClick={saveTextCapacity}>
           儲存文字名額設定
         </button>
       </section>
+      <div className="consultationDivider">
+        <h2>視訊諮詢時段設定</h2>
+        <p>以下設定只影響視訊諮詢可預約時間。</p>
+      </div>
       <section className="adminCard">
         <h2>建立每週開放規則</h2>
         <div className="weekdayRow">
