@@ -42,6 +42,13 @@ export default function Admin() {
     [openDates, setOpenDates] = useState<string[]>([]),
     [holidayDate, setHolidayDate] = useState(today()),
     [note, setNote] = useState("");
+  const [textCap, setTextCap] = useState<any>({
+      enabled: true,
+      monthly_limit: "",
+      weekly_release_day: "",
+      weekly_release_count: "",
+    }),
+    [textUsed, setTextUsed] = useState(0);
   async function load() {
     const r = await fetch("/api/admin/schedule"),
       j = await r.json();
@@ -53,6 +60,27 @@ export default function Admin() {
     setHolidays(j.holidays);
     setMethodId(j.methodId);
     dayLoad(j.methodId, date);
+    fetch("/api/admin/text-capacity").then(async (x) => {
+      if (x.ok) {
+        const y = await x.json();
+        setTextCap(y.settings);
+        setTextUsed(y.used);
+      }
+    });
+  }
+  async function saveTextCapacity() {
+    const r = await fetch("/api/admin/text-capacity", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        enabled: textCap.enabled,
+        monthlyLimit: textCap.monthly_limit ?? "",
+        weeklyDay: textCap.weekly_release_day ?? "",
+        weeklyCount: textCap.weekly_release_count ?? "",
+      }),
+    });
+    if (r.ok) load();
+    else setError((await r.json()).error);
   }
   async function dayLoad(id = methodId, d = date) {
     if (!id) return;
@@ -209,6 +237,68 @@ export default function Admin() {
         <h1>時段管理後台</h1>
       </header>
       {error && <div className="error">{error}</div>}
+      <section className="adminCard">
+        <h2>文字諮詢名額</h2>
+        <p>本月目前預約：{textUsed} 筆</p>
+        <div className="ruleActions">
+          <button
+            className={!textCap.enabled ? "closeMode" : ""}
+            onClick={() => setTextCap({ ...textCap, enabled: false })}
+          >
+            關閉
+          </button>
+          <button
+            className={textCap.enabled ? "openMode" : ""}
+            onClick={() => setTextCap({ ...textCap, enabled: true })}
+          >
+            開啟
+          </button>
+        </div>
+        <div className="adminGrid">
+          <label>
+            每月名額
+            <input
+              type="number"
+              min="0"
+              value={textCap.monthly_limit ?? ""}
+              onChange={(e) =>
+                setTextCap({ ...textCap, monthly_limit: e.target.value })
+              }
+              placeholder="不限"
+            />
+          </label>
+          <label>
+            每週釋出星期
+            <select
+              value={textCap.weekly_release_day ?? ""}
+              onChange={(e) =>
+                setTextCap({ ...textCap, weekly_release_day: e.target.value })
+              }
+            >
+              <option value="">不使用</option>
+              {days.map((d, i) => (
+                <option value={i + 1} key={d}>
+                  週{d}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            每次釋出名額
+            <input
+              type="number"
+              min="0"
+              value={textCap.weekly_release_count ?? ""}
+              onChange={(e) =>
+                setTextCap({ ...textCap, weekly_release_count: e.target.value })
+              }
+            />
+          </label>
+        </div>
+        <button className="holidayButton" onClick={saveTextCapacity}>
+          儲存文字名額設定
+        </button>
+      </section>
       <section className="adminCard">
         <h2>建立每週開放規則</h2>
         <div className="weekdayRow">

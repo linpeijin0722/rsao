@@ -10,6 +10,7 @@ export async function GET() {
       { data: methods, error: methodError },
       { data: items, error: itemError },
       { data: subItems, error: subError },
+      { data: textAvailable },
     ] = await Promise.all([
       db
         .from("consultation_methods")
@@ -30,6 +31,7 @@ export async function GET() {
         .select("id,item_id,title,description,price,is_default,sort_order")
         .eq("is_active", true)
         .order("sort_order"),
+      db.rpc("text_booking_available"),
     ]);
     if (methodError || itemError || subError)
       throw methodError || itemError || subError;
@@ -37,7 +39,11 @@ export async function GET() {
       ...item,
       sub_items: (subItems ?? []).filter((sub) => sub.item_id === item.id),
     }));
-    return NextResponse.json({ methods, items: merged });
+    return NextResponse.json({
+      methods,
+      items: merged,
+      textFull: textAvailable === false,
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "無法讀取預約資料" },

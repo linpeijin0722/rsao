@@ -76,6 +76,7 @@ export default function Page() {
     [screen, setScreen] = useState<Screen>("method"),
     [methods, setMethods] = useState<Method[]>([]),
     [items, setItems] = useState<Item[]>([]),
+    [textFull, setTextFull] = useState(false),
     [method, setMethod] = useState<Method | null>(null),
     [slots, setSlots] = useState<Slot[]>([]),
     [month, setMonth] = useState(""),
@@ -105,6 +106,7 @@ export default function Page() {
         if (!catalogResponse.ok) throw Error(catalog.error);
         setMethods(catalog.methods);
         setItems(catalog.items);
+        setTextFull(Boolean(catalog.textFull));
         if (sessionResponse.ok) {
           setProfile(await sessionResponse.json());
           setAuth("ready");
@@ -420,6 +422,7 @@ export default function Page() {
                 {methods.map((m) => (
                   <button
                     key={m.id}
+                    disabled={m.code === "text" && textFull}
                     className={method?.id === m.id ? "selected" : ""}
                     onClick={() => choose(m)}
                   >
@@ -432,9 +435,11 @@ export default function Page() {
                     ) : (
                       <>
                         <p className="methodWarning">
-                          不指定時間，請詳看下一頁說明
+                          {textFull
+                            ? "目前預約已額滿"
+                            : "不指定時間，請詳看下一頁說明"}
                         </p>
-                        <small>約7–30天內收到結果</small>
+                        {!textFull && <small>約7–30天內收到結果</small>}
                       </>
                     )}
                   </button>

@@ -28,17 +28,15 @@ export async function POST(r: NextRequest) {
   if (!(await allowed()))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
   const b = await r.json(),
-    { error } = await adminSupabase()
-      .from("slot_overrides")
-      .upsert(
-        {
-          consultation_method_id: b.methodId,
-          slot_start: b.slotStart,
-          is_open: b.isOpen,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "consultation_method_id,slot_start" },
-      );
+    { error } = await adminSupabase().from("slot_overrides").upsert(
+      {
+        consultation_method_id: b.methodId,
+        slot_start: b.slotStart,
+        is_open: b.isOpen,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "consultation_method_id,slot_start" },
+    );
   return error
     ? NextResponse.json({ error: error.message }, { status: 500 })
     : NextResponse.json({ ok: true });

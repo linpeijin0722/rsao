@@ -25,15 +25,20 @@ export async function POST(request: NextRequest) {
           status: "confirmed",
           paid_at: new Date().toISOString(),
         })
-        .eq("booking_no", bookingNo);
+        .eq("booking_no", bookingNo)
+        .eq("status", "pending_payment");
       const { data: booking } = await db
         .from("bookings")
         .select(
-          "booking_no,total_price,slot_start,slot_end,payment_notified_at,customers(line_user_id),consultation_methods(code)",
+          "booking_no,total_price,slot_start,slot_end,payment_status,payment_notified_at,customers(line_user_id),consultation_methods(code)",
         )
         .eq("booking_no", bookingNo)
         .single();
-      if (booking && !booking.payment_notified_at) {
+      if (
+        booking &&
+        booking.payment_status === "paid" &&
+        !booking.payment_notified_at
+      ) {
         const customer = booking.customers as unknown as {
             line_user_id: string;
           },

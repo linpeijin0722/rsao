@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "LINE 登入已失效" }, { status: 401 });
     const { bookingNo } = await request.json();
     const db = adminSupabase();
+    await db.rpc("expire_unpaid_bookings");
     const { data: customer } = await db
       .from("customers")
       .select("id")
@@ -36,12 +37,17 @@ export async function POST(request: NextRequest) {
       .single();
     const { data: booking, error } = await db
       .from("bookings")
-      .select("booking_no,total_price,payment_method")
+      .select("booking_no,total_price,payment_method,status,payment_status")
       .eq("booking_no", bookingNo)
       .eq("customer_id", customer?.id || "00000000-0000-0000-0000-000000000000")
       .single();
     if (error || !booking)
       return NextResponse.json({ error: "找不到這筆預約" }, { status: 404 });
+    if (booking.status === "cancelled" || booking.payment_status === "failed")
+      return NextResponse.json(
+        { error: "此訂單已失效，請重新預約" },
+        { status: 400 },
+      );
     if (!["credit_card", "transfer"].includes(booking.payment_method))
       return NextResponse.json(
         { error: "此付款方式不使用綠界金流" },

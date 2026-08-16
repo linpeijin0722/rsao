@@ -3,12 +3,51 @@ import { useEffect, useMemo, useState } from "react";
 export default function Staff() {
   const [password, setPassword] = useState(""),
     [rows, setRows] = useState<any[]>([]),
+    [items, setItems] = useState<any[]>([]),
+    [editing, setEditing] = useState<any>(null),
+    [editTime, setEditTime] = useState(""),
+    [editItems, setEditItems] = useState<string[]>([]),
     [error, setError] = useState("");
   async function load() {
     const r = await fetch("/api/staff/bookings"),
       j = await r.json();
     if (r.ok) setRows(j.bookings);
     else setError(j.error);
+  }
+  useEffect(() => {
+    fetch("/api/catalog")
+      .then((r) => r.json())
+      .then((j) => setItems(j.items || []));
+  }, []);
+  function openEdit(x: any) {
+    setEditing(x);
+    setEditItems((x.booking_details || []).map((d: any) => d.item_id));
+    setEditTime(
+      x.slot_start
+        ? new Date(
+            new Date(x.slot_start).getTime() -
+              new Date(x.slot_start).getTimezoneOffset() * 60000,
+          )
+            .toISOString()
+            .slice(0, 16)
+        : "",
+    );
+  }
+  async function saveEdit() {
+    const r = await fetch("/api/staff/bookings", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        bookingNo: editing.booking_no,
+        slotStart: editTime || null,
+        itemIds: editItems,
+      }),
+    });
+    if (r.ok) {
+      setEditing(null);
+      load();
+      alert("已儲存並發送 LINE 變更通知");
+    } else alert((await r.json()).error);
   }
   useEffect(() => {
     load();
@@ -78,6 +117,7 @@ export default function Staff() {
               </b>
               <span>{x.booking_no}</span>
               <small>{x.customers?.line_display_name}</small>
+              <button onClick={() => openEdit(x)}>修改預約</button>
             </article>
           ))}
         </div>
@@ -103,11 +143,52 @@ export default function Staff() {
                     提醒填寫資料
                   </button>
                 )}
+                <button onClick={() => openEdit(x)}>修改</button>
               </article>
             );
           })}
         </div>
       </section>
+      {editing && (
+        <div className="modalBackdrop">
+          <div className="modal">
+            <h2>修改 {editing.booking_no}</h2>
+            {editing.consultation_methods?.code === "video" && (
+              <label>
+                預約時間
+                <input
+                  type="datetime-local"
+                  value={editTime}
+                  onChange={(e) => setEditTime(e.target.value)}
+                />
+              </label>
+            )}
+            <h3>諮詢項目</h3>
+            <div className="staffItemChoices">
+              {items.map((i) => (
+                <label key={i.id}>
+                  <input
+                    type="checkbox"
+                    checked={editItems.includes(i.id)}
+                    onChange={(e) =>
+                      setEditItems(
+                        e.target.checked
+                          ? [...editItems, i.id]
+                          : editItems.filter((id) => id !== i.id),
+                      )
+                    }
+                  />
+                  {i.title}
+                </label>
+              ))}
+            </div>
+            <button onClick={saveEdit}>儲存並發送 LINE 通知</button>
+            <button className="cancel" onClick={() => setEditing(null)}>
+              取消
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
