@@ -4,6 +4,7 @@ import "./admin/admin.css";
 import "./admin/v17.css";
 import "./v18.css";
 import "./v19.css";
+import "./admin/v20.css";
 import "./shop.css";
 
 export const metadata: Metadata = {

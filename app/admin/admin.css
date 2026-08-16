@@ -1,1 +1,274 @@
-.adminLogin{min-height:100vh;display:grid;place-items:center;background:#f4f1ee}.adminLogin>div{width:min(90%,360px);background:white;padding:28px;border-radius:16px}.adminLogin input,.adminLogin button{width:100%;padding:13px;margin-top:10px;border-radius:9px;border:1px solid #ddd}.adminLogin button{background:#8a5145;color:white}.adminPage{max-width:1100px;margin:auto;padding:25px 18px 60px}.adminPage>header{height:auto;padding:0;background:transparent;border:0;color:#292421}.adminCard{background:white;border:1px solid #e5ded9;border-radius:14px;padding:20px;margin-top:16px}.adminCard h2{font-size:20px;margin-top:0}.adminCard h3{font-size:16px}.weekdayRow{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.weekdayRow button{width:42px;height:42px;border:1px solid #ddd;background:white;border-radius:9px}.weekdayRow button.selected{background:#8a5145;color:white}.adminGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.adminGrid label{font-size:13px}.adminCard input,.adminCard select{padding:11px;border:1px solid #ddd;border-radius:8px;margin:5px 4px 5px 0}.adminGrid input{width:100%}.ruleActions{display:flex;gap:8px;margin-top:13px}.ruleActions button{padding:11px 18px;border:1px solid #ddd;background:white;border-radius:8px}.ruleActions .openMode{background:#318b5b;color:white;border-color:#318b5b}.ruleActions .closeMode{background:#8a5145;color:white;border-color:#8a5145}.ruleActions .primary{margin-left:auto;background:#2d2927;color:white}.rule{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid #eee;gap:10px}.rule small{display:block;color:#81766f}.rule button{padding:7px 10px;border:1px solid #ddd;background:white;border-radius:7px}.greenText{color:#237548}.redText{color:#93463c}.legend{font-size:13px;color:#756b65}.legend i,.legend span{display:inline-block;width:14px;height:14px;border-radius:3px;margin-right:4px;vertical-align:-2px}.legend i{background:#45a36d}.legend span{background:#d9d7d5}.weekChart{overflow:auto;border:1px solid #eee;border-radius:10px;padding:8px}.timeHeader,.weekRow{display:grid;grid-template-columns:54px repeat(48,25px);gap:2px;min-width:1355px}.timeHeader small{font-size:9px;transform:translateX(-7px)}.weekRow{margin:3px 0}.weekRow>b{font-size:12px;display:grid;place-items:center}.weekRow button{height:25px;border:0;border-radius:3px;cursor:pointer}.open{background:#45a36d!important;color:white}.closed{background:#d9d7d5!important;color:#666}.monthNav{display:flex;justify-content:center;align-items:center;gap:8px}.monthNav button{border:0;background:white;font-size:25px}.calendar{max-width:520px;margin:12px auto}.calHeads,.calDays{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}.calHeads b{text-align:center;font-size:12px;color:#7b716b}.calDays button,.calDays span{aspect-ratio:1;border:0;border-radius:9px;background:#f2efed}.calDays button.selected{outline:3px solid #8a5145}.calDays button.holiday{background:#f2c9c5;color:#8c332c}.daySlots{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}.daySlots button{border:0;border-radius:8px;padding:9px}.daySlots b,.daySlots small{display:block}.holidayNotice{padding:12px;background:#fde8e5;color:#8c332c;border-radius:8px;margin-bottom:10px}.holidayButton{padding:11px 18px;border:0;border-radius:8px;background:#8a5145;color:white;margin:10px 0}@media(max-width:600px){.adminGrid{grid-template-columns:1fr}.ruleActions{flex-wrap:wrap}.ruleActions .primary{width:100%;margin-left:0}}
+.adminLogin {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #f4f1ee;
+}
+.adminLogin > div {
+  width: min(90%, 360px);
+  background: white;
+  padding: 28px;
+  border-radius: 16px;
+}
+.adminLogin input,
+.adminLogin button {
+  width: 100%;
+  padding: 13px;
+  margin-top: 10px;
+  border-radius: 9px;
+  border: 1px solid #ddd;
+}
+.adminLogin button {
+  background: #8a5145;
+  color: white;
+}
+.adminPage {
+  max-width: 1100px;
+  margin: auto;
+  padding: 25px 18px 60px;
+}
+.adminPage > header {
+  height: auto;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: #292421;
+}
+.adminCard {
+  background: white;
+  border: 1px solid #e5ded9;
+  border-radius: 14px;
+  padding: 20px;
+  margin-top: 16px;
+}
+.adminCard h2 {
+  font-size: 20px;
+  margin-top: 0;
+}
+.adminCard h3 {
+  font-size: 16px;
+}
+.weekdayRow {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.weekdayRow button {
+  width: 42px;
+  height: 42px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 9px;
+}
+.weekdayRow button.selected {
+  background: #8a5145;
+  color: white;
+}
+.adminGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.adminGrid label {
+  font-size: 13px;
+}
+.adminCard input,
+.adminCard select {
+  padding: 11px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin: 5px 4px 5px 0;
+}
+.adminGrid input {
+  width: 100%;
+}
+.ruleActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 13px;
+}
+.ruleActions button {
+  padding: 11px 18px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 8px;
+}
+.ruleActions .openMode {
+  background: #318b5b;
+  color: white;
+  border-color: #318b5b;
+}
+.ruleActions .closeMode {
+  background: #8a5145;
+  color: white;
+  border-color: #8a5145;
+}
+.ruleActions .primary {
+  margin-left: auto;
+  background: #2d2927;
+  color: white;
+}
+.rule {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 0;
+  border-bottom: 1px solid #eee;
+  gap: 10px;
+}
+.rule small {
+  display: block;
+  color: #81766f;
+}
+.rule button {
+  padding: 7px 10px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 7px;
+}
+.greenText {
+  color: #237548;
+}
+.redText {
+  color: #93463c;
+}
+.legend {
+  font-size: 13px;
+  color: #756b65;
+}
+.legend i,
+.legend span {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  margin-right: 4px;
+  vertical-align: -2px;
+}
+.legend i {
+  background: #45a36d;
+}
+.legend span {
+  background: #d9d7d5;
+}
+.weekChart {
+  overflow: auto;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 8px;
+}
+.timeHeader,
+.weekRow {
+  display: grid;
+  grid-template-columns: 54px repeat(48, 25px);
+  gap: 2px;
+  min-width: 1355px;
+}
+.timeHeader small {
+  font-size: 9px;
+  transform: translateX(-7px);
+}
+.weekRow {
+  margin: 3px 0;
+}
+.weekRow > b {
+  font-size: 12px;
+  display: grid;
+  place-items: center;
+}
+.weekRow button {
+  height: 25px;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.open {
+  background: #45a36d !important;
+  color: white;
+}
+.closed {
+  background: #d9d7d5 !important;
+  color: #666;
+}
+.monthNav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+.monthNav button {
+  border: 0;
+  background: white;
+  font-size: 25px;
+}
+.calendar {
+  max-width: 520px;
+  margin: 12px auto;
+}
+.calHeads,
+.calDays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+.calHeads b {
+  text-align: center;
+  font-size: 12px;
+  color: #7b716b;
+}
+.calDays button,
+.calDays span {
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 9px;
+  background: #f2efed;
+}
+.calDays button.selected {
+  outline: 3px solid #8a5145;
+}
+.calDays button.holiday {
+  background: #f2c9c5;
+  color: #8c332c;
+}
+.daySlots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 8px;
+}
+.daySlots button {
+  border: 0;
+  border-radius: 8px;
+  padding: 9px;
+}
+.daySlots b,
+.daySlots small {
+  display: block;
+}
+.holidayNotice {
+  padding: 12px;
+  background: #fde8e5;
+  color: #8c332c;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+.holidayButton {
+  padding: 11px 18px;
+  border: 0;
+  border-radius: 8px;
+  background: #8a5145;
+  color: white;
+  margin: 10px 0;
+}
+@media (max-width: 600px) {
+  .adminGrid {
+    grid-template-columns: 1fr;
+  }
+  .ruleActions {
+    flex-wrap: wrap;
+  }
+  .ruleActions .primary {
+    width: 100%;
+    margin-left: 0;
+  }
+}

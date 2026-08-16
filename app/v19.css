@@ -13,6 +13,7 @@ body { background: #dfddd8; color: var(--ink); }
 }
 .stepTrail { justify-content: flex-start; }
 .stepUnit i, .stepMore { color: #a98a59; }
+.stepBar span + span::before { display: none !important; content: none !important; }
 .stepLead { color: #a98a59; font-size: 25px; font-style: normal; margin-right: 3px; }
 .stepUnit small { color: #d3c6ad; font-size: 13px; font-weight: 650; }
 .stepUnit small.active {
@@ -20,6 +21,17 @@ body { background: #dfddd8; color: var(--ink); }
   background: transparent;
   border: 1px solid #aa8955;
   box-shadow: inset 0 0 0 1px #5f4928;
+  position: relative;
+}
+.stepUnit small.active::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  bottom: -9px;
+  height: 3px;
+  border-radius: 3px;
+  background: #c49a59;
 }
 .stepUnit small.done { color: #a99b84; }
 .stepBar .account > button { background: #b69255; color: #15120e; }
@@ -67,7 +79,15 @@ body { background: #dfddd8; color: var(--ink); }
 }
 .itemMain.full { padding-right: 112px; }
 .itemMain.full b { font-size: 21px; line-height: 1.45; }
-.itemMain.full p { color: #625b53; font-size: 15px; line-height: 1.65; }
+.itemMain.full p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: #625b53;
+  font-size: 17px;
+  line-height: 1.65;
+}
 .itemMain.full strong { position: absolute; top: 27px; right: 25px; color: #96713a; font-size: 21px; }
 .addRow { position: absolute; right: 22px; bottom: 22px; gap: 0; overflow: hidden; border: 1px solid #d1c8ba; border-radius: 23px; background: #fff; }
 .plusButton, .minusButton {
@@ -91,11 +111,42 @@ body { background: #dfddd8; color: var(--ink); }
 .burgundy, .confirmAdd, .modal > button, .next { background: #a78348 !important; }
 .modal { border: 1px solid #a98a59; border-radius: 24px; }
 .modalBackdrop { background: #11110dc7; }
+.itemDetailModal h2 { padding-bottom: 15px; border-bottom: 1px solid #ddd4c5; font-size: 25px; }
+.itemDetailModal p { white-space: pre-line; font-size: 18px; line-height: 1.85; }
+.itemDetailModal > strong { display: block; margin: 20px 0; color: #9a753b; text-align: right; font-size: 21px; }
+.paymentAmountDock {
+  position: fixed;
+  z-index: 9;
+  right: 0;
+  bottom: 76px;
+  left: 0;
+  width: min(100%, 480px);
+  margin: 0 auto;
+  padding: 6px 20px;
+  border-radius: 0;
+  box-shadow: 0 -4px 16px #271e1520;
+}
+.paymentAmountDock p { margin: 0; }
+.paymentAmountDock + * { margin-bottom: 70px; }
+.app { font-size: 18px; }
+.title h2 { font-size: 27px; }
+.stepUnit small { font-size: 15px; font-weight: 800; }
 .reminderModal h2 { padding-bottom: 15px; border-bottom: 1px solid #ddd4c5; text-align: center; }
 .reminderModal > p { font-weight: 650; line-height: 1.75; }
 .reminderNote { margin: 18px 0; padding: 15px; border: 1px solid #d8cdbd; border-radius: 14px; }
 .reminderNote b, .reminderNote span { display: block; }
 .reminderNote span { margin-top: 6px; color: #6f6559; }
+.textConsultationInfo {
+  padding: 24px;
+  border: 1px solid #c9c0b3;
+  border-radius: 20px;
+  background: #fbf8f2;
+  box-shadow: 0 3px 10px #352a1d10;
+}
+.textConsultationInfo h3 { margin-top: 0; font-size: 22px; }
+.textConsultationInfo li { margin: 13px 0; font-size: 17px; line-height: 1.7; }
+.alertModal { text-align: center; }
+.alertModal p { margin: 24px 0; font-size: 18px; line-height: 1.75; }
 .total b, .summary strong { color: #94703a !important; }
 @media (max-width: 430px) {
   .bookingBrand h1 { font-size: 20px; }

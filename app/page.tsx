@@ -15,6 +15,7 @@ type Sub = {
 };
 type Item = {
   id: string;
+  code: string;
   title: string;
   description: string | null;
   price: number;
@@ -82,10 +83,12 @@ export default function Page() {
     [slot, setSlot] = useState(""),
     [cart, setCart] = useState<Line[]>([]),
     [modalItem, setModalItem] = useState<Item | null>(null),
+    [detailItem, setDetailItem] = useState<Item | null>(null),
     [choice, setChoice] = useState<string | null>(null),
     [qty, setQty] = useState(1),
     [notice, setNotice] = useState(false),
     [videoNotice, setVideoNotice] = useState(false),
+    [alertMessage, setAlertMessage] = useState(""),
     [textOk, setTextOk] = useState(false),
     [payment, setPayment] = useState(""),
     [busy, setBusy] = useState(false),
@@ -94,6 +97,19 @@ export default function Page() {
   useEffect(() => {
     (async () => {
       try {
+        const [sessionResponse, catalogResponse] = await Promise.all([
+            fetch("/api/line/session", { cache: "no-store" }),
+            fetch("/api/catalog"),
+          ]),
+          catalog = await catalogResponse.json();
+        if (!catalogResponse.ok) throw Error(catalog.error);
+        setMethods(catalog.methods);
+        setItems(catalog.items);
+        if (sessionResponse.ok) {
+          setProfile(await sessionResponse.json());
+          setAuth("ready");
+          return;
+        }
         const id = process.env.NEXT_PUBLIC_LIFF_ID;
         if (!id) throw Error("尚未設定 LIFF ID");
         await liff.init({ liffId: id });
@@ -109,11 +125,6 @@ export default function Page() {
           aj = await ar.json();
         if (!ar.ok) throw Error(aj.error);
         setProfile(aj);
-        const r = await fetch("/api/catalog"),
-          j = await r.json();
-        if (!r.ok) throw Error(j.error);
-        setMethods(j.methods);
-        setItems(j.items);
         setAuth("ready");
       } catch (e) {
         setError(e instanceof Error ? e.message : "載入失敗");
@@ -124,7 +135,9 @@ export default function Page() {
   const availableDates = useMemo(
       () =>
         new Set(
-          slots.map((s) => dk(s.slot_start)).filter((d) => d >= today && d <= maxDate),
+          slots
+            .map((s) => dk(s.slot_start))
+            .filter((d) => d >= today && d <= maxDate),
         ),
       [slots, today, maxDate],
     ),
@@ -144,7 +157,7 @@ export default function Page() {
       cart.reduce((a, l) => {
         const i = items.find((x) => x.id === l.itemId),
           s = i?.sub_items.find((x) => x.id === l.subId);
-        return a + ((i?.price || 0) + (s?.price || 0)) * l.qty;
+        return a + (s ? s.price : i?.price || 0) * l.qty;
       }, 0),
     calendar = useMemo(() => {
       if (!month) return [];
@@ -164,13 +177,11 @@ export default function Page() {
     setTextOk(false);
     setSlots([]);
     setSlot("");
-    if (m.code === "text") setNotice(true);
   }
   async function methodNext() {
     if (!method) return setError("請選擇諮詢方式");
     if (method.code === "text") {
-      if (!textOk) return setNotice(true);
-      setScreen("items");
+      setScreen("slots");
       return;
     }
     setBusy(true);
@@ -179,7 +190,7 @@ export default function Page() {
         j = await r.json();
       if (!r.ok) throw Error(j.error);
       setSlots(j.slots);
-        setMonth(firstMonth);
+      setMonth(firstMonth);
       setScreen("slots");
     } catch (e) {
       setError(e instanceof Error ? e.message : "無法讀取時段");
@@ -202,14 +213,23 @@ export default function Page() {
         return current.map((line) =>
           line.key === key ? { ...line, qty: nextQty } : line,
         );
-      return [
-        ...current,
-        { key, itemId: item.id, subId: null, qty: nextQty },
-      ];
+      return [...current, { key, itemId: item.id, subId: null, qty: nextQty }];
     });
   }
   function add() {
     if (!modalItem) return;
+    if (
+      modalItem.code === "health" &&
+      cart.some(
+        (line) =>
+          items.find((item) => item.id === line.itemId)?.code ===
+          "overall-fortune",
+      )
+    ) {
+      setModalItem(null);
+      setAlertMessage("您選擇的「整體運勢」已包含身體健康，請勿重複選購。");
+      return;
+    }
     if (modalItem.option_mode === "single_required" && !choice)
       return setError("請選擇一個子項目");
     const subId = choice && choice !== "base" ? choice : null,
@@ -222,11 +242,52 @@ export default function Page() {
     });
     setModalItem(null);
     setError("");
+    if (modalItem.code === "overall-fortune") {
+      setCart((current) =>
+        current.filter(
+          (line) =>
+            items.find((item) => item.id === line.itemId)?.code !== "health",
+        ),
+      );
+      setAlertMessage("此項目已包含身體健康。");
+    }
+  }
+  function addSimple(item: Item) {
+    if (
+      item.code === "health" &&
+      cart.some(
+        (line) =>
+          items.find((value) => value.id === line.itemId)?.code ===
+          "overall-fortune",
+      )
+    ) {
+      setAlertMessage("您選擇的「整體運勢」已包含身體健康，請勿重複選購。");
+      return;
+    }
+    if (item.code === "overall-fortune") {
+      setCart((current) =>
+        current.filter(
+          (line) =>
+            items.find((value) => value.id === line.itemId)?.code !== "health",
+        ),
+      );
+      changeBase(item, 1);
+      setAlertMessage("此項目已包含身體健康。");
+      return;
+    }
+    changeBase(item, 1);
   }
   function next() {
     setError("");
     if (screen === "slots") {
-      if (!slot) return setError("請選擇日期與時段");
+      if (method?.code === "text") {
+        setScreen("items");
+        return;
+      }
+      if (!slot) {
+        setAlertMessage("請選擇日期與時段");
+        return;
+      }
       setVideoNotice(true);
     } else if (screen === "items") {
       if (!cart.length) return setError("請至少選擇一個諮詢項目");
@@ -248,8 +309,6 @@ export default function Page() {
   }
   async function submit() {
     setBusy(true);
-    const cal =
-      method?.code === "video" ? window.open("about:blank", "_blank") : null;
     try {
       const r = await fetch("/api/bookings", {
           method: "POST",
@@ -268,10 +327,32 @@ export default function Page() {
         j = await r.json();
       if (!r.ok) throw Error(j.error);
       setBookingNo(j.booking.booking_no);
+      if (payment === "credit_card" || payment === "transfer") {
+        const paymentResponse = await fetch("/api/ecpay", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ bookingNo: j.booking.booking_no }),
+          }),
+          paymentResult = await paymentResponse.json();
+        if (!paymentResponse.ok) throw Error(paymentResult.error);
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = paymentResult.action;
+        Object.entries(paymentResult.fields as Record<string, string>).forEach(
+          ([name, value]) => {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = name;
+            input.value = value;
+            form.appendChild(input);
+          },
+        );
+        document.body.appendChild(form);
+        form.submit();
+        return;
+      }
       setScreen("done");
-      if (cal) cal.location.href = calUrl(j.booking.booking_no);
     } catch (e) {
-      cal?.close();
       setError(e instanceof Error ? e.message : "預約失敗");
     } finally {
       setBusy(false);
@@ -294,12 +375,16 @@ export default function Page() {
             {stepStart > 0 && <i className="stepLead">›</i>}
             {steps.slice(stepStart, stepStart + 3).map((x, offset) => {
               const i = stepStart + offset;
-              return <span className="stepUnit" key={x}>
-                {offset > 0 && <i>›</i>}
-                <small className={phase === i ? "active" : phase > i ? "done" : ""}>
-                  {x}
-                </small>
-              </span>;
+              return (
+                <span className="stepUnit" key={x}>
+                  {offset > 0 && <i>›</i>}
+                  <small
+                    className={phase === i ? "active" : phase > i ? "done" : ""}
+                  >
+                    {x}
+                  </small>
+                </span>
+              );
             })}
             {stepStart + 3 < steps.length && <i className="stepMore">…</i>}
           </div>
@@ -346,7 +431,9 @@ export default function Page() {
                       </>
                     ) : (
                       <>
-                        <p className="methodWarning">不指定時間，請詳看下一頁說明</p>
+                        <p className="methodWarning">
+                          不指定時間，請詳看下一頁說明
+                        </p>
                         <small>約7–30天內收到結果</small>
                       </>
                     )}
@@ -358,72 +445,91 @@ export default function Page() {
           {screen === "slots" && (
             <>
               <div className="title">
-                <h2>選擇視訊時間</h2>
+                <h2>
+                  {method?.code === "text"
+                    ? "確認文字諮詢說明"
+                    : "選擇視訊時間"}
+                </h2>
               </div>
-              <div className="bookingCalendar">
-                <div className="monthNav">
-                  <button
-                    disabled={month <= firstMonth}
-                    onClick={() => {
-                      setMonth(shiftMonth(month, -1));
-                      setDate("");
-                      setSlot("");
-                    }}
-                  >
-                    ‹
-                  </button>
-                  <b>{month.replace("-", " 年 ")} 月</b>
-                  <button
-                    disabled={month >= lastMonth}
-                    onClick={() => {
-                      setMonth(shiftMonth(month, 1));
-                      setDate("");
-                      setSlot("");
-                    }}
-                  >
-                    ›
-                  </button>
+              {method?.code === "text" ? (
+                <div className="textConsultationInfo">
+                  <h3>文字諮詢說明</h3>
+                  <ul>
+                    <li>約7–30天內收到諮詢結果。</li>
+                    <li>確認資料時，每項預約可提出3個問題。</li>
+                    <li>收到結果後8小時內，每項預約可提出2個補充問題。</li>
+                  </ul>
                 </div>
-                <div className="calHeads">
-                  {["一", "二", "三", "四", "五", "六", "日"].map((x) => (
-                    <b key={x}>{x}</b>
-                  ))}
-                </div>
-                <div className="calDays">
-                  {calendar.map((d, i) =>
-                    d ? (
+              ) : (
+                <>
+                  <div className="bookingCalendar">
+                    <div className="monthNav">
                       <button
-                        key={d}
-                        disabled={d < today || d > maxDate || !availableDates.has(d)}
-                        className={`${availableDates.has(d) ? "available" : "unavailable"} ${date === d ? "selected" : ""}`}
+                        disabled={month <= firstMonth}
                         onClick={() => {
-                          setDate(d);
+                          setMonth(shiftMonth(month, -1));
+                          setDate("");
                           setSlot("");
                         }}
                       >
-                        {Number(d.slice(-2))}
+                        ‹
                       </button>
-                    ) : (
-                      <span key={i} />
-                    ),
-                  )}
-                </div>
-              </div>
-              {date && (
-                <div className="dayTimes">
-                  <h3>{date} 可預約時段</h3>
-                  <div className="times">
-                    {daySlots.map((s) => (
+                      <b>{month.replace("-", " 年 ")} 月</b>
                       <button
-                        key={s.slot_start}
-                        className={slot === s.slot_start ? "selected" : ""}
-                        onClick={() => setSlot(s.slot_start)}
+                        disabled={month >= lastMonth}
+                        onClick={() => {
+                          setMonth(shiftMonth(month, 1));
+                          setDate("");
+                          setSlot("");
+                        }}
                       >
-                        {tf(s.slot_start)}
+                        ›
                       </button>
-                    ))}
+                    </div>
+                    <div className="calHeads">
+                      {["一", "二", "三", "四", "五", "六", "日"].map((x) => (
+                        <b key={x}>{x}</b>
+                      ))}
+                    </div>
+                    <div className="calDays">
+                      {calendar.map((d, i) =>
+                        d ? (
+                          <button
+                            key={d}
+                            disabled={
+                              d < today || d > maxDate || !availableDates.has(d)
+                            }
+                            className={`${availableDates.has(d) ? "available" : "unavailable"} ${date === d ? "selected" : ""}`}
+                            onClick={() => {
+                              setDate(d);
+                              setSlot("");
+                            }}
+                          >
+                            {Number(d.slice(-2))}
+                          </button>
+                        ) : (
+                          <span key={i} />
+                        ),
+                      )}
+                    </div>
                   </div>
-                </div>
+                  {date && (
+                    <div className="dayTimes">
+                      <h3>{date} 可預約時段</h3>
+                      <div className="times">
+                        {daySlots.map((s) => (
+                          <button
+                            key={s.slot_start}
+                            className={slot === s.slot_start ? "selected" : ""}
+                            onClick={() => setSlot(s.slot_start)}
+                          >
+                            {tf(s.slot_start)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
@@ -440,7 +546,7 @@ export default function Page() {
                       .reduce((a, l) => a + l.qty, 0),
                     subLines = lines.filter((l) => l.subId);
                   return (
-                    <article key={i.id}>
+                    <article key={i.id} onClick={() => setDetailItem(i)}>
                       <div className="itemMain full">
                         <b>{i.title}</b>
                         <p>{i.description}</p>
@@ -448,12 +554,25 @@ export default function Page() {
                       </div>
                       <div className="addRow">
                         {i.sub_items.length === 0 && baseQty > 0 && (
-                          <button className="minusButton" onClick={() => changeBase(i, -1)}>−</button>
+                          <button
+                            className="minusButton"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              changeBase(i, -1);
+                            }}
+                          >
+                            −
+                          </button>
                         )}
-                        {i.sub_items.length === 0 && <span className="itemQty">{baseQty}</span>}
+                        {i.sub_items.length === 0 && (
+                          <span className="itemQty">{baseQty}</span>
+                        )}
                         <button
                           className="plusButton"
-                          onClick={() => i.sub_items.length ? openItem(i) : changeBase(i, 1)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            i.sub_items.length ? openItem(i) : addSimple(i);
+                          }}
                         >
                           ＋
                         </button>
@@ -464,16 +583,15 @@ export default function Page() {
                             const s = i.sub_items.find((x) => x.id === l.subId);
                             return (
                               <div key={l.key}>
-                                <span>
-                                  {i.title}　{s?.title}
-                                </span>
+                                <span>{s?.title}</span>
                                 <b>{l.qty}</b>
                                 <button
-                                  onClick={() =>
+                                  onClick={(event) => {
+                                    event.stopPropagation();
                                     setCart((c) =>
                                       c.filter((x) => x.key !== l.key),
-                                    )
-                                  }
+                                    );
+                                  }}
                                 >
                                   ×
                                 </button>
@@ -513,7 +631,7 @@ export default function Page() {
                   </button>
                 ))}
               </div>
-              <div className="summary">
+              <div className="summary paymentAmountDock">
                 <p>
                   <span>付款金額</span>
                   <strong>{money(total)}</strong>
@@ -548,9 +666,7 @@ export default function Page() {
                     screen === "slots"
                       ? "method"
                       : screen === "items"
-                        ? method?.code === "video"
-                          ? "slots"
-                          : "method"
+                        ? "slots"
                         : "items",
                   )
                 }
@@ -560,7 +676,12 @@ export default function Page() {
             )}
             <button
               className="next burgundy"
-              disabled={busy || (screen === "slots" && !availableDates.size)}
+              disabled={
+                busy ||
+                (screen === "slots" &&
+                  method?.code === "video" &&
+                  !availableDates.size)
+              }
               onClick={screen === "method" ? methodNext : next}
             >
               {busy ? "處理中…" : screen === "payment" ? "確認預約" : "下一步"}
@@ -596,7 +717,36 @@ export default function Page() {
                 <b>視訊後補充問題注意事項</b>
                 <span>須於預約時段後 8 小時內提出。</span>
               </div>
-              <button onClick={() => { setVideoNotice(false); setScreen("items"); }}>我知道了</button>
+              <button
+                onClick={() => {
+                  setVideoNotice(false);
+                  setScreen("items");
+                }}
+              >
+                我知道了
+              </button>
+            </div>
+          </div>
+        )}
+        {alertMessage && (
+          <div className="modalBackdrop">
+            <div className="modal alertModal">
+              <h2>提醒</h2>
+              <p>{alertMessage}</p>
+              <button onClick={() => setAlertMessage("")}>我知道了</button>
+            </div>
+          </div>
+        )}
+        {detailItem && (
+          <div className="modalBackdrop" onClick={() => setDetailItem(null)}>
+            <div
+              className="modal itemDetailModal"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <h2>{detailItem.title}</h2>
+              <p>{detailItem.description || "目前沒有更多說明。"}</p>
+              <strong>費用：{money(detailItem.price)}</strong>
+              <button onClick={() => setDetailItem(null)}>關閉視窗</button>
             </div>
           </div>
         )}
@@ -621,7 +771,7 @@ export default function Page() {
                       onClick={() => setChoice(s.id)}
                     >
                       <span>{s.title}</span>
-                      {s.price > 0 && <b>+{money(s.price)}</b>}
+                      {s.price > 0 && <b>{money(s.price)}</b>}
                     </button>
                   ))}
                 </div>
