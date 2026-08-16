@@ -9,12 +9,28 @@ export async function GET() {
   const { data, error } = await adminSupabase()
     .from("bookings")
     .select(
-      "id,booking_no,slot_start,total_price,payment_method,payment_status,status,cancellation_reason,paid_at,created_at,customers(id,line_user_id,line_display_name,line_picture_url,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,quantity,booking_detail_sub_items(sub_item_id,sub_item_title),booking_detail_profiles(profile_id,consultation_profiles(*)))",
+      "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,status,cancellation_reason,paid_at,created_at,customers(id,line_user_id,line_display_name,line_picture_url,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,quantity,booking_detail_sub_items(sub_item_id,sub_item_title),booking_detail_profiles(profile_id,consultation_profiles(*)))",
     )
     .order("created_at", { ascending: false });
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ bookings: data });
+}
+export async function POST(request: NextRequest) {
+  if (!isAdminSession((await cookies()).get("admin_session")?.value))
+    return NextResponse.json({ error: "未登入" }, { status: 401 });
+  const { bookingNo, action } = await request.json();
+  if (action !== "mark_paid") return NextResponse.json({ error: "不支援的操作" }, { status: 400 });
+  const db = adminSupabase();
+  const { data, error } = await db.from("bookings").update({
+    payment_status: "paid",
+    status: "confirmed",
+    collection_source: "manual",
+    paid_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).eq("booking_no", bookingNo).neq("status", "cancelled").select("booking_no").single();
+  if (error || !data) return NextResponse.json({ error: error?.message || "找不到訂單" }, { status: 400 });
+  return NextResponse.json({ ok: true });
 }
 export async function PATCH(request: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))

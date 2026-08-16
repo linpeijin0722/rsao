@@ -8,7 +8,7 @@ async function context(order: string) {
   const db = adminSupabase(),
     { data: c } = await db
       .from("customers")
-      .select("id")
+      .select("id,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen")
       .eq("line_user_id", uid)
       .single();
   if (!c) return null;
@@ -27,6 +27,10 @@ export async function GET(r: NextRequest) {
       { error: "找不到訂單或登入已失效" },
       { status: 401 },
     );
+  const { data: selfProfile } = await x.db.from("consultation_profiles").select("id").eq("customer_id", x.c.id).eq("relationship", "本人").maybeSingle();
+  if (!selfProfile && x.c.full_name) {
+    await x.db.from("consultation_profiles").insert({ customer_id:x.c.id, profile_type:"person", relationship:"本人", name:x.c.full_name, gender:x.c.gender, address:x.c.full_address, birth_date:x.c.birth_date, lunar_birth_text:x.c.lunar_birth_text, zodiac:x.c.zodiac, birth_shichen:x.c.birth_shichen });
+  }
   const { data: profiles } = await x.db
     .from("consultation_profiles")
     .select("*")
@@ -41,6 +45,7 @@ export async function GET(r: NextRequest) {
     );
   return NextResponse.json({
     booking: x.b,
+    customer: x.c,
     profiles: profiles || [],
     links: links || [],
   });
@@ -57,9 +62,14 @@ export async function POST(r: NextRequest) {
     return NextResponse.json({ error: "完成付款後才能填寫問事資料" }, { status: 400 });
   let profileId = body.profileId;
   if (body.profile) {
+    const profile = { ...body.profile };
+    if (!profile.owner_profile_id) delete profile.owner_profile_id;
+    for (const key of ["birth_date", "death_date", "birth_time"]) {
+      if (!profile[key]) delete profile[key];
+    }
     const { data, error } = await x.db
       .from("consultation_profiles")
-      .insert({ ...body.profile, customer_id: x.c.id })
+      .insert({ ...profile, customer_id: x.c.id })
       .select("id")
       .single();
     if (error)

@@ -4,6 +4,7 @@
   padding: 25px;
   font-size: 17px;
 }
+.questionPage>header{overflow:hidden!important}.questionPage>header>div{min-width:0}.questionPage>header p{overflow-wrap:anywhere}.sectionHead{flex-wrap:wrap}.sectionHead>div{flex:1 1 100%}.sectionHead p{width:100%}.profileFields input:not([readonly]),.profileFields select,.profileFields textarea{background:#fff}.profileFields .readonly input,.profileFields input[readonly]{background:#eee;color:#746b65}.profileFields label small{display:block;font-weight:400;color:#746b65;margin:4px 0}.profileFields label small input{width:auto;padding:0}.addPetFields{background:#fff!important;color:#8a3045!important;border:1px dashed #8a3045!important}.answerTitle{display:flex!important;flex-direction:column!important;gap:5px!important;width:100%}.answerTitle span{font-size:16px!important;width:100%}.answerTitle small{color:#b42332!important;font-size:14px!important;font-weight:700;width:100%}.manualPaidButton{background:#2f8054!important;color:#fff!important;font-weight:800}
 .dataPage section {
   background: #fff;
   padding: 22px;

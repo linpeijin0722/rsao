@@ -120,14 +120,9 @@ export async function POST(request: NextRequest) {
               color: "#8A3045",
               action: {
                 type: "uri",
-                label: "查看訂單狀態",
-                uri: `${site}/my-bookings?order=${encodeURIComponent(data.booking_no)}`,
+                label: "繼續付款",
+                uri: `${site}/pay?order=${encodeURIComponent(data.booking_no)}`,
               },
-            },
-            {
-              type: "button",
-              style: "link",
-                action: { type: "uri", label: "繼續付款", uri: `${site}/pay?order=${encodeURIComponent(data.booking_no)}` },
             },
           ],
         },

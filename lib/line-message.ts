@@ -32,19 +32,9 @@ export function bookingFlex(args: {
     {
       type: "button",
       style: "primary",
-      height: "sm",
+      height: "md",
       color: "#8A3045",
-      action: { type: "uri", label: "點此提供問事資料", uri: dataUrl },
-    },
-    {
-      type: "button",
-      style: "link",
-      height: "sm",
-      action: {
-        type: "uri",
-        label: "查看預約",
-        uri: `${args.site}/my-bookings?order=${encodeURIComponent(args.bookingNo)}`,
-      },
+      action: { type: "uri", label: "立即填寫問事資料（必填）", uri: dataUrl },
     },
   ];
   if (isVideo && args.slot)

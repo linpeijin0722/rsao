@@ -74,6 +74,13 @@ export default function Staff() {
     });
     alert(r.ok ? "已發送提醒" : "發送失敗");
   }
+  async function markPaid(no: string) {
+    if (!confirm("確定已收到這筆款項，並將訂單標記為已付款嗎？")) return;
+    const r = await fetch("/api/staff/bookings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ bookingNo: no, action: "mark_paid" }) });
+    const j = await r.json();
+    if (!r.ok) return alert(j.error || "設定失敗");
+    setEditing(null); await load(); alert("已標記為手動收款");
+  }
   const filtered = useMemo(() => {
       const result = rows.filter((x) => {
         if (statusFilter !== "all" && statusKey(x) !== statusFilter)
@@ -322,7 +329,7 @@ export default function Staff() {
                       )}
                       <span>{x.customers?.line_display_name}</span>
                     </button>
-                    <b className={`staffState ${statusKey(x)}`}>{status}</b>
+                    <b className={`staffState ${statusKey(x)}`}>{paid && x.collection_source === "manual" ? "手動收款" : status}</b>
                     {paid ? (
                       complete ? (
                         <button
@@ -460,7 +467,7 @@ export default function Staff() {
                   )}
                   <span>{x.customers?.line_display_name}</span>
                 </button>
-                <b className={`staffState ${statusKey(x)}`}>{statusText(x)}</b>
+                <b className={`staffState ${statusKey(x)}`}>{paid && x.collection_source === "manual" ? "手動收款" : statusText(x)}</b>
                 {paid ? (
                   complete ? (
                     <button
@@ -521,7 +528,7 @@ export default function Staff() {
               </div>
             </header>
             <div className="bookingStatus">
-              <b>{editing.payment_status === "paid" ? "已付款" : "未付款"}</b>
+              <b>{editing.payment_status === "paid" ? (editing.collection_source === "manual" ? "手動收款" : "已付款") : "未付款"}</b>
               {editing.payment_status === "paid" && (
                 <b>
                   {editing.booking_details?.every(
@@ -532,6 +539,7 @@ export default function Staff() {
                 </b>
               )}
             </div>
+            {editing.payment_status !== "paid" && editing.status !== "cancelled" && <button className="manualPaidButton" onClick={() => markPaid(editing.booking_no)}>設為已付款（手動收款）</button>}
             {editing.payment_status === "paid" &&
               !editing.booking_details?.every(
                 (d: any) => d.booking_detail_profiles?.length,
