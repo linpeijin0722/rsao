@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import liff from "@line/liff";
 import { lunarProfile } from "@/lib/lunar-profile";
 const shichen = [
   "子時（23:00–00:59）",
@@ -67,6 +68,7 @@ export default function MyProfile() {
     [loading, setLoading] = useState(true),
     [saving, setSaving] = useState(false),
     [message, setMessage] = useState(""),
+    [confirming, setConfirming] = useState(false),
     setup =
       typeof window !== "undefined" &&
       new URLSearchParams(location.search).get("setup") === "1";
@@ -85,6 +87,22 @@ export default function MyProfile() {
   function birth(value: string) {
     setForm((v: any) => ({ ...v, birth_date: value, ...lunarProfile(value) }));
   }
+  function requestSave() {
+    if (!form.full_name || !form.gender || !form.full_address || !form.birth_date || !form.birth_shichen) {
+      setMessage("請完整填寫所有欄位");
+      return;
+    }
+    setMessage("");
+    setConfirming(true);
+  }
+  async function goBack() {
+    try {
+      const id = process.env.NEXT_PUBLIC_LIFF_ID;
+      if (id) await liff.init({ liffId: id });
+      if (liff.isInClient()) return liff.closeWindow();
+    } catch {}
+    location.href = "/";
+  }
   async function save() {
     setSaving(true);
     setMessage("");
@@ -96,6 +114,7 @@ export default function MyProfile() {
       j = await r.json();
     setSaving(false);
     if (!r.ok) return setMessage(j.error);
+    setConfirming(false);
     setMessage("✓ 資料已儲存");
     setForm((v: any) => ({ ...v, ...j.profile }));
     if (setup) window.setTimeout(() => location.replace("/"), 700);
@@ -109,17 +128,18 @@ export default function MyProfile() {
   return (
     <main className="profilePage">
       <header>
-        <button onClick={() => history.back()}>‹</button>
+        <button onClick={goBack}>‹</button>
         <div>
           {form.line_picture_url ? (
             <img src={form.line_picture_url} alt="LINE頭貼" />
           ) : (
             <span>我</span>
           )}
-          <h1>{setup ? "建立個人資料" : "我的資料"}</h1>
+          <h1>{form.line_display_name || "個人資料"}</h1>
           <p>資料僅供命理諮詢使用</p>
         </div>
       </header>
+      <p className="profileAccuracy">請務必填寫正確資料</p>
       <section className="profileForm">
         <label>
             <span>姓名</span>
@@ -143,8 +163,8 @@ export default function MyProfile() {
         </label>
         <label className="profileAddress">
             <span>地址</span>
-            <input
-              type="text"
+            <textarea
+              rows={2}
               name="street-address"
               autoComplete="street-address"
             value={form.full_address || ""}
@@ -192,10 +212,11 @@ export default function MyProfile() {
             {message}
           </p>
         )}
-        <button className="profileSave" disabled={saving} onClick={save}>
+        <button className="profileSave" disabled={saving} onClick={requestSave}>
           {saving ? "儲存中…" : setup ? "儲存並開始預約" : "儲存資料"}
         </button>
       </section>
+      {confirming && <div className="modalBackdrop profileConfirmBackdrop" onClick={() => setConfirming(false)}><div className="modal profileConfirmModal" onClick={(event) => event.stopPropagation()}><h2>請確認個人資料</h2><p>您的資料僅用於命理諮詢，為確保命盤解析的準確度與諮詢品質，請務必幫我們仔細核對、確實填寫喔！</p><button disabled={saving} onClick={save}>{saving ? "儲存中…" : "確認並儲存"}</button><button className="cancel" onClick={() => setConfirming(false)}>返回檢查</button></div></div>}
     </main>
   );
 }

@@ -429,7 +429,7 @@ export default function Page() {
           <h1>林阿嫂線上諮詢預約系統</h1>
           <p>✓ 已通過 LINE 登入驗證</p>
         </div>
-        <div className="content">
+        <div className={`content screen-${screen}`}>
           {error && <div className="error">{error}</div>}
           {screen === "method" && (
             <>
@@ -654,12 +654,6 @@ export default function Page() {
                   </button>
                 ))}
               </div>
-              <div className="summary paymentAmountDock">
-                <p>
-                  <span>付款金額</span>
-                  <strong>{money(total)}</strong>
-                </p>
-              </div>
             </>
           )}
           {screen === "done" && (
@@ -680,7 +674,8 @@ export default function Page() {
           )}
         </div>
         {screen !== "done" && (
-          <footer>
+          <footer className={screen === "payment" ? "paymentFooter" : ""}>
+            {screen === "payment" && <div className="footerAmount"><span>付款金額</span><strong>{money(total)}</strong></div>}
             {screen !== "method" && (
               <button
                 className="back"

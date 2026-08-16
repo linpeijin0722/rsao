@@ -18,6 +18,8 @@ import "./shop.css";
 import "./v32.css";
 import "./v33.css";
 import "./v34.css";
+import "./v35.css";
+import "./v36.css";
 
 export const metadata: Metadata = {
   title: "林阿嫂線上諮詢預約",
