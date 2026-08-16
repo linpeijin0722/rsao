@@ -1,0 +1,6 @@
+.mineNoDate{display:grid;place-items:center;min-width:50px;color:#9b8e85;font-size:25px;font-weight:300}.screen-items{padding-bottom:96px!important}.screen-items+.paymentFooter{display:none!important}
+
+/* 子項目選擇視窗：資訊較多，維持清楚但不擁擠。 */
+.cartModal h2{font-size:20px!important}.cartModal .optionList button{font-size:15px!important;text-align:left!important;justify-content:space-between!important}.cartModal .optionList button span{text-align:left!important}.cartModal .optionList button b{font-size:14px!important}.cartModal .qty{font-size:16px!important}
+
+.payForward{min-height:100dvh;display:grid;place-items:center;background:#f4f0e8;padding:24px}.payForward section{width:min(440px,100%);background:#fff;border:1px solid #ddd3c5;border-radius:18px;padding:28px 22px;text-align:center;box-shadow:0 10px 30px #3d2d2414}.payForward h1{font-size:22px;margin:0 0 12px}.payForward p{font-size:15px;color:#6d625b}.payForward .expiry{color:#b42332;font-size:14px;font-weight:700;line-height:1.6}.payForward button{width:100%;margin-top:16px;border:0;border-radius:12px;background:#8a3045;color:#fff;padding:14px;font-size:17px;font-weight:700}.payForward .payError{color:#b42332}

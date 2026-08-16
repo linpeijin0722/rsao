@@ -31,7 +31,7 @@ type Line = {
   subId: string | null;
   qty: number;
 };
-type Screen = "method" | "slots" | "items" | "payment" | "done";
+type Screen = "method" | "slots" | "items" | "done";
 const money = (v: number) =>
     new Intl.NumberFormat("zh-TW", {
       style: "currency",
@@ -93,7 +93,6 @@ export default function Page() {
     [alertMessage, setAlertMessage] = useState(""),
     [healthWarned, setHealthWarned] = useState(false),
     [textOk, setTextOk] = useState(false),
-    [payment, setPayment] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [bookingNo, setBookingNo] = useState("");
@@ -167,6 +166,13 @@ export default function Page() {
       }
     })();
   }, []);
+  useEffect(() => {
+    const closeMenu = (event: PointerEvent) => {
+      if (!(event.target as HTMLElement).closest(".account")) setMenu(false);
+    };
+    document.addEventListener("pointerdown", closeMenu);
+    return () => document.removeEventListener("pointerdown", closeMenu);
+  }, []);
   const availableDates = useMemo(
       () =>
         new Set(
@@ -182,10 +188,8 @@ export default function Page() {
         ? 1
         : screen === "items"
           ? 2
-          : screen === "payment"
-            ? 3
-            : screen === "done"
-              ? 4
+        : screen === "done"
+              ? 3
               : 0,
     total =
       (method?.base_price || 0) +
@@ -214,7 +218,10 @@ export default function Page() {
     setSlot("");
   }
   async function methodNext() {
-    if (!method) return setError("請選擇諮詢方式");
+    if (!method) {
+      setAlertMessage("請選擇諮詢方式");
+      return;
+    }
     if (method.code === "text") {
       setScreen("slots");
       return;
@@ -264,7 +271,7 @@ export default function Page() {
     ) {
       setModalItem(null);
       setHealthWarned(true);
-      setAlertMessage("您選擇的「整體運勢」已包含身體健康。");
+      setAlertMessage("您選擇的整體運勢已包含身體健康，確定要再加購嗎？");
       return;
     }
     if (modalItem.option_mode === "single_required" && !choice)
@@ -294,7 +301,7 @@ export default function Page() {
       )
     ) {
       setHealthWarned(true);
-      setAlertMessage("您選擇的「整體運勢」已包含身體健康。");
+      setAlertMessage("您選擇的整體運勢已包含身體健康，確定要再加購嗎？");
       return;
     }
     if (item.code === "overall-fortune") {
@@ -317,10 +324,10 @@ export default function Page() {
       }
       setVideoNotice(true);
     } else if (screen === "items") {
-      if (!cart.length) return setError("請至少選擇一個諮詢項目");
-      setScreen("payment");
-    } else if (screen === "payment") {
-      if (!payment) return setError("請選擇付款方式");
+      if (!cart.length) {
+        setAlertMessage("請至少選擇一個諮詢項目");
+        return;
+      }
       submit();
     }
   }
@@ -343,7 +350,7 @@ export default function Page() {
           body: JSON.stringify({
             methodId: method?.id,
             slotStart: slot || null,
-            paymentMethod: payment,
+            paymentMethod: "credit_card",
             items: cart.map((l) => ({
               item_id: l.itemId,
               quantity: l.qty,
@@ -354,7 +361,7 @@ export default function Page() {
         j = await r.json();
       if (!r.ok) throw Error(j.error);
       setBookingNo(j.booking.booking_no);
-      if (payment === "credit_card" || payment === "transfer") {
+      {
         const paymentResponse = await fetch("/api/ecpay", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -378,14 +385,13 @@ export default function Page() {
         form.submit();
         return;
       }
-      setScreen("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : "預約失敗");
     } finally {
       setBusy(false);
     }
   }
-  const steps = ["諮詢方式", "確認時間", "諮詢項目", "付款方式", "進行付款"],
+  const steps = ["諮詢方式", "確認時間", "諮詢項目", "進行付款"],
     stepStart = Math.max(0, Math.min(phase - 1, steps.length - 3));
   if (auth !== "ready")
     return (
@@ -638,29 +644,6 @@ export default function Page() {
               </div>
             </>
           )}
-          {screen === "payment" && (
-            <>
-              <div className="title">
-                <h2>選擇付款方式</h2>
-              </div>
-              <div className="payments">
-                {[
-                  ["credit_card", "信用卡"],
-                  ["transfer", "銀行轉帳"],
-                  ["line_pay", "LINE Pay"],
-                ].map(([v, t]) => (
-                  <button
-                    key={v}
-                    className={payment === v ? "selected" : ""}
-                    onClick={() => setPayment(v)}
-                  >
-                    <b>{t}</b>
-                    <span>›</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
           {screen === "done" && (
             <div className="success">
               <div>✓</div>
@@ -679,8 +662,7 @@ export default function Page() {
           )}
         </div>
         {screen !== "done" && (
-          <footer className={screen === "payment" ? "paymentFooter" : ""}>
-            {screen === "payment" && <div className="footerAmount"><span>付款金額</span><strong>{money(total)}</strong></div>}
+          <footer>
             {screen !== "method" && (
               <button
                 className="back"
@@ -707,7 +689,7 @@ export default function Page() {
               }
               onClick={screen === "method" ? methodNext : next}
             >
-              {busy ? "處理中…" : screen === "payment" ? "確認預約" : "下一步"}
+              {busy ? "處理中…" : screen === "items" ? "確認送出預約" : "下一步"}
             </button>
           </footer>
         )}

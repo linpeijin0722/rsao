@@ -67,8 +67,7 @@ export async function POST(request: NextRequest) {
       ReturnURL: `${origin}/api/ecpay/notify`,
       OrderResultURL: `${origin}/api/ecpay/return`,
       ClientBackURL: origin,
-      ChoosePayment:
-        booking.payment_method === "credit_card" ? "Credit" : "ATM",
+      ChoosePayment: "ALL",
       EncryptType: "1",
     };
     fields.CheckMacValue = checkMacValue(fields, config.hashKey, config.hashIv);

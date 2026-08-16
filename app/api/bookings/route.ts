@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
             {
               type: "button",
               style: "link",
-              action: { type: "uri", label: "繼續付款", uri: site },
+                action: { type: "uri", label: "繼續付款", uri: `${site}/pay?order=${encodeURIComponent(data.booking_no)}` },
             },
           ],
         },

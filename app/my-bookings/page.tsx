@@ -141,7 +141,7 @@ export default function Mine() {
           )}
           {x.status !== "cancelled" && x.payment_status !== "paid" && (
             <div className="mineActions">
-              <button onClick={() => pay(x.booking_no)}>繼續付款</button>
+              <button onClick={() => (location.href = `/pay?order=${encodeURIComponent(x.booking_no)}`)}>繼續付款</button>
               <button onClick={() => cancel(x.booking_no)}>取消預約</button>
             </div>
           )}
@@ -177,7 +177,7 @@ export default function Mine() {
               key={x.booking_no}
               onClick={() => setSelected(x)}
             >
-              <span className="mineDate">
+              {x.consultation_methods?.code === "text" ? <span className="mineNoDate">／</span> : <span className="mineDate">
                 <small>
                   {date.toLocaleString("zh-TW", {
                     month: "numeric",
@@ -191,7 +191,7 @@ export default function Mine() {
                   }).replace("日", "")}日
                 </b>
                 <small>{date.getFullYear()}</small>
-              </span>
+              </span>}
               <span className="mineSummaryBody">
                 <span
                   className={`mineStatus ${status(x) === "已付款" ? "paid" : status(x) === "待付款" ? "pending" : "expired"}`}

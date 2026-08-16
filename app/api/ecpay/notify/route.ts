@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
         .from("bookings")
         .update({
           payment_status: "paid",
+          payment_method: String(fields.PaymentType || "").toLowerCase().includes("linepay") ? "line_pay" : String(fields.PaymentType || "").toLowerCase().includes("credit") ? "credit_card" : "transfer",
           status: "confirmed",
           paid_at: new Date().toISOString(),
         })
