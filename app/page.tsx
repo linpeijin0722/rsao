@@ -91,6 +91,7 @@ export default function Page() {
     [videoNotice, setVideoNotice] = useState(false),
     [textConfirm, setTextConfirm] = useState(false),
     [alertMessage, setAlertMessage] = useState(""),
+    [healthWarned, setHealthWarned] = useState(false),
     [textOk, setTextOk] = useState(false),
     [payment, setPayment] = useState(""),
     [busy, setBusy] = useState(false),
@@ -237,6 +238,7 @@ export default function Page() {
     if (!modalItem) return;
     if (
       modalItem.code === "health" &&
+      !healthWarned &&
       cart.some(
         (line) =>
           items.find((item) => item.id === line.itemId)?.code ===
@@ -244,7 +246,8 @@ export default function Page() {
       )
     ) {
       setModalItem(null);
-      setAlertMessage("您選擇的「整體運勢」已包含身體健康，請勿重複選購。");
+      setHealthWarned(true);
+      setAlertMessage("您選擇的「整體運勢」已包含身體健康。");
       return;
     }
     if (modalItem.option_mode === "single_required" && !choice)
@@ -260,34 +263,24 @@ export default function Page() {
     setModalItem(null);
     setError("");
     if (modalItem.code === "overall-fortune") {
-      setCart((current) =>
-        current.filter(
-          (line) =>
-            items.find((item) => item.id === line.itemId)?.code !== "health",
-        ),
-      );
       setAlertMessage("此項目已包含身體健康。");
     }
   }
   function addSimple(item: Item) {
     if (
       item.code === "health" &&
+      !healthWarned &&
       cart.some(
         (line) =>
           items.find((value) => value.id === line.itemId)?.code ===
           "overall-fortune",
       )
     ) {
-      setAlertMessage("您選擇的「整體運勢」已包含身體健康，請勿重複選購。");
+      setHealthWarned(true);
+      setAlertMessage("您選擇的「整體運勢」已包含身體健康。");
       return;
     }
     if (item.code === "overall-fortune") {
-      setCart((current) =>
-        current.filter(
-          (line) =>
-            items.find((value) => value.id === line.itemId)?.code !== "health",
-        ),
-      );
       changeBase(item, 1);
       setAlertMessage("此項目已包含身體健康。");
       return;
@@ -425,10 +418,6 @@ export default function Page() {
             )}
           </div>
         </nav>
-        <div className="bookingBrand">
-          <h1>林阿嫂線上諮詢預約系統</h1>
-          <p>✓ 已通過 LINE 登入驗證</p>
-        </div>
         <div className={`content screen-${screen}`}>
           {error && <div className="error">{error}</div>}
           {screen === "method" && (

@@ -14,11 +14,13 @@ const complete = (x: any) =>
 export default function Mine() {
   const [rows, setRows] = useState<any[]>([]),
     [selected, setSelected] = useState<any>(null),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [loading, setLoading] = useState(true);
   const load = () =>
     fetch("/api/my-bookings").then(async (r) => {
       const j = await r.json();
       r.ok ? setRows(j.bookings) : setError(j.error);
+      setLoading(false);
     });
   useEffect(() => {
     void load();
@@ -148,9 +150,10 @@ export default function Mine() {
   }
   return (
     <main className="dataPage minePage mineOverview">
-      <h1>我的預約</h1>
+      <div className="minePageHeader"><button onClick={() => (location.href = "/")}>‹</button><h1>我的預約</h1></div>
       {error && <div className="error">{error}</div>}
-      {!rows.length && !error && <p className="emptyHint">目前沒有預約紀錄</p>}
+      {loading && <p className="mineLoading">讀取中，請稍後…</p>}
+      {!loading && !rows.length && !error && <p className="emptyHint">目前沒有預約紀錄</p>}
       <div className="mineList">
         {rows.map((x: any) => {
           const date = x.slot_start
@@ -166,15 +169,15 @@ export default function Mine() {
               <span className="mineDate">
                 <small>
                   {date.toLocaleString("zh-TW", {
-                    month: "short",
+                    month: "numeric",
                     timeZone: "Asia/Taipei",
-                  })}
+                  }).replace("月", "")}月
                 </small>
                 <b>
                   {date.toLocaleString("zh-TW", {
-                    day: "2-digit",
+                    day: "numeric",
                     timeZone: "Asia/Taipei",
-                  })}
+                  }).replace("日", "")}日
                 </b>
                 <small>{date.getFullYear()}</small>
               </span>

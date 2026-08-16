@@ -45,10 +45,13 @@ export function checkMacValue(
     .toUpperCase();
 }
 
-export const compactTradeNo = (bookingNo: string) =>
-  bookingNo.replace(/[^A-Za-z0-9]/g, "").slice(0, 20);
+export const compactTradeNo = (bookingNo: string) => {
+  const base = bookingNo.replace(/[^A-Za-z0-9]/g, "").slice(0, 17),
+    attempt = Date.now().toString(36).slice(-3).toUpperCase();
+  return `${base}${attempt}`;
+};
 
 export const bookingNoFromTradeNo = (tradeNo: string) => {
-  const match = tradeNo.match(/^LAS(\d{8})([A-Za-z0-9]{6})$/);
+  const match = tradeNo.match(/^LAS(\d{8})([A-Za-z0-9]{6})(?:[A-Za-z0-9]{3})?$/);
   return match ? `LAS-${match[1]}-${match[2]}` : "";
 };
