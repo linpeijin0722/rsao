@@ -21,6 +21,11 @@ const days = ["一", "二", "三", "四", "五", "六", "日"],
     new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Taipei" }).format(
       new Date(),
     );
+const shiftMonth = (value: string, amount: number) => {
+  const [year, month] = value.split("-").map(Number),
+    serial = year * 12 + month - 1 + amount;
+  return `${Math.floor(serial / 12)}-${String((serial % 12) + 1).padStart(2, "0")}`;
+};
 export default function Admin() {
   const [login, setLogin] = useState(false),
     [password, setPassword] = useState(""),
@@ -41,7 +46,8 @@ export default function Admin() {
     [openTimes, setOpenTimes] = useState<string[]>([]),
     [openDates, setOpenDates] = useState<string[]>([]),
     [holidayDate, setHolidayDate] = useState(today()),
-    [note, setNote] = useState("");
+    [note, setNote] = useState(""),
+    [textSaveMessage, setTextSaveMessage] = useState("");
   const [textCap, setTextCap] = useState<any>({
       enabled: true,
       mode: "monthly",
@@ -85,6 +91,7 @@ export default function Admin() {
     });
   }
   async function saveTextCapacity() {
+    setTextSaveMessage("儲存中…");
     const r = await fetch("/api/admin/text-capacity", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -96,8 +103,14 @@ export default function Admin() {
         weekly: weeklyRelease,
       }),
     });
-    if (r.ok) load();
-    else setError((await r.json()).error);
+    if (r.ok) {
+      setTextSaveMessage("✓ 已儲存");
+      load();
+      window.setTimeout(() => setTextSaveMessage(""), 3500);
+    } else {
+      setTextSaveMessage("");
+      setError((await r.json()).error);
+    }
   }
   function confirmTextEnabled(value: boolean) {
     if (window.confirm(`確定要${value ? "開啟" : "關閉"}文字諮詢預約嗎？`))
@@ -356,6 +369,11 @@ export default function Admin() {
         <button className="holidayButton" onClick={saveTextCapacity}>
           儲存文字名額設定
         </button>
+        {textSaveMessage && (
+          <strong className="textSaveMessage" role="status">
+            {textSaveMessage}
+          </strong>
+        )}
       </section>
       <div className="consultationDivider">
         <h2>視訊諮詢時段設定</h2>
@@ -528,8 +546,7 @@ export default function Admin() {
           <button
             disabled={month <= today().slice(0, 7)}
             onClick={() => {
-              const [y, m] = month.split("-").map(Number);
-              setMonth(new Date(y, m - 2, 1).toISOString().slice(0, 7));
+              setMonth(shiftMonth(month, -1));
             }}
           >
             ‹
@@ -542,8 +559,7 @@ export default function Admin() {
           />
           <button
             onClick={() => {
-              const [y, m] = month.split("-").map(Number);
-              setMonth(new Date(y, m, 1).toISOString().slice(0, 7));
+              setMonth(shiftMonth(month, 1));
             }}
           >
             ›

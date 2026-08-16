@@ -19,7 +19,7 @@ export async function GET() {
     { data } = await db
       .from("bookings")
       .select(
-        "booking_no,slot_start,total_price,payment_method,payment_status,status,created_at,expires_at,cancellation_reason,consultation_methods(title,code),booking_details(item_title)",
+        "booking_no,slot_start,total_price,payment_method,payment_status,status,created_at,paid_at,expires_at,cancellation_reason,consultation_methods(title,code),booking_details(id,item_title,booking_detail_profiles(profile_id))",
       )
       .eq("customer_id", c?.id || "")
       .order("created_at", { ascending: false });

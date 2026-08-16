@@ -4,6 +4,29 @@ const key = (v: string) =>
   new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Taipei" }).format(
     new Date(v),
   );
+const shiftMonth = (value: string, amount: number) => {
+  const [year, month] = value.split("-").map(Number),
+    serial = year * 12 + month - 1 + amount;
+  return `${Math.floor(serial / 12)}-${String((serial % 12) + 1).padStart(2, "0")}`;
+};
+const isComplete = (x: any) =>
+  Boolean(x.booking_details?.length) &&
+  x.booking_details.every((d: any) => d.booking_detail_profiles?.length);
+const statusKey = (x: any) =>
+  x.status === "cancelled"
+    ? x.cancellation_reason === "自行取消"
+      ? "cancelled"
+      : "expired"
+    : x.payment_status === "paid"
+      ? "paid"
+      : "pending";
+const statusText = (x: any) =>
+  ({
+    paid: "已付款",
+    pending: "待付款",
+    cancelled: "已取消",
+    expired: "已失效",
+  })[statusKey(x)];
 export default function Staff() {
   const [password, setPassword] = useState(""),
     [rows, setRows] = useState<any[]>([]),
@@ -15,7 +38,10 @@ export default function Staff() {
     [userView, setUserView] = useState<any>(null),
     [dataView, setDataView] = useState<any[]>([]),
     [editTime, setEditTime] = useState(""),
-    [editLines, setEditLines] = useState<any[]>([]);
+    [editLines, setEditLines] = useState<any[]>([]),
+    [statusFilter, setStatusFilter] = useState("all"),
+    [dataFilter, setDataFilter] = useState("all"),
+    [sortBy, setSortBy] = useState("paid_time");
   async function load() {
     const r = await fetch("/api/staff/bookings"),
       j = await r.json();
@@ -46,25 +72,41 @@ export default function Staff() {
     });
     alert(r.ok ? "已發送提醒" : "發送失敗");
   }
-  const video = useMemo(
+  const filtered = useMemo(() => {
+      const result = rows.filter((x) => {
+        if (statusFilter !== "all" && statusKey(x) !== statusFilter)
+          return false;
+        if (dataFilter !== "all") {
+          if (x.payment_status !== "paid") return false;
+          if (dataFilter === "returned" && !isComplete(x)) return false;
+          if (dataFilter === "missing" && isComplete(x)) return false;
+        }
+        return true;
+      });
+      return result.sort((a, b) => {
+        const av =
+            sortBy === "reservation_time"
+              ? a.slot_start || a.paid_at || a.created_at
+              : a.paid_at || a.created_at,
+          bv =
+            sortBy === "reservation_time"
+              ? b.slot_start || b.paid_at || b.created_at
+              : b.paid_at || b.created_at;
+        return String(bv).localeCompare(String(av));
+      });
+    }, [rows, statusFilter, dataFilter, sortBy]),
+    video = useMemo(
       () =>
-        rows.filter(
+        filtered.filter(
           (x) =>
             x.consultation_methods?.code === "video" &&
             x.status !== "cancelled",
         ),
-      [rows],
+      [filtered],
     ),
     text = useMemo(
-      () =>
-        rows
-          .filter((x) => x.consultation_methods?.code === "text")
-          .sort((a, b) =>
-            String(b.paid_at || b.created_at).localeCompare(
-              String(a.paid_at || a.created_at),
-            ),
-          ),
-      [rows],
+      () => filtered.filter((x) => x.consultation_methods?.code === "text"),
+      [filtered],
     ),
     bookedDates = new Set(
       video.filter((x) => x.slot_start).map((x) => key(x.slot_start)),
@@ -156,13 +198,45 @@ export default function Staff() {
     <main className="staffPage">
       <h1>預約工作後台</h1>
       {error && <div className="error">{error}</div>}
+      <div className="staffFilters">
+        <label>
+          訂單狀態
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="all">全部</option>
+            <option value="paid">已付款</option>
+            <option value="pending">待付款</option>
+            <option value="cancelled">已取消</option>
+            <option value="expired">已失效</option>
+          </select>
+        </label>
+        <label>
+          資料回傳
+          <select
+            value={dataFilter}
+            onChange={(e) => setDataFilter(e.target.value)}
+          >
+            <option value="all">全部</option>
+            <option value="returned">已回傳</option>
+            <option value="missing">尚未回傳</option>
+          </select>
+        </label>
+        <label>
+          排序
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <option value="paid_time">付款時間</option>
+            <option value="reservation_time">預約時間</option>
+          </select>
+        </label>
+      </div>
       <section>
         <h2>視訊預約月曆</h2>
         <div className="staffMonthNav">
           <button
             onClick={() => {
-              const [y, m] = month.split("-").map(Number);
-              setMonth(new Date(y, m - 2, 1).toISOString().slice(0, 7));
+              setMonth(shiftMonth(month, -1));
               setSelectedDate("");
             }}
           >
@@ -171,8 +245,7 @@ export default function Staff() {
           <b>{month.replace("-", " 年 ")} 月</b>
           <button
             onClick={() => {
-              const [y, m] = month.split("-").map(Number);
-              setMonth(new Date(y, m, 1).toISOString().slice(0, 7));
+              setMonth(shiftMonth(month, 1));
               setSelectedDate("");
             }}
           >
@@ -302,44 +375,83 @@ export default function Staff() {
       )}
       <section>
         <h2>文字諮詢（依付款時間）</h2>
-        <div className="staffTable">
+        <div className="staffBookingTable">
+          <div className="staffTableHead">
+            <b>付款時間</b>
+            <b>用戶</b>
+            <b>付款狀態</b>
+            <b>資料回傳</b>
+            <b>訂單編號</b>
+            <b>操作</b>
+          </div>
           {text.map((x) => {
-            const complete = x.booking_details?.every(
-              (d: any) => d.booking_detail_profiles?.length,
-            );
+            const complete = isComplete(x),
+              paid = x.payment_status === "paid";
             return (
-              <article key={x.id} onClick={() => openEdit(x)}>
-                <b>{x.customers?.line_display_name}</b>
-                <span>{x.booking_no}</span>
+              <article className="staffTableRow" key={x.id}>
                 <span>
-                  {x.payment_status === "paid" ? "已付款" : "未付款"}／
-                  {x.payment_method}
+                  {new Date(x.paid_at || x.created_at).toLocaleString("zh-TW", {
+                    timeZone: "Asia/Taipei",
+                  })}
                 </span>
-                <span>
-                  {x.payment_status === "paid"
-                    ? complete
-                      ? "資料已回傳"
-                      : "資料未回傳"
-                    : "—"}
-                </span>
-                {x.payment_status === "paid" && !complete && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      remind(x.booking_no);
-                    }}
-                  >
-                    提醒填寫資料
-                  </button>
+                <button
+                  className="customerButton"
+                  onClick={() => setUserView(x.customers)}
+                >
+                  {x.customers?.line_picture_url && (
+                    <img src={x.customers.line_picture_url} alt="" />
+                  )}
+                  <span>{x.customers?.line_display_name}</span>
+                </button>
+                <b className={`staffState ${statusKey(x)}`}>{statusText(x)}</b>
+                {paid ? (
+                  complete ? (
+                    <button
+                      className="returned"
+                      onClick={() =>
+                        setDataView(
+                          x.booking_details.flatMap(
+                            (d: any) =>
+                              d.booking_detail_profiles
+                                ?.map((p: any) => p.consultation_profiles)
+                                .filter(Boolean) || [],
+                          ),
+                        )
+                      }
+                    >
+                      已回傳
+                    </button>
+                  ) : (
+                    <button
+                      className="missing"
+                      onClick={() => remind(x.booking_no)}
+                    >
+                      尚未回傳
+                    </button>
+                  )
+                ) : (
+                  <span>—</span>
                 )}
+                <small>{x.booking_no}</small>
+                <button onClick={() => openEdit(x)}>修改</button>
               </article>
             );
           })}
         </div>
       </section>
       {editing && (
-        <div className="modalBackdrop">
-          <div className="modal staffEditModal">
+        <div className="modalBackdrop" onClick={() => setEditing(null)}>
+          <div
+            className="modal staffEditModal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="staffModalClose"
+              aria-label="關閉"
+              onClick={() => setEditing(null)}
+            >
+              ×
+            </button>
             <header>
               {editing.customers?.line_picture_url ? (
                 <img src={editing.customers.line_picture_url} alt="LINE頭像" />
@@ -385,43 +497,74 @@ export default function Staff() {
               </label>
             )}
             <h3>修改諮詢項目與數量</h3>
-            <div className="staffEditItems">
-              {items.map((i) => {
-                const line = editLines.find((x) => x.itemId === i.id);
-                return (
-                  <article key={i.id}>
-                    <div>
-                      <b>{i.title}</b>
-                      {line && i.sub_items?.length > 0 && (
-                        <select
-                          value={line.subId}
-                          onChange={(e) =>
+            <div className="staffEditColumns">
+              <section className="staffCurrentItems">
+                <h3>目前已有項目</h3>
+                {editLines.map((line) => {
+                  const i = items.find((item) => item.id === line.itemId);
+                  if (!i) return null;
+                  return (
+                    <article key={i.id}>
+                      <div>
+                        <b>{i.title}</b>
+                        {i.sub_items?.length > 0 && (
+                          <select
+                            value={line.subId}
+                            onChange={(e) =>
+                              setEditLines((v) =>
+                                v.map((x) =>
+                                  x.itemId === i.id
+                                    ? { ...x, subId: e.target.value }
+                                    : x,
+                                ),
+                              )
+                            }
+                          >
+                            <option value="">請選子項目</option>
+                            {i.sub_items.map((s: any) => (
+                              <option key={s.id} value={s.id}>
+                                {s.title}　NT$ {s.price}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                      <div className="staffQty">
+                        <button onClick={() => qty(i.id, -1)}>−</button>
+                        <b>{line.qty}</b>
+                        <button onClick={() => qty(i.id, 1)}>＋</button>
+                        <button
+                          className="removeLine"
+                          onClick={() =>
                             setEditLines((v) =>
-                              v.map((x) =>
-                                x.itemId === i.id
-                                  ? { ...x, subId: e.target.value }
-                                  : x,
-                              ),
+                              v.filter((x) => x.itemId !== i.id),
                             )
                           }
                         >
-                          <option value="">請選子項目</option>
-                          {i.sub_items.map((s: any) => (
-                            <option key={s.id} value={s.id}>
-                              {s.title}　NT$ {s.price}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                    <div className="staffQty">
-                      <button onClick={() => qty(i.id, -1)}>−</button>
-                      <b>{line?.qty || 0}</b>
-                      <button onClick={() => qty(i.id, 1)}>＋</button>
-                    </div>
-                  </article>
-                );
-              })}
+                          刪除
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+                {!editLines.length && <p className="emptyHint">尚未選擇項目</p>}
+              </section>
+              <section className="staffCatalogItems">
+                <h3>新增諮詢項目</h3>
+                {items.map((i) => {
+                  return (
+                    <article key={i.id}>
+                      <b>{i.title}</b>
+                      <button
+                        className="staffAddButton"
+                        onClick={() => qty(i.id, 1)}
+                      >
+                        ＋
+                      </button>
+                    </article>
+                  );
+                })}
+              </section>
             </div>
             <button onClick={saveEdit}>儲存並發送 LINE 通知</button>
             <button className="cancel" onClick={() => setEditing(null)}>

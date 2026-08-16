@@ -12,6 +12,7 @@ import "./v26.css";
 import "./v27.css";
 import "./v28.css";
 import "./v29.css";
+import "./v30.css";
 import "./shop.css";
 
 export const metadata: Metadata = {
