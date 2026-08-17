@@ -49,11 +49,12 @@ export async function GET(r: NextRequest) {
   }
   const { data: links } = await x.db
     .from("booking_consultation_answers")
-    .select("id,booking_detail_id,profile_id,questions,booking_answer_participants(profile_id,position)")
+    .select("id,booking_detail_id,profile_id,questions,extra_data,booking_answer_participants(profile_id,position)")
     .in(
       "booking_detail_id",
       (x.b.booking_details || []).map((d: any) => d.id),
     );
+  for(const detail of x.b.booking_details||[]){const answer=(links||[]).find((a:any)=>a.booking_detail_id===detail.id);(detail as any).answer_extra_data=answer?.extra_data||{}}
   return NextResponse.json({
     booking: x.b,
     customer: x.c,
@@ -115,7 +116,7 @@ export async function POST(r: NextRequest) {
       ? body.questions.map((value: unknown) => String(value || "").trim()).slice(0, 3)
       : [];
     const {data:answer}=await x.db.from("booking_consultation_answers").upsert(
-      { booking_detail_id: body.detailId, profile_id: profileId, questions, updated_at: new Date().toISOString() },
+      { booking_detail_id: body.detailId, profile_id: profileId, questions, extra_data: body.extraData || {}, updated_at: new Date().toISOString() },
       { onConflict: "booking_detail_id" },
     ).select("id").single();
     if(answer&&Array.isArray(body.profileIds)){

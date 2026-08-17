@@ -200,3 +200,4 @@
     padding: 15px;
   }
 }
+.rememberStaff{display:flex!important;align-items:center;gap:7px;margin-top:12px;font-size:14px}.rememberStaff input{width:auto!important;margin:0!important}.staffTableHead b{font-size:19px!important}.staffTableRow>*:not(:first-child){font-size:16px!important}

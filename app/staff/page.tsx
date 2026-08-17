@@ -11,7 +11,7 @@ const shiftMonth = (value: string, amount: number) => {
 };
 const isComplete = (x: any) =>
   Boolean(x.booking_details?.length) &&
-  x.booking_details.every((d: any) => d.booking_detail_profiles?.length);
+  (x.booking_details||[]).every((d: any) => d.booking_detail_profiles?.length);
 const statusKey = (x: any) =>
   x.status === "cancelled"
     ? x.cancellation_reason === "自行取消"
@@ -42,6 +42,7 @@ export default function Staff() {
     [statusFilter, setStatusFilter] = useState("all"),
     [dataFilter, setDataFilter] = useState("all"),
     [sortBy, setSortBy] = useState("paid_time"),
+    [rememberPassword, setRememberPassword] = useState(false),
     [addPicker, setAddPicker] = useState<any>(null),
     [pickedSubId, setPickedSubId] = useState("");
   async function load() {
@@ -50,6 +51,7 @@ export default function Staff() {
     r.ok ? setRows(j.bookings) : setError(j.error);
   }
   useEffect(() => {
+    const saved=localStorage.getItem("lin_a_sao_staff_password");if(saved){setPassword(saved);setRememberPassword(true)}
     load();
     fetch("/api/catalog")
       .then((r) => r.json())
@@ -62,11 +64,13 @@ export default function Staff() {
       body: JSON.stringify({ password }),
     });
     if (r.ok) {
+      if(rememberPassword)localStorage.setItem("lin_a_sao_staff_password",password);else localStorage.removeItem("lin_a_sao_staff_password");
       setError("");
       load();
     } else setError("密碼錯誤");
   }
-  async function remind(no: string) {
+  async function remind(no: string, customer?: any) {
+    if(customer&&!confirm(`是否確定發送 LINE 通知 ${customer.line_display_name || "LINE 用戶"} (${customer.full_name || "尚未填寫姓名"}) 填寫資料？`))return;
     const r = await fetch("/api/staff/remind", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -235,7 +239,7 @@ export default function Staff() {
   }
   if (error === "未登入")
     return (
-      <main className="staffLogin">
+      <main className="adminLogin staffLogin"><div>
         <h1>預約工作後台</h1>
         <input
           type="password"
@@ -243,7 +247,7 @@ export default function Staff() {
           onChange={(e) => setPassword(e.target.value)}
           placeholder="管理密碼"
         />
-        <button onClick={login}>登入</button>
+        <label className="rememberStaff"><input type="checkbox" checked={rememberPassword} onChange={e=>setRememberPassword(e.target.checked)}/> 記住我的密碼</label><button onClick={login}>登入</button></div>
       </main>
     );
   return (
@@ -312,7 +316,7 @@ export default function Staff() {
                   ),
                   paid = x.payment_status === "paid",
                   status = statusText(x),
-                  profiles = x.booking_details.flatMap((d: any) => d.booking_consultation_answers?.map((a:any)=>({ ...a.consultation_profiles, questions:a.questions, item_title:d.item_title })) || []);
+                  profiles = (x.booking_details||[]).flatMap((d: any) => d.booking_consultation_answers?.map((a:any)=>({ ...a.consultation_profiles, questions:a.questions, item_title:d.item_title })) || []);
                 return (
                   <article className="staffTableRow" key={x.id}>
                     <span>
@@ -343,7 +347,7 @@ export default function Staff() {
                       ) : (
                         <button
                           className="missing"
-                          onClick={() => remind(x.booking_no)}
+                          onClick={() => remind(x.booking_no,x.customers)}
                         >
                           尚未回傳
                         </button>
@@ -476,7 +480,7 @@ export default function Staff() {
                       className="returned"
                       onClick={() =>
                         setDataView(
-                          x.booking_details.flatMap((d:any)=>d.booking_consultation_answers?.map((a:any)=>({ ...a.consultation_profiles, questions:a.questions, item_title:d.item_title })) || []),
+                          (x.booking_details||[]).flatMap((d:any)=>d.booking_consultation_answers?.map((a:any)=>({ ...a.consultation_profiles, questions:a.questions, item_title:d.item_title })) || []),
                         )
                       }
                     >
@@ -485,7 +489,7 @@ export default function Staff() {
                   ) : (
                     <button
                       className="missing"
-                      onClick={() => remind(x.booking_no)}
+                      onClick={() => remind(x.booking_no,x.customers)}
                     >
                       尚未回傳
                     </button>
