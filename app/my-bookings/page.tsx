@@ -8,9 +8,7 @@ const status = (x: any) =>
     : x.payment_status === "paid"
       ? "已付款"
       : "待付款";
-const complete = (x: any) =>
-  Boolean(x.booking_details?.length) &&
-  x.booking_details.every((d: any) => d.booking_detail_profiles?.length);
+const complete = (x: any) => Boolean(x.data_submitted_at);
 const itemText = (detail: any) => {
   const subs = detail.booking_detail_sub_items?.map((x: any) => x.sub_item_title).filter(Boolean) || [];
   return `${detail.item_title}${subs.length ? `－${subs.join("、")}` : ""}${detail.quantity > 1 ? ` × ${detail.quantity}` : ""}`;
@@ -58,7 +56,8 @@ export default function Mine() {
   }
   async function cancel(no: string) {
     const current = rows.find((x) => x.booking_no === no), paid = current?.payment_status === "paid";
-    if (!confirm(paid ? "確定取消這筆已付款預約？取消後請聯絡客服確認退款事宜。" : "確定取消這筆預約？")) return;
+    if (paid) return setError("已付款的預約無法自行取消，如需調整請聯絡 LINE 助理");
+    if (!confirm("確定取消這筆預約？")) return;
     const response = await fetch("/api/my-bookings", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -145,7 +144,6 @@ export default function Mine() {
               <button onClick={() => cancel(x.booking_no)}>取消預約</button>
             </div>
           )}
-          {x.status !== "cancelled" && x.payment_status === "paid" && <button className="mineCancelPaid" onClick={() => cancel(x.booking_no)}>取消預約</button>}
           {x.payment_status === "paid" &&
             !missing &&
             x.status !== "cancelled" && (
@@ -167,42 +165,24 @@ export default function Mine() {
       {!loading && !rows.length && !error && <p className="emptyHint">目前沒有預約紀錄</p>}
       <div className="mineList">
         {rows.map((x: any) => {
-          const date = x.slot_start
-              ? new Date(x.slot_start)
-              : new Date(x.paid_at || x.created_at),
-            missing = x.payment_status === "paid" && !complete(x);
+          const date = new Date(x.slot_start || x.paid_at || x.created_at),
+            missing = x.payment_status === "paid" && !complete(x),
+            isVideo = x.consultation_methods?.code === "video";
           return (
             <button
               className="mineSummary"
               key={x.booking_no}
               onClick={() => setSelected(x)}
             >
-              {x.consultation_methods?.code === "text" ? <span className="mineNoDate">／</span> : <span className="mineDate">
-                <small>
-                  {date.toLocaleString("zh-TW", {
-                    month: "numeric",
-                    timeZone: "Asia/Taipei",
-                  }).replace("月", "")}月
-                </small>
-                <b>
-                  {date.toLocaleString("zh-TW", {
-                    day: "numeric",
-                    timeZone: "Asia/Taipei",
-                  }).replace("日", "")}日
-                </b>
-                <small>{date.getFullYear()}</small>
-              </span>}
+              <span className={`mineMethodBlock ${isVideo ? "video" : "text"}`}>{isVideo ? <>視訊<br/>諮詢</> : <>文字<br/>諮詢</>}</span>
               <span className="mineSummaryBody">
-                <span
-                  className={`mineStatus ${status(x) === "已付款" ? "paid" : status(x) === "待付款" ? "pending" : "expired"}`}
-                >
-                  {status(x)}
+                <span className={`mineSummaryTime ${isVideo ? "video" : "text"}`}>
+                  {isVideo ? "視訊時間" : "訂單時間"}：{date.toLocaleString("zh-TW", {timeZone:"Asia/Taipei",year:"numeric",month:"numeric",day:"numeric",...(isVideo?{hour:"2-digit",minute:"2-digit"}:{})})}
                 </span>
-                <span className={`methodTag ${x.consultation_methods?.code}`}>{x.consultation_methods?.code === "video" ? "視訊諮詢" : "文字諮詢"}</span>
-                <small>
+                <small className="mineSummaryItems">
                   {x.booking_details?.map(itemText).join("、")}
                 </small>
-                {missing && <strong>！尚未填寫諮詢者資料</strong>}
+                <span className="mineSummaryStates"><span className={`mineStatus ${status(x) === "已付款" ? "paid" : status(x) === "待付款" ? "pending" : "expired"}`}>{status(x)}</span>{missing ? <strong>！尚未填寫諮詢者資料</strong> : x.payment_status === "paid" && <span className="mineDataComplete">✓ 已填寫諮詢者資料</span>}</span>
               </span>
               <span className="mineArrow">›</span>
             </button>

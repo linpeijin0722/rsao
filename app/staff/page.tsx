@@ -9,9 +9,30 @@ const shiftMonth = (value: string, amount: number) => {
     serial = year * 12 + month - 1 + amount;
   return `${Math.floor(serial / 12)}-${String((serial % 12) + 1).padStart(2, "0")}`;
 };
-const isComplete = (x: any) =>
-  Boolean(x.booking_details?.length) &&
-  (x.booking_details||[]).every((d: any) => d.booking_detail_profiles?.length);
+const asArray = (value: any): any[] =>
+  Array.isArray(value) ? value : value ? [value] : [];
+const isComplete = (x: any) => Boolean(x.data_submitted_at);
+const returnedData = (x: any) =>
+  asArray(x.booking_details).flatMap((detail: any) =>
+    asArray(detail.booking_consultation_answers).flatMap((answer: any) => {
+      const direct = asArray(answer.consultation_profiles);
+      const participants = asArray(answer.booking_answer_participants)
+        .sort((a: any, b: any) => Number(a.position || 0) - Number(b.position || 0))
+        .flatMap((participant: any) => asArray(participant.consultation_profiles));
+      const profiles = [...direct, ...participants].filter(
+        (profile: any, index: number, all: any[]) =>
+          profile && all.findIndex((candidate: any) => candidate?.id === profile.id) === index,
+      );
+      return profiles.map((profile: any) => ({
+        ...profile,
+        answerId: answer.id,
+        questions: asArray(answer.questions),
+        extra_data: answer.extra_data || {},
+        item_title: detail.item_title,
+        sub_items: asArray(detail.booking_detail_sub_items).map((sub: any) => sub.sub_item_title).filter(Boolean),
+      }));
+    }),
+  );
 const statusKey = (x: any) =>
   x.status === "cancelled"
     ? x.cancellation_reason === "自行取消"
@@ -311,12 +332,10 @@ export default function Staff() {
                 <b>操作</b>
               </div>
               {daily.map((x) => {
-                const complete = x.booking_details?.every(
-                    (d: any) => d.booking_detail_profiles?.length,
-                  ),
+                const complete = isComplete(x),
                   paid = x.payment_status === "paid",
                   status = statusText(x),
-                  profiles = (x.booking_details||[]).flatMap((d: any) => d.booking_consultation_answers?.map((a:any)=>({ ...a.consultation_profiles, questions:a.questions, item_title:d.item_title })) || []);
+                  profiles = returnedData(x);
                 return (
                   <article className="staffTableRow" key={x.id}>
                     <span>
@@ -402,7 +421,8 @@ export default function Staff() {
                 <p>
                   {p.gender}　{p.birth_date}　{p.birth_shichen || p.birth_time}
                 </p>
-                <p>農曆：{p.lunar_birth_text || "未填"}</p>{p.item_title&&<p><b>項目：{p.item_title}</b></p>}{p.questions?.filter(Boolean).map((q:string,n:number)=><p key={n}>問題 {n+1}：{q}</p>)}
+                <p>農曆：{p.lunar_birth_text || "未填"}</p>{p.item_title&&<p><b>項目：{p.item_title}{p.sub_items?.length ? `－${p.sub_items.join("、")}` : ""}</b></p>}{p.questions?.filter(Boolean).map((q:string,n:number)=><p key={n}>問題 {n+1}：{q}</p>)}
+                {p.extra_data && Object.keys(p.extra_data).length > 0 && <div className="staffExtraData">{Object.entries(p.extra_data).map(([label,value])=><p key={label}><b>{label}：</b>{typeof value === "object" ? JSON.stringify(value) : String(value || "未填")}</p>)}</div>}
                 {p.notes && <p>{p.notes}</p>}<button onClick={()=>void editReturned(p)}>編輯這筆資料</button>
               </article>
             ))}
@@ -480,7 +500,7 @@ export default function Staff() {
                       className="returned"
                       onClick={() =>
                         setDataView(
-                          (x.booking_details||[]).flatMap((d:any)=>d.booking_consultation_answers?.map((a:any)=>({ ...a.consultation_profiles, questions:a.questions, item_title:d.item_title })) || []),
+                          returnedData(x),
                         )
                       }
                     >
@@ -532,9 +552,7 @@ export default function Staff() {
               <b>{editing.payment_status === "paid" ? (editing.collection_source === "manual" ? "手動收款" : "已付款") : "未付款"}</b>
               {editing.payment_status === "paid" && (
                 <b>
-                  {editing.booking_details?.every(
-                    (d: any) => d.booking_detail_profiles?.length,
-                  )
+                  {isComplete(editing)
                     ? "諮詢者資料已填"
                     : "諮詢者資料未填"}
                 </b>
@@ -542,9 +560,7 @@ export default function Staff() {
             </div>
             {editing.payment_status !== "paid" && editing.status !== "cancelled" && <button className="manualPaidButton" onClick={() => markPaid(editing.booking_no)}>設為已付款（手動收款）</button>}
             {editing.payment_status === "paid" &&
-              !editing.booking_details?.every(
-                (d: any) => d.booking_detail_profiles?.length,
-              ) && (
+              !isComplete(editing) && (
                 <button
                   className="remindButton"
                   onClick={() => remind(editing.booking_no)}
