@@ -58,7 +58,9 @@ export default function Staff() {
     [editing, setEditing] = useState<any>(null),
     [userView, setUserView] = useState<any>(null),
     [dataView, setDataView] = useState<any[]>([]),
+    [dataViewMode, setDataViewMode] = useState<"menu"|"view"|"user"|"answers">("menu"),
     [returnedEdit, setReturnedEdit] = useState<any>(null),
+    [returnedEditMode, setReturnedEditMode] = useState<"user"|"answers">("user"),
     [editTime, setEditTime] = useState(""),
     [editLines, setEditLines] = useState<any[]>([]),
     [statusFilter, setStatusFilter] = useState("all"),
@@ -271,7 +273,7 @@ export default function Staff() {
       </main>
     );
   return (
-    <main className="staffPage">
+    <main className={`staffPage returned-edit-${returnedEditMode}`}>
       <h1>預約工作後台</h1>
       {error && <div className="error">{error}</div>}
       <section className="staffBookingSection videoBookingSection">
@@ -358,7 +360,7 @@ export default function Staff() {
                       complete ? (
                         <button
                           className="returned"
-                          onClick={() => setDataView(profiles)}
+                          onClick={() => {setDataViewMode("menu");setDataView(profiles)}}
                         >
                           已回傳
                         </button>
@@ -411,8 +413,11 @@ export default function Staff() {
             className="modal returnedDataModal"
             onClick={(e) => e.stopPropagation()}
           >
+            <button className="staffModalClose" aria-label="關閉" onClick={() => setDataView([])}>×</button>
             <h2>已回傳的諮詢者資料</h2>
-            {dataView.map((p: any, i: number) => (
+            {dataViewMode==="menu"&&<div className="returnedActionMenu"><button onClick={()=>setDataViewMode("view")}>查看內容</button><button onClick={()=>setDataViewMode("user")}>修改用戶資料</button><button onClick={()=>setDataViewMode("answers")}>修改問事資料</button></div>}
+            {dataViewMode!=="menu"&&<button className="returnedMenuBack" onClick={()=>setDataViewMode("menu")}>‹ 返回功能選單</button>}
+            {dataViewMode!=="menu"&&dataView.map((p: any, i: number) => (
               <article key={p.id || i}>
                 <b>
                   {p.relationship}－{p.name}
@@ -422,7 +427,7 @@ export default function Staff() {
                 </p>
                 <p>農曆：{p.lunar_birth_text || "未填"}</p>{p.item_title&&<p><b>項目：{p.item_title}{p.sub_items?.length ? `－${p.sub_items.join("、")}` : ""}</b></p>}{p.questions?.filter(Boolean).map((q:string,n:number)=><p key={n}>問題 {n+1}：{q}</p>)}
                 {p.extra_data && Object.keys(p.extra_data).length > 0 && <div className="staffExtraData">{Object.entries(p.extra_data).map(([label,value])=><p key={label}><b>{label}：</b>{typeof value === "object" ? JSON.stringify(value) : String(value || "未填")}</p>)}</div>}
-                {p.notes && <p>{p.notes}</p>}<button onClick={()=>setReturnedEdit({...p,questions:[0,1,2].map(i=>p.questions?.[i]||"")})}>編輯這筆資料</button>
+                {p.notes && <p>{p.notes}</p>}{dataViewMode!=="view"&&<button onClick={()=>{setReturnedEditMode(dataViewMode);setReturnedEdit({...p,questions:[0,1,2].map(i=>p.questions?.[i]||"")})}}>{dataViewMode==="user"?"修改這位人物資料":"修改這個項目的問事資料"}</button>}
               </article>
             ))}
             <button onClick={() => setDataView([])}>關閉</button>
@@ -500,7 +505,7 @@ export default function Staff() {
                       className="returned"
                       onClick={() =>
                         setDataView(
-                          returnedData(x),
+                          (setDataViewMode("menu"),returnedData(x)),
                         )
                       }
                     >
