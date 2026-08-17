@@ -124,6 +124,7 @@ export async function POST(r: NextRequest) {
       const participants=body.profileIds.filter(Boolean).map((id:string,position:number)=>({answer_id:answer.id,profile_id:id,position}));
       if(participants.length)await x.db.from("booking_answer_participants").insert(participants);
     }
+    if(body.extraData?.pregnancy_losses&&profileId){await x.db.from("consultation_profiles").update({pregnancy_losses:body.extraData.pregnancy_losses,updated_at:new Date().toISOString()}).eq("id",profileId).eq("customer_id",x.c.id)}
     /* 保留舊後台的完成狀態判斷。 */
     await x.db.from("booking_detail_profiles").upsert({ booking_detail_id: body.detailId, profile_id: profileId });
   }
