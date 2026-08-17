@@ -39,9 +39,13 @@ export async function POST(request: NextRequest) {
         { onConflict: "line_user_id" },
       );
     if (error) throw error;
+    const messagingToken=process.env.LINE_MESSAGING_CHANNEL_ACCESS_TOKEN;
+    let isFriend=false;
+    if(messagingToken){try{const friendResponse=await fetch(`https://api.line.me/v2/bot/profile/${encodeURIComponent(profile.userId)}`,{headers:{Authorization:`Bearer ${messagingToken}`},cache:"no-store"});isFriend=friendResponse.ok}catch{isFriend=false}}
     const response = NextResponse.json({
       displayName: profile.displayName,
       pictureUrl: profile.pictureUrl ?? null,
+      isFriend,
     });
     response.cookies.set("line_session", signLineSession(profile.userId), {
       httpOnly: true,

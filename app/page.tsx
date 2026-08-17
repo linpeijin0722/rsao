@@ -126,6 +126,12 @@ export default function Page() {
           }
           return true;
         };
+        const hasOfficialAccountFriendship = async (fallback:boolean) => {
+          const liffId=process.env.NEXT_PUBLIC_LIFF_ID;
+          if(!liffId)return fallback;
+          try{await liff.init({liffId});if(liff.isLoggedIn()){const friendship=await liff.getFriendship();return friendship.friendFlag}}catch{}
+          return fallback;
+        };
         const [sessionResponse, catalogResponse] = await Promise.all([
             fetch("/api/line/session", { cache: "no-store" }),
             fetch("/api/catalog"),
@@ -137,6 +143,7 @@ export default function Page() {
         setTextFull(Boolean(catalog.textFull));
         if (sessionResponse.ok) {
           const sessionProfile = await sessionResponse.json();
+          if(!(await hasOfficialAccountFriendship(Boolean(sessionProfile.isFriend)))){setError("請先加入 LINE 官方帳號好友；若曾封鎖，請先解除封鎖後再進行預約。");setAuth("friend-required");return}
           setProfile(sessionProfile);
           if (!(await requirePrimaryProfile())) return;
           remember(sessionProfile);
@@ -157,6 +164,7 @@ export default function Page() {
           }),
           aj = await ar.json();
         if (!ar.ok) throw Error(aj.error);
+        if(!(await hasOfficialAccountFriendship(Boolean(aj.isFriend)))){setError("請先加入 LINE 官方帳號好友；若曾封鎖，請先解除封鎖後再進行預約。");setAuth("friend-required");return}
         setProfile(aj);
         if (!(await requirePrimaryProfile())) return;
         remember(aj);
@@ -402,6 +410,7 @@ export default function Page() {
     return (
       <main className="loginGate">
         <p>{auth === "loading" ? "正在確認 LINE 登入…" : error}</p>
+        {auth === "friend-required"&&<a className="addLineFriend" href={process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL||"https://line.me/"}>前往加入／解除封鎖</a>}
       </main>
     );
   return (
