@@ -13,6 +13,11 @@ const itemText = (detail: any) => {
   const subs = detail.booking_detail_sub_items?.map((x: any) => x.sub_item_title).filter(Boolean) || [];
   return `${detail.item_title}${subs.length ? `－${subs.join("、")}` : ""}${detail.quantity > 1 ? ` × ${detail.quantity}` : ""}`;
 };
+const bookingTime = (value: string) => {
+  const date = new Date(value), weekdayName=new Intl.DateTimeFormat("en-US", {timeZone:"Asia/Taipei",weekday:"long"}).format(date), weekday=({Sunday:"日",Monday:"一",Tuesday:"二",Wednesday:"三",Thursday:"四",Friday:"五",Saturday:"六"} as Record<string,string>)[weekdayName]||"";
+  const parts = new Intl.DateTimeFormat("zh-TW", {timeZone:"Asia/Taipei",year:"numeric",month:"numeric",day:"numeric",hour:"numeric",minute:"2-digit",hour12:true}).formatToParts(date), get=(type:string)=>parts.find(p=>p.type===type)?.value||"";
+  return `${get("year")}/${get("month")}/${get("day")}(${weekday})${get("dayPeriod")}${get("hour")}:${get("minute")}`;
+};
 export default function Mine() {
   const [rows, setRows] = useState<any[]>([]),
     [selected, setSelected] = useState<any>(null),
@@ -161,7 +166,7 @@ export default function Mine() {
     <main className="dataPage minePage mineOverview">
       <div className="minePageHeader"><button onClick={() => (location.href = "/")}>‹</button><h1>我的預約</h1></div>
       {error && <div className="error">{error}</div>}
-      {loading && <p className="mineLoading">讀取中，請稍後…</p>}
+      {loading && <p className="mineLoading">載入中，請稍後10～20秒…</p>}
       {!loading && !rows.length && !error && <p className="emptyHint">目前沒有預約紀錄</p>}
       <div className="mineList">
         {rows.map((x: any) => {
@@ -174,15 +179,15 @@ export default function Mine() {
               key={x.booking_no}
               onClick={() => setSelected(x)}
             >
-              <span className={`mineMethodBlock ${isVideo ? "video" : "text"}`}>{isVideo ? <>視訊<br/>諮詢</> : <>文字<br/>諮詢</>}</span>
+              <span className="mineSummaryLeft"><span className={`mineMethodBlock ${isVideo ? "video" : "text"}`}>{isVideo ? <>視訊<br/>諮詢</> : <>文字<br/>諮詢</>}</span><span className={`mineStatus ${status(x) === "已付款" ? "paid" : status(x) === "待付款" ? "pending" : "expired"}`}>{status(x)}</span></span>
               <span className="mineSummaryBody">
                 <span className={`mineSummaryTime ${isVideo ? "video" : "text"}`}>
-                  {isVideo ? "視訊時間" : "訂單時間"}：{date.toLocaleString("zh-TW", {timeZone:"Asia/Taipei",year:"numeric",month:"numeric",day:"numeric",...(isVideo?{hour:"2-digit",minute:"2-digit"}:{})})}
+                  {isVideo ? <>視訊時間：<br/><b>{bookingTime(x.slot_start)}</b></> : <>訂單時間：{date.toLocaleDateString("zh-TW", {timeZone:"Asia/Taipei",year:"numeric",month:"numeric",day:"numeric"})}</>}
                 </span>
                 <small className="mineSummaryItems">
                   {x.booking_details?.map(itemText).join("、")}
                 </small>
-                <span className="mineSummaryStates"><span className={`mineStatus ${status(x) === "已付款" ? "paid" : status(x) === "待付款" ? "pending" : "expired"}`}>{status(x)}</span>{missing ? <strong>！尚未填寫諮詢者資料</strong> : x.payment_status === "paid" && <span className="mineDataComplete">✓ 已填寫諮詢者資料</span>}</span>
+                <span className="mineSummaryStates">{missing ? <strong>！尚未填寫諮詢者資料</strong> : x.payment_status === "paid" && <span className="mineDataComplete">✓ 已填寫諮詢者資料</span>}</span>
               </span>
               <span className="mineArrow">›</span>
             </button>

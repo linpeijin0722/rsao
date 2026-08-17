@@ -58,6 +58,7 @@ export default function Staff() {
     [editing, setEditing] = useState<any>(null),
     [userView, setUserView] = useState<any>(null),
     [dataView, setDataView] = useState<any[]>([]),
+    [returnedEdit, setReturnedEdit] = useState<any>(null),
     [editTime, setEditTime] = useState(""),
     [editLines, setEditLines] = useState<any[]>([]),
     [statusFilter, setStatusFilter] = useState("all"),
@@ -106,12 +107,10 @@ export default function Staff() {
     if (!r.ok) return alert(j.error || "設定失敗");
     setEditing(null); await load(); alert("已標記為手動收款");
   }
-  async function editReturned(profile: any) {
-    const name=prompt("姓名",profile.name||""); if(name===null)return;
-    const relationship_detail=prompt("他是我的…",profile.relationship_detail||""); if(relationship_detail===null)return;
-    const notes=prompt("備註",profile.notes||""); if(notes===null)return;
-    const r=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"update_consultation_profile",profileId:profile.id,profile:{...profile,name,relationship_detail,notes},questions:profile.questions||[]})});
-    const j=await r.json(); if(!r.ok)return alert(j.error||"儲存失敗"); alert("資料已更新");setDataView([]);await load();
+  async function saveReturned() {
+    if(!returnedEdit?.id)return;
+    const r=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"update_consultation_profile",profileId:returnedEdit.id,answerId:returnedEdit.answerId,profile:returnedEdit,questions:returnedEdit.questions||[]})});
+    const j=await r.json(); if(!r.ok)return alert(j.error||"儲存失敗"); alert("資料已更新");setReturnedEdit(null);setDataView([]);await load();
   }
   const filtered = useMemo(() => {
       const result = rows.filter((x) => {
@@ -423,13 +422,14 @@ export default function Staff() {
                 </p>
                 <p>農曆：{p.lunar_birth_text || "未填"}</p>{p.item_title&&<p><b>項目：{p.item_title}{p.sub_items?.length ? `－${p.sub_items.join("、")}` : ""}</b></p>}{p.questions?.filter(Boolean).map((q:string,n:number)=><p key={n}>問題 {n+1}：{q}</p>)}
                 {p.extra_data && Object.keys(p.extra_data).length > 0 && <div className="staffExtraData">{Object.entries(p.extra_data).map(([label,value])=><p key={label}><b>{label}：</b>{typeof value === "object" ? JSON.stringify(value) : String(value || "未填")}</p>)}</div>}
-                {p.notes && <p>{p.notes}</p>}<button onClick={()=>void editReturned(p)}>編輯這筆資料</button>
+                {p.notes && <p>{p.notes}</p>}<button onClick={()=>setReturnedEdit({...p,questions:[0,1,2].map(i=>p.questions?.[i]||"")})}>編輯這筆資料</button>
               </article>
             ))}
             <button onClick={() => setDataView([])}>關閉</button>
           </div>
         </div>
       )}
+      {returnedEdit && <div className="modalBackdrop returnedEditBackdrop"><div className="modal returnedEditPage"><button className="staffModalClose" onClick={()=>setReturnedEdit(null)}>×</button><header><div><h2>編輯回傳資料</h2><p>{returnedEdit.item_title}{returnedEdit.sub_items?.length?`－${returnedEdit.sub_items.join("、")}`:""}</p></div></header><div className="returnedEditGrid"><label>姓名<input value={returnedEdit.name||""} onChange={e=>setReturnedEdit({...returnedEdit,name:e.target.value})}/></label><label>關係<input value={returnedEdit.relationship_detail||returnedEdit.relationship||""} onChange={e=>setReturnedEdit({...returnedEdit,relationship_detail:e.target.value})}/></label><label>性別<select value={returnedEdit.gender||""} onChange={e=>setReturnedEdit({...returnedEdit,gender:e.target.value})}><option value="">未填</option><option>男</option><option>女</option><option>其他</option></select></label><label>國曆生日<input type="date" value={returnedEdit.birth_date||""} onChange={e=>setReturnedEdit({...returnedEdit,birth_date:e.target.value})}/></label><label>農曆生日<input value={returnedEdit.lunar_birth_text||""} onChange={e=>setReturnedEdit({...returnedEdit,lunar_birth_text:e.target.value})}/></label><label>生肖<input value={returnedEdit.zodiac||""} onChange={e=>setReturnedEdit({...returnedEdit,zodiac:e.target.value})}/></label><label>出生時辰<input value={returnedEdit.birth_shichen||""} onChange={e=>setReturnedEdit({...returnedEdit,birth_shichen:e.target.value})}/></label><label className="wide">地址<textarea value={returnedEdit.address||""} onChange={e=>setReturnedEdit({...returnedEdit,address:e.target.value})}/></label><label>國曆往生日期<input type="date" value={returnedEdit.death_date||""} onChange={e=>setReturnedEdit({...returnedEdit,death_date:e.target.value})}/></label><label>農曆往生日期<input value={returnedEdit.lunar_death_text||""} onChange={e=>setReturnedEdit({...returnedEdit,lunar_death_text:e.target.value})}/></label><label>往生時辰<input value={returnedEdit.death_shichen||""} onChange={e=>setReturnedEdit({...returnedEdit,death_shichen:e.target.value})}/></label><label className="wide">備註<textarea value={returnedEdit.notes||""} onChange={e=>setReturnedEdit({...returnedEdit,notes:e.target.value})}/></label>{returnedEdit.questions.map((q:string,i:number)=><label className="wide" key={i}>問題 {i+1}<textarea value={q} onChange={e=>setReturnedEdit({...returnedEdit,questions:returnedEdit.questions.map((v:string,n:number)=>n===i?e.target.value:v)})}/></label>)}</div><div className="returnedEditActions"><button onClick={()=>void saveReturned()}>儲存所有修改</button><button className="cancel" onClick={()=>setReturnedEdit(null)}>取消</button></div></div></div>}
       <section className="staffBookingSection textBookingSection">
         <h2 className="staffSectionTitle">文字預約</h2>
         <div className="staffFilters">
