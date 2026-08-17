@@ -63,15 +63,10 @@ export default function PayPage() {
     <main className="payForward">
       <section>
         <h1>正在前往綠界付款</h1>
-        {booking?.expires_at && !invalid && (
-          <p className="expiry">
-            請於 {expiryText(booking.expires_at)} 前完成付款，逾期訂單將自動失效。
-          </p>
-        )}
+        {booking && !invalid && <p>跳轉付款頁面中…請稍後</p>}
         {!booking && !error && <p>正在確認訂單，請稍候…</p>}
         {invalid && <p className="payError">此筆訂單已失效，請重新預約。</p>}
         {error && <p className="payError">{error}</p>}
-        {booking && !invalid && <button onClick={() => void forward()}>立即前往付款</button>}
       </section>
     </main>
   );

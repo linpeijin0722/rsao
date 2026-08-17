@@ -49,7 +49,7 @@ export async function GET(r: NextRequest) {
   }
   const { data: links } = await x.db
     .from("booking_consultation_answers")
-    .select("booking_detail_id,profile_id,questions")
+    .select("id,booking_detail_id,profile_id,questions,booking_answer_participants(profile_id,position)")
     .in(
       "booking_detail_id",
       (x.b.booking_details || []).map((d: any) => d.id),
@@ -77,6 +77,17 @@ export async function POST(r: NextRequest) {
     await x.db.from("bookings").update({data_submitted_at:new Date().toISOString()}).eq("id",x.b.id);
     return NextResponse.json({ok:true,submitted:true});
   }
+  if (body.action === "update_profile") {
+    const profile={...body.profile};if(!profile.owner_profile_id)delete profile.owner_profile_id;for(const key of ["birth_date","death_date","birth_time"])if(!profile[key])delete profile[key];
+    const {error}=await x.db.from("consultation_profiles").update({...profile,updated_at:new Date().toISOString()}).eq("id",body.profileId).eq("customer_id",x.c.id);
+    return error?NextResponse.json({error:error.message},{status:400}):NextResponse.json({ok:true});
+  }
+  if (body.action === "delete_profile") {
+    const {data:p}=await x.db.from("consultation_profiles").select("relationship").eq("id",body.profileId).eq("customer_id",x.c.id).single();
+    if(p?.relationship==="本人")return NextResponse.json({error:"本人資料不能刪除"},{status:400});
+    const {error}=await x.db.from("consultation_profiles").delete().eq("id",body.profileId).eq("customer_id",x.c.id);
+    return error?NextResponse.json({error:"此資料已被預約使用，不能刪除；您仍可編輯。"},{status:400}):NextResponse.json({ok:true});
+  }
   if (x.b.data_submitted_at) return NextResponse.json({error:"資料已送出，如需修改請透過 LINE 聯絡助理"},{status:400});
   let profileId = body.profileId;
   if (body.profile) {
@@ -103,10 +114,15 @@ export async function POST(r: NextRequest) {
     const questions = Array.isArray(body.questions)
       ? body.questions.map((value: unknown) => String(value || "").trim()).slice(0, 3)
       : [];
-    await x.db.from("booking_consultation_answers").upsert(
+    const {data:answer}=await x.db.from("booking_consultation_answers").upsert(
       { booking_detail_id: body.detailId, profile_id: profileId, questions, updated_at: new Date().toISOString() },
       { onConflict: "booking_detail_id" },
-    );
+    ).select("id").single();
+    if(answer&&Array.isArray(body.profileIds)){
+      await x.db.from("booking_answer_participants").delete().eq("answer_id",answer.id);
+      const participants=body.profileIds.filter(Boolean).map((id:string,position:number)=>({answer_id:answer.id,profile_id:id,position}));
+      if(participants.length)await x.db.from("booking_answer_participants").insert(participants);
+    }
     /* 保留舊後台的完成狀態判斷。 */
     await x.db.from("booking_detail_profiles").upsert({ booking_detail_id: body.detailId, profile_id: profileId });
   }

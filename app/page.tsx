@@ -751,9 +751,9 @@ export default function Page() {
           <div className="modalBackdrop">
             <div className="modal alertModal">
               <h2>預約前溫馨提醒</h2>
-              <p>此項諮詢目前沒有提供代替您向過世親友帶話或傳話的服務喔！若您已了解並可以接受，再繼續加入預約。</p>
-              <button onClick={() => { const item = deceasedPending; setDeceasedPending(null); changeBase(item, 1); }}>我了解，繼續預約</button>
-              <button className="cancel" onClick={() => setDeceasedPending(null)}>返回</button>
+              <p>請確認這位親友已過世半年以上再進行預約，謝謝您的理解與配合。</p>
+              <button onClick={() => { const item = deceasedPending; setDeceasedPending(null); changeBase(item, 1); }}>半年以上</button>
+              <button className="cancel" onClick={() => setDeceasedPending(null)}>未滿半年</button>
             </div>
           </div>
         )}
