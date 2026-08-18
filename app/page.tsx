@@ -374,6 +374,15 @@ export default function Page() {
         j = await r.json();
       if (!r.ok) throw Error(j.error);
       setBookingNo(j.booking.booking_no);
+      try{
+        const liffId=process.env.NEXT_PUBLIC_LIFF_ID;if(!liffId)throw Error();
+        await liff.init({liffId});if(!liff.isInClient())throw Error();
+        await liff.sendMessages([{type:"text",text:"我已送出訂單。"}]);
+      }catch{
+        setError("請從 LINE 官方帳號聊天室重新開啟預約網站，系統才能以您的身分傳送「我已送出訂單。」");
+        setAlertMessage("訂單已建立，但 LINE 無法傳送訊息。請先回到官方帳號傳送「我已送出訂單。」，再到「我的預約」繼續付款。");
+        return;
+      }
       {
         const paymentResponse = await fetch("/api/ecpay", {
             method: "POST",
