@@ -22,7 +22,8 @@ export async function POST(request: NextRequest) {
   const body = await request.json(), { bookingNo, action } = body;
   if (action === "update_answer") {
     if(!body.answerId||!body.profileId)return NextResponse.json({error:"缺少問事資料"},{status:400});
-    const {error}=await adminSupabase().from("booking_consultation_answers").update({profile_id:body.profileId,questions:(body.questions||[]).slice(0,3),updated_at:new Date().toISOString()}).eq("id",body.answerId);
+    const db=adminSupabase(),{error}=await db.from("booking_consultation_answers").update({profile_id:body.profileId,questions:(body.questions||[]).slice(0,3),updated_at:new Date().toISOString()}).eq("id",body.answerId);
+    if(!error&&Array.isArray(body.profileIds)){await db.from("booking_answer_participants").delete().eq("answer_id",body.answerId);const rows=body.profileIds.filter(Boolean).filter((id:string,i:number,a:string[])=>a.indexOf(id)===i).map((profile_id:string,position:number)=>({answer_id:body.answerId,profile_id,position}));if(rows.length)await db.from("booking_answer_participants").insert(rows)}
     return error?NextResponse.json({error:error.message},{status:400}):NextResponse.json({ok:true});
   }
   if (action === "update_consultation_profile") {
