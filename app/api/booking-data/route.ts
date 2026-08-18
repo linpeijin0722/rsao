@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { verifyLineSession } from "@/lib/line-session";
 import { adminSupabase } from "@/lib/supabase";
 import { lunarProfile } from "@/lib/lunar-profile";
+import { createConsultationSheets } from "@/lib/google-consultation-sheets";
 async function context(order: string) {
   const uid = verifyLineSession((await cookies()).get("line_session")?.value);
   if (!uid) return null;
@@ -75,6 +76,7 @@ export async function POST(r: NextRequest) {
   if (body.action === "submit") {
     const detailIds=(x.b.booking_details||[]).map((d:any)=>d.id),{data:answers}=await x.db.from("booking_consultation_answers").select("booking_detail_id").in("booking_detail_id",detailIds);
     if (!detailIds.length || new Set((answers||[]).map((a:any)=>a.booking_detail_id)).size !== detailIds.length) return NextResponse.json({error:"請先儲存每一個項目的問事資料"},{status:400});
+    await createConsultationSheets(x.db,x.b.id,x.b.booking_no);
     await x.db.from("bookings").update({data_submitted_at:new Date().toISOString()}).eq("id",x.b.id);
     return NextResponse.json({ok:true,submitted:true});
   }
