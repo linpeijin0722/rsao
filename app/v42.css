@@ -1,0 +1,7 @@
+/* 前台在電腦與手機都維持相同的手機版閱讀寬度；後台不受影響。 */
+body{background:#e8e5df}
+.shell{width:100%;max-width:480px!important;margin:0 auto!important;background:#f5f1ea;box-shadow:0 0 30px #33251d18}
+.shell .app{width:100%!important;max-width:480px!important}
+.questionPage,.minePage,.profilePage,.dataPage{width:100%!important;max-width:480px!important;margin:0 auto!important;box-shadow:0 0 30px #33251d18}
+.targetQuestionGroups{display:grid;gap:16px;margin-top:14px}.targetQuestionGroups>.questions{padding:14px;border:1px solid #ded3c6;border-radius:12px;background:#faf8f4}.targetQuestionGroups>.questions>b{font-size:16px;line-height:1.5;color:#6f2638}.questions textarea::placeholder{font-size:14px}
+@media(max-width:480px){.shell,.questionPage,.minePage,.profilePage,.dataPage{box-shadow:none}}
