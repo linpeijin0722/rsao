@@ -5,3 +5,18 @@ body{background:#e8e5df}
 .questionPage,.minePage,.profilePage,.dataPage{width:100%!important;max-width:480px!important;margin:0 auto!important;box-shadow:0 0 30px #33251d18}
 .targetQuestionGroups{display:grid;gap:16px;margin-top:14px}.targetQuestionGroups>.questions{padding:14px;border:1px solid #ded3c6;border-radius:12px;background:#faf8f4}.targetQuestionGroups>.questions>b{font-size:16px;line-height:1.5;color:#6f2638}.questions textarea::placeholder{font-size:14px}
 @media(max-width:480px){.shell,.questionPage,.minePage,.profilePage,.dataPage{box-shadow:none}}
+
+/* 問事資料頁統一可讀字級，避免諮詢者卡片與部分提示文字過小。 */
+.questionPage{font-size:16px}
+.questionPage .sectionHead h2,.questionPage .answerSection>h2{font-size:22px}
+.questionPage .sectionHead p,.questionPage .answerSection>p{font-size:15px;line-height:1.6}
+.questionPage .savedProfiles article{font-size:17px}
+.questionPage .savedProfiles b{font-size:18px;line-height:1.45}
+.questionPage .savedProfiles small{font-size:16px;line-height:1.45}
+.questionPage .answerTitle span{font-size:19px}
+.questionPage .answerTitle small{font-size:15px;line-height:1.5}
+.questionPage .answerCard label,.questionPage .extraFields label{font-size:16px;line-height:1.5}
+.questionPage input,.questionPage select,.questionPage textarea,.questionPage button{font-size:16px}
+.questionPage .questions>b,.questionPage .relationshipFields h3{font-size:17px;line-height:1.55}
+.questionPage .questions .addQuestion{font-size:14px!important}
+.questionPage .questions textarea::placeholder,.questionPage input::placeholder,.questionPage textarea::placeholder{font-size:15px}
