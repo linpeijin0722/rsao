@@ -21,3 +21,10 @@ body{background:#e8e5df}
 .questionPage .questions .addQuestion{font-size:14px!important}
 .questionPage .questions textarea::placeholder,.questionPage input::placeholder,.questionPage textarea::placeholder{font-size:15px}
 .questionPage .babyProfileHint{display:block;width:100%;margin:-2px 0 2px;color:#7a6e66;font-size:14px;line-height:1.6}
+.questionPage .lossTags{display:flex;flex-wrap:wrap;gap:8px}
+.questionPage .lossTags:empty{display:none}
+.questionPage .lossTags button{width:auto;padding:8px 12px;border:1px solid #d7c9bb;background:#fff;color:#5f5148;border-radius:999px;font-size:14px}
+.questionPage .lossTags button.selected{border-color:#8a3045;background:#f8e9ed;color:#8a3045;font-weight:700}
+.questionPage .addLossTime{width:100%;background:transparent!important;color:#8a3045!important;border:1px dashed #b98592!important}
+.questionPage .pregnancyLossSection .lossDate{display:grid;gap:10px;padding-top:6px}
+.questionPage .pregnancyLossSection .readonly input{background:#eceae7!important;color:#706861}

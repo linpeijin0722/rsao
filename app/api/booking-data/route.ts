@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyLineSession } from "@/lib/line-session";
 import { adminSupabase } from "@/lib/supabase";
@@ -67,8 +67,15 @@ export async function POST(r: NextRequest) {
   if (body.action === "submit") {
     const detailIds=(x.b.booking_details||[]).map((d:any)=>d.id),{data:answers}=await x.db.from("booking_consultation_answers").select("booking_detail_id").in("booking_detail_id",detailIds);
     if (!detailIds.length || new Set((answers||[]).map((a:any)=>a.booking_detail_id)).size !== detailIds.length) return NextResponse.json({error:"請先儲存每一個項目的問事資料"},{status:400});
-    await createConsultationSheets(x.db,x.b.id,x.b.booking_no);
-    await x.db.from("bookings").update({data_submitted_at:new Date().toISOString()}).eq("id",x.b.id);
+    const { error: submittedError } = await x.db.from("bookings").update({data_submitted_at:new Date().toISOString()}).eq("id",x.b.id);
+    if (submittedError) return NextResponse.json({error:"資料送出失敗，請稍後再試"},{status:500});
+    after(async () => {
+      try {
+        await createConsultationSheets(x.db,x.b.id,x.b.booking_no);
+      } catch (error) {
+        console.error("建立諮詢試算表失敗", error);
+      }
+    });
     return NextResponse.json({ok:true,submitted:true});
   }
   if (body.action === "update_profile") {
