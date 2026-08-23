@@ -29,6 +29,7 @@ const shiftMonth = (value: string, amount: number) => {
 export default function Admin() {
   const [login, setLogin] = useState(false),
     [password, setPassword] = useState(""),
+    [rememberPassword, setRememberPassword] = useState(false),
     [error, setError] = useState(""),
     [rules, setRules] = useState<R[]>([]),
     [weekly, setWeekly] = useState<W[]>([]),
@@ -131,6 +132,8 @@ export default function Admin() {
     if (response.ok) setOpenDates(result.dates || []);
   }
   useEffect(() => {
+    const saved=localStorage.getItem("lin_a_sao_admin_password");
+    if(saved){setPassword(saved);setRememberPassword(true)}
     load();
   }, []);
   useEffect(() => {
@@ -147,6 +150,8 @@ export default function Admin() {
       }),
       j = await r.json();
     if (!r.ok) return setError(j.error);
+    if(rememberPassword)localStorage.setItem("lin_a_sao_admin_password",password);
+    else localStorage.removeItem("lin_a_sao_admin_password");
     load();
   }
   async function save() {
@@ -260,6 +265,7 @@ export default function Admin() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="管理密碼"
           />
+          <label className="rememberAdmin"><input type="checkbox" checked={rememberPassword} onChange={e=>setRememberPassword(e.target.checked)}/> 記住我的密碼</label>
           <button onClick={signIn}>登入</button>
           {error && <p>{error}</p>}
         </div>
