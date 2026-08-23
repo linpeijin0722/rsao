@@ -14,7 +14,6 @@ html,body{max-width:100%;overflow-x:hidden}*,*::before,*::after{box-sizing:borde
 .answerCard.collapsed>button{justify-self:end!important;width:36px!important;min-width:36px!important;height:36px!important;padding:0!important;display:grid!important;place-items:center!important;font-size:20px!important;line-height:1!important;color:#fff!important}
 .answerCard.collapsed>button[title="查看"]{width:auto!important;min-width:48px!important;padding:0 8px!important;font-size:14px!important}
 .answerCard select,.answerCard input,.answerCard textarea,.relationChooser select{background:#fff!important}
-.relationChooser>span:last-child{display:none!important}
 .missingItemsModal ul{margin:10px 0 18px;padding-left:24px;text-align:left}.missingItemsModal li{margin:6px 0;color:#8f243a;font-weight:700}
 
 /* 後台回傳資料：返回鍵永遠獨立一列且無底色 */
