@@ -20,3 +20,4 @@ body{background:#e8e5df}
 .questionPage .questions>b,.questionPage .relationshipFields h3{font-size:17px;line-height:1.55}
 .questionPage .questions .addQuestion{font-size:14px!important}
 .questionPage .questions textarea::placeholder,.questionPage input::placeholder,.questionPage textarea::placeholder{font-size:15px}
+.questionPage .babyProfileHint{display:block;width:100%;margin:-2px 0 2px;color:#7a6e66;font-size:14px;line-height:1.6}
