@@ -32,6 +32,10 @@ type Line = {
   qty: number;
 };
 type Screen = "method" | "slots" | "items" | "done";
+const FIXED_METHODS:Method[]=[
+  {id:"",code:"video",title:"視訊諮詢",description:"25分鐘",base_price:1200},
+  {id:"",code:"text",title:"文字諮詢",description:"不指定時間",base_price:0},
+];
 const money = (v: number) =>
     new Intl.NumberFormat("zh-TW", {
       style: "currency",
@@ -74,7 +78,7 @@ export default function Page() {
     } | null>(null),
     [menu, setMenu] = useState(false),
     [screen, setScreen] = useState<Screen>("method"),
-    [methods, setMethods] = useState<Method[]>([]),
+    [methods, setMethods] = useState<Method[]>(FIXED_METHODS),
     [items, setItems] = useState<Item[]>([]),
     [textFull, setTextFull] = useState(false),
     [method, setMethod] = useState<Method | null>(null),
@@ -132,15 +136,7 @@ export default function Page() {
           try{await liff.init({liffId});if(liff.isLoggedIn()){const friendship=await liff.getFriendship();return friendship.friendFlag}}catch{}
           return fallback;
         };
-        const [sessionResponse, catalogResponse] = await Promise.all([
-            fetch("/api/line/session", { cache: "no-store" }),
-            fetch("/api/catalog"),
-          ]),
-          catalog = await catalogResponse.json();
-        if (!catalogResponse.ok) throw Error(catalog.error);
-        setMethods(catalog.methods);
-        setItems(catalog.items);
-        setTextFull(Boolean(catalog.textFull));
+        const sessionResponse=await fetch("/api/line/session",{cache:"no-store"});
         if (sessionResponse.ok) {
           const sessionProfile = await sessionResponse.json();
           if(!(await hasOfficialAccountFriendship(Boolean(sessionProfile.isFriend)))){setError("請先加入 LINE 官方帳號好友；若曾封鎖，請先解除封鎖後再進行預約。");setAuth("friend-required");return}
@@ -231,13 +227,12 @@ export default function Page() {
       setAlertMessage("請選擇諮詢方式");
       return;
     }
-    if (method.code === "text") {
-      setScreen("slots");
-      return;
-    }
     setBusy(true);
     try {
-      const r = await fetch(`/api/slots?methodId=${method.id}`),
+      let selected=method;
+      if(!selected.id||!items.length){const catalogResponse=await fetch("/api/catalog"),catalog=await catalogResponse.json();if(!catalogResponse.ok)throw Error(catalog.error);setMethods(catalog.methods);setItems(catalog.items);setTextFull(Boolean(catalog.textFull));selected=catalog.methods.find((m:Method)=>m.code===method.code);if(!selected)throw Error("找不到諮詢方式");setMethod(selected);if(selected.code==="text"&&catalog.textFull){setAlertMessage("目前文字諮詢預約已額滿");return}}
+      if(selected.code==="text"){setScreen("slots");return}
+      const r = await fetch(`/api/slots?methodId=${selected.id}`),
         j = await r.json();
       if (!r.ok) throw Error(j.error);
       setSlots(j.slots);
@@ -346,7 +341,7 @@ export default function Page() {
   }
   function calUrl(no: string) {
     const start = new Date(slot),
-      end = new Date(start.getTime() + 1800000),
+      end = new Date(start.getTime() + 1500000),
       stamp = (d: Date) =>
         d
           .toISOString()
@@ -475,13 +470,13 @@ export default function Page() {
                   <button
                     key={m.id}
                     disabled={m.code === "text" && textFull}
-                    className={method?.id === m.id ? "selected" : ""}
+                    className={method?.code === m.code ? "selected" : ""}
                     onClick={() => choose(m)}
                   >
                     <b>{m.title}</b>
                     {m.code === "video" ? (
                       <>
-                        <p className="methodMeta">◷ 30分鐘</p>
+                        <p className="methodMeta">◷ 25分鐘</p>
                         <strong>+{money(m.base_price)}</strong>
                       </>
                     ) : (
