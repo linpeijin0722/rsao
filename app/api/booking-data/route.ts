@@ -33,28 +33,19 @@ export async function GET(r: NextRequest) {
   if (!selfProfile && x.c.full_name) {
     await x.db.from("consultation_profiles").insert({ customer_id:x.c.id, profile_type:"person", relationship:"本人", name:x.c.full_name, gender:x.c.gender, address:x.c.full_address, birth_date:x.c.birth_date, lunar_birth_text:x.c.lunar_birth_text, zodiac:x.c.zodiac, birth_shichen:x.c.birth_shichen });
   }
-  const { data: profiles } = await x.db
-    .from("consultation_profiles")
-    .select("*")
-    .eq("customer_id", x.c.id)
-    .order("created_at");
+  const detailIds=(x.b.booking_details || []).map((d:any)=>d.id);
+  const [{data:profiles},{data:links}]=await Promise.all([
+    x.db.from("consultation_profiles").select("*").eq("customer_id",x.c.id).order("created_at"),
+    x.db.from("booking_consultation_answers").select("id,booking_detail_id,profile_id,questions,extra_data,booking_answer_participants(profile_id,position)").in("booking_detail_id",detailIds),
+  ]);
   for (const profile of profiles || []) {
-    const update: Record<string,string> = {};
     if (profile.birth_date) {
       const calculated = lunarProfile(profile.birth_date);
-      if (profile.lunar_birth_text !== calculated.lunar_birth_text) update.lunar_birth_text = calculated.lunar_birth_text;
-      if (profile.zodiac !== calculated.zodiac) update.zodiac = calculated.zodiac;
+      profile.lunar_birth_text=calculated.lunar_birth_text;
+      profile.zodiac=calculated.zodiac;
     }
-    if (profile.death_date) update.lunar_death_text = lunarProfile(profile.death_date).lunar_birth_text;
-    if (Object.keys(update).length) { Object.assign(profile, update); await x.db.from("consultation_profiles").update(update).eq("id", profile.id); }
+    if (profile.death_date) profile.lunar_death_text=lunarProfile(profile.death_date).lunar_birth_text;
   }
-  const { data: links } = await x.db
-    .from("booking_consultation_answers")
-    .select("id,booking_detail_id,profile_id,questions,extra_data,booking_answer_participants(profile_id,position)")
-    .in(
-      "booking_detail_id",
-      (x.b.booking_details || []).map((d: any) => d.id),
-    );
   for(const detail of x.b.booking_details||[]){const answer=(links||[]).find((a:any)=>a.booking_detail_id===detail.id);(detail as any).answer_extra_data=answer?.extra_data||{}}
   return NextResponse.json({
     booking: x.b,
@@ -115,7 +106,7 @@ export async function POST(r: NextRequest) {
     if (!valid)
       return NextResponse.json({ error: "項目不屬於此訂單" }, { status: 400 });
     const questions = Array.isArray(body.questions)
-      ? body.questions.map((value: unknown) => String(value || "").trim()).slice(0, 3)
+      ? body.questions.map((value: unknown) => String(value || "").trim()).slice(0, 9)
       : [];
     const {data:answer}=await x.db.from("booking_consultation_answers").upsert(
       { booking_detail_id: body.detailId, profile_id: profileId, questions, extra_data: body.extraData || {}, updated_at: new Date().toISOString() },
