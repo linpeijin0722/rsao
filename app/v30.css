@@ -40,10 +40,10 @@
   grid-template-columns: 150px minmax(150px, 1.2fr) 90px 110px minmax(
       180px,
       1.2fr
-    ) 72px;
+    ) 72px 70px;
   gap: 12px;
   align-items: center;
-  min-width: 850px;
+  min-width: 930px;
   padding: 12px 14px;
 }
 .staffTableHead {
