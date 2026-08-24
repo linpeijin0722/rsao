@@ -3,6 +3,8 @@ import crypto from "node:crypto";
 const folderId = process.env.GOOGLE_DRIVE_OUTPUT_FOLDER_ID || process.env.GOOGLE_DRIVE_TEMPLATE_FOLDER_ID || "";
 const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || "";
 const privateKey = (process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+const appsScriptUrl = process.env.GOOGLE_APPS_SCRIPT_WEB_APP_URL || "";
+const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -125,12 +127,30 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const detail = allDetails[targetIndex];
   if (detail.google_document_id) return;
   if (!folderId) throw new Error("尚未設定 GOOGLE_DRIVE_OUTPUT_FOLDER_ID");
+  const { content, marks } = documentBody(detail, targetIndex + 1, allDetails.length);
+  if (appsScriptUrl) {
+    if (!appsScriptSecret) throw new Error("尚未設定 GOOGLE_APPS_SCRIPT_SECRET");
+    const response = await fetch(appsScriptUrl, {
+      method: "POST",
+      headers: { "content-type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ secret: appsScriptSecret, folderId, title: `${bookingNo}－${detail.item_title}`, content, marks }),
+      redirect: "follow",
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || "Apps Script 建立文件失敗");
+    const { error: updateError } = await db.from("booking_details").update({
+      google_document_id: result.documentId,
+      google_document_url: result.documentUrl,
+      google_document_created_at: new Date().toISOString(),
+    }).eq("id", detail.id);
+    if (updateError) throw updateError;
+    return;
+  }
   const token = await accessToken();
   const document = await google("https://docs.googleapis.com/v1/documents", token, {
     method: "POST", body: JSON.stringify({ title: `${bookingNo}－${detail.item_title}` }),
   });
   await google(`https://www.googleapis.com/drive/v3/files/${document.documentId}?addParents=${encodeURIComponent(folderId)}&fields=id,parents&supportsAllDrives=true`, token, { method: "PATCH", body: "{}" });
-  const { content, marks } = documentBody(detail, targetIndex + 1, allDetails.length);
   const requests: any[] = [
     { insertText: { location: { index: 1 }, text: content } },
     { updateTextStyle: { range: { startIndex: 1, endIndex: content.length + 1 }, textStyle: { weightedFontFamily: { fontFamily: "Noto Sans TC" }, fontSize: { magnitude: 14, unit: "PT" } }, fields: "weightedFontFamily,fontSize" } },
