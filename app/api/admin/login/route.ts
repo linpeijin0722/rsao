@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeAdminSession } from "@/lib/admin-session";
 export async function POST(r: NextRequest) {
-  const { password } = await r.json();
+  const { password, remember } = await r.json();
   if (!process.env.ADMIN_PASSWORD || password !== process.env.ADMIN_PASSWORD)
     return NextResponse.json({ error: "管理密碼錯誤" }, { status: 401 });
   const x = NextResponse.json({ ok: true });
@@ -10,7 +10,7 @@ export async function POST(r: NextRequest) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
     path: "/",
-    maxAge: 28800,
+    maxAge: remember ? 60 * 60 * 24 * 30 : 28800,
   });
   return x;
 }
