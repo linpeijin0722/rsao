@@ -30,20 +30,17 @@
   background: #fff;
 }
 .staffBookingTable {
-  overflow-x: auto;
+  overflow-x: visible;
   border: 1px solid #ddd2c6;
   border-radius: 12px;
 }
 .staffTableHead,
 .staffTableRow {
   display: grid;
-  grid-template-columns: 150px minmax(150px, 1.2fr) 90px 110px minmax(
-      180px,
-      1.2fr
-    ) 72px 70px;
+  grid-template-columns: 155px minmax(155px, 1fr) 120px 125px minmax(190px, 1.15fr) 88px 82px;
   gap: 12px;
   align-items: center;
-  min-width: 930px;
+  min-width: 0;
   padding: 12px 14px;
 }
 .staffTableHead {
