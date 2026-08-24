@@ -111,7 +111,7 @@ function documentBody(detail: any, itemIndex: number, totalItems: number) {
   return { content, marks };
 }
 
-export async function createConsultationDocuments(db: any, bookingId: string, bookingNo: string) {
+export async function createConsultationDocuments(db: any, bookingId: string, bookingNo: string, force = false) {
   const { data: details, error } = await db.from("booking_details").select(`
     id,item_title,created_at,google_document_id,
     booking_items(code),booking_detail_sub_items(sub_item_title),
@@ -125,7 +125,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   });
   if (targetIndex < 0) return;
   const detail = allDetails[targetIndex];
-  if (detail.google_document_id) return;
+  if (detail.google_document_id && !force) return;
   if (!folderId) throw new Error("尚未設定 GOOGLE_DRIVE_OUTPUT_FOLDER_ID");
   const { content, marks } = documentBody(detail, targetIndex + 1, allDetails.length);
   if (appsScriptUrl) {
@@ -133,7 +133,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     const response = await fetch(appsScriptUrl, {
       method: "POST",
       headers: { "content-type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ secret: appsScriptSecret, folderId, title: `${bookingNo}－${detail.item_title}`, content, marks }),
+      body: JSON.stringify({ secret: appsScriptSecret, folderId, title: `${bookingNo}－${detail.item_title}`, content, marks, previousDocumentId: force ? detail.google_document_id : "" }),
       redirect: "follow",
     });
     const result = await response.json();
