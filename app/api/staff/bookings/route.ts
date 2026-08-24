@@ -35,6 +35,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({error:error instanceof Error?error.message:"建立文件失敗"},{status:500});
     }
   }
+  if (action === "change_document_link") {
+    const url=String(body.documentUrl||"").trim(),match=url.match(/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/);
+    if(!match)return NextResponse.json({error:"請貼上正確的 Google 文件連結"},{status:400});
+    const db=adminSupabase(),{data:booking,error}=await db.from("bookings").select("id").eq("booking_no",bookingNo).single();
+    if(error||!booking)return NextResponse.json({error:"找不到訂單"},{status:404});
+    const {data:details,error:detailError}=await db.from("booking_details").select("id,item_title,google_document_created_at,booking_items(code)").eq("booking_id",booking.id);
+    if(detailError)return NextResponse.json({error:detailError.message},{status:400});
+    const target=(details||[]).find((detail:any)=>{const item=Array.isArray(detail.booking_items)?detail.booking_items[0]:detail.booking_items;return item?.code==="past-life-personal"||String(detail.item_title||"").includes("前世因果（個人）")});
+    if(!target)return NextResponse.json({error:"這筆訂單沒有可連結的前世因果（個人）項目"},{status:400});
+    const normalized=`https://docs.google.com/document/d/${match[1]}/edit`,{error:updateError}=await db.from("booking_details").update({google_document_id:match[1],google_document_url:normalized,google_document_created_at:target.google_document_created_at||new Date().toISOString()}).eq("id",target.id);
+    return updateError?NextResponse.json({error:updateError.message},{status:400}):NextResponse.json({ok:true,url:normalized});
+  }
   if (action === "update_answer") {
     if(!body.answerId||!body.profileId)return NextResponse.json({error:"缺少問事資料"},{status:400});
     const db=adminSupabase(),{error}=await db.from("booking_consultation_answers").update({profile_id:body.profileId,questions:(body.questions||[]).slice(0,3),extra_data:body.extraData||{},updated_at:new Date().toISOString()}).eq("id",body.answerId);
