@@ -53,6 +53,7 @@ const labels: Record<string, string> = {
   lunar_death_text: "農曆往生日期", death_shichen: "往生時辰", notes: "備註",
   relationship_status: "目前關係狀態", relationship_duration: "這段關係多久了",
   main_event: "這次最想解決的事件", relationship_goal: "最希望達成的目標",
+  overall_focuses: "目前最關心的事件", overall_focus_details: "事件詳細資料",
 };
 
 function extraLines(value: unknown, prefix = ""): string[] {
@@ -63,24 +64,26 @@ function extraLines(value: unknown, prefix = ""): string[] {
   return [`${prefix || "其他資料"}：${text(value)}`];
 }
 
-const profileLines = (profile: any, index: number, total: number) => {
-  const heading = total > 1 ? `諮詢者 ${index + 1}` : "諮詢者資料";
-  const rows = [
-    `${heading}－姓名：${text(profile.name)}`,
-    `資料分類：${text(profile.relationship)}`,
-    profile.relationship_detail ? `與我的關係：${text(profile.relationship_detail)}` : "",
-    `性別：${text(profile.gender)}`,
-    `國曆生日：${text(profile.birth_date)}`,
-    `農曆生日：${text(profile.lunar_birth_text)}`,
-    `生肖：${text(profile.zodiac)}`,
-    `出生時辰：${text(profile.birth_shichen)}`,
-    `居住地址：${text(profile.address)}`,
-  ].filter((line) => !line.endsWith("："));
-  return rows;
+const shichenName = (value: unknown) => text(value).split(/[（(]/)[0];
+const profileLines = (profile: any, ownerName: string) => {
+  const relation = profile.relationship === "本人"
+    ? "本人"
+    : `${ownerName || "用戶"}的${text(profile.relationship_detail || profile.relationship || "親友")}`;
+  const nameLine = `姓名：${text(profile.name)}${profile.gender ? `／${text(profile.gender)}` : ""}${relation ? `（${relation}）` : ""}`;
+  const lunarLine = profile.lunar_birth_text
+    ? `農曆生日：${text(profile.lunar_birth_text)}${profile.birth_shichen ? `（${shichenName(profile.birth_shichen)}）` : ""}${profile.zodiac ? `　生肖：${text(profile.zodiac)}` : ""}`
+    : "";
+  return [
+    nameLine,
+    lunarLine,
+    profile.address ? `居住地址：${text(profile.address)}` : "",
+    profile.lunar_death_text ? `農曆往生日期：${text(profile.lunar_death_text)}${profile.death_shichen ? `（${shichenName(profile.death_shichen)}）` : ""}` : "",
+    profile.notes ? `備註：${text(profile.notes)}` : "",
+  ].filter(Boolean);
 };
 
-type Mark = { start: number; end: number; kind: "meta" | "title" | "section" };
-function documentBody(detail: any, itemIndex: number, totalItems: number) {
+type Mark = { start: number; end: number; kind: "meta" | "title" | "section" | "answer" };
+function documentBody(detail: any, itemIndex: number, totalItems: number, ownerName: string) {
   let content = "";
   const marks: Mark[] = [];
   const add = (line: string, kind?: Mark["kind"]) => {
@@ -89,32 +92,44 @@ function documentBody(detail: any, itemIndex: number, totalItems: number) {
     if (kind) marks.push({ start, end: start + line.length, kind });
   };
   add(`項目 ${itemIndex}（共 ${totalItems} 個項目）`, "meta");
-  add(text(detail.item_title), "title");
   const subItems = (detail.booking_detail_sub_items || []).map((entry: any) => text(entry.sub_item_title)).filter(Boolean);
-  if (subItems.length) add(`子項目：${subItems.join("、")}`);
+  add([text(detail.item_title), subItems.join("、")].filter(Boolean).join("｜"), "title");
   add("");
   const answer = one(detail.booking_consultation_answers);
   const participants = (answer?.booking_answer_participants || []).slice().sort((a: any, b: any) => a.position - b.position);
   const people = [one(answer?.consultation_profiles), ...participants.map((entry: any) => one(entry.consultation_profiles))]
     .filter(Boolean).filter((profile: any, index: number, all: any[]) => all.findIndex((entry) => entry.id === profile.id) === index);
-  people.forEach((profile: any, index: number) => {
-    profileLines(profile, index, people.length).forEach((line) => add(line));
-    const omitted = new Set(["id", "customer_id", "created_at", "updated_at", "name", "profile_type", "relationship", "relationship_detail", "gender", "birth_date", "lunar_birth_text", "zodiac", "birth_shichen", "address", "photo_data"]);
+  people.forEach((profile: any) => {
+    profileLines(profile, ownerName).forEach((line) => add(line));
+    const omitted = new Set(["id", "customer_id", "created_at", "updated_at", "name", "profile_type", "relationship", "relationship_detail", "gender", "birth_date", "lunar_birth_text", "zodiac", "birth_shichen", "address", "photo_data", "death_date", "lunar_death_text", "death_shichen", "notes"]);
     extraLines(Object.fromEntries(Object.entries(profile).filter(([key]) => !omitted.has(key)))).forEach((line) => add(line));
     add("");
   });
-  (answer?.questions || []).map(text).filter(Boolean).forEach((question: string, index: number) => add(`問題 ${index + 1}：${question}`));
+  (answer?.questions || []).map(text).filter(Boolean).forEach((question: string, index: number) => {
+    add(`Q${index + 1}：${question}`);
+    add(`A${index + 1}：`, "answer");
+    add(""); add("");
+  });
   extraLines(answer?.extra_data || {}).forEach((line) => add(line));
   add("");
-  ["【前前世】", "【前世】", "【綜觀今生】"].forEach((heading) => {
+  const subTitle = subItems.join("、");
+  const sections = /前三世|三世/.test(subTitle)
+    ? ["【前前前世】", "【前前世】", "【前世】", "【綜觀今生】"]
+    : /前兩世|二世/.test(subTitle)
+      ? ["【前前世】", "【前世】", "【綜觀今生】"]
+      : ["【前世】", "【綜觀今生】"];
+  sections.forEach((heading) => {
     add(heading, "section");
-    add("老師回覆：");
     add(""); add(""); add(""); add("");
   });
   return { content, marks };
 }
 
 export async function createConsultationDocuments(db: any, bookingId: string, bookingNo: string, force = false) {
+  const { data: booking } = await db.from("bookings").select("customers(line_display_name,full_name)").eq("id", bookingId).single();
+  const customer = one(booking?.customers) || {};
+  const lineName = text(customer.line_display_name) || "LINE用戶";
+  const ownerName = text(customer.full_name) || lineName;
   const { data: details, error } = await db.from("booking_details").select(`
     id,item_title,created_at,google_document_id,
     booking_items(code),booking_detail_sub_items(sub_item_title),
@@ -130,13 +145,14 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const detail = allDetails[targetIndex];
   if (detail.google_document_id && !force) return;
   if (!folderId) throw new Error("尚未設定 GOOGLE_DRIVE_OUTPUT_FOLDER_ID");
-  const { content, marks } = documentBody(detail, targetIndex + 1, allDetails.length);
+  const { content, marks } = documentBody(detail, targetIndex + 1, allDetails.length, ownerName);
+  const fileTitle = `A${String(targetIndex + 1).padStart(2, "0")}-${lineName}-${ownerName}`;
   if (appsScriptUrl) {
     if (!appsScriptSecret) throw new Error("尚未設定 GOOGLE_APPS_SCRIPT_SECRET");
     const response = await fetch(appsScriptUrl, {
       method: "POST",
       headers: { "content-type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ secret: appsScriptSecret, folderId, title: `${bookingNo}－${detail.item_title}`, content, marks, previousDocumentId: force ? detail.google_document_id : "" }),
+      body: JSON.stringify({ secret: appsScriptSecret, folderId, title: fileTitle, content, marks, previousDocumentId: force ? detail.google_document_id : "" }),
       redirect: "follow",
     });
     const result = await response.json();
@@ -151,19 +167,22 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   }
   const token = await accessToken();
   const document = await google("https://docs.googleapis.com/v1/documents", token, {
-    method: "POST", body: JSON.stringify({ title: `${bookingNo}－${detail.item_title}` }),
+    method: "POST", body: JSON.stringify({ title: fileTitle }),
   });
   await google(`https://www.googleapis.com/drive/v3/files/${document.documentId}?addParents=${encodeURIComponent(folderId)}&fields=id,parents&supportsAllDrives=true`, token, { method: "PATCH", body: "{}" });
   const requests: any[] = [
     { insertText: { location: { index: 1 }, text: content } },
-    { updateTextStyle: { range: { startIndex: 1, endIndex: content.length + 1 }, textStyle: { weightedFontFamily: { fontFamily: "Noto Sans TC" }, fontSize: { magnitude: 14, unit: "PT" } }, fields: "weightedFontFamily,fontSize" } },
+    { updateDocumentStyle: { documentStyle: { marginTop: { magnitude: 28.3465, unit: "PT" }, marginBottom: { magnitude: 28.3465, unit: "PT" }, marginLeft: { magnitude: 28.3465, unit: "PT" }, marginRight: { magnitude: 28.3465, unit: "PT" } }, fields: "marginTop,marginBottom,marginLeft,marginRight" } },
+    { updateTextStyle: { range: { startIndex: 1, endIndex: content.length + 1 }, textStyle: { weightedFontFamily: { fontFamily: "Arial" }, fontSize: { magnitude: 14, unit: "PT" } }, fields: "weightedFontFamily,fontSize" } },
   ];
   for (const mark of marks) {
     const style = mark.kind === "meta"
       ? { foregroundColor: { color: { rgbColor: { red: .45, green: .42, blue: .4 } } }, fontSize: { magnitude: 10, unit: "PT" } }
       : mark.kind === "title"
         ? { bold: true, fontSize: { magnitude: 20, unit: "PT" } }
-        : { bold: true, fontSize: { magnitude: 18, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: .55, green: .12, blue: .22 } } } };
+        : mark.kind === "answer"
+          ? { bold: true, foregroundColor: { color: { rgbColor: { red: .1, green: .35, blue: .8 } } } }
+          : { bold: true, fontSize: { magnitude: 18, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: .55, green: .12, blue: .22 } } } };
     requests.push({ updateTextStyle: { range: { startIndex: mark.start, endIndex: mark.end }, textStyle: style, fields: "*" } });
   }
   await google(`https://docs.googleapis.com/v1/documents/${document.documentId}:batchUpdate`, token, { method: "POST", body: JSON.stringify({ requests }) });
