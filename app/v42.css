@@ -35,3 +35,13 @@ body{background:#e8e5df}
 /* 所有用戶輸入內容維持正常字重；欄位標題仍保留粗體。 */
 .shell input,.shell select,.shell textarea,.questionPage input,.questionPage select,.questionPage textarea,.profilePage input,.profilePage select,.profilePage textarea,.profileReadOnly b{font-weight:400!important}.questionPage label,.profileForm label>span,.profileReadOnly>span{font-weight:700!important}.profileEditActions{grid-template-columns:1fr!important}.profileEditActions .saveProfile,.profileEditActions .deleteProfile{display:block!important;width:100%!important}.extraFields:has(+.questionExtraFields){padding-bottom:4px!important}.extraFields+.questionExtraFields{border-top-left-radius:0!important;border-top-right-radius:0!important;background:#faf7f2!important}
 .alertModal .cancel{color:#fff!important}.questionPage *{max-width:100%;box-sizing:border-box}.questionPage textarea,.questionPage input,.questionPage select{width:100%!important;min-width:0!important}.textFlowStep{scroll-margin-block:120px}.targetQuestionGroups,.targetQuestionBlock,.relationshipFields,.questionExtraFields,.questions{width:100%;min-width:0;max-width:100%;box-sizing:border-box}.targetQuestionBlock textarea,.relationshipFields textarea,.questionExtraFields textarea{width:100%;max-width:100%;box-sizing:border-box}
+
+/* 預約工作後台－用戶資料彈窗提高可讀性。 */
+.staffPage .userInfoModal{width:min(640px,92vw);padding:22px}
+.staffPage .userInfoModal>img{width:96px;height:96px}
+.staffPage .userInfoModal>h2{margin:8px 0 12px;font-size:23px;line-height:1.35}
+.staffPage .staffCustomerProfile{margin:16px 0;border-radius:11px}
+.staffPage .staffCustomerProfile>div{grid-template-columns:105px minmax(0,1fr);gap:16px;padding:13px 15px;align-items:start}
+.staffPage .staffCustomerProfile span{font-size:15px;line-height:1.55}
+.staffPage .staffCustomerProfile b{font-size:16px;line-height:1.55}
+.staffPage .userInfoModal>button{font-size:16px;padding:12px}
