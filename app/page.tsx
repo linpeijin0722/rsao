@@ -385,16 +385,17 @@ export default function Page() {
         j = await r.json();
       if (!r.ok) throw Error(j.error);
       setBookingNo(j.booking.booking_no);
-      try{
-        const liffId=process.env.NEXT_PUBLIC_LIFF_ID;if(!liffId)throw Error();
-        await liff.init({liffId});if(!liff.isInClient())throw Error();
-        await liff.sendMessages([{type:"text",text:"我已送出預約，訂單待付款。"}]);
-        await fetch("/api/bookings/notify", {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({bookingNo:j.booking.booking_no})});
-      }catch{
-        const lineUrl=process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL;
-        if(lineUrl){location.assign(lineUrl);return}
-        location.assign(`https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID||""}`);
-        return;
+      try {
+        const liffId=process.env.NEXT_PUBLIC_LIFF_ID;
+        if(liffId){await liff.init({liffId});if(liff.isInClient())await liff.sendMessages([{type:"text",text:"我已送出預約，訂單待付款。"}])}
+      } catch (error) {
+        console.error("LIFF 用戶訊息發送失敗",error);
+      }
+      try {
+        const notifyResponse=await fetch("/api/bookings/notify",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({bookingNo:j.booking.booking_no})});
+        if(!notifyResponse.ok)console.error("待付款 Flex 發送失敗",await notifyResponse.text());
+      } catch (error) {
+        console.error("待付款 Flex 發送失敗",error);
       }
       {
         const paymentResponse = await fetch("/api/ecpay", {
