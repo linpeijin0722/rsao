@@ -98,6 +98,7 @@ export default function Page() {
     [deceasedPending, setDeceasedPending] = useState<Item | null>(null),
     [healthWarned, setHealthWarned] = useState(false),
     [textOk, setTextOk] = useState(false),
+    [textInfoStep, setTextInfoStep] = useState(1),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [bookingNo, setBookingNo] = useState("");
@@ -219,6 +220,7 @@ export default function Page() {
   function choose(m: Method) {
     setMethod(m);
     setTextOk(false);
+    setTextInfoStep(1);
     setSlots([]);
     setSlot("");
   }
@@ -323,6 +325,10 @@ export default function Page() {
     setError("");
     if (screen === "slots") {
       if (method?.code === "text") {
+        if (textInfoStep < 3) {
+          setTextInfoStep((value) => value + 1);
+          return;
+        }
         setTextConfirm(true);
         return;
       }
@@ -499,18 +505,17 @@ export default function Page() {
               <div className="title">
                 <h2>
                   {method?.code === "text"
-                    ? "確認文字諮詢說明"
+                    ? "文字諮詢流程與說明"
                     : "選擇視訊時間"}
                 </h2>
               </div>
               {method?.code === "text" ? (
-                <div className="textConsultationInfo">
-                  <h3>文字諮詢說明</h3>
-                  <ul>
-                    <li>約7–30天內收到諮詢結果。</li>
-                    <li>確認資料時，每項預約可提出3個問題。</li>
-                    <li>收到結果後8小時內，每項預約可提出2個補充問題。</li>
-                  </ul>
+                <div className="textConsultationInfo progressiveTextFlow" aria-live="polite">
+                  <article className="textFlowStep active"><b>1</b><div><h3>確認並提交資料</h3><p>請先完整填寫資料，我們收到後才會正式為您送單預約。</p></div></article>
+                  {textInfoStep >= 2 && <article className="textFlowStep active"><b>2</b><div><h3>等待分析結果</h3><p>送單後，阿嫂老師將於 7–30 天內經由 LINE 回傳文字諮詢結果。</p></div></article>}
+                  {textInfoStep >= 3 && <article className="textFlowStep active"><b>3</b><div><h3>售後補充提問</h3><p>收到結果後 8 小時內，可再提出 2 個補充問題。</p></div></article>}
+                  <div className="textFlowProgress"><span style={{width:`${textInfoStep/3*100}%`}} /></div>
+                  <small>目前顯示第 {textInfoStep} 步，共 3 步</small>
                 </div>
               ) : (
                 <>
