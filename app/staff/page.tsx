@@ -77,12 +77,23 @@ export default function Staff() {
     [pickedSubId, setPickedSubId] = useState(""),
     [documentLinkEdit,setDocumentLinkEdit]=useState<any>(null),
     [documentLinkValue,setDocumentLinkValue]=useState("");
+  async function staffPost(body:any,retry=true){
+    let response=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+    if(response.status===401&&retry){
+      const savedPassword=localStorage.getItem("lin_a_sao_staff_password");
+      if(savedPassword){
+        const loginResponse=await fetch("/api/admin/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password:savedPassword,remember:true})});
+        if(loginResponse.ok)return staffPost(body,false);
+      }
+    }
+    return response;
+  }
   async function generateDocument(x:any){
     const exists=sheetLinks(x).length>0;
     if(exists&&!confirm("該訂單已建立文件，是否確定要重新建立？\n\n重新建立後，右側連結會更新為新文件。"))return;
     setGeneratingDocument(x.booking_no);
     try{
-      const response=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"generate_document",bookingNo:x.booking_no,force:exists})}),result=await response.json();
+      const response=await staffPost({action:"generate_document",bookingNo:x.booking_no,force:exists}),result=await response.json();
       if(!response.ok)throw new Error(result.error||"建立文件失敗");
       const lineName=x.customers?.line_display_name||"LINE 用戶";
       alert(exists?`${lineName}諮詢單已重新建立，連結已更新。`:`${lineName}諮詢單已建立完成。`);
@@ -91,7 +102,7 @@ export default function Staff() {
   }
   async function saveDocumentLink(){
     if(!documentLinkEdit||!documentLinkValue.trim())return alert("請貼上 Google 文件連結");
-    const response=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"change_document_link",bookingNo:documentLinkEdit.booking_no,documentUrl:documentLinkValue.trim()})}),result=await response.json();
+    const response=await staffPost({action:"change_document_link",bookingNo:documentLinkEdit.booking_no,documentUrl:documentLinkValue.trim()}),result=await response.json();
     if(!response.ok)return alert(result.error||"更改連結失敗");
     setDocumentLinkEdit(null);setDocumentLinkValue("");await load();alert("諮詢單連結已更新");
   }
@@ -121,7 +132,7 @@ export default function Staff() {
     const r = await fetch("/api/admin/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ password, remember: rememberPassword }),
     });
     if (r.ok) {
       if(rememberPassword)localStorage.setItem("lin_a_sao_staff_password",password);else localStorage.removeItem("lin_a_sao_staff_password");
