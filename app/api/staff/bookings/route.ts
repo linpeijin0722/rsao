@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
 import { adminSupabase } from "@/lib/supabase";
 import { pushLineFlex } from "@/lib/line-message";
+import { createConsultationDocuments } from "@/lib/google-consultation-docs";
 export async function GET() {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
@@ -20,6 +21,20 @@ export async function POST(request: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
   const body = await request.json(), { bookingNo, action } = body;
+  if (action === "generate_document") {
+    const db=adminSupabase(),{data:booking,error}=await db.from("bookings").select("id,booking_no,data_submitted_at").eq("booking_no",bookingNo).single();
+    if(error||!booking)return NextResponse.json({error:"找不到訂單"},{status:404});
+    if(!booking.data_submitted_at)return NextResponse.json({error:"用戶尚未回傳問事資料，不能建立諮詢單"},{status:400});
+    try{
+      await createConsultationDocuments(db,booking.id,booking.booking_no,Boolean(body.force));
+      const {data:details}=await db.from("booking_details").select("id,item_title,google_document_url").eq("booking_id",booking.id).not("google_document_url","is",null);
+      if(!details?.length)return NextResponse.json({error:"這筆訂單沒有「前世因果（個人）」項目；目前測試版只會建立這個項目的文件。"},{status:400});
+      return NextResponse.json({ok:true,documents:details});
+    }catch(error){
+      console.error("後台建立諮詢文件失敗",error);
+      return NextResponse.json({error:error instanceof Error?error.message:"建立文件失敗"},{status:500});
+    }
+  }
   if (action === "update_answer") {
     if(!body.answerId||!body.profileId)return NextResponse.json({error:"缺少問事資料"},{status:400});
     const db=adminSupabase(),{error}=await db.from("booking_consultation_answers").update({profile_id:body.profileId,questions:(body.questions||[]).slice(0,3),extra_data:body.extraData||{},updated_at:new Date().toISOString()}).eq("id",body.answerId);
