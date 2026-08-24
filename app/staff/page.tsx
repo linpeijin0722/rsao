@@ -13,7 +13,7 @@ const shiftMonth = (value: string, amount: number) => {
 const asArray = (value: any): any[] =>
   Array.isArray(value) ? value : value ? [value] : [];
 const isComplete = (x: any) => Boolean(x.data_submitted_at);
-const sheetLinks = (x: any) => asArray(x.booking_details).filter((detail: any) => detail.google_sheet_url);
+const sheetLinks = (x: any) => asArray(x.booking_details).map((detail: any) => ({...detail,consultation_url:detail.google_document_url||detail.google_sheet_url})).filter((detail: any) => detail.consultation_url);
 const returnedData = (x: any) =>
   asArray(x.booking_details).flatMap((detail: any) =>
     asArray(detail.booking_consultation_answers).flatMap((answer: any) => {
@@ -392,7 +392,7 @@ export default function Staff() {
                     )}
                     <small>{x.booking_no}</small>
                     <button onClick={() => openEdit(x)}>修改</button>
-                    {sheetLinks(x).length ? <span className="consultationSheetLinks">{sheetLinks(x).map((detail:any)=><a key={detail.id} className="consultationSheetLink" href={detail.google_sheet_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗</a>)}</span> : <span className="sheetPending">—</span>}
+                    {sheetLinks(x).length ? <span className="consultationSheetLinks">{sheetLinks(x).map((detail:any)=><a key={detail.id} className="consultationSheetLink" href={detail.consultation_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗</a>)}</span> : <span className="sheetPending">—</span>}
                   </article>
                 );
               })}
@@ -533,7 +533,7 @@ export default function Staff() {
                 )}
                 <small>{x.booking_no}</small>
                 <button onClick={() => openEdit(x)}>修改</button>
-                {sheetLinks(x).length ? <span className="consultationSheetLinks">{sheetLinks(x).map((detail:any)=><a key={detail.id} className="consultationSheetLink" href={detail.google_sheet_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗</a>)}</span> : <span className="sheetPending">—</span>}
+                {sheetLinks(x).length ? <span className="consultationSheetLinks">{sheetLinks(x).map((detail:any)=><a key={detail.id} className="consultationSheetLink" href={detail.consultation_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗</a>)}</span> : <span className="sheetPending">—</span>}
               </article>
             );
           })}
