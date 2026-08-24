@@ -13,7 +13,8 @@ export default function StaffAnswerEditorV2({ value, profiles, change, close, sa
   const title = text(value.item_title);
   const sub = (value.sub_items || []).join("、");
   const relation = title.includes("與他人前世關係");
-  const love = title.includes("感情運勢與關係合盤") || title.includes("合八字") || title.includes("合婚");
+  const personalLove = title.includes("個人感情運") || sub.includes("個人感情運");
+  const love = (title.includes("感情運勢") || title.includes("關係合盤") || title.includes("合八字") || title.includes("合婚")) && !personalLove;
   const newborn = title.includes("新生兒命名");
   const company = title.includes("公司命名") || title.includes("公司改名") || sub.includes("公司命名") || sub.includes("公司改名");
   const datePick = title.includes("擇日") || title.includes("擇時") || title.includes("則日") || title.includes("則時");
@@ -21,7 +22,6 @@ export default function StaffAnswerEditorV2({ value, profiles, change, close, sa
   const home = title.includes("陽宅");
   const infant = title.includes("嬰靈");
   const lawsuit = title.includes("官司") || title.includes("貴人");
-  const personalLove = title.includes("個人感情運");
   const noGenericQuestions = company || newborn || lawsuit || relation || love;
 
   const setExtra = (key: string, next: any) =>
@@ -98,7 +98,7 @@ export default function StaffAnswerEditorV2({ value, profiles, change, close, sa
 
       {personalLove && <section className="staffAnswerSection">{area("目前感情狀態", "love_status", "例如：單身多久、剛分手沉澱中、空窗期較長等")}{area("目前的社交與生活型態", "social_lifestyle", "例如：生活圈固定不太出門、正積極使用交友軟體或參加活動等")}</section>}
       {newborn && <section className="staffAnswerSection">{input("希望寶寶姓氏", "baby_surname")}{area("是否有特別想用的字或喜歡的讀音？", "preferred_characters", "例如：喜歡『安』字、希望讀音溫柔好念")}{area("對名字的風格有沒有什麼想像？", "name_style", "例如：想要響亮一點、優雅一點，還是有想避開的感覺？")}{area("是否有禁忌或避諱的字或諧音？", "name_taboo", "例如：避開長輩同名、特定字或容易產生誤會的諧音")}{area("其他備註", "naming_notes")}</section>}
-      {company && <section className="staffAnswerSection">{sub.includes("公司改名") && input("公司目前名字（或舊名）", "old_name")}{area("主要業務與產品", "business", "簡單說明公司是做什麼的、主要賣什麼或提供什麼服務即可")}<label>公司經營模式<select value={text(extra.mode)} onChange={(e)=>setExtra("mode",e.target.value)}><option value="">請選擇</option><option value="sole">獨資（自己一人開）</option><option value="partners">合夥（有其他股東）</option></select></label>{extra.mode === "partners" && <label>請選擇其他合夥人<select value={text(extra.partner)} onChange={(e)=>setExtra("partner",e.target.value)}><option value="">請選擇</option>{profiles.filter((p:any)=>p.profile_type==="person").map((p:any)=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}{area("命名喜好與禁忌", "preferences")}{area("有沒有特別喜歡或想放進去的字？", "favorite_words")}{area("其他備註", "notes")}</section>}
+      {company && <section className="staffAnswerSection">{sub.includes("公司改名") && input("公司目前名字（或舊名）", "old_name")}{area("主要業務與產品", "business", "簡單說明公司是做什麼的、主要賣什麼或提供什麼服務即可")}<label>公司經營模式<select value={text(extra.mode)} onChange={(e)=>setExtra("mode",e.target.value)}><option value="">請選擇</option><option value="sole">獨資（自己一人開）</option><option value="partners">合夥（有其他股東）</option></select></label>{extra.mode === "partners" && <label>請選擇其他合夥人<select value={text(extra.partner)} onChange={(e)=>setExtra("partner",e.target.value)}><option value="">請選擇</option>{profiles.filter((p:any)=>p.profile_type==="person").map((p:any)=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}{area("命名喜好與禁忌", "preferences", "例如：希望名稱穩重、親切、現代，或想避開的風格")}{area("有沒有特別喜歡或想放進去的字？", "favorite_words", "例如：希望放入『安』、『盛』等字，或喜歡特定讀音")}{area("其他備註", "notes", "例如：產業特色、品牌理念，或其他希望老師留意的事項")}</section>}
       {datePick && <section className="staffAnswerSection">{select("這次是要擇什麼日子呢？", "purpose", ["結婚／登記","手術／開刀","開工／開業","搬家／入宅","動土／修造","簽約／交易","提車／交車","安神／立壇","出行／遠行","喪葬／安葬","其他"])}{extra.purpose === "其他" && input("其他用途", "other_purpose")}{area("請說明您目前的狀況", "situation")}{area("是否有指定的日期範圍？有沒有特別忌諱或需要注意的？", "date_range")}{input("地點在哪裡？（若無則不需填寫）", "location")}{area("其他想補充的說明或狀況？", "notes")}</section>}
       {deceased && <section className="staffAnswerSection">{area("目前的困擾或遺憾", "current_regret", "例如：夢到對方感到不安、執著於某句沒說出口的話")}{area("這次諮詢最希望獲得什麼", "consultation_goal", "例如：確認對方現在過得好不好？")}</section>}
       {home && <section className="staffAnswerSection">{area("本次諮詢的主要目的", "home_purpose", "例如：購屋前評估、裝修格局調整、搬入後想改善運勢")}{area("目前住起來最困擾的問題", "home_problem", "例如：睡眠不好、頻繁吵架、財運受阻、身體欠安")}</section>}
