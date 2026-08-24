@@ -74,7 +74,9 @@ export default function Staff() {
     [rememberPassword, setRememberPassword] = useState(false),
     [generatingDocument, setGeneratingDocument] = useState(""),
     [addPicker, setAddPicker] = useState<any>(null),
-    [pickedSubId, setPickedSubId] = useState("");
+    [pickedSubId, setPickedSubId] = useState(""),
+    [documentLinkEdit,setDocumentLinkEdit]=useState<any>(null),
+    [documentLinkValue,setDocumentLinkValue]=useState("");
   async function generateDocument(x:any){
     const exists=sheetLinks(x).length>0;
     if(exists&&!confirm("該訂單已建立文件，是否確定要重新建立？\n\n重新建立後，右側連結會更新為新文件。"))return;
@@ -86,11 +88,18 @@ export default function Staff() {
       await load();
     }catch(error){alert(error instanceof Error?error.message:"建立文件失敗")}finally{setGeneratingDocument("")}
   }
+  async function saveDocumentLink(){
+    if(!documentLinkEdit||!documentLinkValue.trim())return alert("請貼上 Google 文件連結");
+    const response=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"change_document_link",bookingNo:documentLinkEdit.booking_no,documentUrl:documentLinkValue.trim()})}),result=await response.json();
+    if(!response.ok)return alert(result.error||"更改連結失敗");
+    setDocumentLinkEdit(null);setDocumentLinkValue("");await load();alert("諮詢單連結已更新");
+  }
   function documentActions(x:any){
     if(!isComplete(x))return <span className="sheetPending">—</span>;
     const links=sheetLinks(x),busy=generatingDocument===x.booking_no;
     return <span className="consultationSheetLinks">
-      <button className="consultationSheetLink documentGenerateButton" disabled={busy} onClick={()=>generateDocument(x)} title={links.length?"重新建立諮詢文件":"建立諮詢文件"} aria-label={links.length?"重新建立諮詢文件":"建立諮詢文件"}>{busy?"…":"🔄"}</button>
+      <button className="consultationSheetLink documentGenerateButton" disabled={busy} onClick={()=>generateDocument(x)} title={links.length?"重新建立諮詢文件":"建立諮詢文件"} aria-label={links.length?"重新建立諮詢文件":"建立諮詢文件"}>{busy?"…":"📄"}</button>
+      <button className="consultationSheetLink documentRelinkButton" onClick={()=>{setDocumentLinkEdit(x);setDocumentLinkValue(links[0]?.consultation_url||"")}} title="更改為現有 Google 文件連結" aria-label="更改諮詢單連結">🔄</button>
       {links.map((detail:any)=><a key={detail.id} className="consultationSheetLink" href={detail.consultation_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗</a>)}
     </span>
   }
@@ -694,6 +703,7 @@ export default function Staff() {
           </div>
         </div>
       )}
+      {documentLinkEdit&&<div className="modalBackdrop documentLinkBackdrop" onClick={()=>setDocumentLinkEdit(null)}><div className="modal documentLinkModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setDocumentLinkEdit(null)}>×</button><h2>更改諮詢單連結</h2><p>先到 Google 雲端硬碟開啟要使用的文件，複製網址後貼到下方。</p><a className="openGoogleDrive" href="https://drive.google.com/drive/my-drive" target="_blank" rel="noreferrer">開啟 Google 雲端硬碟</a><label>Google 文件連結<input autoFocus placeholder="https://docs.google.com/document/d/..." value={documentLinkValue} onChange={e=>setDocumentLinkValue(e.target.value)}/></label><div className="documentLinkActions"><button onClick={()=>void saveDocumentLink()}>確認更改連結</button><button className="cancel" onClick={()=>setDocumentLinkEdit(null)}>取消</button></div></div></div>}
       {addPicker && (
         <div
           className="modalBackdrop addSubBackdrop"
