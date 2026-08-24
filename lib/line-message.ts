@@ -91,7 +91,7 @@ export function bookingFlex(args: {
         },
         {
           type: "text",
-          text: "重要提醒｜請務必完成問事資料\n這份資料是阿嫂老師進行觀靈與命理分析的重要依據。請點選下方按鈕完整填寫；資料送出後，我們才能正式安排後續諮詢，謝謝您的配合。",
+          text: "請記得填寫問事資料\n這是阿嫂老師進行諮詢的重要資料；完成填寫後，我們才能接續安排。請點選下方按鈕填寫，謝謝您。",
           wrap: true,
           color: "#B42332",
           weight: "bold",
@@ -137,6 +137,7 @@ export function videoReminderFlex(args: {
           weight: "bold",
           size: "xl",
         },
+        { type: "text", text: "林阿嫂線上諮詢", color: "#6B625B", size: "sm" },
       ],
     },
     body: {
