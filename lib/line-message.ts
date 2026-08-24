@@ -107,3 +107,68 @@ export function bookingFlex(args: {
     },
   };
 }
+
+export function videoReminderFlex(args: {
+  bookingNo: string;
+  slotStart: string;
+  site: string;
+}) {
+  const date = new Intl.DateTimeFormat("zh-TW", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(args.slotStart));
+  return {
+    type: "bubble",
+    header: {
+      type: "box",
+      layout: "vertical",
+      backgroundColor: "#FFF4E5",
+      contents: [
+        {
+          type: "text",
+          text: "明日視訊諮詢提醒",
+          color: "#8A5A24",
+          weight: "bold",
+          size: "xl",
+        },
+      ],
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      spacing: "md",
+      contents: [
+        { type: "text", text: `預約時間：${date}`, weight: "bold", wrap: true },
+        { type: "text", text: `訂單編號：${args.bookingNo}`, wrap: true, color: "#6B625B" },
+        {
+          type: "text",
+          text: "溫馨提醒您，明天有林阿嫂視訊諮詢預約。請預先確認 LINE 訊息與網路連線正常，並留意助理傳送的視訊連結。",
+          wrap: true,
+          color: "#4D453F",
+        },
+      ],
+    },
+    footer: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "button",
+          style: "primary",
+          color: "#8A3045",
+          action: {
+            type: "uri",
+            label: "查看我的預約",
+            uri: `${args.site}/my-bookings?order=${encodeURIComponent(args.bookingNo)}`,
+          },
+        },
+      ],
+    },
+  };
+}
