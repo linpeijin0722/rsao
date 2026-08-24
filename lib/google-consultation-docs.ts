@@ -8,7 +8,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-08-24-v5";
+const requiredAppsScriptVersion = "2026-08-24-v6";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -122,7 +122,9 @@ function documentBody(detail: any, itemIndex: number, totalItems: number, ownerN
   extraLines(answer?.extra_data || {}).forEach((line) => add(line));
   add("");
   const subTitle = subItems.join("、");
-  const sections = /前三世|三世/.test(subTitle)
+  const itemCode = one(detail.booking_items)?.code || "";
+  const isPastLifePersonal = itemCode === "past-life-personal" || text(detail.item_title).includes("前世因果（個人）");
+  const sections = !isPastLifePersonal ? [] : /前三世|三世/.test(subTitle)
     ? ["【前前前世】", "【前前世】", "【前世】", "【綜觀今生】"]
     : /前兩世|二世/.test(subTitle)
       ? ["【前前世】", "【前世】", "【綜觀今生】"]
@@ -141,7 +143,7 @@ function consultationNumber(position: number) {
   return `${String.fromCharCode(65 + letterIndex)}${String(((safe - 1) % 99) + 1).padStart(2, "0")}`;
 }
 
-export async function createConsultationDocuments(db: any, bookingId: string, bookingNo: string, force = false) {
+export async function createConsultationDocuments(db: any, bookingId: string, bookingNo: string, force = false, createMode: "replace" | "new" = "replace") {
   const { data: booking } = await db.from("bookings").select("customers(line_display_name,full_name)").eq("id", bookingId).single();
   const customer = one(booking?.customers) || {};
   const lineName = text(customer.line_display_name) || "LINE用戶";
@@ -153,69 +155,58 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   `).eq("booking_id", bookingId).order("created_at", { ascending: true });
   if (error) throw error;
   const allDetails = details || [];
-  const targetIndex = allDetails.findIndex((detail: any) => {
-    const item = one(detail.booking_items);
-    return item?.code === "past-life-personal" || text(detail.item_title).includes("前世因果（個人）");
-  });
-  if (targetIndex < 0) return;
-  const detail = allDetails[targetIndex];
-  if (detail.google_document_id && !force) return;
+  if (!allDetails.length) return;
   if (!folderId) throw new Error("尚未設定 GOOGLE_DRIVE_OUTPUT_FOLDER_ID");
-  const { content, marks } = documentBody(detail, targetIndex + 1, allDetails.length, ownerName);
+  if (!appsScriptUrl) throw new Error("尚未設定 GOOGLE_APPS_SCRIPT_WEB_APP_URL");
+  if (!appsScriptSecret) throw new Error("尚未設定 GOOGLE_APPS_SCRIPT_SECRET");
+
+  const existingDetails = allDetails.filter((detail: any) => detail.google_document_id);
+  if (existingDetails.length && !force) return;
+  const anchor = existingDetails[0] || allDetails[0];
+  const detailIds = new Set(allDetails.map((detail: any) => detail.id));
+  let content = "";
+  const marks: Mark[] = [];
+  allDetails.forEach((detail: any, index: number) => {
+    if (index > 0) content += "[[[PAGE_BREAK]]]\n";
+    const offset = content.length;
+    const page = documentBody(detail, index + 1, allDetails.length, ownerName);
+    content += page.content;
+    marks.push(...page.marks.map((mark) => ({ ...mark, start: mark.start + offset, end: mark.end + offset })));
+  });
+
   const { data: numberedDocuments, error: numberError } = await db.from("booking_details")
-    .select("id,google_document_created_at")
+    .select("id,google_document_id,google_document_created_at")
     .not("google_document_id", "is", null)
     .order("google_document_created_at", { ascending: true });
   if (numberError) throw numberError;
-  const existingPosition = (numberedDocuments || []).findIndex((row: any) => row.id === detail.id);
-  const documentPosition = existingPosition >= 0 ? existingPosition + 1 : (numberedDocuments || []).length + 1;
+  const uniqueDocuments = (numberedDocuments || []).filter((row: any, index: number, rows: any[]) =>
+    rows.findIndex((candidate: any) => candidate.google_document_id === row.google_document_id) === index
+  );
+  const existingPosition = uniqueDocuments.findIndex((row: any) => detailIds.has(row.id));
+  const documentPosition = existingPosition >= 0 ? existingPosition + 1 : uniqueDocuments.length + 1;
   const fileTitle = `${consultationNumber(documentPosition)}-${lineName}-${ownerName}`;
-  if (appsScriptUrl) {
-    if (!appsScriptSecret) throw new Error("尚未設定 GOOGLE_APPS_SCRIPT_SECRET");
-    const response = await fetch(appsScriptUrl, {
-      method: "POST",
-      headers: { "content-type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ secret: appsScriptSecret, expectedVersion: requiredAppsScriptVersion, folderId, title: fileTitle, content, marks, previousDocumentId: force ? detail.google_document_id : "" }),
-      redirect: "follow",
-    });
-    const result = await response.json();
-    if (!response.ok || !result.ok) throw new Error(result.error || "Apps Script 建立文件失敗");
-    if (result.version !== requiredAppsScriptVersion) throw new Error(`目前連到舊版 Google Apps Script（目前：${result.version || "無版本資訊"}；需要：${requiredAppsScriptVersion}），請更新 Vercel 的 GOOGLE_APPS_SCRIPT_WEB_APP_URL 後重新部署`);
-    const { error: updateError } = await db.from("booking_details").update({
-      google_document_id: result.documentId,
-      google_document_url: result.documentUrl,
-      google_document_created_at: detail.google_document_created_at || new Date().toISOString(),
-    }).eq("id", detail.id);
-    if (updateError) throw updateError;
-    return;
-  }
-  const token = await accessToken();
-  const document = await google("https://docs.googleapis.com/v1/documents", token, {
-    method: "POST", body: JSON.stringify({ title: fileTitle }),
+  const response = await fetch(appsScriptUrl, {
+    method: "POST",
+    headers: { "content-type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      secret: appsScriptSecret, expectedVersion: requiredAppsScriptVersion, folderId,
+      title: fileTitle, content, marks, createMode,
+      previousDocumentIds: force ? existingDetails.map((detail: any) => detail.google_document_id).filter(Boolean) : [],
+    }),
+    redirect: "follow",
   });
-  await google(`https://www.googleapis.com/drive/v3/files/${document.documentId}?addParents=${encodeURIComponent(folderId)}&fields=id,parents&supportsAllDrives=true`, token, { method: "PATCH", body: "{}" });
-  const requests: any[] = [
-    { insertText: { location: { index: 1 }, text: content } },
-    { updateDocumentStyle: { documentStyle: { marginTop: { magnitude: 28.3465, unit: "PT" }, marginBottom: { magnitude: 28.3465, unit: "PT" }, marginLeft: { magnitude: 28.3465, unit: "PT" }, marginRight: { magnitude: 28.3465, unit: "PT" } }, fields: "marginTop,marginBottom,marginLeft,marginRight" } },
-    { updateTextStyle: { range: { startIndex: 1, endIndex: content.length + 1 }, textStyle: { weightedFontFamily: { fontFamily: "Arial" }, fontSize: { magnitude: 14, unit: "PT" } }, fields: "weightedFontFamily,fontSize" } },
-  ];
-  for (const mark of marks) {
-    const style = mark.kind === "meta"
-      ? { foregroundColor: { color: { rgbColor: { red: .45, green: .42, blue: .4 } } }, fontSize: { magnitude: 10, unit: "PT" } }
-      : mark.kind === "title"
-        ? { bold: true, fontSize: { magnitude: 20, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: .42, green: .23, blue: .14 } } } }
-        : mark.kind === "question"
-          ? { bold: true }
-          : mark.kind === "answer"
-            ? { bold: false, foregroundColor: { color: { rgbColor: { red: .1, green: .35, blue: .8 } } } }
-            : { bold: true, fontSize: { magnitude: 18, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: .55, green: .12, blue: .22 } } } };
-    requests.push({ updateTextStyle: { range: { startIndex: mark.start, endIndex: mark.end }, textStyle: style, fields: "*" } });
-  }
-  await google(`https://docs.googleapis.com/v1/documents/${document.documentId}:batchUpdate`, token, { method: "POST", body: JSON.stringify({ requests }) });
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.error || "Apps Script 建立文件失敗");
+  if (result.version !== requiredAppsScriptVersion) throw new Error(`目前連到舊版 Google Apps Script（目前：${result.version || "無版本資訊"}；需要：${requiredAppsScriptVersion}），請更新 Vercel 的 GOOGLE_APPS_SCRIPT_WEB_APP_URL 後重新部署`);
+  const createdAt = existingDetails.map((detail: any) => detail.google_document_created_at).filter(Boolean).sort()[0] || new Date().toISOString();
+  const { error: clearError } = await db.from("booking_details").update({
+    google_document_id: null, google_document_url: null, google_document_created_at: null,
+  }).eq("booking_id", bookingId);
+  if (clearError) throw clearError;
   const { error: updateError } = await db.from("booking_details").update({
-    google_document_id: document.documentId,
-    google_document_url: `https://docs.google.com/document/d/${document.documentId}/edit`,
-    google_document_created_at: detail.google_document_created_at || new Date().toISOString(),
-  }).eq("id", detail.id);
+    google_document_id: result.documentId,
+    google_document_url: result.documentUrl,
+    google_document_created_at: createdAt,
+  }).eq("id", anchor.id);
   if (updateError) throw updateError;
 }
