@@ -72,8 +72,28 @@ export default function Staff() {
     [dataFilter, setDataFilter] = useState("all"),
     [sortBy, setSortBy] = useState("paid_time"),
     [rememberPassword, setRememberPassword] = useState(false),
+    [generatingDocument, setGeneratingDocument] = useState(""),
     [addPicker, setAddPicker] = useState<any>(null),
     [pickedSubId, setPickedSubId] = useState("");
+  async function generateDocument(x:any){
+    const exists=sheetLinks(x).length>0;
+    if(exists&&!confirm("該訂單已建立文件，是否確定要重新建立？\n\n重新建立後，右側連結會更新為新文件。"))return;
+    setGeneratingDocument(x.booking_no);
+    try{
+      const response=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"generate_document",bookingNo:x.booking_no,force:exists})}),result=await response.json();
+      if(!response.ok)throw new Error(result.error||"建立文件失敗");
+      alert(exists?"文件已重新建立，連結已更新。":"文件已建立完成。");
+      await load();
+    }catch(error){alert(error instanceof Error?error.message:"建立文件失敗")}finally{setGeneratingDocument("")}
+  }
+  function documentActions(x:any){
+    if(!isComplete(x))return <span className="sheetPending">—</span>;
+    const links=sheetLinks(x),busy=generatingDocument===x.booking_no;
+    return <span className="consultationSheetLinks">
+      <button className="consultationSheetLink documentGenerateButton" disabled={busy} onClick={()=>generateDocument(x)} title={links.length?"重新建立諮詢文件":"建立諮詢文件"} aria-label={links.length?"重新建立諮詢文件":"建立諮詢文件"}>{busy?"…":"🔄"}</button>
+      {links.map((detail:any)=><a key={detail.id} className="consultationSheetLink" href={detail.consultation_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗</a>)}
+    </span>
+  }
   async function load() {
     const r = await fetch("/api/staff/bookings"),
       j = await r.json();
@@ -392,7 +412,7 @@ export default function Staff() {
                     )}
                     <small>{x.booking_no}</small>
                     <button onClick={() => openEdit(x)}>修改</button>
-                    {sheetLinks(x).length ? <span className="consultationSheetLinks">{sheetLinks(x).map((detail:any)=><a key={detail.id} className="consultationSheetLink" href={detail.consultation_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗</a>)}</span> : <span className="sheetPending">—</span>}
+                    {documentActions(x)}
                   </article>
                 );
               })}
@@ -533,7 +553,7 @@ export default function Staff() {
                 )}
                 <small>{x.booking_no}</small>
                 <button onClick={() => openEdit(x)}>修改</button>
-                {sheetLinks(x).length ? <span className="consultationSheetLinks">{sheetLinks(x).map((detail:any)=><a key={detail.id} className="consultationSheetLink" href={detail.consultation_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗</a>)}</span> : <span className="sheetPending">—</span>}
+                {documentActions(x)}
               </article>
             );
           })}
