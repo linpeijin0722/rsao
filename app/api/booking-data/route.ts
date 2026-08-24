@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { verifyLineSession } from "@/lib/line-session";
 import { adminSupabase } from "@/lib/supabase";
 import { lunarProfile } from "@/lib/lunar-profile";
-import { createConsultationSheets } from "@/lib/google-consultation-sheets";
+import { createConsultationDocuments } from "@/lib/google-consultation-docs";
 async function context(order: string) {
   const uid = verifyLineSession((await cookies()).get("line_session")?.value);
   if (!uid) return null;
@@ -71,9 +71,9 @@ export async function POST(r: NextRequest) {
     if (submittedError) return NextResponse.json({error:"資料送出失敗，請稍後再試"},{status:500});
     after(async () => {
       try {
-        await createConsultationSheets(x.db,x.b.id,x.b.booking_no);
+        await createConsultationDocuments(x.db,x.b.id,x.b.booking_no);
       } catch (error) {
-        console.error("建立諮詢試算表失敗", error);
+        console.error("建立諮詢 Google 文件失敗", error);
       }
     });
     return NextResponse.json({ok:true,submitted:true});
