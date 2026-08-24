@@ -67,10 +67,18 @@ function extraLines(value: unknown, prefix = ""): string[] {
 
 const shichenName = (value: unknown) => text(value).split(/[（(]/)[0];
 const profileLines = (profile: any, ownerName: string) => {
-  const relation = profile.relationship === "本人"
+  const profileName = text(profile.name);
+  const relationshipDetail = text(profile.relationship_detail);
+  // 舊資料有些親友的 relationship 曾被存成「本人」，因此不能只看這個欄位。
+  // 必須同時符合姓名、沒有親友關係備註，才是真正的預約人本人。
+  const isOwner = profile.relationship === "本人"
+    && !relationshipDetail
+    && !!ownerName
+    && profileName === ownerName;
+  const relation = isOwner
     ? "本人"
-    : `${ownerName || "用戶"}的${text(profile.relationship_detail || profile.relationship || "親友")}`;
-  const nameLine = `姓名：${text(profile.name)}${profile.gender ? `／${text(profile.gender)}` : ""}${relation ? `（${relation}）` : ""}`;
+    : `${ownerName || "用戶"}的${relationshipDetail || (profile.relationship === "本人" ? "親友" : text(profile.relationship || "親友"))}`;
+  const nameLine = `姓名：${profileName}${profile.gender ? `／${text(profile.gender)}` : ""}${relation ? `（${relation}）` : ""}`;
   const lunarLine = profile.lunar_birth_text
     ? `農曆生日：${text(profile.lunar_birth_text)}${profile.birth_shichen ? `（${shichenName(profile.birth_shichen)}）` : ""}${profile.zodiac ? `　生肖：${text(profile.zodiac)}` : ""}`
     : "";
