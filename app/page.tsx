@@ -378,10 +378,10 @@ export default function Page() {
       try{
         const liffId=process.env.NEXT_PUBLIC_LIFF_ID;if(!liffId)throw Error();
         await liff.init({liffId});if(!liff.isInClient())throw Error();
-        await liff.sendMessages([{type:"text",text:"我已送出訂單。"}]);
+        await liff.sendMessages([{type:"text",text:"我已完成預約"}]);
       }catch{
-        setError("請從 LINE 官方帳號聊天室重新開啟預約網站，系統才能以您的身分傳送「我已送出訂單。」");
-        setAlertMessage("訂單已建立，但 LINE 無法傳送訊息。請先回到官方帳號傳送「我已送出訂單。」，再到「我的預約」繼續付款。");
+        setError("請從 LINE 官方帳號聊天室的 LIFF 連結重新開啟預約網站，系統才能以您的身分傳送「我已完成預約」。");
+        setAlertMessage("訂單已建立，但 LINE 無法自動傳送訊息。請先回到官方帳號傳送「我已完成預約」，再到「我的預約」繼續付款。");
         return;
       }
       {
@@ -511,9 +511,9 @@ export default function Page() {
               </div>
               {method?.code === "text" ? (
                 <div className="textConsultationInfo progressiveTextFlow" aria-live="polite">
-                  <article className="textFlowStep active"><b>1</b><div><h3>確認並提交資料</h3><p>請先完整填寫資料，我們收到後才會正式為您送單預約。</p></div></article>
+                  <article className="textFlowStep active"><b>1</b><div><h3>付款完成後，依 LINE 提示提交資料</h3><p>完成付款後，我們會透過 LINE 傳送資料填寫連結；收到訊息後再點入填寫即可。</p></div></article>
                   {textInfoStep >= 2 && <article className="textFlowStep active"><b>2</b><div><h3>等待分析結果</h3><p>送單後，阿嫂老師將於 7–30 天內經由 LINE 回傳文字諮詢結果。</p></div></article>}
-                  {textInfoStep >= 3 && <article className="textFlowStep active"><b>3</b><div><h3>售後補充提問</h3><p>收到結果後 8 小時內，可再提出 2 個補充問題。</p></div></article>}
+                  {textInfoStep >= 3 && <article className="textFlowStep active"><b>3</b><div><h3>補充提問</h3><p>收到結果後 8 小時內，可再提出 2 個補充問題。</p></div></article>}
                   <div className="textFlowProgress"><span style={{width:`${textInfoStep/3*100}%`}} /></div>
                   <small>目前顯示第 {textInfoStep} 步，共 3 步</small>
                 </div>
@@ -779,7 +779,7 @@ export default function Page() {
           <div className="modalBackdrop">
             <div className="modal importantConfirm">
               <h2>請再次確認</h2>
-              <p>文字諮詢說明非常重要，請務必完整閱讀並確認了解後再預約。</p>
+              <p>請先完整閱讀文字諮詢流程，確認了解資料提交、結果回傳與補充提問方式後，再繼續預約。</p>
               <button
                 onClick={() => {
                   setTextConfirm(false);
