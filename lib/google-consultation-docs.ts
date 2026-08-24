@@ -138,7 +138,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const lineName = text(customer.line_display_name) || "LINE用戶";
   const ownerName = text(customer.full_name) || lineName;
   const { data: details, error } = await db.from("booking_details").select(`
-    id,item_title,created_at,google_document_id,
+    id,item_title,created_at,google_document_id,google_document_created_at,
     booking_items(code),booking_detail_sub_items(sub_item_title),
     booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(*),booking_answer_participants(position,consultation_profiles(*)))
   `).eq("booking_id", bookingId).order("created_at", { ascending: true });
@@ -174,7 +174,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     const { error: updateError } = await db.from("booking_details").update({
       google_document_id: result.documentId,
       google_document_url: result.documentUrl,
-      google_document_created_at: new Date().toISOString(),
+      google_document_created_at: detail.google_document_created_at || new Date().toISOString(),
     }).eq("id", detail.id);
     if (updateError) throw updateError;
     return;
@@ -205,7 +205,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const { error: updateError } = await db.from("booking_details").update({
     google_document_id: document.documentId,
     google_document_url: `https://docs.google.com/document/d/${document.documentId}/edit`,
-    google_document_created_at: new Date().toISOString(),
+    google_document_created_at: detail.google_document_created_at || new Date().toISOString(),
   }).eq("id", detail.id);
   if (updateError) throw updateError;
 }
