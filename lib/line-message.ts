@@ -30,11 +30,19 @@ export function bookingFlex(args: {
     dataUrl = `${args.site}/booking-data?order=${encodeURIComponent(args.bookingNo)}`;
   const buttons: any[] = [
     {
-      type: "button",
-      style: "primary",
-      height: "md",
-      color: "#8A3045",
-      action: { type: "uri", label: "立即填寫問事資料（必填）", uri: dataUrl },
+      type: "box",
+      layout: "horizontal",
+      justifyContent: "center",
+      alignItems: "center",
+      spacing: "sm",
+      paddingAll: "14px",
+      backgroundColor: "#8A3045",
+      cornerRadius: "10px",
+      action: { type: "uri", uri: dataUrl },
+      contents: [
+        { type: "text", text: "📝", size: "lg", flex: 0 },
+        { type: "text", text: "立即填寫問事資料（必填）", color: "#FFFFFF", weight: "bold", align: "center", flex: 0 },
+      ],
     },
   ];
   if (isVideo && args.slot)
@@ -83,7 +91,7 @@ export function bookingFlex(args: {
         },
         {
           type: "text",
-          text: "重要提醒：請務必填寫問事資料！這是提供給阿嫂老師觀靈的重要資料，完成填寫後才能進行後續諮詢。",
+          text: "重要提醒｜請務必完成問事資料\n這份資料是阿嫂老師進行觀靈與命理分析的重要依據。請點選下方按鈕完整填寫；資料送出後，我們才能正式安排後續諮詢，謝謝您的配合。",
           wrap: true,
           color: "#B42332",
           weight: "bold",
