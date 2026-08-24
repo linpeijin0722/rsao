@@ -82,7 +82,7 @@ const profileLines = (profile: any, ownerName: string) => {
   ].filter(Boolean);
 };
 
-type Mark = { start: number; end: number; kind: "meta" | "title" | "section" | "answer" };
+type Mark = { start: number; end: number; kind: "meta" | "title" | "section" | "question" | "answer" };
 function documentBody(detail: any, itemIndex: number, totalItems: number, ownerName: string) {
   let content = "";
   const marks: Mark[] = [];
@@ -101,14 +101,14 @@ function documentBody(detail: any, itemIndex: number, totalItems: number, ownerN
     .filter(Boolean).filter((profile: any, index: number, all: any[]) => all.findIndex((entry) => entry.id === profile.id) === index);
   people.forEach((profile: any) => {
     profileLines(profile, ownerName).forEach((line) => add(line));
-    const omitted = new Set(["id", "customer_id", "created_at", "updated_at", "name", "profile_type", "relationship", "relationship_detail", "gender", "birth_date", "lunar_birth_text", "zodiac", "birth_shichen", "address", "photo_data", "death_date", "lunar_death_text", "death_shichen", "notes"]);
+    const omitted = new Set(["id", "customer_id", "created_at", "updated_at", "name", "profile_type", "relationship", "relationship_detail", "gender", "birth_date", "lunar_birth_text", "zodiac", "birth_shichen", "address", "photo_data", "death_date", "lunar_death_text", "death_shichen", "notes", "is_lunar", "owner_profile_id"]);
     extraLines(Object.fromEntries(Object.entries(profile).filter(([key]) => !omitted.has(key)))).forEach((line) => add(line));
     add("");
   });
   (answer?.questions || []).map(text).filter(Boolean).forEach((question: string, index: number) => {
-    add(`Q${index + 1}：${question}`);
-    add(`A${index + 1}：`, "answer");
-    add(""); add("");
+    add(`Q${index + 1}:${question}`, "question");
+    add(`A${index + 1}:`, "answer");
+    add("");
   });
   extraLines(answer?.extra_data || {}).forEach((line) => add(line));
   add("");
@@ -123,6 +123,13 @@ function documentBody(detail: any, itemIndex: number, totalItems: number, ownerN
     add(""); add(""); add(""); add("");
   });
   return { content, marks };
+}
+
+function consultationNumber(position: number) {
+  const safe = Math.max(1, position);
+  const letterIndex = Math.floor((safe - 1) / 99);
+  if (letterIndex > 25) throw new Error("諮詢單編號已超過 Z99，請新增編號規則");
+  return `${String.fromCharCode(65 + letterIndex)}${String(((safe - 1) % 99) + 1).padStart(2, "0")}`;
 }
 
 export async function createConsultationDocuments(db: any, bookingId: string, bookingNo: string, force = false) {
@@ -146,7 +153,14 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   if (detail.google_document_id && !force) return;
   if (!folderId) throw new Error("尚未設定 GOOGLE_DRIVE_OUTPUT_FOLDER_ID");
   const { content, marks } = documentBody(detail, targetIndex + 1, allDetails.length, ownerName);
-  const fileTitle = `A${String(targetIndex + 1).padStart(2, "0")}-${lineName}-${ownerName}`;
+  const { data: numberedDocuments, error: numberError } = await db.from("booking_details")
+    .select("id,google_document_created_at")
+    .not("google_document_id", "is", null)
+    .order("google_document_created_at", { ascending: true });
+  if (numberError) throw numberError;
+  const existingPosition = (numberedDocuments || []).findIndex((row: any) => row.id === detail.id);
+  const documentPosition = existingPosition >= 0 ? existingPosition + 1 : (numberedDocuments || []).length + 1;
+  const fileTitle = `${consultationNumber(documentPosition)}-${lineName}-${ownerName}`;
   if (appsScriptUrl) {
     if (!appsScriptSecret) throw new Error("尚未設定 GOOGLE_APPS_SCRIPT_SECRET");
     const response = await fetch(appsScriptUrl, {
@@ -179,10 +193,12 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     const style = mark.kind === "meta"
       ? { foregroundColor: { color: { rgbColor: { red: .45, green: .42, blue: .4 } } }, fontSize: { magnitude: 10, unit: "PT" } }
       : mark.kind === "title"
-        ? { bold: true, fontSize: { magnitude: 20, unit: "PT" } }
-        : mark.kind === "answer"
-          ? { bold: true, foregroundColor: { color: { rgbColor: { red: .1, green: .35, blue: .8 } } } }
-          : { bold: true, fontSize: { magnitude: 18, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: .55, green: .12, blue: .22 } } } };
+        ? { bold: true, fontSize: { magnitude: 20, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: .42, green: .23, blue: .14 } } } }
+        : mark.kind === "question"
+          ? { bold: true }
+          : mark.kind === "answer"
+            ? { bold: false, foregroundColor: { color: { rgbColor: { red: .1, green: .35, blue: .8 } } } }
+            : { bold: true, fontSize: { magnitude: 18, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: .55, green: .12, blue: .22 } } } };
     requests.push({ updateTextStyle: { range: { startIndex: mark.start, endIndex: mark.end }, textStyle: style, fields: "*" } });
   }
   await google(`https://docs.googleapis.com/v1/documents/${document.documentId}:batchUpdate`, token, { method: "POST", body: JSON.stringify({ requests }) });
