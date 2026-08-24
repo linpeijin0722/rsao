@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { publicSupabase } from "@/lib/supabase";
 import { verifyLineSession } from "@/lib/line-session";
 import { cookies } from "next/headers";
-import { pushLineFlex } from "@/lib/line-message";
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,100 +35,6 @@ export async function POST(request: NextRequest) {
       p_items: body.items,
     });
     if (error) throw error;
-    try {
-      const db = publicSupabase(),
-        site = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin;
-      const [{ data: method }, { data: selectedItems }] = await Promise.all([
-        db
-          .from("consultation_methods")
-          .select("code")
-          .eq("id", body.methodId)
-          .single(),
-        db
-          .from("booking_items")
-          .select("id,title")
-          .in(
-            "id",
-            body.items.map((x: { item_id: string }) => x.item_id),
-          ),
-      ]);
-      const deadline = new Date(
-        Date.now() + 24 * 60 * 60 * 1000,
-      ).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
-      await pushLineFlex(lineUid, "林阿嫂預約待付款", {
-        type: "bubble",
-        header: {
-          type: "box",
-          layout: "vertical",
-          backgroundColor: "#F7F7F7",
-          contents: [
-            {
-              type: "text",
-              text: "待付款",
-              color: "#E64B45",
-              weight: "bold",
-              size: "xl",
-              align: "center",
-            },
-            {
-              type: "text",
-              text: "林阿嫂",
-              color: "#999999",
-              align: "center",
-              margin: "sm",
-            },
-          ],
-        },
-        body: {
-          type: "box",
-          layout: "vertical",
-          spacing: "md",
-          contents: [
-            {
-              type: "text",
-              text: `訂單編號：${data.booking_no}`,
-              weight: "bold",
-              wrap: true,
-            },
-            {
-              type: "text",
-              text: (selectedItems || []).map((x) => x.title).join("、"),
-              wrap: true,
-            },
-            {
-              type: "text",
-              text: `金額：NT$ ${Number(data.total_price).toLocaleString("zh-TW")}`,
-              color: "#E64B45",
-              weight: "bold",
-            },
-            {
-              type: "text",
-              text: `請於 ${deadline} 前完成付款，超過24小時將自動失效。`,
-              wrap: true,
-              color: "#555555",
-            },
-          ],
-        },
-        footer: {
-          type: "box",
-          layout: "vertical",
-          contents: [
-            {
-              type: "button",
-              style: "primary",
-              color: "#8A3045",
-              action: {
-                type: "uri",
-                label: "繼續付款",
-                uri: `${site}/pay?order=${encodeURIComponent(data.booking_no)}`,
-              },
-            },
-          ],
-        },
-      });
-    } catch (notificationError) {
-      console.error(notificationError);
-    }
     return NextResponse.json({ booking: data });
   } catch (error) {
     return NextResponse.json(
