@@ -3,7 +3,10 @@ import crypto from "node:crypto";
 const folderId = process.env.GOOGLE_DRIVE_OUTPUT_FOLDER_ID || process.env.GOOGLE_DRIVE_TEMPLATE_FOLDER_ID || "";
 const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || "";
 const privateKey = (process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || "").replace(/\\n/g, "\n");
-const appsScriptUrl = process.env.GOOGLE_APPS_SCRIPT_WEB_APP_URL || "";
+const appsScriptSetting = (process.env.GOOGLE_APPS_SCRIPT_WEB_APP_URL || "").trim();
+const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetting)
+  ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
+  : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
