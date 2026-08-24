@@ -26,9 +26,9 @@ export async function POST(request: NextRequest) {
     if(error||!booking)return NextResponse.json({error:"找不到訂單"},{status:404});
     if(!booking.data_submitted_at)return NextResponse.json({error:"用戶尚未回傳問事資料，不能建立諮詢單"},{status:400});
     try{
-      await createConsultationDocuments(db,booking.id,booking.booking_no,Boolean(body.force));
+      await createConsultationDocuments(db,booking.id,booking.booking_no,Boolean(body.force),body.createMode==="new"?"new":"replace");
       const {data:details}=await db.from("booking_details").select("id,item_title,google_document_url").eq("booking_id",booking.id).not("google_document_url","is",null);
-      if(!details?.length)return NextResponse.json({error:"這筆訂單沒有「前世因果（個人）」項目；目前測試版只會建立這個項目的文件。"},{status:400});
+      if(!details?.length)return NextResponse.json({error:"這筆訂單沒有可建立的問事資料"},{status:400});
       return NextResponse.json({ok:true,documents:details});
     }catch(error){
       console.error("後台建立諮詢文件失敗",error);
