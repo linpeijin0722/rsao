@@ -8,6 +8,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
+const requiredAppsScriptVersion = "2026-08-24-v5";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -166,11 +167,12 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     const response = await fetch(appsScriptUrl, {
       method: "POST",
       headers: { "content-type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ secret: appsScriptSecret, folderId, title: fileTitle, content, marks, previousDocumentId: force ? detail.google_document_id : "" }),
+      body: JSON.stringify({ secret: appsScriptSecret, expectedVersion: requiredAppsScriptVersion, folderId, title: fileTitle, content, marks, previousDocumentId: force ? detail.google_document_id : "" }),
       redirect: "follow",
     });
     const result = await response.json();
     if (!response.ok || !result.ok) throw new Error(result.error || "Apps Script 建立文件失敗");
+    if (result.version !== requiredAppsScriptVersion) throw new Error(`目前連到舊版 Google Apps Script（目前：${result.version || "無版本資訊"}；需要：${requiredAppsScriptVersion}），請更新 Vercel 的 GOOGLE_APPS_SCRIPT_WEB_APP_URL 後重新部署`);
     const { error: updateError } = await db.from("booking_details").update({
       google_document_id: result.documentId,
       google_document_url: result.documentUrl,
