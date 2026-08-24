@@ -1,6 +1,7 @@
 .staffLogin,
 .staffPage {
-  max-width: 1000px;
+  max-width: 1480px;
+  width: min(96vw, 1480px);
   margin: auto;
   padding: 28px;
 }
@@ -204,4 +205,7 @@
 .staffExactAnswerFields{gap:16px!important}.staffAnswerTargetGroup,.staffAnswerSection{display:grid;gap:11px;width:100%;padding:14px;border:1px solid #e2d8cf;border-radius:12px;background:#fbf8f4}.staffAnswerTargetGroup>b,.staffAnswerSection h4{margin:0;font-size:17px}.staffNestedFields{display:grid;gap:10px;padding:12px;border-radius:10px;background:#f5efe8}.staffAnswerEditor{width:min(720px,96vw)!important}.staffAnswerEditor .staffAnswerItem{padding-right:42px}.staffAnswerEditor .returnedEditActions{position:sticky;bottom:-24px;padding-top:14px;background:#fff}
 .staffEditModal,.staffEditModal input,.staffEditModal select,.staffEditModal button{font-size:17px!important}.staffEditModal h2{font-size:25px!important}.staffEditItems b{font-size:18px!important}.staffEditItems small{font-size:15px!important}.staffQty span{font-size:18px!important;font-weight:700}.staffFrontFields input,.staffFrontFields select,.staffFrontFields textarea,.staffAnswerSection textarea{font-weight:400!important}.staffFrontFields label,.staffAnswerSection h4,.staffAnswerTargetGroup>b{font-weight:800!important}.returnedEditActions button{font-size:17px!important;font-weight:800!important;padding:12px 18px!important}
 .staffAnswerSection textarea,.staffNestedFields input,.staffNestedFields select,.staffNestedFields textarea{font-size:16px!important;font-weight:400!important;line-height:1.55}.staffAnswerSection h4,.staffAnswerTargetGroup>b{font-size:17px!important}.staffFrontFields input,.staffFrontFields select,.staffFrontFields textarea{font-size:16px!important;font-weight:400!important}
+.textBookingSection .staffState,.textBookingSection .returned,.textBookingSection .missing{white-space:nowrap;min-width:104px}.textBookingSection .staffTableHead,.textBookingSection .staffTableRow{width:100%}
 .staffCatalogItems h3,.staffSubPicker h2{font-size:24px!important}.staffCatalogItems article>b{font-size:19px!important}.staffSubPicker>p{font-size:17px!important}.staffSubOptions button b{font-size:18px!important}.staffSubOptions button span{font-size:16px!important}.consultationSheetLinks{display:flex;gap:5px;flex-wrap:wrap}.consultationSheetLink{display:grid;place-items:center;width:34px;height:34px;border-radius:8px;background:#f4ece5;text-decoration:none;font-size:18px}.sheetPending{text-align:center;color:#999}
+.textBookingSection .staffBookingTable{overflow-x:visible}.textBookingSection .staffTableHead,.textBookingSection .staffTableRow{grid-template-columns:minmax(145px,1.2fr) minmax(145px,1fr) minmax(105px,.7fr) minmax(110px,.75fr) minmax(175px,1.2fr) 76px minmax(70px,.55fr);min-width:0;width:100%;box-sizing:border-box}.textBookingSection .staffTableRow>*{min-width:0}.textBookingSection .staffTableRow small{overflow-wrap:anywhere}
+@media(max-width:1050px){.textBookingSection .staffBookingTable{overflow-x:auto}.textBookingSection .staffTableHead,.textBookingSection .staffTableRow{min-width:980px}}
