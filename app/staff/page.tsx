@@ -115,13 +115,16 @@ export default function Staff() {
   }
   async function saveReturned() {
     if(!returnedEdit?.id)return;
+    if(!confirm("是否確認要修改用戶資料並儲存？"))return;
     const r=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"update_consultation_profile",profileId:returnedEdit.id,answerId:returnedEdit.answerId,profile:returnedEdit,questions:returnedEdit.questions||[]})});
     const j=await r.json(); if(!r.ok)return alert(j.error||"儲存失敗"); alert("資料已更新");setReturnedEdit(null);setDataView([]);await load();
   }
   async function saveProfileEditor() {
+    if(!confirm("是否確認要修改用戶資料並儲存？"))return;
     const r=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"update_consultation_profile",profileId:profileEditor.id,profile:profileEditor})}),j=await r.json();if(!r.ok)return alert(j.error||"儲存失敗");alert("用戶資料已更新");setProfileEditor(null);setDataView([]);await load();
   }
   async function saveAnswerEditor() {
+    if(!confirm("是否確認要修改問事資料並儲存？"))return;
     const r=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"update_answer",answerId:answerEditor.answerId,profileId:answerEditor.targetProfileId,profileIds:answerEditor.targetProfileIds,questions:answerEditor.questions,extraData:answerEditor.extra_data||{}})}),j=await r.json();if(!r.ok)return alert(j.error||"儲存失敗");alert("問事資料已更新");setAnswerEditor(null);setDataView([]);await load();
   }
   const filtered = useMemo(() => {
