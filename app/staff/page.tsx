@@ -70,7 +70,7 @@ export default function Staff() {
     [editLines, setEditLines] = useState<any[]>([]),
     [statusFilter, setStatusFilter] = useState("all"),
     [dataFilter, setDataFilter] = useState("all"),
-    [sortBy, setSortBy] = useState("paid_time"),
+    [sortBy, setSortBy] = useState("paid_desc"),
     [rememberPassword, setRememberPassword] = useState(false),
     [generatingDocument, setGeneratingDocument] = useState(""),
     [addPicker, setAddPicker] = useState<any>(null),
@@ -84,7 +84,8 @@ export default function Staff() {
     try{
       const response=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"generate_document",bookingNo:x.booking_no,force:exists})}),result=await response.json();
       if(!response.ok)throw new Error(result.error||"建立文件失敗");
-      alert(exists?"文件已重新建立，連結已更新。":"文件已建立完成。");
+      const lineName=x.customers?.line_display_name||"LINE 用戶";
+      alert(exists?`${lineName}諮詢單已重新建立，連結已更新。`:`${lineName}諮詢單已建立完成。`);
       await load();
     }catch(error){alert(error instanceof Error?error.message:"建立文件失敗")}finally{setGeneratingDocument("")}
   }
@@ -110,6 +111,7 @@ export default function Staff() {
   }
   useEffect(() => {
     const saved=localStorage.getItem("lin_a_sao_staff_password");if(saved){setPassword(saved);setRememberPassword(true)}
+    const savedSort=localStorage.getItem("lin_a_sao_staff_paid_sort");if(savedSort==="paid_asc"||savedSort==="paid_desc")setSortBy(savedSort);
     load();
     fetch("/api/catalog")
       .then((r) => r.json())
@@ -169,15 +171,10 @@ export default function Staff() {
         return true;
       });
       return result.sort((a, b) => {
-        const av =
-            sortBy === "reservation_time"
-              ? a.slot_start || a.paid_at || a.created_at
-              : a.paid_at || a.created_at,
-          bv =
-            sortBy === "reservation_time"
-              ? b.slot_start || b.paid_at || b.created_at
-              : b.paid_at || b.created_at;
-        return String(bv).localeCompare(String(av));
+        const av = a.paid_at || a.created_at,
+          bv = b.paid_at || b.created_at,
+          comparison=String(av).localeCompare(String(bv));
+        return sortBy==="paid_asc"?comparison:-comparison;
       });
     }, [rows, statusFilter, dataFilter, sortBy]),
     video = useMemo(
@@ -501,9 +498,9 @@ export default function Staff() {
           </label>
           <label>
             排序
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-              <option value="paid_time">付款時間</option>
-              <option value="reservation_time">預約時間</option>
+            <select value={sortBy} onChange={(e) => {setSortBy(e.target.value);localStorage.setItem("lin_a_sao_staff_paid_sort",e.target.value)}}>
+              <option value="paid_desc">付款時間（由新到舊）</option>
+              <option value="paid_asc">付款時間（由舊到新）</option>
             </select>
           </label>
         </div>
