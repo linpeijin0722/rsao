@@ -173,6 +173,16 @@ export default function Page() {
     })();
   }, []);
   useEffect(() => {
+    if (screen !== "slots" || method?.code !== "text" || textInfoStep < 2) return;
+    const timer = window.setTimeout(() => {
+      document.querySelector(`[data-text-step="${textInfoStep}"]`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [textInfoStep, screen, method?.code]);
+  useEffect(() => {
     const closeMenu = (event: PointerEvent) => {
       if (!(event.target as HTMLElement).closest(".account")) setMenu(false);
     };
@@ -378,10 +388,12 @@ export default function Page() {
       try{
         const liffId=process.env.NEXT_PUBLIC_LIFF_ID;if(!liffId)throw Error();
         await liff.init({liffId});if(!liff.isInClient())throw Error();
-        await liff.sendMessages([{type:"text",text:"我已完成預約"}]);
+        await liff.sendMessages([{type:"text",text:"我已送出預約，訂單待付款。"}]);
+        await fetch("/api/bookings/notify", {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({bookingNo:j.booking.booking_no})});
       }catch{
-        setError("請從 LINE 官方帳號聊天室的 LIFF 連結重新開啟預約網站，系統才能以您的身分傳送「我已完成預約」。");
-        setAlertMessage("訂單已建立，但 LINE 無法自動傳送訊息。請先回到官方帳號傳送「我已完成預約」，再到「我的預約」繼續付款。");
+        const lineUrl=process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL;
+        if(lineUrl){location.assign(lineUrl);return}
+        location.assign(`https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID||""}`);
         return;
       }
       {
@@ -505,15 +517,15 @@ export default function Page() {
               <div className="title">
                 <h2>
                   {method?.code === "text"
-                    ? "文字諮詢流程與說明"
+                    ? "文字諮詢流程"
                     : "選擇視訊時間"}
                 </h2>
               </div>
               {method?.code === "text" ? (
                 <div className="textConsultationInfo progressiveTextFlow" aria-live="polite">
-                  <article className="textFlowStep active"><b>1</b><div><h3>付款完成後，依 LINE 提示提交資料</h3><p>完成付款後，我們會透過 LINE 傳送資料填寫連結；收到訊息後再點入填寫即可。</p></div></article>
-                  {textInfoStep >= 2 && <article className="textFlowStep active"><b>2</b><div><h3>等待分析結果</h3><p>送單後，阿嫂老師將於 7–30 天內經由 LINE 回傳文字諮詢結果。</p></div></article>}
-                  {textInfoStep >= 3 && <article className="textFlowStep active"><b>3</b><div><h3>補充提問</h3><p>收到結果後 8 小時內，可再提出 2 個補充問題。</p></div></article>}
+                  <article data-text-step="1" className="textFlowStep active"><b>1</b><div><h3>付款完成後，依 LINE 提示提交資料</h3><p>完成付款後，我們會透過 LINE 傳送資料填寫連結；收到訊息後再點入填寫即可。</p></div></article>
+                  {textInfoStep >= 2 && <article data-text-step="2" className="textFlowStep active"><b>2</b><div><h3>等待分析結果</h3><p>送單後，阿嫂老師將於 7–30 天內經由 LINE 回傳文字諮詢結果。</p></div></article>}
+                  {textInfoStep >= 3 && <article data-text-step="3" className="textFlowStep active"><b>3</b><div><h3>補充提問</h3><p>收到結果後 8 小時內，可再提出 2 個補充問題。</p></div></article>}
                   <div className="textFlowProgress"><span style={{width:`${textInfoStep/3*100}%`}} /></div>
                   <small>目前顯示第 {textInfoStep} 步，共 3 步</small>
                 </div>
@@ -769,7 +781,7 @@ export default function Page() {
           <div className="modalBackdrop">
             <div className="modal alertModal">
               <h2>預約前溫馨提醒</h2>
-              <p>請確認這位親友已過世半年以上再進行預約，謝謝您的理解與配合。</p>
+              <p>請確認這位親友已過世半年以上再進行預約。</p>
               <button onClick={() => { const item = deceasedPending; setDeceasedPending(null); changeBase(item, 1); }}>半年以上</button>
               <button className="cancel" onClick={() => setDeceasedPending(null)}>未滿半年</button>
             </div>
