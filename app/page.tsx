@@ -96,6 +96,7 @@ export default function Page() {
     [textConfirm, setTextConfirm] = useState(false),
     [alertMessage, setAlertMessage] = useState(""),
     [deceasedPending, setDeceasedPending] = useState<Item | null>(null),
+    [noMessagePending, setNoMessagePending] = useState<Item | null>(null),
     [healthWarned, setHealthWarned] = useState(false),
     [textOk, setTextOk] = useState(false),
     [textInfoStep, setTextInfoStep] = useState(1),
@@ -307,7 +308,10 @@ export default function Page() {
     }
   }
   function addSimple(item: Item) {
-    if (item.code === "deceased-relative") {
+    if (
+      item.code === "deceased-relative" ||
+      item.code === "deceased-pet"
+    ) {
       setDeceasedPending(item);
       return;
     }
@@ -782,9 +786,45 @@ export default function Page() {
           <div className="modalBackdrop">
             <div className="modal alertModal">
               <h2>預約前溫馨提醒</h2>
-              <p>請確認這位親友已過世半年以上再進行預約。</p>
-              <button onClick={() => { const item = deceasedPending; setDeceasedPending(null); changeBase(item, 1); }}>半年以上</button>
+              <p>
+                請確認
+                {deceasedPending.code === "deceased-pet" ? "寵物" : "這位親友"}
+                已過世半年以上再進行預約。
+              </p>
+              <button
+                onClick={() => {
+                  const item = deceasedPending;
+                  setDeceasedPending(null);
+                  setNoMessagePending(item);
+                }}
+              >
+                半年以上
+              </button>
               <button className="cancel" onClick={() => setDeceasedPending(null)}>未滿半年</button>
+            </div>
+          </div>
+        )}
+        {noMessagePending && (
+          <div className="modalBackdrop">
+            <div className="modal alertModal">
+              <h2>服務內容提醒</h2>
+              <p>
+                本服務無帶話服務，無法與過世
+                {noMessagePending.code === "deceased-pet" ? "寵物" : "親友"}
+                對話或代為傳話。請確認您已了解後再繼續預約。
+              </p>
+              <button
+                onClick={() => {
+                  const item = noMessagePending;
+                  setNoMessagePending(null);
+                  changeBase(item, 1);
+                }}
+              >
+                我已知道
+              </button>
+              <button className="cancel" onClick={() => setNoMessagePending(null)}>
+                取消預約
+              </button>
             </div>
           </div>
         )}
