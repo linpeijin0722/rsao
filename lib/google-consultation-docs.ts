@@ -8,7 +8,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-08-24-v6";
+const requiredAppsScriptVersion = "2026-08-26-v7";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -91,7 +91,14 @@ const profileLines = (profile: any, ownerName: string) => {
   ].filter(Boolean);
 };
 
-type Mark = { start: number; end: number; kind: "meta" | "title" | "section" | "question" | "answer" };
+type Mark = { start: number; end: number; kind: "meta" | "title" | "section" | "question" | "answer" | "teacher" };
+function virtualAge(profile: any) {
+  const lunar = text(profile?.lunar_birth_text);
+  const rocYear = Number(lunar.match(/民國\s*(\d+)/)?.[1]);
+  if (!rocYear) return null;
+  const currentRocYear = new Date().getFullYear() - 1911;
+  return Math.max(1, currentRocYear - rocYear + 1);
+}
 function documentBody(detail: any, itemIndex: number, totalItems: number, ownerName: string) {
   let content = "";
   const marks: Mark[] = [];
@@ -124,6 +131,21 @@ function documentBody(detail: any, itemIndex: number, totalItems: number, ownerN
   const subTitle = subItems.join("、");
   const itemCode = one(detail.booking_items)?.code || "";
   const isPastLifePersonal = itemCode === "past-life-personal" || text(detail.item_title).includes("前世因果（個人）");
+  const isOverallFortune = itemCode === "overall-fortune" || text(detail.item_title).includes("整體運勢");
+  if (isOverallFortune) {
+    add("【整體建議】", "section");
+    for (let index = 0; index < 5; index += 1) add("\u00a0", "teacher");
+    add("【流年運勢】", "section");
+    const startingAge = virtualAge(people[0]);
+    if (startingAge) {
+      for (let age = startingAge; age <= Math.min(99, startingAge + 20); age += 1) add(`${age}歲：\u00a0`, "teacher");
+    }
+    add("");
+    add("備註：");
+    add("1.以上均為虛歲");
+    add("2.如果沒有特別提到的年紀，代表身體狀況大致平順，不需要特別擔心，只要維持日常保養即可。");
+    add("3.運勢中的歲數，僅代表在那個年齡段需要特別留意的事項（非今生會活到幾歲喔） 若遇到劫難的時候就要比較小心，通過自己的努力衝過難關，多做福德佈施，化解災劫也能夠延續生命。");
+  }
   const sections = !isPastLifePersonal ? [] : /前三世|三世/.test(subTitle)
     ? ["【前前前世】", "【前前世】", "【前世】", "【綜觀今生】"]
     : /前兩世|二世/.test(subTitle)
@@ -131,7 +153,7 @@ function documentBody(detail: any, itemIndex: number, totalItems: number, ownerN
       : ["【前世】", "【綜觀今生】"];
   sections.forEach((heading) => {
     add(heading, "section");
-    add(""); add(""); add(""); add("");
+    add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher");
   });
   return { content, marks };
 }
