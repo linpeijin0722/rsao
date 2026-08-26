@@ -369,6 +369,10 @@ export default function Staff() {
             ›
           </button>
         </div>
+        <div className="videoViewToolbar">
+          <span>{showUpcomingVideo ? "目前顯示：現在之後的全部視訊" : selectedDate ? `目前顯示：${selectedDate}` : "請從月曆選擇有預約的日期"}</span>
+          <button className={showUpcomingVideo?"active":""} onClick={()=>{setShowUpcomingVideo(true);setSelectedDate("")}}>即將來臨的視訊</button>
+        </div>
         <div className="staffCalendar">
           <div className="staffWeek">
             {["一", "二", "三", "四", "五", "六", "日"].map((d) => (
@@ -392,7 +396,6 @@ export default function Staff() {
             )}
           </div>
         </div>
-        <button className={`upcomingVideoButton ${showUpcomingVideo?"active":""}`} onClick={()=>{setShowUpcomingVideo(true);setSelectedDate("")}}>一覽接下來即將來臨的視訊</button>
         {(selectedDate || showUpcomingVideo) && (
           <div className="dailyBookings">
             <h3>{showUpcomingVideo?"接下來即將來臨的視訊":`${selectedDate} 的預約`}</h3>
@@ -504,9 +507,9 @@ export default function Staff() {
       {answerEditor&&<StaffAnswerEditorV2 value={answerEditor} profiles={dataView.filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.id===p.id)===i)} change={setAnswerEditor} close={()=>setAnswerEditor(null)} save={saveAnswerEditor}/>} 
       <section className="staffBookingSection textBookingSection">
         <h2 className="staffSectionTitle">文字預約</h2>
-        <div className="staffFilters">
-          <label className="staffSearchField">搜尋用戶或訂單編號<input value={textSearch} onChange={e=>setTextSearch(e.target.value)} placeholder="輸入用戶名或訂單編號"/></label>
-          <label>
+        <div className="textBookingTools">
+          <div className="staffFilters staffPrimaryFilters">
+            <label>
             訂單狀態
             <select
               value={statusFilter}
@@ -518,8 +521,8 @@ export default function Staff() {
               <option value="cancelled">已取消</option>
               <option value="expired">已失效</option>
             </select>
-          </label>
-          <label>
+            </label>
+            <label>
             資料回傳
             <select
               value={dataFilter}
@@ -529,17 +532,20 @@ export default function Staff() {
               <option value="returned">已回傳</option>
               <option value="missing">尚未回傳</option>
             </select>
-          </label>
-          <label>
+            </label>
+            <label>
             排序
             <select value={sortBy} onChange={(e) => {setSortBy(e.target.value);localStorage.setItem("lin_a_sao_staff_paid_sort",e.target.value)}}>
               <option value="paid_desc">付款時間（由新到舊）</option>
               <option value="paid_asc">付款時間（由舊到新）</option>
             </select>
-          </label>
-          <label>付款日期從<input type="date" value={textDateFrom} onChange={e=>setTextDateFrom(e.target.value)}/></label>
-          <label>付款日期到<input type="date" value={textDateTo} min={textDateFrom||undefined} onChange={e=>setTextDateTo(e.target.value)}/></label>
-          <div className="staffDisplayOptions"><b>顯示欄位</b><label><input type="checkbox" checked={showTextItems} onChange={e=>setShowTextItems(e.target.checked)}/>預約項目內容</label><label><input type="checkbox" checked={showTextAmount} onChange={e=>setShowTextAmount(e.target.checked)}/>訂單金額</label></div>
+            </label>
+            <label className="staffSearchField" aria-label="搜尋用戶或訂單編號"><span aria-hidden="true">⌕</span><input value={textSearch} onChange={e=>setTextSearch(e.target.value)} placeholder="用戶名或訂單編號"/></label>
+          </div>
+          <div className="staffSecondaryFilters">
+            <div className="staffDateRange"><b>付款日期</b><label><span>從</span><input type="date" value={textDateFrom} onChange={e=>setTextDateFrom(e.target.value)}/></label><label><span>到</span><input type="date" value={textDateTo} min={textDateFrom||undefined} onChange={e=>setTextDateTo(e.target.value)}/></label>{(textDateFrom||textDateTo)&&<button onClick={()=>{setTextDateFrom("");setTextDateTo("")}}>清除日期</button>}</div>
+            <div className="staffDisplayOptions"><b>表格顯示</b><label><input type="checkbox" checked={showTextItems} onChange={e=>setShowTextItems(e.target.checked)}/><span>預約項目</span></label><label><input type="checkbox" checked={showTextAmount} onChange={e=>setShowTextAmount(e.target.checked)}/><span>訂單金額</span></label></div>
+          </div>
         </div>
         <div className="staffBookingTable">
           <div className="staffTableHead">
@@ -594,7 +600,7 @@ export default function Staff() {
                 ) : (
                   <span>—</span>
                 )}
-                <small className="staffOrderCell"><span>{x.booking_no}</span>{showTextItems&&<span className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><span key={`${x.id}-item-${index}`}>{line}</span>)}</span>}</small>
+                <div className="staffOrderCell"><small>{x.booking_no}</small>{showTextItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-item-${index}`}>{line}</div>)}</div>}</div>
                 <button onClick={() => openEdit(x)}>修改</button>
                 {documentActions(x)}
               </article>
