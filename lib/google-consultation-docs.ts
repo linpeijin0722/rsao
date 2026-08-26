@@ -220,21 +220,21 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     const targetName = text(targetProfile?.name) || "對方";
     add("【感情運勢與關係合盤】", "section");
     add("");
-    add(`${primaryDisplayName}本身個性`, "section");
+    add(`${primaryDisplayName}本身個性`, "teacher");
     add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher");
     add("");
-    add("紅鸞星會落在　歲、　歲、　歲、（容易會遇到有緣份的對象，或者是感情會有明顯進展。）");
-    add("而離婚或離異的高風險年齡則要特別注意：　歲。");
+    add("紅鸞星會落在　歲、　歲、　歲、（容易會遇到有緣份的對象，或者是感情會有明顯進展。）", "teacher");
+    add("而離婚或離異的高風險年齡則要特別注意：　歲。", "teacher");
     add("");
-    add("（以上歲數皆為虛歲）");
+    add("（以上歲數皆為虛歲）", "teacher");
     add("");
-    add(`對方（${targetName}）的個性`, "section");
+    add(`對方（${targetName}）的個性`, "teacher");
     add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher");
     add("");
-    add("對方的紅鸞星會落在　歲、　歲。");
-    add("而離婚或離異的高風險年齡則要特別注意：　歲。");
+    add("對方的紅鸞星會落在　歲、　歲。", "teacher");
+    add("而離婚或離異的高風險年齡則要特別注意：　歲。", "teacher");
     add("");
-    add("如果要姻緣比較順利，");
+    add("如果要姻緣比較順利，", "teacher");
     add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher");
   }
   const sections = isPastLifeRelation ? ["【前前世】", "【前世】", "【綜觀今生】"] : !isPastLifePersonal ? [] : /前三世|三世/.test(subTitle)
@@ -255,7 +255,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   const alreadyHasTeacherLayout = isPastLifePersonal || isPastLifeRelation || isOverallFortune || marriage || itemCode === "date-time-selection" || title.includes("擇日");
   if (!alreadyHasTeacherLayout) {
     add(`【${subTitle || title}】`, "section");
-    for (let index = 0; index < 8; index += 1) add("\u00a0", "teacher");
+    for (let index = 0; index < 4; index += 1) add("\u00a0", "teacher");
   }
   return { content, marks, images };
 }
