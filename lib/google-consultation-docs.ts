@@ -8,7 +8,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-08-26-v8";
+const requiredAppsScriptVersion = "2026-08-26-v9";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -101,6 +101,7 @@ const profileLines = (profile: any, ownerName: string) => {
 };
 
 type Mark = { start: number; end: number; kind: "meta" | "title" | "section" | "question" | "answer" | "teacher" | "fieldLabel" | "fieldAnswer" };
+type DocumentImage = { marker: string; dataUrl: string; width: number };
 type PageSpec = { detail: any; target?: any; targetIndex?: number; targetCount?: number };
 const cleanSubItemTitle = (value: unknown) => text(value).replace(/^\s*[＋+]\s*加購\s*[：:]?\s*(?:你)?/, "");
 const detailInfo = (detail: any) => {
@@ -133,6 +134,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   const { detail, target, targetIndex, targetCount } = pageSpec;
   let content = "";
   const marks: Mark[] = [];
+  const images: DocumentImage[] = [];
   const add = (line: string, kind?: Mark["kind"]) => {
     const start = content.length + 1;
     content += `${line}\n`;
@@ -149,6 +151,12 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     .filter(Boolean).filter((profile: any, index: number, all: any[]) => all.findIndex((entry) => entry.id === profile.id) === index);
   people.forEach((profile: any) => {
     profileLines(profile, ownerName).forEach((line) => add(line));
+    const photoData = text(profile.photo_data);
+    if (profile.profile_type === "pet" && photoData.startsWith("data:image/")) {
+      const marker = `[[[PET_IMAGE_${text(profile.id) || itemIndex}]]]`;
+      add(marker);
+      images.push({ marker, dataUrl: photoData, width: 220 });
+    }
     add("");
   });
   const extra = answer?.extra_data || {};
@@ -205,10 +213,14 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     add("2.如果沒有特別提到的年紀，代表身體狀況大致平順，不需要特別擔心，只要維持日常保養即可。");
     add("3.運勢中的歲數，僅代表在那個年齡段需要特別留意的事項（非今生會活到幾歲喔） 若遇到劫難的時候就要比較小心，通過自己的努力衝過難關，多做福德佈施，化解災劫也能夠延續生命。");
   }
-  if (marriage && (targetIndex == null || targetIndex === (targetCount || 1) - 1)) {
+  if (marriage) {
+    const primaryProfile = one(answer?.consultation_profiles);
+    const primaryFullName = text(primaryProfile?.name) || ownerName;
+    const primaryDisplayName = /^[\u3400-\u9fff]{2,4}$/.test(primaryFullName) ? primaryFullName.slice(1) : primaryFullName;
+    const targetName = text(targetProfile?.name) || "對方";
     add("【感情運勢與關係合盤】", "section");
     add("");
-    add("本身個性", "section");
+    add(`${primaryDisplayName}本身個性`, "section");
     add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher");
     add("");
     add("紅鸞星會落在　歲、　歲、　歲、（容易會遇到有緣份的對象，或者是感情會有明顯進展。）");
@@ -216,7 +228,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     add("");
     add("（以上歲數皆為虛歲）");
     add("");
-    add("對方的個性", "section");
+    add(`對方（${targetName}）的個性`, "section");
     add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher");
     add("");
     add("對方的紅鸞星會落在　歲、　歲。");
@@ -240,7 +252,12 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     const count = /六|6/.test(subTitle) ? 6 : 3;
     for (let index = 1; index <= count; index += 1) add(`${index}.\u00a0`, "teacher");
   }
-  return { content, marks };
+  const alreadyHasTeacherLayout = isPastLifePersonal || isPastLifeRelation || isOverallFortune || marriage || itemCode === "date-time-selection" || title.includes("擇日");
+  if (!alreadyHasTeacherLayout) {
+    add(`【${subTitle || title}】`, "section");
+    for (let index = 0; index < 8; index += 1) add("\u00a0", "teacher");
+  }
+  return { content, marks, images };
 }
 
 function consultationNumber(position: number) {
@@ -273,6 +290,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const detailIds = new Set(allDetails.map((detail: any) => detail.id));
   let content = "";
   const marks: Mark[] = [];
+  const images: DocumentImage[] = [];
   const pages = expandPages(allDetails);
   pages.forEach((pageSpec: PageSpec, index: number) => {
     if (index > 0) content += "[[[PAGE_BREAK]]]\n";
@@ -280,6 +298,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     const page = documentBody(pageSpec, index + 1, pages.length, ownerName);
     content += page.content;
     marks.push(...page.marks.map((mark) => ({ ...mark, start: mark.start + offset, end: mark.end + offset })));
+    images.push(...page.images);
   });
 
   const { data: numberedDocuments, error: numberError } = await db.from("booking_details")
@@ -298,7 +317,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     headers: { "content-type": "text/plain;charset=utf-8" },
     body: JSON.stringify({
       secret: appsScriptSecret, expectedVersion: requiredAppsScriptVersion, folderId,
-      title: fileTitle, content, marks, createMode,
+      title: fileTitle, content, marks, images, createMode,
       previousDocumentIds: force ? existingDetails.map((detail: any) => detail.google_document_id).filter(Boolean) : [],
     }),
     redirect: "follow",
