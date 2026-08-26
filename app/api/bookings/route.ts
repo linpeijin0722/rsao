@@ -37,8 +37,14 @@ export async function POST(request: NextRequest) {
     if (error) throw error;
     return NextResponse.json({ booking: data });
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : error && typeof error === "object" && "message" in error
+          ? String(error.message)
+          : "預約建立失敗";
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "預約建立失敗" },
+      { error: message },
       { status: 500 },
     );
   }
