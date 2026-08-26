@@ -51,6 +51,14 @@ const statusText = (x: any) =>
     cancelled: "已取消",
     expired: "已失效",
   })[statusKey(x)];
+const shortText = (value: unknown, limit = 12) => {
+  const chars = Array.from(String(value || ""));
+  return chars.length > limit ? `${chars.slice(0, limit).join("")}…` : chars.join("");
+};
+const bookingItemLines = (booking: any) => asArray(booking.booking_details).map((detail: any) => {
+  const subs = asArray(detail.booking_detail_sub_items).map((sub: any) => sub.sub_item_title).filter(Boolean);
+  return shortText([detail.item_title, ...subs].filter(Boolean).join(" "));
+});
 export default function Staff() {
   const [password, setPassword] = useState(""),
     [rows, setRows] = useState<any[]>([]),
@@ -71,6 +79,12 @@ export default function Staff() {
     [statusFilter, setStatusFilter] = useState("all"),
     [dataFilter, setDataFilter] = useState("all"),
     [sortBy, setSortBy] = useState("paid_desc"),
+    [textSearch,setTextSearch]=useState(""),
+    [textDateFrom,setTextDateFrom]=useState(""),
+    [textDateTo,setTextDateTo]=useState(""),
+    [showTextItems,setShowTextItems]=useState(false),
+    [showTextAmount,setShowTextAmount]=useState(false),
+    [showUpcomingVideo,setShowUpcomingVideo]=useState(false),
     [rememberPassword, setRememberPassword] = useState(false),
     [generatingDocument, setGeneratingDocument] = useState(""),
     [addPicker, setAddPicker] = useState<any>(null),
@@ -180,6 +194,13 @@ export default function Staff() {
           if (dataFilter === "returned" && !isComplete(x)) return false;
           if (dataFilter === "missing" && isComplete(x)) return false;
         }
+        if(x.consultation_methods?.code === "text"){
+          const query=textSearch.trim().toLocaleLowerCase();
+          if(query&&!`${x.customers?.line_display_name||""} ${x.customers?.full_name||""} ${x.booking_no||""}`.toLocaleLowerCase().includes(query))return false;
+          const paidDate=key(x.paid_at||x.created_at);
+          if(textDateFrom&&paidDate<textDateFrom)return false;
+          if(textDateTo&&paidDate>textDateTo)return false;
+        }
         return true;
       });
       return result.sort((a, b) => {
@@ -188,7 +209,7 @@ export default function Staff() {
           comparison=String(av).localeCompare(String(bv));
         return sortBy==="paid_asc"?comparison:-comparison;
       });
-    }, [rows, statusFilter, dataFilter, sortBy]),
+    }, [rows, statusFilter, dataFilter, sortBy, textSearch, textDateFrom, textDateTo]),
     video = useMemo(
       () =>
         rows.filter(
@@ -205,9 +226,8 @@ export default function Staff() {
     bookedDates = new Set(
       video.filter((x) => x.slot_start).map((x) => key(x.slot_start)),
     ),
-    daily = video.filter(
-      (x) => x.slot_start && key(x.slot_start) === selectedDate,
-    ),
+    daily = video.filter((x) => x.slot_start && (showUpcomingVideo ? new Date(x.slot_start).getTime() >= Date.now() : key(x.slot_start) === selectedDate))
+      .sort((a,b)=>new Date(a.slot_start).getTime()-new Date(b.slot_start).getTime()),
     cal = useMemo(() => {
       const [y, m] = month.split("-").map(Number),
         pad = (new Date(y, m - 1, 1).getDay() + 6) % 7,
@@ -361,8 +381,8 @@ export default function Staff() {
                 <button
                   key={d}
                   disabled={!bookedDates.has(d)}
-                  className={`${bookedDates.has(d) ? "booked" : "empty"} ${selectedDate === d ? "selected" : ""}`}
-                  onClick={() => setSelectedDate(d)}
+                  className={`${bookedDates.has(d) ? (d < key(new Date().toISOString()) ? "booked pastBooked" : "booked") : "empty"} ${selectedDate === d && !showUpcomingVideo ? "selected" : ""}`}
+                  onClick={() => {setSelectedDate(d);setShowUpcomingVideo(false)}}
                 >
                   {Number(d.slice(-2))}
                 </button>
@@ -372,9 +392,10 @@ export default function Staff() {
             )}
           </div>
         </div>
-        {selectedDate && (
+        <button className={`upcomingVideoButton ${showUpcomingVideo?"active":""}`} onClick={()=>{setShowUpcomingVideo(true);setSelectedDate("")}}>一覽接下來即將來臨的視訊</button>
+        {(selectedDate || showUpcomingVideo) && (
           <div className="dailyBookings">
-            <h3>{selectedDate} 的預約</h3>
+            <h3>{showUpcomingVideo?"接下來即將來臨的視訊":`${selectedDate} 的預約`}</h3>
             <div className="staffBookingTable">
               <div className="staffTableHead">
                 <b>視訊時間</b>
@@ -391,7 +412,7 @@ export default function Staff() {
                   status = statusText(x),
                   profiles = returnedData(x);
                 return (
-                  <article className="staffTableRow" key={x.id}>
+                  <article className={`staffTableRow ${new Date(x.slot_start).getTime()<Date.now()?"pastVideoRow":""}`} key={x.id}>
                     <span>
                       {new Date(x.slot_start).toLocaleTimeString("zh-TW", {
                         timeZone: "Asia/Taipei",
@@ -484,6 +505,7 @@ export default function Staff() {
       <section className="staffBookingSection textBookingSection">
         <h2 className="staffSectionTitle">文字預約</h2>
         <div className="staffFilters">
+          <label className="staffSearchField">搜尋用戶或訂單編號<input value={textSearch} onChange={e=>setTextSearch(e.target.value)} placeholder="輸入用戶名或訂單編號"/></label>
           <label>
             訂單狀態
             <select
@@ -515,6 +537,9 @@ export default function Staff() {
               <option value="paid_asc">付款時間（由舊到新）</option>
             </select>
           </label>
+          <label>付款日期從<input type="date" value={textDateFrom} onChange={e=>setTextDateFrom(e.target.value)}/></label>
+          <label>付款日期到<input type="date" value={textDateTo} min={textDateFrom||undefined} onChange={e=>setTextDateTo(e.target.value)}/></label>
+          <div className="staffDisplayOptions"><b>顯示欄位</b><label><input type="checkbox" checked={showTextItems} onChange={e=>setShowTextItems(e.target.checked)}/>預約項目內容</label><label><input type="checkbox" checked={showTextAmount} onChange={e=>setShowTextAmount(e.target.checked)}/>訂單金額</label></div>
         </div>
         <div className="staffBookingTable">
           <div className="staffTableHead">
@@ -545,7 +570,7 @@ export default function Staff() {
                   )}
                   <span>{x.customers?.line_display_name}</span>
                 </button>
-                <b className={`staffState ${statusKey(x)}`}>{paid && x.collection_source === "manual" ? "手動收款" : statusText(x)}</b>
+                <b className={`staffState ${statusKey(x)}`}><span>{paid && x.collection_source === "manual" ? "手動收款" : statusText(x)}</span>{showTextAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</b>
                 {paid ? (
                   complete ? (
                     <button
@@ -569,7 +594,7 @@ export default function Staff() {
                 ) : (
                   <span>—</span>
                 )}
-                <small>{x.booking_no}</small>
+                <small className="staffOrderCell"><span>{x.booking_no}</span>{showTextItems&&<span className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><span key={`${x.id}-item-${index}`}>{line}</span>)}</span>}</small>
                 <button onClick={() => openEdit(x)}>修改</button>
                 {documentActions(x)}
               </article>
