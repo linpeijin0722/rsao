@@ -84,6 +84,7 @@ export default function Staff() {
     [textDateTo,setTextDateTo]=useState(""),
     [showTextItems,setShowTextItems]=useState(false),
     [showTextAmount,setShowTextAmount]=useState(false),
+    [showDocumentNumber,setShowDocumentNumber]=useState(false),
     [showUpcomingVideo,setShowUpcomingVideo]=useState(false),
     [rememberPassword, setRememberPassword] = useState(false),
     [generatingDocument, setGeneratingDocument] = useState(""),
@@ -91,7 +92,9 @@ export default function Staff() {
     [pickedSubId, setPickedSubId] = useState(""),
     [documentLinkEdit,setDocumentLinkEdit]=useState<any>(null),
     [documentLinkValue,setDocumentLinkValue]=useState(""),
-    [documentRebuild,setDocumentRebuild]=useState<any>(null);
+    [documentRebuild,setDocumentRebuild]=useState<any>(null),
+    [priceEdit,setPriceEdit]=useState<any>(null),
+    [priceValue,setPriceValue]=useState("");
   async function staffPost(body:any,retry=true){
     let response=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
     if(response.status===401&&retry){
@@ -127,8 +130,24 @@ export default function Staff() {
     return <span className="consultationSheetLinks">
       <button className="consultationSheetLink documentGenerateButton" disabled={busy} onClick={()=>links.length?setDocumentRebuild(x):generateDocument(x)} title={links.length?"重新建立諮詢文件":"建立諮詢文件"} aria-label={links.length?"重新建立諮詢文件":"建立諮詢文件"}>{busy?"…":"📄"}</button>
       <button className="consultationSheetLink documentRelinkButton" onClick={()=>{setDocumentLinkEdit(x);setDocumentLinkValue(links[0]?.consultation_url||"")}} title="更改為現有 Google 文件連結" aria-label="更改諮詢單連結">🔄</button>
-      {links.map((detail:any)=><a key={detail.id} className="consultationSheetLink" href={detail.consultation_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗</a>)}
+      {links.map((detail:any)=><a key={detail.id} className="consultationSheetLink consultationDocumentLink" href={detail.consultation_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗{showDocumentNumber&&<small>{consultationNumberFor(x)}</small>}</a>)}
     </span>
+  }
+  function consultationNumberFor(booking:any){
+    const docs=rows.flatMap((row:any)=>asArray(row.booking_details).filter((detail:any)=>detail.google_document_id).map((detail:any)=>({id:detail.google_document_id,created:detail.google_document_created_at||row.created_at}))).filter((doc:any,index:number,all:any[])=>all.findIndex((candidate:any)=>candidate.id===doc.id)===index).sort((a:any,b:any)=>String(a.created).localeCompare(String(b.created)));
+    const documentId=asArray(booking.booking_details).find((detail:any)=>detail.google_document_id)?.google_document_id;
+    const position=docs.findIndex((doc:any)=>doc.id===documentId)+1;
+    if(position<1)return "";
+    return `${String.fromCharCode(65+Math.floor((position-1)/99))}${String(((position-1)%99)+1).padStart(2,"0")}`;
+  }
+  async function savePrice(){
+    if(!priceEdit)return;
+    const amount=Number(priceValue.replace(/,/g,""));
+    if(!Number.isInteger(amount)||amount<0)return alert("請輸入正確的整數金額");
+    if(!confirm(`是否確認將訂單 ${priceEdit.booking_no} 的總金額修改為 NT$ ${amount.toLocaleString("en-US")}？`))return;
+    const response=await staffPost({action:"update_price",bookingNo:priceEdit.booking_no,totalPrice:amount}),result=await response.json();
+    if(!response.ok)return alert(result.error||"修改價格失敗");
+    setPriceEdit(null);setPriceValue("");setEditing(null);await load();alert("訂單價格已更新");
   }
   async function load() {
     const r = await fetch("/api/staff/bookings"),
@@ -543,7 +562,7 @@ export default function Staff() {
           </div>
           <div className="staffSecondaryFilters">
             <div className="staffDateRange"><b>付款日期</b><label><span>從</span><input type="date" value={textDateFrom} onChange={e=>setTextDateFrom(e.target.value)}/></label><label><span>到</span><input type="date" value={textDateTo} min={textDateFrom||undefined} onChange={e=>setTextDateTo(e.target.value)}/></label>{(textDateFrom||textDateTo)&&<button onClick={()=>{setTextDateFrom("");setTextDateTo("")}}>清除日期</button>}</div>
-            <div className="staffDisplayOptions"><b>表格顯示</b><label><input type="checkbox" checked={showTextItems} onChange={e=>setShowTextItems(e.target.checked)}/><span>預約項目</span></label><label><input type="checkbox" checked={showTextAmount} onChange={e=>setShowTextAmount(e.target.checked)}/><span>訂單金額</span></label></div>
+            <div className="staffDisplayOptions"><b>表格顯示</b><label><input type="checkbox" checked={showTextItems} onChange={e=>setShowTextItems(e.target.checked)}/><span>預約項目</span></label><label><input type="checkbox" checked={showTextAmount} onChange={e=>setShowTextAmount(e.target.checked)}/><span>訂單金額</span></label><label><input type="checkbox" checked={showDocumentNumber} onChange={e=>setShowDocumentNumber(e.target.checked)}/><span>諮詢單編號</span></label></div>
           </div>
         </div>
         <div className="staffBookingTable">
@@ -735,6 +754,7 @@ export default function Staff() {
                 })}
               </section>
             </div>
+            <div className="staffTotalPrice"><b>總金額</b><strong>NT$ {Number(editing.total_price||0).toLocaleString("en-US")}</strong><button onClick={()=>{setPriceEdit(editing);setPriceValue(String(editing.total_price||0))}}>修改</button></div>
             <button onClick={saveEdit}>儲存並發送 LINE 通知</button>
             <button className="cancel" onClick={() => setEditing(null)}>
               取消
@@ -744,6 +764,7 @@ export default function Staff() {
       )}
       {documentLinkEdit&&<div className="modalBackdrop documentLinkBackdrop" onClick={()=>setDocumentLinkEdit(null)}><div className="modal documentLinkModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setDocumentLinkEdit(null)}>×</button><h2>更改諮詢單連結</h2><p>先到 Google 雲端硬碟開啟要使用的文件，複製網址後貼到下方。</p><a className="openGoogleDrive" href="https://drive.google.com/drive/folders/1jajjmq_vxySLJBVWleIGrmkRI0TykJgI?usp=drive_link" target="_blank" rel="noreferrer">開啟<strong>阿嫂諮詢單</strong>資料夾</a><label>Google 文件連結<input autoFocus placeholder="https://docs.google.com/document/d/..." value={documentLinkValue} onChange={e=>setDocumentLinkValue(e.target.value)}/></label><div className="documentLinkActions"><button onClick={()=>void saveDocumentLink()}>確認更改連結</button><button className="cancel" onClick={()=>setDocumentLinkEdit(null)}>取消</button></div></div></div>}
       {documentRebuild&&<div className="modalBackdrop" onClick={()=>setDocumentRebuild(null)}><div className="modal rebuildDocumentModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setDocumentRebuild(null)}>×</button><h2>重新建立諮詢文件</h2><p>請選擇這次要如何建立：</p><button onClick={()=>void generateDocument(documentRebuild,"replace")}><b>覆蓋原諮詢單</b><small>更新連結，原本的文件會移至垃圾桶</small></button><button onClick={()=>void generateDocument(documentRebuild,"new")}><b>建立新的諮詢單</b><small>保留原文件，新檔名會依序加上 .新01、.新02</small></button><button className="cancel" onClick={()=>setDocumentRebuild(null)}>取消</button></div></div>}
+      {priceEdit&&<div className="modalBackdrop" onClick={()=>setPriceEdit(null)}><div className="modal staffPriceModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setPriceEdit(null)}>×</button><h2>修改訂單價格</h2><p>訂單編號：{priceEdit.booking_no}</p><label>新的總金額<div className="priceInput"><span>NT$</span><input autoFocus inputMode="numeric" value={priceValue} onChange={e=>setPriceValue(e.target.value.replace(/[^0-9]/g,""))}/></div></label><button onClick={()=>void savePrice()}>確認修改</button><button className="cancel" onClick={()=>setPriceEdit(null)}>取消</button></div></div>}
       {addPicker && (
         <div
           className="modalBackdrop addSubBackdrop"
