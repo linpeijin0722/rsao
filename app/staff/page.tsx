@@ -79,7 +79,9 @@ export default function Staff() {
     [statusFilter, setStatusFilter] = useState("all"),
     [dataFilter, setDataFilter] = useState("all"),
     [sortBy, setSortBy] = useState("paid_desc"),
-    [textSearch,setTextSearch]=useState(""),
+    [customerSearch,setCustomerSearch]=useState(""),
+    [bookingSearch,setBookingSearch]=useState(""),
+    [documentSearch,setDocumentSearch]=useState(""),
     [textDateFrom,setTextDateFrom]=useState(""),
     [textDateTo,setTextDateTo]=useState(""),
     [showTextItems,setShowTextItems]=useState(false),
@@ -214,8 +216,13 @@ export default function Staff() {
           if (dataFilter === "missing" && isComplete(x)) return false;
         }
         if(x.consultation_methods?.code === "text"){
-          const query=textSearch.trim().toLocaleLowerCase();
-          if(query&&!`${x.customers?.line_display_name||""} ${x.customers?.full_name||""} ${x.booking_no||""}`.toLocaleLowerCase().includes(query))return false;
+          const customerQuery=customerSearch.trim().toLocaleLowerCase();
+          const bookingQuery=bookingSearch.trim().toLocaleLowerCase();
+          const documentQuery=documentSearch.trim().toLocaleLowerCase();
+          const customerValue=`${x.customers?.line_display_name||""} ${x.customers?.full_name||""}`.toLocaleLowerCase();
+          if(customerQuery&&!customerValue.includes(customerQuery))return false;
+          if(bookingQuery&&!String(x.booking_no||"").toLocaleLowerCase().includes(bookingQuery))return false;
+          if(documentQuery&&!consultationNumberFor(x).toLocaleLowerCase().includes(documentQuery))return false;
           const paidDate=key(x.paid_at||x.created_at);
           if(textDateFrom&&paidDate<textDateFrom)return false;
           if(textDateTo&&paidDate>textDateTo)return false;
@@ -228,7 +235,7 @@ export default function Staff() {
           comparison=String(av).localeCompare(String(bv));
         return sortBy==="paid_asc"?comparison:-comparison;
       });
-    }, [rows, statusFilter, dataFilter, sortBy, textSearch, textDateFrom, textDateTo]),
+    }, [rows, statusFilter, dataFilter, sortBy, customerSearch, bookingSearch, documentSearch, textDateFrom, textDateTo]),
     video = useMemo(
       () =>
         rows.filter(
@@ -448,7 +455,7 @@ export default function Staff() {
                       {x.customers?.line_picture_url && (
                         <img src={x.customers.line_picture_url} alt="" />
                       )}
-                      <span>{x.customers?.line_display_name}</span>
+                      <span>{[x.customers?.line_display_name,x.customers?.full_name].filter(Boolean).join("｜")}</span>
                     </button>
                     <b className={`staffState ${statusKey(x)}`}>{paid && x.collection_source === "manual" ? "手動收款" : status}</b>
                     {paid ? (
@@ -558,7 +565,12 @@ export default function Staff() {
               <option value="paid_asc">付款時間（由舊到新）</option>
             </select>
             </label>
-            <label className="staffSearchField" aria-label="搜尋用戶或訂單編號"><span aria-hidden="true">⌕</span><input value={textSearch} onChange={e=>setTextSearch(e.target.value)} placeholder="用戶名或訂單編號"/></label>
+            <div className="staffSearchGroup" role="search" aria-label="搜尋文字預約">
+              <span className="staffSearchIcon" aria-hidden="true">⌕</span>
+              <label className="staffSearchField"><span>用戶名</span><input value={customerSearch} onChange={e=>setCustomerSearch(e.target.value)} placeholder="LINE名或姓名"/></label>
+              <label className="staffSearchField"><span>訂單編號</span><input value={bookingSearch} onChange={e=>setBookingSearch(e.target.value)} placeholder="LAS-…"/></label>
+              <label className="staffSearchField"><span>諮詢單號</span><input value={documentSearch} onChange={e=>setDocumentSearch(e.target.value)} placeholder="例如 A03"/></label>
+            </div>
           </div>
           <div className="staffSecondaryFilters">
             <div className="staffDateRange"><b>付款日期</b><label><span>從</span><input type="date" value={textDateFrom} onChange={e=>setTextDateFrom(e.target.value)}/></label><label><span>到</span><input type="date" value={textDateTo} min={textDateFrom||undefined} onChange={e=>setTextDateTo(e.target.value)}/></label>{(textDateFrom||textDateTo)&&<button onClick={()=>{setTextDateFrom("");setTextDateTo("")}}>清除日期</button>}</div>
@@ -592,7 +604,7 @@ export default function Staff() {
                   {x.customers?.line_picture_url && (
                     <img src={x.customers.line_picture_url} alt="" />
                   )}
-                  <span>{x.customers?.line_display_name}</span>
+                  <span>{[x.customers?.line_display_name,x.customers?.full_name].filter(Boolean).join("｜")}</span>
                 </button>
                 <b className={`staffState ${statusKey(x)}`}><span>{paid && x.collection_source === "manual" ? "手動收款" : statusText(x)}</span>{showTextAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</b>
                 {paid ? (
