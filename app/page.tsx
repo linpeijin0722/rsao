@@ -243,7 +243,7 @@ export default function Page() {
     setBusy(true);
     try {
       let selected=method;
-      if(!selected.id||!items.length){const catalogResponse=await fetch("/api/catalog"),catalog=await catalogResponse.json();if(!catalogResponse.ok)throw Error(catalog.error);setMethods(catalog.methods);setItems(catalog.items);setTextFull(Boolean(catalog.textFull));selected=catalog.methods.find((m:Method)=>m.code===method.code);if(!selected)throw Error("找不到諮詢方式");setMethod(selected);if(selected.code==="text"&&catalog.textFull){setAlertMessage("目前文字諮詢預約已額滿");return}}
+       if(!selected.id||!items.length){const catalogResponse=await fetch("/api/catalog"),catalog=await catalogResponse.json();if(!catalogResponse.ok)throw Error(catalog.error);setItems(catalog.items);setTextFull(Boolean(catalog.textFull));selected=catalog.methods.find((m:Method)=>m.code===method.code);if(!selected)throw Error("找不到諮詢方式");setMethod(selected);if(selected.code==="text"&&catalog.textFull){setAlertMessage("目前文字諮詢預約已額滿");return}}
       if(selected.code==="text"){setScreen("slots");return}
       const r = await fetch(`/api/slots?methodId=${selected.id}`),
         j = await r.json();
@@ -372,21 +372,39 @@ export default function Page() {
   async function submit() {
     setBusy(true);
     try {
-      const r = await fetch("/api/bookings", {
+      const bookingPayload = {
+        methodId: method?.id,
+        slotStart: slot || null,
+        paymentMethod: "credit_card",
+        items: cart.map((l) => ({
+          item_id: l.itemId,
+          quantity: l.qty,
+          sub_item_ids: l.subId ? [l.subId] : [],
+        })),
+      };
+      const createBooking = () => fetch("/api/bookings", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            methodId: method?.id,
-            slotStart: slot || null,
-            paymentMethod: "credit_card",
-            items: cart.map((l) => ({
-              item_id: l.itemId,
-              quantity: l.qty,
-              sub_item_ids: l.subId ? [l.subId] : [],
-            })),
-          }),
-        }),
-        j = await r.json();
+          body: JSON.stringify(bookingPayload),
+        });
+      let r = await createBooking();
+      if (r.status === 401) {
+        const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+        if (!liffId) throw Error("LINE 登入已失效，請重新開啟預約頁面");
+        await liff.init({ liffId });
+        if (!liff.isLoggedIn()) {
+          liff.login({ redirectUri: location.href });
+          return;
+        }
+        const authResponse = await fetch("/api/line/auth", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ accessToken: liff.getAccessToken() }),
+        });
+        if (!authResponse.ok) throw Error("LINE 登入已失效，請重新開啟預約頁面");
+        r = await createBooking();
+      }
+      const j = await r.json();
       if (!r.ok) throw Error(j.error);
       setBookingNo(j.booking.booking_no);
       try {
