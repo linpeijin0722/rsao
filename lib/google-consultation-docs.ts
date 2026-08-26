@@ -66,6 +66,14 @@ const fieldLabels: Record<string, string> = {
 };
 
 const shichenName = (value: unknown) => text(value).split(/[（(]/)[0];
+const virtualAge = (profile: any) => {
+  const lunar = text(profile?.lunar_birth_text);
+  const rocYear = Number(lunar.match(/民國\s*(\d+)/)?.[1]);
+  const birthYear = rocYear ? rocYear + 1911 : Number(text(profile?.birth_date).match(/^(\d{4})/)?.[1]);
+  if (!birthYear) return null;
+  return Math.max(1, new Date().getFullYear() - birthYear + 1);
+};
+
 const profileLines = (profile: any, ownerName: string) => {
   const profileName = text(profile.name);
   const relationshipDetail = text(profile.relationship_detail);
@@ -78,7 +86,8 @@ const profileLines = (profile: any, ownerName: string) => {
   const relation = isOwner
     ? "本人"
     : `${ownerName || "用戶"}的${relationshipDetail || (profile.relationship === "本人" ? "親友" : text(profile.relationship || "親友"))}`;
-  const nameLine = `姓名：${profileName}${profile.gender ? `／${text(profile.gender)}` : ""}${relation ? `（${relation}）` : ""}`;
+  const age = virtualAge(profile);
+  const nameLine = `姓名：${profileName}${profile.gender ? `／${text(profile.gender)}` : ""}${relation ? `（${relation}）` : ""}${age ? `　虛歲：${age}歲` : ""}`;
   const lunarLine = profile.lunar_birth_text
     ? `農曆生日：${text(profile.lunar_birth_text)}${profile.birth_shichen ? `（${shichenName(profile.birth_shichen)}）` : ""}${profile.zodiac ? `　生肖：${text(profile.zodiac)}` : ""}`
     : "";
@@ -92,19 +101,13 @@ const profileLines = (profile: any, ownerName: string) => {
 };
 
 type Mark = { start: number; end: number; kind: "meta" | "title" | "section" | "question" | "answer" | "teacher" | "fieldLabel" | "fieldAnswer" };
-type PageSpec = { detail: any; target?: any };
-function virtualAge(profile: any) {
-  const lunar = text(profile?.lunar_birth_text);
-  const rocYear = Number(lunar.match(/民國\s*(\d+)/)?.[1]);
-  if (!rocYear) return null;
-  const currentRocYear = new Date().getFullYear() - 1911;
-  return Math.max(1, currentRocYear - rocYear + 1);
-}
+type PageSpec = { detail: any; target?: any; targetIndex?: number; targetCount?: number };
+const cleanSubItemTitle = (value: unknown) => text(value).replace(/^\s*[＋+]\s*加購\s*[：:]?\s*(?:你)?/, "");
 const detailInfo = (detail: any) => {
   const answer = one(detail.booking_consultation_answers);
   const itemCode = one(detail.booking_items)?.code || "";
   const title = text(detail.item_title);
-  const subItems = (detail.booking_detail_sub_items || []).map((entry: any) => text(entry.sub_item_title)).filter(Boolean);
+  const subItems = (detail.booking_detail_sub_items || []).map((entry: any) => cleanSubItemTitle(entry.sub_item_title)).filter(Boolean);
   const subTitle = subItems.join("、");
   const personalLove = subTitle.includes("個人感情運") || title.includes("個人感情運");
   const relation = itemCode === "past-life-relationship" || title.includes("與他人前世關係");
@@ -113,16 +116,21 @@ const detailInfo = (detail: any) => {
 };
 
 function expandPages(details: any[]): PageSpec[] {
-  return details.flatMap((detail: any) => {
+  return details.filter((detail: any) => !!one(detail.booking_consultation_answers)).flatMap((detail: any) => {
     const info = detailInfo(detail);
-    const participants = (info.answer?.booking_answer_participants || []).slice().sort((a: any, b: any) => a.position - b.position);
-    if ((info.relation || info.marriage) && participants.length) return participants.map((target: any) => ({ detail, target }));
+    const primaryId = text(one(info.answer?.consultation_profiles)?.id || info.answer?.profile_id);
+    const participants = (info.answer?.booking_answer_participants || []).slice()
+      .sort((a: any, b: any) => a.position - b.position)
+      .filter((entry: any) => text(one(entry.consultation_profiles)?.id) !== primaryId);
+    if ((info.relation || info.marriage) && participants.length) {
+      return participants.map((target: any, targetIndex: number) => ({ detail, target, targetIndex, targetCount: participants.length }));
+    }
     return [{ detail }];
   });
 }
 
 function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number, ownerName: string) {
-  const { detail, target } = pageSpec;
+  const { detail, target, targetIndex, targetCount } = pageSpec;
   let content = "";
   const marks: Mark[] = [];
   const add = (line: string, kind?: Mark["kind"]) => {
@@ -196,6 +204,26 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     add("1.以上均為虛歲");
     add("2.如果沒有特別提到的年紀，代表身體狀況大致平順，不需要特別擔心，只要維持日常保養即可。");
     add("3.運勢中的歲數，僅代表在那個年齡段需要特別留意的事項（非今生會活到幾歲喔） 若遇到劫難的時候就要比較小心，通過自己的努力衝過難關，多做福德佈施，化解災劫也能夠延續生命。");
+  }
+  if (marriage && (targetIndex == null || targetIndex === (targetCount || 1) - 1)) {
+    add("【感情運勢與關係合盤】", "section");
+    add("");
+    add("本身個性", "section");
+    add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher");
+    add("");
+    add("紅鸞星會落在　歲、　歲、　歲、（容易會遇到有緣份的對象，或者是感情會有明顯進展。）");
+    add("而離婚或離異的高風險年齡則要特別注意：　歲。");
+    add("");
+    add("（以上歲數皆為虛歲）");
+    add("");
+    add("對方的個性", "section");
+    add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher");
+    add("");
+    add("對方的紅鸞星會落在　歲、　歲。");
+    add("而離婚或離異的高風險年齡則要特別注意：　歲。");
+    add("");
+    add("如果要姻緣比較順利，");
+    add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher");
   }
   const sections = isPastLifeRelation ? ["【前前世】", "【前世】", "【綜觀今生】"] : !isPastLifePersonal ? [] : /前三世|三世/.test(subTitle)
     ? ["【前前前世】", "【前前世】", "【前世】", "【綜觀今生】"]
