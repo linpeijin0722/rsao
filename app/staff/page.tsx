@@ -51,7 +51,7 @@ const statusText = (x: any) =>
     cancelled: "已取消",
     expired: "已失效",
   })[statusKey(x)];
-const shortText = (value: unknown, limit = 12) => {
+const shortText = (value: unknown, limit = 20) => {
   const chars = Array.from(String(value || ""));
   return chars.length > limit ? `${chars.slice(0, limit).join("")}…` : chars.join("");
 };
@@ -369,10 +369,6 @@ export default function Staff() {
             ›
           </button>
         </div>
-        <div className="videoViewToolbar">
-          <span>{showUpcomingVideo ? "目前顯示：現在之後的全部視訊" : selectedDate ? `目前顯示：${selectedDate}` : "請從月曆選擇有預約的日期"}</span>
-          <button className={showUpcomingVideo?"active":""} onClick={()=>{setShowUpcomingVideo(true);setSelectedDate("")}}>即將來臨的視訊</button>
-        </div>
         <div className="staffCalendar">
           <div className="staffWeek">
             {["一", "二", "三", "四", "五", "六", "日"].map((d) => (
@@ -396,9 +392,12 @@ export default function Staff() {
             )}
           </div>
         </div>
+        <div className="videoViewToolbar">
+          <button className={showUpcomingVideo?"active":""} onClick={()=>{setShowUpcomingVideo(true);setSelectedDate("")}}>即將來臨的視訊</button>
+        </div>
         {(selectedDate || showUpcomingVideo) && (
           <div className="dailyBookings">
-            <h3>{showUpcomingVideo?"接下來即將來臨的視訊":`${selectedDate} 的預約`}</h3>
+            <h3>目前顯示：{showUpcomingVideo?"現在之後的全部視訊":selectedDate}</h3>
             <div className="staffBookingTable">
               <div className="staffTableHead">
                 <b>視訊時間</b>
