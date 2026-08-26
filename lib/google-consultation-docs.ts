@@ -8,7 +8,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-08-26-v7";
+const requiredAppsScriptVersion = "2026-08-26-v8";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -47,23 +47,23 @@ async function google(url: string, token: string, init: RequestInit = {}) {
   return result;
 }
 
-const labels: Record<string, string> = {
-  relationship: "資料分類", relationship_detail: "與我的關係", gender: "性別",
-  birth_date: "國曆生日", lunar_birth_text: "農曆生日", zodiac: "生肖",
-  birth_shichen: "出生時辰", address: "居住地址", death_date: "國曆往生日期",
-  lunar_death_text: "農曆往生日期", death_shichen: "往生時辰", notes: "備註",
-  relationship_status: "目前關係狀態", relationship_duration: "這段關係多久了",
-  main_event: "這次最想解決的事件", relationship_goal: "最希望達成的目標",
-  overall_focuses: "目前最關心的事件", overall_focus_details: "事件詳細資料",
+const fieldLabels: Record<string, string> = {
+  relationship_status: "目前關係狀態", relationship_duration: "這段關係多久了？",
+  main_event: "這次最想解決的事件？", relationship_goal: "你最希望達成的目標？",
+  purpose: "這次是要擇什麼日子呢？", situation: "請說明您目前的狀況",
+  date_range: "是否有指定的日期範圍？有沒有特別忌諱或需要注意的？",
+  location: "地點在哪裡？", notes: "其他想補充的說明或狀況？",
+  preferred_characters: "是否有特別想用的字或喜歡的讀音？",
+  name_style: "對名字的風格有沒有什麼想像？", name_taboo: "是否有禁忌或避諱的字或諧音？",
+  naming_notes: "其他備註", baby_surname: "希望寶寶姓氏",
+  interference_situation: "請簡述被干擾的情況", interference_duration: "這樣的情況多久了？",
+  love_status: "目前感情狀態", social_lifestyle: "目前的社交與生活型態",
+  home_purpose: "本次諮詢的主要目的", home_problem: "目前住起來最困擾的問題",
+  lawsuit_type: "官司／糾紛類型", lawsuit_progress: "目前訴訟進度",
+  next_court_date: "下次開庭或調解日期", dispute_summary: "事件簡述與爭議點",
+  professional_help: "目前是否有專業人士或他人協助", core_question: "本次最想解答的核心問題",
+  current_condition: "目前的心理或生活狀況", previous_handling: "過去是否曾處理過",
 };
-
-function extraLines(value: unknown, prefix = ""): string[] {
-  if (value == null || value === "") return [];
-  if (Array.isArray(value)) return value.flatMap((entry, index) => extraLines(entry, `${prefix}${prefix ? " " : ""}${index + 1}`));
-  if (typeof value === "object") return Object.entries(value as Record<string, unknown>)
-    .flatMap(([key, entry]) => extraLines(entry, `${prefix}${prefix ? "－" : ""}${labels[key] || key}`));
-  return [`${prefix || "其他資料"}：${text(value)}`];
-}
 
 const shichenName = (value: unknown) => text(value).split(/[（(]/)[0];
 const profileLines = (profile: any, ownerName: string) => {
@@ -91,7 +91,8 @@ const profileLines = (profile: any, ownerName: string) => {
   ].filter(Boolean);
 };
 
-type Mark = { start: number; end: number; kind: "meta" | "title" | "section" | "question" | "answer" | "teacher" };
+type Mark = { start: number; end: number; kind: "meta" | "title" | "section" | "question" | "answer" | "teacher" | "fieldLabel" | "fieldAnswer" };
+type PageSpec = { detail: any; target?: any };
 function virtualAge(profile: any) {
   const lunar = text(profile?.lunar_birth_text);
   const rocYear = Number(lunar.match(/民國\s*(\d+)/)?.[1]);
@@ -99,7 +100,29 @@ function virtualAge(profile: any) {
   const currentRocYear = new Date().getFullYear() - 1911;
   return Math.max(1, currentRocYear - rocYear + 1);
 }
-function documentBody(detail: any, itemIndex: number, totalItems: number, ownerName: string) {
+const detailInfo = (detail: any) => {
+  const answer = one(detail.booking_consultation_answers);
+  const itemCode = one(detail.booking_items)?.code || "";
+  const title = text(detail.item_title);
+  const subItems = (detail.booking_detail_sub_items || []).map((entry: any) => text(entry.sub_item_title)).filter(Boolean);
+  const subTitle = subItems.join("、");
+  const personalLove = subTitle.includes("個人感情運") || title.includes("個人感情運");
+  const relation = itemCode === "past-life-relationship" || title.includes("與他人前世關係");
+  const marriage = (itemCode === "marriage-bazi" || title.includes("感情運勢") || title.includes("合婚") || title.includes("合八字") || title.includes("關係合盤")) && !personalLove;
+  return { answer, itemCode, title, subItems, subTitle, relation, marriage };
+};
+
+function expandPages(details: any[]): PageSpec[] {
+  return details.flatMap((detail: any) => {
+    const info = detailInfo(detail);
+    const participants = (info.answer?.booking_answer_participants || []).slice().sort((a: any, b: any) => a.position - b.position);
+    if ((info.relation || info.marriage) && participants.length) return participants.map((target: any) => ({ detail, target }));
+    return [{ detail }];
+  });
+}
+
+function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number, ownerName: string) {
+  const { detail, target } = pageSpec;
   let content = "";
   const marks: Mark[] = [];
   const add = (line: string, kind?: Mark["kind"]) => {
@@ -108,29 +131,57 @@ function documentBody(detail: any, itemIndex: number, totalItems: number, ownerN
     if (kind) marks.push({ start, end: start + line.length, kind });
   };
   add(`項目 ${itemIndex}（共 ${totalItems} 個項目）`, "meta");
-  const subItems = (detail.booking_detail_sub_items || []).map((entry: any) => text(entry.sub_item_title)).filter(Boolean);
+  const info = detailInfo(detail);
+  const { answer, itemCode, title, subItems, subTitle, relation, marriage } = info;
   add([text(detail.item_title), subItems.join("、")].filter(Boolean).join("｜"), "title");
   add("");
-  const answer = one(detail.booking_consultation_answers);
   const participants = (answer?.booking_answer_participants || []).slice().sort((a: any, b: any) => a.position - b.position);
-  const people = [one(answer?.consultation_profiles), ...participants.map((entry: any) => one(entry.consultation_profiles))]
+  const selectedParticipants = target ? [target] : participants;
+  const people = [one(answer?.consultation_profiles), ...selectedParticipants.map((entry: any) => one(entry.consultation_profiles))]
     .filter(Boolean).filter((profile: any, index: number, all: any[]) => all.findIndex((entry) => entry.id === profile.id) === index);
   people.forEach((profile: any) => {
     profileLines(profile, ownerName).forEach((line) => add(line));
-    const omitted = new Set(["id", "customer_id", "created_at", "updated_at", "name", "profile_type", "relationship", "relationship_detail", "gender", "birth_date", "lunar_birth_text", "zodiac", "birth_shichen", "address", "photo_data", "death_date", "lunar_death_text", "death_shichen", "notes", "is_lunar", "owner_profile_id"]);
-    extraLines(Object.fromEntries(Object.entries(profile).filter(([key]) => !omitted.has(key)))).forEach((line) => add(line));
     add("");
   });
-  (answer?.questions || []).map(text).filter(Boolean).forEach((question: string, index: number) => {
+  const extra = answer?.extra_data || {};
+  const targetProfile = one(target?.consultation_profiles);
+  const targetId = text(targetProfile?.id);
+  const questions = targetId && Array.isArray(extra.target_questions?.[targetId])
+    ? extra.target_questions[targetId]
+    : (answer?.questions || []);
+  const addField = (label: string, value: unknown) => {
+    const rendered = Array.isArray(value) ? value.map(text).filter(Boolean).join("、") : text(value);
+    if (!rendered) return;
+    add(label, "fieldLabel"); add(rendered, "fieldAnswer"); add("");
+  };
+  if (marriage && targetId) {
+    const row = extra.relationship_details?.[targetId] || {};
+    ["relationship_status", "relationship_duration", "main_event", "relationship_goal"].forEach((key) => addField(fieldLabels[key], row[key]));
+  } else if (itemCode === "date-time-selection" || title.includes("擇日")) {
+    addField(fieldLabels.purpose, [extra.purpose === "其他" ? extra.other_purpose : extra.purpose, extra.situation].map(text).filter(Boolean).join("，"));
+    addField(fieldLabels.location, extra.location);
+    addField(fieldLabels.date_range, extra.date_range);
+    addField(fieldLabels.notes, extra.notes);
+  } else {
+    Object.keys(fieldLabels).forEach((key) => {
+      if (["relationship_status", "relationship_duration", "main_event", "relationship_goal", "purpose", "situation", "date_range", "location", "notes"].includes(key)) return;
+      addField(fieldLabels[key], extra[key]);
+    });
+    if (Array.isArray(extra.overall_focuses)) addField("目前最關心的事件", extra.overall_focuses);
+    const focusDetails = extra.overall_focus_details || {};
+    Object.entries(focusDetails).forEach(([focus, rows]) => {
+      if (!rows || typeof rows !== "object") return;
+      Object.entries(rows as Record<string, unknown>).forEach(([label, value]) => addField(`${focus}－${label}`, value));
+    });
+  }
+  questions.map(text).filter(Boolean).forEach((question: string, index: number) => {
     add(`Q${index + 1}:${question}`, "question");
     add(`A${index + 1}:`, "answer");
     add("");
   });
-  extraLines(answer?.extra_data || {}).forEach((line) => add(line));
   add("");
-  const subTitle = subItems.join("、");
-  const itemCode = one(detail.booking_items)?.code || "";
   const isPastLifePersonal = itemCode === "past-life-personal" || text(detail.item_title).includes("前世因果（個人）");
+  const isPastLifeRelation = relation;
   const isOverallFortune = itemCode === "overall-fortune" || text(detail.item_title).includes("整體運勢");
   if (isOverallFortune) {
     add("【整體建議】", "section");
@@ -146,15 +197,21 @@ function documentBody(detail: any, itemIndex: number, totalItems: number, ownerN
     add("2.如果沒有特別提到的年紀，代表身體狀況大致平順，不需要特別擔心，只要維持日常保養即可。");
     add("3.運勢中的歲數，僅代表在那個年齡段需要特別留意的事項（非今生會活到幾歲喔） 若遇到劫難的時候就要比較小心，通過自己的努力衝過難關，多做福德佈施，化解災劫也能夠延續生命。");
   }
-  const sections = !isPastLifePersonal ? [] : /前三世|三世/.test(subTitle)
+  const sections = isPastLifeRelation ? ["【前前世】", "【前世】", "【綜觀今生】"] : !isPastLifePersonal ? [] : /前三世|三世/.test(subTitle)
     ? ["【前前前世】", "【前前世】", "【前世】", "【綜觀今生】"]
     : /前兩世|二世/.test(subTitle)
       ? ["【前前世】", "【前世】", "【綜觀今生】"]
       : ["【前世】", "【綜觀今生】"];
   sections.forEach((heading) => {
     add(heading, "section");
+    if (isPastLifeRelation && heading === sections[0] && targetProfile?.name) add(`${text(targetProfile.name)}是`, "teacher");
     add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher");
   });
+  if (itemCode === "date-time-selection" || title.includes("擇日")) {
+    add("【擇日建議】", "section");
+    const count = /六|6/.test(subTitle) ? 6 : 3;
+    for (let index = 1; index <= count; index += 1) add(`${index}.\u00a0`, "teacher");
+  }
   return { content, marks };
 }
 
@@ -188,10 +245,11 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const detailIds = new Set(allDetails.map((detail: any) => detail.id));
   let content = "";
   const marks: Mark[] = [];
-  allDetails.forEach((detail: any, index: number) => {
+  const pages = expandPages(allDetails);
+  pages.forEach((pageSpec: PageSpec, index: number) => {
     if (index > 0) content += "[[[PAGE_BREAK]]]\n";
     const offset = content.length;
-    const page = documentBody(detail, index + 1, allDetails.length, ownerName);
+    const page = documentBody(pageSpec, index + 1, pages.length, ownerName);
     content += page.content;
     marks.push(...page.marks.map((mark) => ({ ...mark, start: mark.start + offset, end: mark.end + offset })));
   });
