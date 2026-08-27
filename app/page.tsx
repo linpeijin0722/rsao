@@ -97,6 +97,8 @@ export default function Page() {
     [alertMessage, setAlertMessage] = useState(""),
     [deceasedPending, setDeceasedPending] = useState<Item | null>(null),
     [noMessagePending, setNoMessagePending] = useState<Item | null>(null),
+    [healthPending, setHealthPending] = useState<{item:Item;subId:string|null;qty:number}|null>(null),
+    [deceasedAcknowledged, setDeceasedAcknowledged] = useState<string[]>([]),
     [healthWarned, setHealthWarned] = useState(false),
     [textOk, setTextOk] = useState(false),
     [textInfoStep, setTextInfoStep] = useState(1),
@@ -286,9 +288,7 @@ export default function Page() {
           "overall-fortune",
       )
     ) {
-      setModalItem(null);
-      setHealthWarned(true);
-      setAlertMessage("您選擇的整體運勢已包含身體健康，確定要再加購嗎？");
+      setHealthPending({item:modalItem,subId:choice&&choice!=="base"?choice:null,qty});
       return;
     }
     if (modalItem.option_mode === "single_required" && !choice)
@@ -312,7 +312,8 @@ export default function Page() {
       item.code === "deceased-relative" ||
       item.code === "deceased-pet"
     ) {
-      setDeceasedPending(item);
+      if(deceasedAcknowledged.includes(item.code))changeBase(item,1);
+      else setDeceasedPending(item);
       return;
     }
     if (
@@ -324,8 +325,7 @@ export default function Page() {
           "overall-fortune",
       )
     ) {
-      setHealthWarned(true);
-      setAlertMessage("您選擇的整體運勢已包含身體健康，確定要再加購嗎？");
+      setHealthPending({item,subId:null,qty:1});
       return;
     }
     if (item.code === "overall-fortune") {
@@ -822,6 +822,16 @@ export default function Page() {
             </div>
           </div>
         )}
+        {healthPending && (
+          <div className="modalBackdrop">
+            <div className="modal alertModal">
+              <h2>加購提醒</h2>
+              <p>您選擇的整體運勢已包含身體健康，確定要再加購嗎？</p>
+              <button onClick={()=>{const pending=healthPending,key=pending.item.id+":"+(pending.subId||"base");setCart(current=>{const old=current.find(line=>line.key===key);return old?current.map(line=>line.key===key?{...line,qty:line.qty+pending.qty}:line):[...current,{key,itemId:pending.item.id,subId:pending.subId,qty:pending.qty}]});setHealthWarned(true);setHealthPending(null);setModalItem(null);setError("")}}>確定加購</button>
+              <button className="cancel" onClick={()=>setHealthPending(null)}>取消</button>
+            </div>
+          </div>
+        )}
         {noMessagePending && (
           <div className="modalBackdrop">
             <div className="modal alertModal">
@@ -835,6 +845,7 @@ export default function Page() {
                 onClick={() => {
                   const item = noMessagePending;
                   setNoMessagePending(null);
+                  setDeceasedAcknowledged(current=>current.includes(item.code)?current:[...current,item.code]);
                   changeBase(item, 1);
                 }}
               >
