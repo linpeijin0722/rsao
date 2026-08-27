@@ -144,12 +144,13 @@ export default function Staff() {
   }
   async function savePrice(){
     if(!priceEdit)return;
+    if(priceEdit.payment_status==="paid")return alert("已付款訂單不能修改金額");
     const amount=Number(priceValue.replace(/,/g,""));
     if(!Number.isInteger(amount)||amount<0)return alert("請輸入正確的整數金額");
     if(!confirm(`是否確認將訂單 ${priceEdit.booking_no} 的總金額修改為 NT$ ${amount.toLocaleString("en-US")}？`))return;
     const response=await staffPost({action:"update_price",bookingNo:priceEdit.booking_no,totalPrice:amount}),result=await response.json();
     if(!response.ok)return alert(result.error||"修改價格失敗");
-    setPriceEdit(null);setPriceValue("");setEditing(null);await load();alert("訂單價格已更新");
+    setPriceEdit(null);setPriceValue("");setEditing(null);await load();alert("訂單價格已更新，並已發送 LINE 通知");
   }
   async function load() {
     const r = await fetch("/api/staff/bookings"),
@@ -559,7 +560,7 @@ export default function Staff() {
             </select>
             </label>
             <label>
-            排序
+            付款時間排序
             <select value={sortBy} onChange={(e) => {setSortBy(e.target.value);localStorage.setItem("lin_a_sao_staff_paid_sort",e.target.value)}}>
               <option value="paid_desc">付款時間（由新到舊）</option>
               <option value="paid_asc">付款時間（由舊到新）</option>
@@ -567,9 +568,9 @@ export default function Staff() {
             </label>
             <div className="staffSearchGroup" role="search" aria-label="搜尋文字預約">
               <span className="staffSearchIcon" aria-hidden="true">⌕</span>
-              <label className="staffSearchField"><span>用戶名</span><input value={customerSearch} onChange={e=>setCustomerSearch(e.target.value)} placeholder="LINE名或姓名"/></label>
-              <label className="staffSearchField"><span>訂單編號</span><input value={bookingSearch} onChange={e=>setBookingSearch(e.target.value)} placeholder="LAS-…"/></label>
-              <label className="staffSearchField"><span>諮詢單號</span><input value={documentSearch} onChange={e=>setDocumentSearch(e.target.value)} placeholder="例如 A03"/></label>
+              <label className="staffSearchField"><input value={customerSearch} onChange={e=>setCustomerSearch(e.target.value)} placeholder="LINE名或姓名" aria-label="LINE名或姓名"/></label>
+              <label className="staffSearchField"><input value={bookingSearch} onChange={e=>setBookingSearch(e.target.value)} placeholder="訂單編號" aria-label="訂單編號"/></label>
+              <label className="staffSearchField"><input value={documentSearch} onChange={e=>setDocumentSearch(e.target.value)} placeholder="諮詢單號" aria-label="諮詢單號"/></label>
             </div>
           </div>
           <div className="staffSecondaryFilters">
@@ -766,7 +767,7 @@ export default function Staff() {
                 })}
               </section>
             </div>
-            <div className="staffTotalPrice"><b>總金額</b><strong>NT$ {Number(editing.total_price||0).toLocaleString("en-US")}</strong><button onClick={()=>{setPriceEdit(editing);setPriceValue(String(editing.total_price||0))}}>修改</button></div>
+            <div className="staffTotalPrice"><b>總金額</b><strong>NT$ {Number(editing.total_price||0).toLocaleString("en-US")}</strong>{editing.payment_status!=="paid"&&editing.status!=="cancelled"&&editing.status!=="expired"&&<button onClick={()=>{setPriceEdit(editing);setPriceValue(String(editing.total_price||0))}}>修改</button>}</div>
             <button onClick={saveEdit}>儲存並發送 LINE 通知</button>
             <button className="cancel" onClick={() => setEditing(null)}>
               取消
