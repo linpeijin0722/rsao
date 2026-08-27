@@ -95,6 +95,11 @@ export default function Staff() {
     [documentLinkEdit,setDocumentLinkEdit]=useState<any>(null),
     [documentLinkValue,setDocumentLinkValue]=useState(""),
     [documentRebuild,setDocumentRebuild]=useState<any>(null),
+    [teacherOverwrite,setTeacherOverwrite]=useState<any>(null),
+    [overwritePhrase,setOverwritePhrase]=useState(""),
+    [lineContact,setLineContact]=useState<any>(null),
+    [lineMessage,setLineMessage]=useState(""),
+    [savedMessages,setSavedMessages]=useState<string[]>([]),
     [priceEdit,setPriceEdit]=useState<any>(null),
     [priceValue,setPriceValue]=useState("");
   async function staffPost(body:any,retry=true){
@@ -108,8 +113,13 @@ export default function Staff() {
     }
     return response;
   }
-  async function generateDocument(x:any,createMode:"replace"|"new"="replace"){
+  async function generateDocument(x:any,createMode:"replace"|"new"="replace",confirmedTeacherEdit=false){
     const exists=sheetLinks(x).length>0;
+    if(exists&&createMode==="replace"&&!confirmedTeacherEdit){
+      const checkResponse=await staffPost({action:"check_document_edited",bookingNo:x.booking_no}),check=await checkResponse.json();
+      if(!checkResponse.ok)return alert(check.error||"無法檢查諮詢單狀態");
+      if(check.teacherEdited){setDocumentRebuild(null);setTeacherOverwrite(x);setOverwritePhrase("");return}
+    }
     setDocumentRebuild(null);
     setGeneratingDocument(x.booking_no);
     try{
@@ -130,7 +140,7 @@ export default function Staff() {
     if(!isComplete(x))return <span className="sheetPending">—</span>;
     const links=sheetLinks(x),busy=generatingDocument===x.booking_no;
     return <span className="consultationSheetLinks">
-      <button className="consultationSheetLink documentGenerateButton" disabled={busy} onClick={()=>links.length?setDocumentRebuild(x):generateDocument(x)} title={links.length?"重新建立諮詢文件":"建立諮詢文件"} aria-label={links.length?"重新建立諮詢文件":"建立諮詢文件"}>{busy?"…":"📄"}</button>
+      <button className="consultationSheetLink documentGenerateButton" disabled={busy} onClick={()=>links.length?setDocumentRebuild(x):generateDocument(x)} title={links.length?"重新建立諮詢單":"建立諮詢單"} aria-label={links.length?"重新建立諮詢單":"建立諮詢單"}>{busy?"…":"📄"}</button>
       <button className="consultationSheetLink documentRelinkButton" onClick={()=>{setDocumentLinkEdit(x);setDocumentLinkValue(links[0]?.consultation_url||"")}} title="更改為現有 Google 文件連結" aria-label="更改諮詢單連結">🔄</button>
       {links.map((detail:any)=><a key={detail.id} className="consultationSheetLink consultationDocumentLink" href={detail.consultation_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗{showDocumentNumber&&<small>{consultationNumberFor(x)}</small>}</a>)}
     </span>
@@ -160,11 +170,19 @@ export default function Staff() {
   useEffect(() => {
     const saved=localStorage.getItem("lin_a_sao_staff_password");if(saved){setPassword(saved);setRememberPassword(true)}
     const savedSort=localStorage.getItem("lin_a_sao_staff_paid_sort");if(savedSort==="paid_asc"||savedSort==="paid_desc")setSortBy(savedSort);
+    try{setSavedMessages(JSON.parse(localStorage.getItem("lin_a_sao_staff_line_messages")||"[]"))}catch{}
     load();
     fetch("/api/catalog")
       .then((r) => r.json())
       .then((j) => setItems(j.items || []));
   }, []);
+  async function sendLineContact(message:string){
+    if(!lineContact||!message.trim())return alert("請輸入要傳送的內容");
+    const response=await fetch("/api/staff/line-contact",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({lineUserId:lineContact.line_user_id,message:message.trim()})}),result=await response.json();
+    if(!response.ok)return alert(result.error||"訊息傳送失敗");
+    alert("LINE 訊息已傳送");setLineContact(null);setLineMessage("");
+  }
+  function saveLineMessage(){const value=lineMessage.trim();if(!value)return alert("請先輸入訊息內容");const next=[value,...savedMessages.filter(x=>x!==value)].slice(0,12);setSavedMessages(next);localStorage.setItem("lin_a_sao_staff_line_messages",JSON.stringify(next));alert("自訂訊息已儲存")}
   async function login() {
     const r = await fetch("/api/admin/login", {
       method: "POST",
@@ -507,6 +525,7 @@ export default function Staff() {
               <div><span>生肖</span><b>{userView.zodiac || "尚未填寫"}</b></div>
               <div><span>出生時辰</span><b>{userView.birth_shichen || "尚未填寫"}</b></div>
             </div>
+            <button className="lineContactButton" onClick={()=>{setLineContact(userView);setLineMessage("")}}>💬 LINE 聯絡</button>
             <button onClick={() => setUserView(null)}>關閉</button>
           </div>
         </div>
@@ -528,6 +547,7 @@ export default function Staff() {
           </div>
         </div>
       )}
+      {lineContact&&<div className="modalBackdrop" onClick={()=>setLineContact(null)}><div className="modal lineContactModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setLineContact(null)}>×</button><h2>💬 LINE 聯絡</h2><p>{lineContact.line_display_name}｜{lineContact.full_name||"尚未填寫姓名"}</p><button className="videoReminderPreset" onClick={()=>setLineMessage("提醒您，視訊諮詢時間即將到來，請留意 LINE 訊息並提前準備，謝謝您。")}>視訊提醒</button><label>自訂訊息<textarea value={lineMessage} onChange={e=>setLineMessage(e.target.value)} placeholder="請輸入要傳送給用戶的訊息"/></label>{savedMessages.length>0&&<div className="savedLineMessages">{savedMessages.map((message,index)=><button key={index} onClick={()=>setLineMessage(message)}>{message}</button>)}</div>}<div className="lineContactActions"><button onClick={saveLineMessage}>儲存自訂訊息</button><button onClick={()=>void sendLineContact(lineMessage)}>傳送訊息</button></div></div></div>}
       {returnedEdit && <div className="modalBackdrop returnedEditBackdrop"><div className="modal returnedEditPage"><button className="staffModalClose" onClick={()=>setReturnedEdit(null)}>×</button><header><div><h2>編輯回傳資料</h2><p>{returnedEdit.item_title}{returnedEdit.sub_items?.length?`－${returnedEdit.sub_items.join("、")}`:""}</p></div></header><div className="returnedEditGrid"><label>姓名<input value={returnedEdit.name||""} onChange={e=>setReturnedEdit({...returnedEdit,name:e.target.value})}/></label><label>關係<input value={returnedEdit.relationship_detail||returnedEdit.relationship||""} onChange={e=>setReturnedEdit({...returnedEdit,relationship_detail:e.target.value})}/></label><label>性別<select value={returnedEdit.gender||""} onChange={e=>setReturnedEdit({...returnedEdit,gender:e.target.value})}><option value="">未填</option><option>男</option><option>女</option><option>其他</option></select></label><label>國曆生日<input type="date" value={returnedEdit.birth_date||""} onChange={e=>setReturnedEdit({...returnedEdit,birth_date:e.target.value})}/></label><label>農曆生日<input value={returnedEdit.lunar_birth_text||""} onChange={e=>setReturnedEdit({...returnedEdit,lunar_birth_text:e.target.value})}/></label><label>生肖<input value={returnedEdit.zodiac||""} onChange={e=>setReturnedEdit({...returnedEdit,zodiac:e.target.value})}/></label><label>出生時辰<input value={returnedEdit.birth_shichen||""} onChange={e=>setReturnedEdit({...returnedEdit,birth_shichen:e.target.value})}/></label><label className="wide">地址<textarea value={returnedEdit.address||""} onChange={e=>setReturnedEdit({...returnedEdit,address:e.target.value})}/></label><label>國曆往生日期<input type="date" value={returnedEdit.death_date||""} onChange={e=>setReturnedEdit({...returnedEdit,death_date:e.target.value})}/></label><label>農曆往生日期<input value={returnedEdit.lunar_death_text||""} onChange={e=>setReturnedEdit({...returnedEdit,lunar_death_text:e.target.value})}/></label><label>往生時辰<input value={returnedEdit.death_shichen||""} onChange={e=>setReturnedEdit({...returnedEdit,death_shichen:e.target.value})}/></label><label className="wide">備註<textarea value={returnedEdit.notes||""} onChange={e=>setReturnedEdit({...returnedEdit,notes:e.target.value})}/></label>{returnedEdit.questions.map((q:string,i:number)=><label className="wide" key={i}>問題 {i+1}<textarea value={q} onChange={e=>setReturnedEdit({...returnedEdit,questions:returnedEdit.questions.map((v:string,n:number)=>n===i?e.target.value:v)})}/></label>)}</div><div className="returnedEditActions"><button onClick={()=>void saveReturned()}>儲存所有修改</button><button className="cancel" onClick={()=>setReturnedEdit(null)}>取消</button></div></div></div>}
       {profileEditor&&<StaffProfileEditor value={profileEditor} profiles={dataView.filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.id===p.id)===i)} change={setProfileEditor} close={()=>setProfileEditor(null)} save={saveProfileEditor}/>} 
       {answerEditor&&<StaffAnswerEditorV2 value={answerEditor} profiles={dataView.filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.id===p.id)===i)} change={setAnswerEditor} close={()=>setAnswerEditor(null)} save={saveAnswerEditor}/>} 
@@ -560,10 +580,10 @@ export default function Staff() {
             </select>
             </label>
             <label>
-            付款時間排序
+            排序
             <select value={sortBy} onChange={(e) => {setSortBy(e.target.value);localStorage.setItem("lin_a_sao_staff_paid_sort",e.target.value)}}>
-              <option value="paid_desc">付款時間（由新到舊）</option>
-              <option value="paid_asc">付款時間（由舊到新）</option>
+              <option value="paid_desc">由新到舊</option>
+              <option value="paid_asc">由舊到新</option>
             </select>
             </label>
             <div className="staffSearchGroup" role="search" aria-label="搜尋文字預約">
@@ -776,7 +796,8 @@ export default function Staff() {
         </div>
       )}
       {documentLinkEdit&&<div className="modalBackdrop documentLinkBackdrop" onClick={()=>setDocumentLinkEdit(null)}><div className="modal documentLinkModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setDocumentLinkEdit(null)}>×</button><h2>更改諮詢單連結</h2><p>先到 Google 雲端硬碟開啟要使用的文件，複製網址後貼到下方。</p><a className="openGoogleDrive" href="https://drive.google.com/drive/folders/1jajjmq_vxySLJBVWleIGrmkRI0TykJgI?usp=drive_link" target="_blank" rel="noreferrer">開啟<strong>阿嫂諮詢單</strong>資料夾</a><label>Google 文件連結<input autoFocus placeholder="https://docs.google.com/document/d/..." value={documentLinkValue} onChange={e=>setDocumentLinkValue(e.target.value)}/></label><div className="documentLinkActions"><button onClick={()=>void saveDocumentLink()}>確認更改連結</button><button className="cancel" onClick={()=>setDocumentLinkEdit(null)}>取消</button></div></div></div>}
-      {documentRebuild&&<div className="modalBackdrop" onClick={()=>setDocumentRebuild(null)}><div className="modal rebuildDocumentModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setDocumentRebuild(null)}>×</button><h2>重新建立諮詢文件</h2><p>請選擇這次要如何建立：</p><button onClick={()=>void generateDocument(documentRebuild,"replace")}><b>覆蓋原諮詢單</b><small>更新連結，原本的文件會移至垃圾桶</small></button><button onClick={()=>void generateDocument(documentRebuild,"new")}><b>建立新的諮詢單</b><small>保留原文件，新檔名會依序加上 .新01、.新02</small></button><button className="cancel" onClick={()=>setDocumentRebuild(null)}>取消</button></div></div>}
+      {documentRebuild&&<div className="modalBackdrop" onClick={()=>setDocumentRebuild(null)}><div className="modal rebuildDocumentModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setDocumentRebuild(null)}>×</button><h2>重新建立諮詢單</h2><p>請選擇這次要如何建立：</p><button onClick={()=>void generateDocument(documentRebuild,"replace")}><b>覆蓋原諮詢單</b><small>更新連結，原本的文件會移至垃圾桶</small></button><button onClick={()=>void generateDocument(documentRebuild,"new")}><b>建立新的諮詢單</b><small>保留原文件，新檔名會依序加上 .新01、.新02</small></button><button className="cancel" onClick={()=>setDocumentRebuild(null)}>取消</button></div></div>}
+      {teacherOverwrite&&<div className="modalBackdrop" onClick={()=>setTeacherOverwrite(null)}><div className="modal teacherOverwriteModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setTeacherOverwrite(null)}>×</button><h2>阿嫂已編輯過此諮詢單</h2><p>覆蓋後，阿嫂已輸入的內容可能無法復原。若仍要覆蓋，請在下方輸入：</p><b>確定覆蓋諮詢單</b><input value={overwritePhrase} onChange={e=>setOverwritePhrase(e.target.value)} placeholder="請輸入指定文字"/><button disabled={overwritePhrase!=="確定覆蓋諮詢單"} onClick={()=>{const target=teacherOverwrite;setTeacherOverwrite(null);void generateDocument(target,"replace",true)}}>確認覆蓋諮詢單</button><button className="cancel" onClick={()=>setTeacherOverwrite(null)}>取消</button></div></div>}
       {priceEdit&&<div className="modalBackdrop" onClick={()=>setPriceEdit(null)}><div className="modal staffPriceModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setPriceEdit(null)}>×</button><h2>修改訂單價格</h2><p>訂單編號：{priceEdit.booking_no}</p><label>新的總金額<div className="priceInput"><span>NT$</span><input autoFocus inputMode="numeric" value={priceValue} onChange={e=>setPriceValue(e.target.value.replace(/[^0-9]/g,""))}/></div></label><button onClick={()=>void savePrice()}>確認修改</button><button className="cancel" onClick={()=>setPriceEdit(null)}>取消</button></div></div>}
       {addPicker && (
         <div
