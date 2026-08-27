@@ -100,6 +100,8 @@ export default function Staff() {
     [lineContact,setLineContact]=useState<any>(null),
     [lineMessage,setLineMessage]=useState(""),
     [savedMessages,setSavedMessages]=useState<string[]>([]),
+    [editingSavedMessage,setEditingSavedMessage]=useState<number|null>(null),
+    [videoReminderConfirm,setVideoReminderConfirm]=useState(false),
     [priceEdit,setPriceEdit]=useState<any>(null),
     [priceValue,setPriceValue]=useState("");
   async function staffPost(body:any,retry=true){
@@ -176,13 +178,23 @@ export default function Staff() {
       .then((r) => r.json())
       .then((j) => setItems(j.items || []));
   }, []);
-  async function sendLineContact(message:string){
-    if(!lineContact||!message.trim())return alert("請輸入要傳送的內容");
-    const response=await fetch("/api/staff/line-contact",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({lineUserId:lineContact.line_user_id,message:message.trim()})}),result=await response.json();
+  async function sendLineContact(message:string,action:"text"|"video_reminder"="text"){
+    if(!lineContact)return;
+    if(action==="text"&&!message.trim())return alert("請輸入要傳送的內容");
+    const response=await fetch("/api/staff/line-contact",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({lineUserId:lineContact.line_user_id,message:message.trim(),action,bookingNo:lineContact._booking?.booking_no})}),result=await response.json();
     if(!response.ok)return alert(result.error||"訊息傳送失敗");
-    alert("LINE 訊息已傳送");setLineContact(null);setLineMessage("");
+    alert(action==="video_reminder"?"視訊提醒已傳送":"LINE 訊息已傳送");setVideoReminderConfirm(false);setLineContact(null);setLineMessage("");setEditingSavedMessage(null);
   }
-  function saveLineMessage(){const value=lineMessage.trim();if(!value)return alert("請先輸入訊息內容");const next=[value,...savedMessages.filter(x=>x!==value)].slice(0,12);setSavedMessages(next);localStorage.setItem("lin_a_sao_staff_line_messages",JSON.stringify(next));alert("自訂訊息已儲存")}
+  function saveLineMessage(){
+    const value=lineMessage.trim();if(!value)return alert("請先輸入訊息內容");
+    const next=editingSavedMessage===null?[value,...savedMessages.filter(x=>x!==value)].slice(0,12):savedMessages.map((x,index)=>index===editingSavedMessage?value:x);
+    setSavedMessages(next);localStorage.setItem("lin_a_sao_staff_line_messages",JSON.stringify(next));setEditingSavedMessage(null);alert("自訂訊息已儲存");
+  }
+  function deleteLineMessage(index:number){
+    if(!confirm("確定刪除這則自訂訊息嗎？刪除後無法復原。"))return;
+    const next=savedMessages.filter((_,messageIndex)=>messageIndex!==index);setSavedMessages(next);localStorage.setItem("lin_a_sao_staff_line_messages",JSON.stringify(next));
+    if(editingSavedMessage===index){setEditingSavedMessage(null);setLineMessage("")}
+  }
   async function login() {
     const r = await fetch("/api/admin/login", {
       method: "POST",
@@ -469,7 +481,7 @@ export default function Staff() {
                     </span>
                     <button
                       className="customerButton"
-                      onClick={() => setUserView(x.customers)}
+                      onClick={() => setUserView({...x.customers,_booking:x})}
                     >
                       {x.customers?.line_picture_url && (
                         <img src={x.customers.line_picture_url} alt="" />
@@ -525,8 +537,10 @@ export default function Staff() {
               <div><span>生肖</span><b>{userView.zodiac || "尚未填寫"}</b></div>
               <div><span>出生時辰</span><b>{userView.birth_shichen || "尚未填寫"}</b></div>
             </div>
-            <button className="lineContactButton" onClick={()=>{setLineContact(userView);setLineMessage("")}}>💬 LINE 聯絡</button>
-            <button onClick={() => setUserView(null)}>關閉</button>
+            <div className="userInfoActions">
+              <button className="lineContactButton" onClick={()=>{setLineContact(userView);setLineMessage("");setEditingSavedMessage(null)}}>💬 LINE 聯絡</button>
+              <button className="userInfoClose" onClick={() => setUserView(null)}>關閉</button>
+            </div>
           </div>
         </div>
       )}
@@ -547,7 +561,16 @@ export default function Staff() {
           </div>
         </div>
       )}
-      {lineContact&&<div className="modalBackdrop" onClick={()=>setLineContact(null)}><div className="modal lineContactModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setLineContact(null)}>×</button><h2>💬 LINE 聯絡</h2><p>{lineContact.line_display_name}｜{lineContact.full_name||"尚未填寫姓名"}</p><button className="videoReminderPreset" onClick={()=>setLineMessage("提醒您，視訊諮詢時間即將到來，請留意 LINE 訊息並提前準備，謝謝您。")}>視訊提醒</button><label>自訂訊息<textarea value={lineMessage} onChange={e=>setLineMessage(e.target.value)} placeholder="請輸入要傳送給用戶的訊息"/></label>{savedMessages.length>0&&<div className="savedLineMessages">{savedMessages.map((message,index)=><button key={index} onClick={()=>setLineMessage(message)}>{message}</button>)}</div>}<div className="lineContactActions"><button onClick={saveLineMessage}>儲存自訂訊息</button><button onClick={()=>void sendLineContact(lineMessage)}>傳送訊息</button></div></div></div>}
+      {lineContact&&<div className="modalBackdrop" onClick={()=>setLineContact(null)}><div className="modal lineContactModal" onClick={e=>e.stopPropagation()}>
+        <button className="staffModalClose" onClick={()=>setLineContact(null)}>×</button>
+        <h2>💬 LINE 聯絡</h2>
+        <p className="lineContactCustomer">{lineContact.line_display_name}・{lineContact.full_name||"尚未填寫姓名"}</p>
+        {lineContact._booking?.consultation_methods?.code==="video"&&lineContact._booking?.payment_status==="paid"&&<button className="videoReminderPreset" onClick={()=>setVideoReminderConfirm(true)}>視訊提醒</button>}
+        <label className="lineMessageEditor">自訂訊息<textarea value={lineMessage} onChange={e=>setLineMessage(e.target.value)} placeholder="請輸入要傳送給用戶的訊息"/></label>
+        {savedMessages.length>0&&<section className="savedMessagesSection"><h3>已儲存訊息</h3><div className="savedLineMessages">{savedMessages.map((message,index)=><div className="savedLineMessage" key={`${message}-${index}`}><button className="savedMessageText" onClick={()=>{setLineMessage(message);setEditingSavedMessage(null)}}>{message}</button><button className="savedMessageEdit" aria-label="編輯" onClick={()=>{setLineMessage(message);setEditingSavedMessage(index)}}>編輯</button><button className="savedMessageDelete" aria-label="刪除" onClick={()=>deleteLineMessage(index)}>刪除</button></div>)}</div></section>}
+        <div className="lineContactActions"><button className="saveLineMessageButton" onClick={saveLineMessage}>{editingSavedMessage===null?"儲存自訂訊息":"儲存修改"}</button><button className="sendLineMessageButton" onClick={()=>void sendLineContact(lineMessage)}>傳送訊息</button></div>
+      </div></div>}
+      {videoReminderConfirm&&lineContact&&<div className="modalBackdrop priorityModal" onClick={()=>setVideoReminderConfirm(false)}><div className="modal videoReminderConfirmModal" onClick={e=>e.stopPropagation()}><h2>傳送視訊提醒</h2><p>是否確定要傳送提醒通知給 <strong>{lineContact.line_display_name}・{lineContact.full_name||"尚未填寫姓名"}</strong>？</p><div><button onClick={()=>void sendLineContact("","video_reminder")}>確定傳送</button><button className="cancel" onClick={()=>setVideoReminderConfirm(false)}>取消</button></div></div></div>}
       {returnedEdit && <div className="modalBackdrop returnedEditBackdrop"><div className="modal returnedEditPage"><button className="staffModalClose" onClick={()=>setReturnedEdit(null)}>×</button><header><div><h2>編輯回傳資料</h2><p>{returnedEdit.item_title}{returnedEdit.sub_items?.length?`－${returnedEdit.sub_items.join("、")}`:""}</p></div></header><div className="returnedEditGrid"><label>姓名<input value={returnedEdit.name||""} onChange={e=>setReturnedEdit({...returnedEdit,name:e.target.value})}/></label><label>關係<input value={returnedEdit.relationship_detail||returnedEdit.relationship||""} onChange={e=>setReturnedEdit({...returnedEdit,relationship_detail:e.target.value})}/></label><label>性別<select value={returnedEdit.gender||""} onChange={e=>setReturnedEdit({...returnedEdit,gender:e.target.value})}><option value="">未填</option><option>男</option><option>女</option><option>其他</option></select></label><label>國曆生日<input type="date" value={returnedEdit.birth_date||""} onChange={e=>setReturnedEdit({...returnedEdit,birth_date:e.target.value})}/></label><label>農曆生日<input value={returnedEdit.lunar_birth_text||""} onChange={e=>setReturnedEdit({...returnedEdit,lunar_birth_text:e.target.value})}/></label><label>生肖<input value={returnedEdit.zodiac||""} onChange={e=>setReturnedEdit({...returnedEdit,zodiac:e.target.value})}/></label><label>出生時辰<input value={returnedEdit.birth_shichen||""} onChange={e=>setReturnedEdit({...returnedEdit,birth_shichen:e.target.value})}/></label><label className="wide">地址<textarea value={returnedEdit.address||""} onChange={e=>setReturnedEdit({...returnedEdit,address:e.target.value})}/></label><label>國曆往生日期<input type="date" value={returnedEdit.death_date||""} onChange={e=>setReturnedEdit({...returnedEdit,death_date:e.target.value})}/></label><label>農曆往生日期<input value={returnedEdit.lunar_death_text||""} onChange={e=>setReturnedEdit({...returnedEdit,lunar_death_text:e.target.value})}/></label><label>往生時辰<input value={returnedEdit.death_shichen||""} onChange={e=>setReturnedEdit({...returnedEdit,death_shichen:e.target.value})}/></label><label className="wide">備註<textarea value={returnedEdit.notes||""} onChange={e=>setReturnedEdit({...returnedEdit,notes:e.target.value})}/></label>{returnedEdit.questions.map((q:string,i:number)=><label className="wide" key={i}>問題 {i+1}<textarea value={q} onChange={e=>setReturnedEdit({...returnedEdit,questions:returnedEdit.questions.map((v:string,n:number)=>n===i?e.target.value:v)})}/></label>)}</div><div className="returnedEditActions"><button onClick={()=>void saveReturned()}>儲存所有修改</button><button className="cancel" onClick={()=>setReturnedEdit(null)}>取消</button></div></div></div>}
       {profileEditor&&<StaffProfileEditor value={profileEditor} profiles={dataView.filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.id===p.id)===i)} change={setProfileEditor} close={()=>setProfileEditor(null)} save={saveProfileEditor}/>} 
       {answerEditor&&<StaffAnswerEditorV2 value={answerEditor} profiles={dataView.filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.id===p.id)===i)} change={setAnswerEditor} close={()=>setAnswerEditor(null)} save={saveAnswerEditor}/>} 
@@ -620,7 +643,7 @@ export default function Staff() {
                 </span>
                 <button
                   className="customerButton"
-                  onClick={() => setUserView(x.customers)}
+                  onClick={() => setUserView({...x.customers,_booking:x})}
                 >
                   {x.customers?.line_picture_url && (
                     <img src={x.customers.line_picture_url} alt="" />
