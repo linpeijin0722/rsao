@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
 import { adminSupabase } from "@/lib/supabase";
 import { pushLineFlex } from "@/lib/line-message";
-import { createConsultationDocuments } from "@/lib/google-consultation-docs";
+import { createConsultationDocuments, wasDocumentEditedBy } from "@/lib/google-consultation-docs";
 export async function GET() {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
@@ -21,6 +21,14 @@ export async function POST(request: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
   const body = await request.json(), { bookingNo, action } = body;
+  if (action === "check_document_edited") {
+    const db=adminSupabase(),{data:booking}=await db.from("bookings").select("id,booking_details(google_document_id)").eq("booking_no",bookingNo).single();
+    if(!booking)return NextResponse.json({error:"找不到訂單"},{status:404});
+    const documentId=(booking.booking_details||[]).find((detail:any)=>detail.google_document_id)?.google_document_id;
+    if(!documentId)return NextResponse.json({ok:true,teacherEdited:false});
+    try{return NextResponse.json({ok:true,teacherEdited:await wasDocumentEditedBy(documentId,"jingxuan570820@gmail.com")})}
+    catch(error){console.error("無法檢查諮詢單編輯紀錄",error);return NextResponse.json({ok:true,teacherEdited:false,checkUnavailable:true})}
+  }
   if (action === "generate_document") {
     const db=adminSupabase(),{data:booking,error}=await db.from("bookings").select("id,booking_no,data_submitted_at").eq("booking_no",bookingNo).single();
     if(error||!booking)return NextResponse.json({error:"找不到訂單"},{status:404});
