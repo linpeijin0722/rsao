@@ -92,8 +92,10 @@ export async function POST(r: NextRequest) {
   if (body.action === "update_pregnancy_losses") {
     if (!body.profileId || !Array.isArray(body.pregnancy_losses)) return NextResponse.json({error:"流產日期資料不完整"},{status:400});
     const pregnancyLosses=body.pregnancy_losses.filter((loss:any)=>loss&&loss.date).map((loss:any)=>({date:String(loss.date).slice(0,10),lunar:String(loss.lunar||""),accuracy:String(loss.accuracy||""),shichen:String(loss.shichen||""),notes:String(loss.notes||"")}));
-    const {error}=await x.db.from("consultation_profiles").update({pregnancy_losses:pregnancyLosses,updated_at:new Date().toISOString()}).eq("id",body.profileId).eq("customer_id",x.c.id);
-    return error?NextResponse.json({error:error.message},{status:400}):NextResponse.json({ok:true,pregnancy_losses:pregnancyLosses});
+    const {data:updated,error}=await x.db.from("consultation_profiles").update({pregnancy_losses:pregnancyLosses,updated_at:new Date().toISOString()}).eq("id",body.profileId).eq("customer_id",x.c.id).select("id,pregnancy_losses").maybeSingle();
+    if(error)return NextResponse.json({error:error.message},{status:400});
+    if(!updated)return NextResponse.json({error:"找不到這位媽媽的資料，流產日期尚未儲存"},{status:404});
+    return NextResponse.json({ok:true,pregnancy_losses:updated.pregnancy_losses||pregnancyLosses});
   }
   if (x.b.data_submitted_at) return NextResponse.json({error:"資料已送出，如需修改請透過 LINE 聯絡助理"},{status:400});
   let profileId = body.profileId;
