@@ -92,7 +92,9 @@ export function bookingFlex(args: {
         {
           type: "box",
           layout: "vertical",
-          height: "52px",
+          height: "64px",
+          paddingTop: "4px",
+          paddingBottom: "4px",
           justifyContent: "center",
           alignItems: "center",
           contents: [
@@ -101,7 +103,7 @@ export function bookingFlex(args: {
               text: "↓",
               color: "#9A9A9A",
               weight: "bold",
-              size: "4xl",
+              size: "3xl",
               align: "center",
               gravity: "center",
             },
@@ -122,6 +124,7 @@ export function videoReminderFlex(args: {
   bookingNo: string;
   slotStart: string;
   site: string;
+  isTomorrow?: boolean;
 }) {
   const date = new Intl.DateTimeFormat("zh-TW", {
     timeZone: "Asia/Taipei",
@@ -142,7 +145,7 @@ export function videoReminderFlex(args: {
       contents: [
         {
           type: "text",
-          text: "明日視訊諮詢提醒",
+          text: args.isTomorrow ? "明日視訊諮詢提醒" : "視訊諮詢提醒",
           color: "#8A5A24",
           weight: "bold",
           size: "xl",
@@ -159,7 +162,7 @@ export function videoReminderFlex(args: {
         { type: "text", text: `訂單編號：${args.bookingNo}`, wrap: true, color: "#6B625B" },
         {
           type: "text",
-          text: "溫馨提醒您，明天有林阿嫂視訊諮詢預約。請預先確認 LINE 訊息與網路連線正常，並留意助理傳送的視訊連結。",
+          text: args.isTomorrow ? "溫馨提醒您，明天有林阿嫂視訊諮詢預約。請預先確認 LINE 訊息與網路連線正常，並留意助理傳送的視訊連結。" : "溫馨提醒您，視訊諮詢時間即將到來。請預先確認 LINE 訊息與網路連線正常，並留意助理傳送的視訊連結。",
           wrap: true,
           color: "#4D453F",
         },
