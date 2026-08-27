@@ -70,6 +70,9 @@ const fieldLabels: Record<string, string> = {
   next_court_date: "下次開庭或調解日期", dispute_summary: "事件簡述與爭議點",
   professional_help: "目前是否有專業人士或他人協助", core_question: "本次最想解答的核心問題",
   current_condition: "目前的心理或生活狀況", previous_handling: "過去是否曾處理過",
+  health_concerns: "當前關注的健康問題", major_treatment_planned: "近期是否有手術或重大治療規劃？",
+  treatment_question: "想瞭解的問題", treatment_question_other: "其他想瞭解的問題",
+  health_notes: "備註", current_regret: "目前的困擾或遺憾", consultation_goal: "這次諮詢最希望獲得什麼",
 };
 
 const shichenName = (value: unknown) => text(value).split(/[（(]/)[0];
