@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       await pushLineFlex(
         customer.line_user_id,
         "明日視訊諮詢提醒",
-        videoReminderFlex({ bookingNo: booking.booking_no, slotStart: booking.slot_start, site }),
+        videoReminderFlex({ bookingNo: booking.booking_no, slotStart: booking.slot_start, site, isTomorrow: true }),
       );
       await db
         .from("bookings")
