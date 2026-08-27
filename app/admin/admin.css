@@ -273,3 +273,16 @@
   }
 }
 .rememberAdmin{display:flex!important;align-items:center!important;gap:7px!important;margin:12px 0!important;font-size:14px!important}.rememberAdmin input{width:auto!important;margin:0!important}
+
+/* 時段管理後台：提高整體可讀性，保留原有版面比例。 */
+.adminPage{font-size:17px;line-height:1.55}
+.adminPage>header h1{font-size:30px}
+.adminCard h2{font-size:23px}
+.adminCard h3{font-size:18px}
+.adminGrid label,.legend,.rule,.rule small{font-size:16px}
+.adminCard input,.adminCard select,.adminCard button{font-size:16px}
+.weekdayRow button{font-size:17px;font-weight:700}
+.timeHeader small,.weekRow>strong{font-size:13px}
+.adminLogin{font-size:17px}
+.adminLogin h1,.adminLogin h2{font-size:25px}
+.adminLogin input,.adminLogin button{font-size:17px}
