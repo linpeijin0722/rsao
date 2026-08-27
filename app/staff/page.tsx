@@ -87,6 +87,17 @@ export default function Staff() {
     [showTextItems,setShowTextItems]=useState(false),
     [showTextAmount,setShowTextAmount]=useState(false),
     [showDocumentNumber,setShowDocumentNumber]=useState(false),
+    [videoStatusFilter,setVideoStatusFilter]=useState("all"),
+    [videoDataFilter,setVideoDataFilter]=useState("all"),
+    [videoSortBy,setVideoSortBy]=useState("paid_desc"),
+    [videoCustomerSearch,setVideoCustomerSearch]=useState(""),
+    [videoBookingSearch,setVideoBookingSearch]=useState(""),
+    [videoDocumentSearch,setVideoDocumentSearch]=useState(""),
+    [videoDateFrom,setVideoDateFrom]=useState(""),
+    [videoDateTo,setVideoDateTo]=useState(""),
+    [showVideoItems,setShowVideoItems]=useState(false),
+    [showVideoAmount,setShowVideoAmount]=useState(false),
+    [showVideoDocumentNumber,setShowVideoDocumentNumber]=useState(false),
     [showUpcomingVideo,setShowUpcomingVideo]=useState(false),
     [rememberPassword, setRememberPassword] = useState(false),
     [generatingDocument, setGeneratingDocument] = useState(""),
@@ -138,13 +149,13 @@ export default function Staff() {
     if(!response.ok)return alert(result.error||"更改連結失敗");
     setDocumentLinkEdit(null);setDocumentLinkValue("");await load();alert("諮詢單連結已更新");
   }
-  function documentActions(x:any){
+  function documentActions(x:any,showNumber=showDocumentNumber){
     if(!isComplete(x))return <span className="sheetPending">—</span>;
     const links=sheetLinks(x),busy=generatingDocument===x.booking_no;
     return <span className="consultationSheetLinks">
       <button className="consultationSheetLink documentGenerateButton" disabled={busy} onClick={()=>links.length?setDocumentRebuild(x):generateDocument(x)} title={links.length?"重新建立諮詢單":"建立諮詢單"} aria-label={links.length?"重新建立諮詢單":"建立諮詢單"}>{busy?"…":"📄"}</button>
       <button className="consultationSheetLink documentRelinkButton" onClick={()=>{setDocumentLinkEdit(x);setDocumentLinkValue(links[0]?.consultation_url||"")}} title="更改為現有 Google 文件連結" aria-label="更改諮詢單連結">🔄</button>
-      {links.map((detail:any)=><a key={detail.id} className="consultationSheetLink consultationDocumentLink" href={detail.consultation_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗{showDocumentNumber&&<small>{consultationNumberFor(x)}</small>}</a>)}
+      {links.map((detail:any)=><a key={detail.id} className="consultationSheetLink consultationDocumentLink" href={detail.consultation_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗{showNumber&&<small>{consultationNumberFor(x)}</small>}</a>)}
     </span>
   }
   function consultationNumberFor(booking:any){
@@ -267,15 +278,32 @@ export default function Staff() {
         return sortBy==="paid_asc"?comparison:-comparison;
       });
     }, [rows, statusFilter, dataFilter, sortBy, customerSearch, bookingSearch, documentSearch, textDateFrom, textDateTo]),
-    video = useMemo(
-      () =>
-        rows.filter(
-          (x) =>
-            x.consultation_methods?.code === "video" &&
-            x.status !== "cancelled",
-        ),
-      [rows],
-    ),
+    video = useMemo(() => {
+      const result=rows.filter((x)=>{
+        if(x.consultation_methods?.code!=="video")return false;
+        if(videoStatusFilter!=="all"&&statusKey(x)!==videoStatusFilter)return false;
+        if(videoDataFilter!=="all"){
+          if(x.payment_status!=="paid")return false;
+          if(videoDataFilter==="returned"&&!isComplete(x))return false;
+          if(videoDataFilter==="missing"&&isComplete(x))return false;
+        }
+        const customerQuery=videoCustomerSearch.trim().toLocaleLowerCase();
+        const bookingQuery=videoBookingSearch.trim().toLocaleLowerCase();
+        const documentQuery=videoDocumentSearch.trim().toLocaleLowerCase();
+        const customerValue=`${x.customers?.line_display_name||""} ${x.customers?.full_name||""}`.toLocaleLowerCase();
+        if(customerQuery&&!customerValue.includes(customerQuery))return false;
+        if(bookingQuery&&!String(x.booking_no||"").toLocaleLowerCase().includes(bookingQuery))return false;
+        if(documentQuery&&!consultationNumberFor(x).toLocaleLowerCase().includes(documentQuery))return false;
+        const paidDate=key(x.paid_at||x.created_at);
+        if(videoDateFrom&&paidDate<videoDateFrom)return false;
+        if(videoDateTo&&paidDate>videoDateTo)return false;
+        return true;
+      });
+      return result.sort((a,b)=>{
+        const comparison=String(a.paid_at||a.created_at).localeCompare(String(b.paid_at||b.created_at));
+        return videoSortBy==="paid_asc"?comparison:-comparison;
+      });
+    },[rows,videoStatusFilter,videoDataFilter,videoSortBy,videoCustomerSearch,videoBookingSearch,videoDocumentSearch,videoDateFrom,videoDateTo]),
     text = useMemo(
       () => filtered.filter((x) => x.consultation_methods?.code === "text"),
       [filtered],
@@ -283,7 +311,7 @@ export default function Staff() {
     bookedDates = new Set(
       video.filter((x) => x.slot_start).map((x) => key(x.slot_start)),
     ),
-    daily = video.filter((x) => x.slot_start && (showUpcomingVideo ? new Date(x.slot_start).getTime() >= Date.now() : key(x.slot_start) === selectedDate))
+    daily = video.filter((x) => x.slot_start && (showUpcomingVideo ? x.payment_status === "paid" && statusKey(x) === "paid" && key(x.slot_start) >= key(new Date().toISOString()) : key(x.slot_start) === selectedDate))
       .sort((a,b)=>new Date(a.slot_start).getTime()-new Date(b.slot_start).getTime()),
     cal = useMemo(() => {
       const [y, m] = month.split("-").map(Number),
@@ -407,6 +435,18 @@ export default function Staff() {
       {error && <div className="error">{error}</div>}
       <section className="staffBookingSection videoBookingSection">
         <h2 className="staffSectionTitle">視訊預約</h2>
+        <div className="textBookingTools videoBookingTools">
+          <div className="staffFilters staffPrimaryFilters">
+            <label>訂單狀態<select value={videoStatusFilter} onChange={e=>setVideoStatusFilter(e.target.value)}><option value="all">全部</option><option value="paid">已付款</option><option value="pending">待付款</option><option value="cancelled">已取消</option><option value="expired">已失效</option></select></label>
+            <label>資料回傳<select value={videoDataFilter} onChange={e=>setVideoDataFilter(e.target.value)}><option value="all">全部</option><option value="returned">已回傳</option><option value="missing">尚未回傳</option></select></label>
+            <label>排序<select value={videoSortBy} onChange={e=>setVideoSortBy(e.target.value)}><option value="paid_desc">由新到舊</option><option value="paid_asc">由舊到新</option></select></label>
+            <div className="staffSearchGroup" role="search" aria-label="搜尋視訊預約"><span className="staffSearchIcon" aria-hidden="true">⌕</span><label className="staffSearchField"><input value={videoCustomerSearch} onChange={e=>setVideoCustomerSearch(e.target.value)} placeholder="LINE名或姓名" aria-label="LINE名或姓名"/></label><label className="staffSearchField"><input value={videoBookingSearch} onChange={e=>setVideoBookingSearch(e.target.value)} placeholder="訂單編號" aria-label="訂單編號"/></label><label className="staffSearchField"><input value={videoDocumentSearch} onChange={e=>setVideoDocumentSearch(e.target.value)} placeholder="諮詢單號" aria-label="諮詢單號"/></label></div>
+          </div>
+          <div className="staffSecondaryFilters">
+            <div className="staffDateRange"><b>付款日期</b><label><span>從</span><input type="date" value={videoDateFrom} onChange={e=>setVideoDateFrom(e.target.value)}/></label><label><span>到</span><input type="date" value={videoDateTo} min={videoDateFrom||undefined} onChange={e=>setVideoDateTo(e.target.value)}/></label>{(videoDateFrom||videoDateTo)&&<button onClick={()=>{setVideoDateFrom("");setVideoDateTo("")}}>清除日期</button>}</div>
+            <div className="staffDisplayOptions"><b>表格顯示</b><label><input type="checkbox" checked={showVideoItems} onChange={e=>setShowVideoItems(e.target.checked)}/><span>預約項目</span></label><label><input type="checkbox" checked={showVideoAmount} onChange={e=>setShowVideoAmount(e.target.checked)}/><span>訂單金額</span></label><label><input type="checkbox" checked={showVideoDocumentNumber} onChange={e=>setShowVideoDocumentNumber(e.target.checked)}/><span>諮詢單編號</span></label></div>
+          </div>
+        </div>
         <div className="staffMonthNav">
           <button
             onClick={() => {
@@ -454,7 +494,7 @@ export default function Staff() {
         </div>
         {(selectedDate || showUpcomingVideo) && (
           <div className="dailyBookings">
-            <h3>目前顯示：{showUpcomingVideo?"現在之後的全部視訊":selectedDate}</h3>
+            <h3>目前顯示：{showUpcomingVideo?"今天起的已付款視訊":selectedDate}</h3>
             <div className="staffBookingTable">
               <div className="staffTableHead">
                 <b>視訊時間</b>
@@ -488,7 +528,7 @@ export default function Staff() {
                       )}
                       <span>{[x.customers?.line_display_name,x.customers?.full_name].filter(Boolean).join("｜")}</span>
                     </button>
-                    <b className={`staffState ${statusKey(x)}`}>{paid && x.collection_source === "manual" ? "手動收款" : status}</b>
+                    <b className={`staffState ${statusKey(x)}`}><span>{paid && x.collection_source === "manual" ? "手動收款" : status}</span>{showVideoAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</b>
                     {paid ? (
                       complete ? (
                         <button
@@ -508,12 +548,13 @@ export default function Staff() {
                     ) : (
                       <span>—</span>
                     )}
-                    <small>{x.booking_no}</small>
+                    <div className="staffOrderCell"><small>{x.booking_no}</small>{showVideoItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-video-item-${index}`}>{line}</div>)}</div>}</div>
                     <button onClick={() => openEdit(x)}>修改</button>
-                    {documentActions(x)}
+                    {documentActions(x,showVideoDocumentNumber)}
                   </article>
                 );
               })}
+              {!daily.length&&<div className="staffEmptyState">目前沒有符合條件的視訊預約</div>}
             </div>
           </div>
         )}
