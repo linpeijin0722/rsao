@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { publicSupabase } from "@/lib/supabase";
 import { verifyLineSession } from "@/lib/line-session";
 import { cookies } from "next/headers";
+import { isAllowedVideoSlot } from "@/lib/video-booking-window";
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,6 +25,21 @@ export async function POST(request: NextRequest) {
         { error: "請完整選擇諮詢項目與付款方式" },
         { status: 400 },
       );
+    }
+    const { data: method, error: methodError } = await publicSupabase()
+      .from("consultation_methods")
+      .select("code")
+      .eq("id", body.methodId)
+      .single();
+    if (methodError) throw methodError;
+    if (method?.code === "video") {
+      if (!body.slotStart)
+        return NextResponse.json({ error: "請選擇視訊日期與時段" }, { status: 400 });
+      if (!isAllowedVideoSlot(body.slotStart))
+        return NextResponse.json(
+          { error: "視訊諮詢最早只能預約 4 天後的日期，請重新選擇時段" },
+          { status: 400 },
+        );
     }
     const { data, error } = await publicSupabase().rpc("create_booking", {
       p_method_id: body.methodId,
