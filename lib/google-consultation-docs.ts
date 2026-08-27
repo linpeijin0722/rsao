@@ -8,7 +8,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-08-26-v9";
+const requiredAppsScriptVersion = "2026-08-27-v10";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -45,6 +45,13 @@ async function google(url: string, token: string, init: RequestInit = {}) {
   const result = await response.json();
   if (!response.ok) throw new Error(result.error?.message || "Google API 操作失敗");
   return result;
+}
+
+export async function wasDocumentEditedBy(documentId: string, editorEmail: string) {
+  if (!documentId || !editorEmail) return false;
+  const token = await accessToken();
+  const result = await google(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(documentId)}/revisions?fields=revisions(lastModifyingUser(emailAddress))`, token);
+  return (result.revisions || []).some((revision: any) => String(revision?.lastModifyingUser?.emailAddress || "").toLowerCase() === editorEmail.toLowerCase());
 }
 
 const fieldLabels: Record<string, string> = {
@@ -296,7 +303,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     if (index > 0) content += "[[[PAGE_BREAK]]]\n";
     const offset = content.length;
     const page = documentBody(pageSpec, index + 1, pages.length, ownerName);
-    content += page.content;
+    content += page.content.replace(/(?:[ \t\u00a0]*\n)+$/u, "\n");
     marks.push(...page.marks.map((mark) => ({ ...mark, start: mark.start + offset, end: mark.end + offset })));
     images.push(...page.images);
   });
@@ -317,7 +324,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     headers: { "content-type": "text/plain;charset=utf-8" },
     body: JSON.stringify({
       secret: appsScriptSecret, expectedVersion: requiredAppsScriptVersion, folderId,
-      title: fileTitle, content, marks, images, createMode,
+      title: fileTitle, bookingNo, content, marks, images, createMode,
       previousDocumentIds: force ? existingDetails.map((detail: any) => detail.google_document_id).filter(Boolean) : [],
     }),
     redirect: "follow",
