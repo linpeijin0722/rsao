@@ -108,6 +108,19 @@ export default function Page() {
   useEffect(() => {
     (async () => {
       try {
+        const liffId=process.env.NEXT_PUBLIC_LIFF_ID;
+        if(liffId&&location.hostname!=="localhost"){
+          await liff.init({liffId});
+          const url=new URL(location.href);
+          if(!liff.isInClient()&&!url.searchParams.has("from")){
+            location.replace(`https://liff.line.me/${liffId}/?from=liff`);
+            return;
+          }
+          if(url.searchParams.get("from")==="liff"){
+            url.searchParams.delete("from");
+            history.replaceState(null,"",`${url.pathname}${url.search}${url.hash}`);
+          }
+        }
         const cacheKey = "lin_a_sao_line_ready",
           cached = sessionStorage.getItem(cacheKey);
         if (cached) {
