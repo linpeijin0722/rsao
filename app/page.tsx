@@ -1,5 +1,6 @@
 "use client";
 import liff from "@line/liff";
+import { addCalendarDays } from "@/lib/video-booking-window";
 import { useEffect, useMemo, useState } from "react";
 type Method = {
   id: string;
@@ -69,6 +70,7 @@ const money = (v: number) =>
   };
 export default function Page() {
   const today = taiwanToday(),
+    earliestVideoDate = addCalendarDays(today, 4),
     maxDate = addMonths(today, 2),
     firstMonth = today.slice(0, 7),
     lastMonth = maxDate.slice(0, 7),
@@ -210,9 +212,9 @@ export default function Page() {
         new Set(
           slots
             .map((s) => dk(s.slot_start))
-            .filter((d) => d >= today && d <= maxDate),
+            .filter((d) => d >= earliestVideoDate && d <= maxDate),
         ),
-      [slots, today, maxDate],
+      [slots, earliestVideoDate, maxDate],
     ),
     daySlots = slots.filter((s) => dk(s.slot_start) === date),
     phase =
@@ -602,7 +604,7 @@ export default function Page() {
                           <button
                             key={d}
                             disabled={
-                              d < today || d > maxDate || !availableDates.has(d)
+                              d < earliestVideoDate || d > maxDate || !availableDates.has(d)
                             }
                             className={`${availableDates.has(d) ? "available" : "unavailable"} ${date === d ? "selected" : ""}`}
                             onClick={() => {
