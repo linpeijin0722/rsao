@@ -207,16 +207,19 @@ export async function PATCH(request: NextRequest) {
         .eq("id", b.id);
     }
   }
-  if (!titles.length) {
-    const { data: d } = await db
-      .from("booking_details")
-      .select("item_title")
-      .eq("booking_id", b.id);
-    titles = (d || []).map((x) => x.item_title);
-  }
+  const { data: currentDetails } = await db
+    .from("booking_details")
+    .select("item_title,quantity,booking_detail_sub_items(sub_item_title)")
+    .eq("booking_id", b.id);
+  titles = (currentDetails || []).map((detail: any) => {
+    const subTitle = detail.booking_detail_sub_items?.[0]?.sub_item_title || "";
+    return [detail.item_title, subTitle].filter(Boolean).join("｜");
+  });
   titles = titles.map((title) =>
     title
+      .replace(/(兩位嬰靈[（(]含[）)]以上).*/u, "$1")
       .replace(/[（(]?無論幾位[^）)]*[）)]?/g, "")
+      .replace(/^＋加購[：:]\s*/u, "")
       .replace(/\s+/g, " ")
       .trim(),
   );
@@ -224,31 +227,40 @@ export async function PATCH(request: NextRequest) {
     site = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin,
     effectiveSlot = body.slotStart || oldSlotStart,
     isVideo = (b.consultation_methods as unknown as { code: string })?.code === "video",
-    time = effectiveSlot
-      ? new Intl.DateTimeFormat("zh-TW", {
-          timeZone: "Asia/Taipei",
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          weekday: "short",
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        }).format(new Date(effectiveSlot))
-      : "文字諮詢";
+    slotDate = effectiveSlot ? new Date(effectiveSlot) : null,
+    dateParts = slotDate ? new Intl.DateTimeFormat("zh-TW", {
+      timeZone: "Asia/Taipei", month: "numeric", day: "numeric", weekday: "short",
+    }).formatToParts(slotDate) : [],
+    datePart = (type: string) => dateParts.find((part) => part.type === type)?.value || "",
+    videoDate = slotDate ? `${datePart("month")}月${datePart("day")}日（${datePart("weekday").replace("週", "週")}）` : "",
+    timeParts = slotDate ? new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Taipei", hour: "2-digit", minute: "2-digit", hour12: false,
+    }).formatToParts(slotDate) : [],
+    hour24 = Number(timeParts.find((part) => part.type === "hour")?.value || 0),
+    minute = timeParts.find((part) => part.type === "minute")?.value || "00",
+    videoTime = `${hour24 < 12 ? "上午" : hour24 < 13 ? "中午" : "下午"} ${String(hour24 % 12 || 12).padStart(2, "0")}:${minute}`;
   await pushLineFlex(c.line_user_id, "預約已變更", {
     type: "bubble",
     header: {
       type: "box",
       layout: "vertical",
-      backgroundColor: "#F4EBDD",
+      backgroundColor: "#F1F1F1",
       contents: [
         {
           type: "text",
           text: "預約已變更",
-          color: "#8A3045",
+          color: "#333333",
           weight: "bold",
           size: "xl",
+          align: "center",
+        },
+        {
+          type: "text",
+          text: `訂單編號：${b.booking_no}`,
+          color: "#8B8B8B",
+          size: "xs",
+          align: "center",
+          margin: "sm",
         },
       ],
     },
@@ -257,33 +269,49 @@ export async function PATCH(request: NextRequest) {
       layout: "vertical",
       spacing: "md",
       contents: [
-        {
-          type: "text",
-          text: `訂單編號：${b.booking_no}`,
-          wrap: true,
-          weight: "bold",
-        },
         ...(isVideo
           ? [
               {
                 type: "text",
-                text: `${timeChanged ? "變更後時間" : "預約時間"}\n${time}`,
+                text: "視訊諮詢",
+                align: "center",
+                weight: "bold",
+                size: "lg",
+              },
+              { type: "separator", margin: "md" },
+              {
+                type: "text",
+                text: "預約時間",
+                color: "#333333",
+                size: "sm",
+                margin: "lg",
+              },
+              {
+                type: "text",
+                text: videoDate,
                 wrap: true,
                 color: "#218548",
                 weight: "bold",
-                size: "xl",
+                size: "xxl",
               },
-            ]
-          : []),
-        ...(itemsChanged
-          ? [
               {
                 type: "text",
-                text: `變更後項目\n${titles.join("\n")}`,
+                text: videoTime,
                 wrap: true,
+                color: "#218548",
+                weight: "bold",
+                size: "xxl",
               },
             ]
           : []),
+        {
+          type: "text",
+          text: `${isVideo ? "線上視訊諮詢\n" : "文字諮詢\n"}${titles.map((title, index) => `${["❶","❷","❸","❹","❺","❻","❼","❽","❾"][index] || `${index + 1}.`}${title}`).join("\n")}`,
+          wrap: true,
+          margin: "lg",
+          color: "#333333",
+          size: "md",
+        },
       ],
     },
     footer: {
@@ -291,24 +319,15 @@ export async function PATCH(request: NextRequest) {
       layout: "vertical",
       contents: [
         {
-          type: "box",
-          layout: "vertical",
-          backgroundColor: "#F3EEE8",
-          cornerRadius: "10px",
-          paddingAll: "14px",
+          type: "button",
+          style: "primary",
+          color: "#4A78C2",
+          height: "md",
           action: {
             type: "uri",
+            label: "查看預約",
             uri: `${site}/my-bookings?order=${encodeURIComponent(b.booking_no)}`,
           },
-          contents: [
-            {
-              type: "text",
-              text: "查看預約",
-              color: "#5A4A42",
-              weight: "bold",
-              align: "center",
-            },
-          ],
         },
       ],
     },
