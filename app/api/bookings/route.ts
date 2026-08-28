@@ -14,6 +14,10 @@ export async function POST(request: NextRequest) {
         { error: "LINE 登入已失效，請重新登入" },
         { status: 401 },
       );
+    const channelToken=process.env.LINE_MESSAGING_CHANNEL_ACCESS_TOKEN;
+    if(!channelToken)return NextResponse.json({error:"系統尚未完成 LINE 官方帳號設定"},{status:503});
+    const friendship=await fetch(`https://api.line.me/v2/bot/profile/${encodeURIComponent(lineUid)}`,{headers:{Authorization:`Bearer ${channelToken}`},cache:"no-store"});
+    if(!friendship.ok)return NextResponse.json({error:"請先加入 LINE 官方帳號好友；若曾封鎖，請先解除封鎖後再進行預約。"},{status:403});
     const body = await request.json();
     if (
       !body.methodId ||
