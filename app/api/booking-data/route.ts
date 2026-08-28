@@ -4,13 +4,14 @@ import { verifyLineSession } from "@/lib/line-session";
 import { adminSupabase } from "@/lib/supabase";
 import { lunarProfile } from "@/lib/lunar-profile";
 import { createConsultationDocuments } from "@/lib/google-consultation-docs";
+import { pushLineText } from "@/lib/line-message";
 async function context(order: string) {
   const uid = verifyLineSession((await cookies()).get("line_session")?.value);
   if (!uid) return null;
   const db = adminSupabase(),
     { data: c } = await db
       .from("customers")
-      .select("id,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen")
+      .select("id,line_user_id,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen")
       .eq("line_user_id", uid)
       .single();
   if (!c) return null;
@@ -84,7 +85,28 @@ export async function POST(r: NextRequest) {
         console.error("建立諮詢 Google 文件失敗", error);
       }
     });
-    return NextResponse.json({ok:true,submitted:true,data_submitted_at:submittedBooking.data_submitted_at});
+    let officialLineSent = false;
+    let officialLineError = "";
+    if (body.submitSource === "web") {
+      try {
+        await pushLineText(
+          x.c.line_user_id,
+          "已完成填單，請於此聊天室窗回傳您的姓名",
+        );
+        officialLineSent = true;
+      } catch (error) {
+        officialLineError =
+          error instanceof Error ? error.message : "官方帳號訊息傳送失敗";
+        console.error("一般瀏覽器填單完成通知傳送失敗", error);
+      }
+    }
+    return NextResponse.json({
+      ok:true,
+      submitted:true,
+      data_submitted_at:submittedBooking.data_submitted_at,
+      officialLineSent,
+      officialLineError,
+    });
   }
   if (body.action === "update_profile") {
     const profile={...body.profile};if(!profile.owner_profile_id)delete profile.owner_profile_id;for(const key of ["birth_date","death_date","birth_time"])if(!profile[key])delete profile[key];
