@@ -102,11 +102,27 @@ export async function PATCH(request: NextRequest) {
     { data: b } = await db
       .from("bookings")
       .select(
-        "id,booking_no,consultation_method_id,customers(line_user_id),consultation_methods(code,base_price)",
+        "id,booking_no,slot_start,consultation_method_id,customers(line_user_id),consultation_methods(code,base_price),booking_details(item_id,quantity,booking_detail_sub_items(sub_item_id))",
       )
       .eq("booking_no", body.bookingNo)
       .single();
   if (!b) return NextResponse.json({ error: "找不到訂單" }, { status: 404 });
+  const oldSlotStart = b.slot_start,
+    normalizeLines = (lines: any[]) =>
+      lines
+        .map((line: any) =>
+          `${line.itemId || line.item_id}|${line.subId || line.booking_detail_sub_items?.[0]?.sub_item_id || ""}|${Math.max(1, Number(line.qty ?? line.quantity) || 1)}`,
+        )
+        .sort(),
+    timeChanged = Boolean(
+      body.slotStart &&
+        (!oldSlotStart ||
+          new Date(body.slotStart).getTime() !== new Date(oldSlotStart).getTime()),
+    ),
+    itemsChanged =
+      Array.isArray(body.lines) &&
+      JSON.stringify(normalizeLines(body.lines)) !==
+        JSON.stringify(normalizeLines(b.booking_details || []));
   if (body.slotStart) {
     const start = new Date(body.slotStart),
       end = new Date(start.getTime() + 1800000);
@@ -198,24 +214,39 @@ export async function PATCH(request: NextRequest) {
       .eq("booking_id", b.id);
     titles = (d || []).map((x) => x.item_title);
   }
+  titles = titles.map((title) =>
+    title
+      .replace(/[（(]?無論幾位[^）)]*[）)]?/g, "")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
   const c = b.customers as unknown as { line_user_id: string },
     site = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin,
-    time = body.slotStart
-      ? new Date(body.slotStart).toLocaleString("zh-TW", {
+    effectiveSlot = body.slotStart || oldSlotStart,
+    isVideo = (b.consultation_methods as unknown as { code: string })?.code === "video",
+    time = effectiveSlot
+      ? new Intl.DateTimeFormat("zh-TW", {
           timeZone: "Asia/Taipei",
-        })
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          weekday: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }).format(new Date(effectiveSlot))
       : "文字諮詢";
   await pushLineFlex(c.line_user_id, "預約已變更", {
     type: "bubble",
     header: {
       type: "box",
       layout: "vertical",
-      backgroundColor: "#8A3045",
+      backgroundColor: "#F4EBDD",
       contents: [
         {
           type: "text",
           text: "預約已變更",
-          color: "#FFFFFF",
+          color: "#8A3045",
           weight: "bold",
           size: "xl",
         },
@@ -232,8 +263,27 @@ export async function PATCH(request: NextRequest) {
           wrap: true,
           weight: "bold",
         },
-        { type: "text", text: `變更後時間：${time}`, wrap: true },
-        { type: "text", text: `變更後項目：${titles.join("、")}`, wrap: true },
+        ...(isVideo
+          ? [
+              {
+                type: "text",
+                text: `${timeChanged ? "變更後時間" : "預約時間"}\n${time}`,
+                wrap: true,
+                color: "#218548",
+                weight: "bold",
+                size: "xl",
+              },
+            ]
+          : []),
+        ...(itemsChanged
+          ? [
+              {
+                type: "text",
+                text: `變更後項目\n${titles.join("\n")}`,
+                wrap: true,
+              },
+            ]
+          : []),
       ],
     },
     footer: {
@@ -241,14 +291,24 @@ export async function PATCH(request: NextRequest) {
       layout: "vertical",
       contents: [
         {
-          type: "button",
-          style: "primary",
-          color: "#8A3045",
+          type: "box",
+          layout: "vertical",
+          backgroundColor: "#F3EEE8",
+          cornerRadius: "10px",
+          paddingAll: "14px",
           action: {
             type: "uri",
-            label: "查看預約",
             uri: `${site}/my-bookings?order=${encodeURIComponent(b.booking_no)}`,
           },
+          contents: [
+            {
+              type: "text",
+              text: "查看預約",
+              color: "#5A4A42",
+              weight: "bold",
+              align: "center",
+            },
+          ],
         },
       ],
     },
