@@ -1047,6 +1047,8 @@ function Answer({
     ),
     relation =
       code === "past-life-relationship" || title.includes("與他人前世關係"),
+    personalPastLife =
+      code === "past-life-personal" || title.includes("前世因果（個人）"),
     personalLove = sub.includes("個人感情運") || title.includes("個人感情運"),
     marriage =
       (code === "marriage-bazi" ||
@@ -1123,6 +1125,7 @@ function Answer({
       key: string,
       label: string,
       gender?: string,
+      maximumAge?: number,
     ) => (
       <label>
         {label}
@@ -1136,7 +1139,9 @@ function Answer({
             .filter(
               (p: any) =>
                 (!gender || p.gender === gender) &&
-                (!gender || isAtLeast15(p.birth_date)),
+                (!gender || isAtLeast15(p.birth_date)) &&
+                (maximumAge === undefined ||
+                  isAtMostAge(p.birth_date, maximumAge)),
             )
             .map((p: any) => (
               <option key={p.id} value={p.id}>
@@ -1325,7 +1330,7 @@ function Answer({
         <div className="extraFields newbornPeople">
           {personSelect(extra.mother_id, "mother_id", "請選擇寶寶的媽媽", "女")}
           {personSelect(extra.father_id, "father_id", "請選擇寶寶的爸爸", "男")}
-          {personSelect(extra.baby_id, "baby_id", "請選擇寶寶")}
+          {personSelect(extra.baby_id, "baby_id", "請選擇寶寶", undefined, 2)}
           <small className="babyProfileHint">
             請先於最上方『諮詢者資料』新增寶寶資料（姓名可填『還沒取』），再返回此處選取。
           </small>
@@ -1911,7 +1916,7 @@ function Answer({
           <label>
             是否有特別想用的字或喜歡的讀音？
             <textarea
-              placeholder="例如：希望使用「安」、「樂」等字，或喜歡ㄩ、ㄣ等讀音"
+              placeholder="例如：希望使用「安」、「芸」等字，或喜歡ㄩ、ㄣ等讀音"
               value={extra.preferred_characters || ""}
               onChange={(e) => change("preferred_characters", e.target.value)}
             />
@@ -1972,6 +1977,32 @@ function Answer({
       )}
       {home && (
         <div className="extraFields">
+          <label>
+            欲觀看陽宅的所在地址
+            <span className="sameAddressOption">
+              <input
+                type="checkbox"
+                disabled={locked}
+                checked={Boolean(extra.home_same_address)}
+                onChange={(event) => {
+                  const checked = event.target.checked;
+                  setExtra({
+                    ...extra,
+                    home_same_address: checked,
+                    home_address: checked ? selectedProfile?.address || "" : "",
+                  });
+                  setSaved(false);
+                }}
+              />
+              同用戶地址
+            </span>
+            <textarea
+              disabled={locked}
+              placeholder="請填寫完整地址"
+              value={extra.home_address || ""}
+              onChange={(event) => change("home_address", event.target.value)}
+            />
+          </label>
           <label>
             本次諮詢的主要目的
             <textarea
@@ -2109,12 +2140,7 @@ function Answer({
                   : `「${primaryPerson?.name || "諮詢者"}」`,
               right =
                 id === self?.id ? "我" : `「${person?.name || "這位對象"}」`,
-              list = relation
-                ? Array.from(
-                    { length: 3 },
-                    (_, index) => targetQuestions[id]?.[index] || "",
-                  )
-                : targetQuestions[id]?.length
+              list = targetQuestions[id]?.length
                   ? targetQuestions[id]
                   : [""],
               relationshipData = extra.relationship_details?.[id] || {},
@@ -2217,6 +2243,7 @@ function Answer({
                       placeholder="例如：我們前世是什麼關係？我前世是否有結婚？有幾個小孩？"
                       questions={list}
                       locked={locked}
+                      suggestions={PAST_LIFE_RELATION_QUESTIONS}
                       change={(next: string[]) => {
                         setTargetQuestions({ ...targetQuestions, [id]: next });
                         setSaved(false);
@@ -2248,6 +2275,7 @@ function Answer({
             }
             questions={questions}
             locked={locked}
+            suggestions={personalPastLife ? PERSONAL_PAST_LIFE_QUESTIONS : undefined}
             change={(next: string[]) => {
               setQuestions(next);
               setSaved(false);
@@ -2391,6 +2419,8 @@ function answerMissingFields(value: any) {
     if (extra.purpose === "其他" && !filled(extra.other_purpose))
       missing.push("其他擇日用途");
   }
+  if (value.home && !filled(extra.home_address))
+    missing.push("欲觀看陽宅的所在地址");
   if (value.lawsuit) {
     if (!filled(extra.lawsuit_type)) missing.push("官司／糾紛類型");
     if (extra.lawsuit_type === "其他" && !filled(extra.other_lawsuit_type))
@@ -2532,6 +2562,38 @@ function isAtLeast15(birthDate: string) {
   cutoff.setFullYear(cutoff.getFullYear() - 15);
   return birth <= cutoff;
 }
+function isAtMostAge(birthDate: string, maximumAge: number) {
+  if (!birthDate) return false;
+  const birth = new Date(`${String(birthDate).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(birth.getTime())) return false;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const beforeBirthday =
+    today.getMonth() < birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
+  if (beforeBirthday) age -= 1;
+  return age >= 0 && age <= maximumAge;
+}
+
+const PAST_LIFE_RELATION_QUESTIONS = [
+  "我們前世是否曾互相扶持、共同完成重要的事？",
+  "今生相遇為彼此帶來哪些正面成長？",
+  "如何延續這段關係中好的緣分？",
+  "我們前世是怎麼認識的？",
+  "為什麼今生會有這麼深的牽絆？",
+  "我們之間是否有未完成的課題？",
+  "如果這段關係很痛苦，我該如何善了，才不會把這個因果又帶到下一世？",
+];
+
+const PERSONAL_PAST_LIFE_QUESTIONS = [
+  "我前世有什麼特別擅長或有興趣的事情？",
+  "我與哪位神佛最有緣？",
+  "前世累積了哪些優點或福報延續到今生？",
+  "今生可以如何發揮前世帶來的天賦？",
+  "前世有哪些珍貴緣分在今生仍守護著我？",
+  "我前世從事什麼職業，對今生有什麼影響？",
+];
+
 function QuestionFields({
   title,
   questions,
@@ -2539,11 +2601,66 @@ function QuestionFields({
   change,
   placeholder = "輸入你想問的問題",
   allowAdd = true,
+  suggestions,
 }: any) {
   const [limit, setLimit] = useState(false);
   return (
     <div className="questions">
       <b>{title}</b>
+      {Array.isArray(suggestions) && suggestions.length > 0 && !locked && (
+        <div className="quickQuestionOptions">
+          {suggestions.map((suggestion: string, index: number) => {
+            const selected = questions.includes(suggestion);
+            return (
+              <label key={suggestion} className={selected ? "selected" : ""}>
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  onChange={(event) => {
+                    if (event.target.checked) {
+                      const blankIndex = questions.findIndex(
+                        (question: string) => !question.trim(),
+                      );
+                      if (blankIndex >= 0) {
+                        change(
+                          questions.map((question: string, questionIndex: number) =>
+                            questionIndex === blankIndex ? suggestion : question,
+                          ),
+                        );
+                      } else if (questions.length < 3) {
+                        change([...questions, suggestion]);
+                      } else {
+                        setLimit(true);
+                      }
+                    } else {
+                      const next = questions.filter(
+                        (question: string) => question !== suggestion,
+                      );
+                      change(next.length ? next : [""]);
+                      setLimit(false);
+                    }
+                  }}
+                />
+                <span>{index + 1}. {suggestion}</span>
+              </label>
+            );
+          })}
+          <button
+            type="button"
+            className="quickQuestionOther"
+            onClick={() => {
+              if (questions.length >= 3 && questions.every((q: string) => q.trim())) {
+                setLimit(true);
+                return;
+              }
+              const hasBlank = questions.some((q: string) => !q.trim());
+              if (!hasBlank) change([...questions, ""]);
+            }}
+          >
+            {suggestions.length + 1}. 其它（自填）
+          </button>
+        </div>
+      )}
       {questions.map((q: string, i: number) => (
         <textarea
           disabled={locked}
