@@ -286,7 +286,8 @@ export default function Staff() {
     const r = await fetch("/api/staff/bookings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ bookingNo: no, action: "mark_paid" }) });
     const j = await r.json();
     if (!r.ok) return alert(j.error || "設定失敗");
-    setEditing(null); await load(); alert("已標記為手動收款");
+    setEditing(null); await load();
+    alert(j.lineNotified ? "已標記為手動收款，並已傳送已付款 LINE 訊息" : `已標記為手動收款，但 LINE 訊息未送出：${j.lineError || "請檢查 LINE 設定"}`);
   }
   async function saveReturned() {
     if(!returnedEdit?.id)return;
@@ -365,7 +366,7 @@ export default function Staff() {
     bookedDates = new Set(
       video.filter((x) => x.slot_start).map((x) => key(x.slot_start)),
     ),
-    daily = video.filter((x) => x.slot_start && (showUpcomingVideo ? x.payment_status === "paid" && statusKey(x) === "paid" && key(x.slot_start) >= key(new Date().toISOString()) : key(x.slot_start) === selectedDate))
+    daily = video.filter((x) => x.slot_start && (showUpcomingVideo ? ["paid", "pending"].includes(statusKey(x)) && new Date(x.slot_start).getTime() >= Date.now() : key(x.slot_start) === selectedDate))
       .sort((a,b)=>new Date(a.slot_start).getTime()-new Date(b.slot_start).getTime()),
     cal = useMemo(() => {
       const [y, m] = month.split("-").map(Number),
@@ -548,7 +549,7 @@ export default function Staff() {
         </div>
         {(selectedDate || showUpcomingVideo) && (
           <div className="dailyBookings">
-            <h3>目前顯示：{showUpcomingVideo?"今天起的已付款視訊":selectedDate}</h3>
+            <h3>目前顯示：{showUpcomingVideo?"即將來臨的視訊（含待付款）":selectedDate}</h3>
             <div className="staffBookingTable">
               <div className="staffTableHead">
                 <b>視訊時間</b>
@@ -829,12 +830,12 @@ export default function Staff() {
                 </b>
               )}
             </div>
-            {editing.payment_status !== "paid" && editing.status !== "cancelled" && <button className="manualPaidButton" onClick={() => markPaid(editing.booking_no)}>設為已付款（手動收款）</button>}
+            {editing.payment_status !== "paid" && <button className="manualPaidButton" onClick={() => markPaid(editing.booking_no)}>設為已付款（手動收款）</button>}
             {editing.payment_status === "paid" &&
               !isComplete(editing) && (
                 <button
                   className="remindButton"
-                  onClick={() => remind(editing.booking_no)}
+                  onClick={() => remind(editing.booking_no, editing.customers)}
                 >
                   通知客人填寫資料
                 </button>
