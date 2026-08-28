@@ -19,6 +19,24 @@ export async function pushLineFlex(
   if (!response.ok)
     throw new Error(`LINE 訊息發送失敗：${await response.text()}`);
 }
+
+export async function pushLineText(userId: string, text: string) {
+  const token = process.env.LINE_MESSAGING_CHANNEL_ACCESS_TOKEN;
+  if (!token) throw new Error("尚未設定 LINE_MESSAGING_CHANNEL_ACCESS_TOKEN");
+  const response = await fetch("https://api.line.me/v2/bot/message/push", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      to: userId,
+      messages: [{ type: "text", text }],
+    }),
+  });
+  if (!response.ok)
+    throw new Error(`LINE 訊息發送失敗：${await response.text()}`);
+}
 export function bookingFlex(args: {
   bookingNo: string;
   method: string;
