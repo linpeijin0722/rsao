@@ -9,8 +9,13 @@ const status = (x: any) =>
       ? "已付款"
       : "待付款";
 const complete = (x: any) => Boolean(x.data_submitted_at);
+const cleanSubItemTitle = (value: unknown) =>
+  String(value || "")
+    .replace(/^(兩位嬰靈[（(]含[）)]以上).*/u, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
 const itemText = (detail: any) => {
-  const subs = detail.booking_detail_sub_items?.map((x: any) => x.sub_item_title).filter(Boolean) || [];
+  const subs = detail.booking_detail_sub_items?.map((x: any) => cleanSubItemTitle(x.sub_item_title)).filter(Boolean) || [];
   return `${detail.item_title}${subs.length ? `－${subs.join("、")}` : ""}${detail.quantity > 1 ? ` × ${detail.quantity}` : ""}`;
 };
 const bookingTime = (value: string) => {
