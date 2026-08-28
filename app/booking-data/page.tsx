@@ -226,6 +226,7 @@ const mergeProfiles = (profiles: any[]) => {
 };
 export default function BookingData() {
   const savingRef = useRef(0);
+  const liffReadyRef = useRef<Promise<void> | null>(null);
   const [order, setOrder] = useState(""),
     [data, setData] = useState<any>(null),
     [form, setForm] = useState<any>(empty),
@@ -258,6 +259,17 @@ export default function BookingData() {
     });
     return response.ok;
   }
+  function prepareLiff() {
+    const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+    if (!liffId) return Promise.reject(new Error("尚未設定 LIFF ID"));
+    if (!liffReadyRef.current) {
+      liffReadyRef.current = liff.init({ liffId }).catch((error) => {
+        liffReadyRef.current = null;
+        throw error;
+      });
+    }
+    return liffReadyRef.current;
+  }
   async function load(o = order, retry = true) {
     let r = await fetch(`/api/booking-data?order=${encodeURIComponent(o)}`, {
         cache: "no-store",
@@ -276,6 +288,9 @@ export default function BookingData() {
   useEffect(() => {
     const o = new URLSearchParams(location.search).get("order") || "";
     setOrder(o);
+    void prepareLiff().catch((error) =>
+      console.error("LIFF 預先初始化失敗", error),
+    );
     void load(o);
   }, []);
   function date(field: "birth_date" | "death_date", v: string) {
@@ -391,6 +406,17 @@ export default function BookingData() {
     const controller = new AbortController(),
       timer = setTimeout(() => controller.abort(), 25000);
     try {
+      await prepareLiff();
+      if (!liff.isInClient()) {
+        const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+        if (liffId) {
+          location.replace(
+            `https://liff.line.me/${liffId}/booking-data?order=${encodeURIComponent(order)}`,
+          );
+          return;
+        }
+        throw new Error("請從 LINE 官方帳號內開啟此頁後再送出");
+      }
       // 先完成資料庫送出；LINE 初始化或聊天室傳訊失敗，不得阻止後台收到資料。
       const r = await fetch("/api/booking-data", {
           method: "POST",
@@ -420,27 +446,27 @@ export default function BookingData() {
       setSubmitSuccess(true);
       setMsg("");
 
-      const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
       try {
-        if (!liffId) throw new Error("尚未設定 LIFF ID");
-        await Promise.race([
-          liff.init({ liffId }),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("LINE 初始化逾時")), 8000),
-          ),
-        ]);
-        if (!liff.isInClient())
-          throw new Error("目前不在 LINE 應用程式內，無法代您傳送聊天室訊息");
-        await liff.sendMessages([
-          {
-            type: "text",
-            text: `我已完成填單，姓名：${data?.customer?.full_name || "未填寫"}`,
-          },
-        ]);
+        const message = {
+          type: "text" as const,
+          text: `我已完成填單，姓名：${data?.customer?.full_name || "未填寫"}`,
+        };
+        try {
+          await liff.sendMessages([message]);
+        } catch {
+          await new Promise((resolve) => setTimeout(resolve, 700));
+          await liff.sendMessages([message]);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        if (liff.isInClient()) {
+          liff.closeWindow();
+          return;
+        }
+        returnToLine();
       } catch (lineError) {
         console.error("問事資料已送出，但 LINE 聊天訊息傳送失敗", lineError);
         setLineSendWarning(
-          "資料已成功送到後台，但 LINE 聊天訊息未能自動傳送。請回到官方帳號告知助理您已完成填單。",
+          `資料已送出；LINE 訊息傳送失敗：${lineError instanceof Error ? lineError.message : "請重新由官方帳號內開啟後再試"}`,
         );
       }
     } catch (error) {
@@ -865,6 +891,15 @@ export default function BookingData() {
       {(savingItems > 0 || submitWaiting) && (
         <p className="savingNotice">請勿切換畫面，資料正在儲存並送出，請稍候…</p>
       )}
+      {(submitWaiting || (saving && confirmSubmit)) && (
+        <div className="submitProgressOverlay" role="alert" aria-live="assertive">
+          <div className="submitProgressCard">
+            <span className="submitProgressSpinner" aria-hidden="true" />
+            <h2>資料正在送出</h2>
+            <p>請勿切換或關閉畫面，完成後將自動返回 LINE。</p>
+          </div>
+        </div>
+      )}
       {!data?.booking?.data_submitted_at ? (
         <button
           className="submitAllData"
@@ -933,7 +968,7 @@ export default function BookingData() {
         <div className="modalBackdrop">
           <div className="modal submitConfirm submitSuccessModal">
             <h2>資料已成功送出</h2>
-            <p>後台已收到您的問事資料，系統將接續建立諮詢單。</p>
+            <p>後台已收到您的問事資料。</p>
             {lineSendWarning && <p className="submitError">{lineSendWarning}</p>}
             <button onClick={returnToLine}>返回 LINE</button>
           </div>
