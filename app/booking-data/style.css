@@ -43,6 +43,7 @@
 .assign {
   margin: 13px 0;
 }
+.questionPage .sameAddressOption{display:inline-flex!important;align-items:center!important;gap:7px!important;margin:8px 0!important;font-weight:500!important}.questionPage .sameAddressOption input{width:18px!important;height:18px!important;min-width:18px!important;margin:0!important;flex:0 0 18px!important}.questionPage .quickQuestionOptions{display:grid;gap:8px;margin:10px 0 12px}.questionPage .quickQuestionOptions label,.questionPage .quickQuestionOther{box-sizing:border-box;width:100%;min-width:0;display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border:1px solid #d8cbbd;border-radius:10px;background:#fff;color:#2d2925;font-size:inherit;font-weight:500;line-height:1.5;text-align:left}.questionPage .quickQuestionOptions label.selected{border-color:#8f2f49;background:#fff5f7;color:#7c263e}.questionPage .quickQuestionOptions input{width:18px!important;height:18px!important;min-width:18px!important;margin:2px 0 0!important;flex:0 0 18px!important}.questionPage .quickQuestionOther{cursor:pointer}
 @media (max-width: 600px) {
   .dataGrid {
     grid-template-columns: 1fr;
