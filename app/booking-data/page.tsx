@@ -397,12 +397,6 @@ export default function BookingData() {
         location.replace(deepLink);
         return;
       }
-      await liff.sendMessages([
-        {
-          type: "text",
-          text: `我已完成填單，姓名：${data?.customer?.full_name || "未填寫"}`,
-        },
-      ]);
       const r = await fetch("/api/booking-data", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -411,6 +405,16 @@ export default function BookingData() {
         }),
         j = await r.json();
       if (!r.ok) throw new Error(j.error || "資料送出失敗，請稍後再試");
+      try {
+        await liff.sendMessages([
+          {
+            type: "text",
+            text: `我已完成填單，姓名：${data?.customer?.full_name || "未填寫"}`,
+          },
+        ]);
+      } catch (lineError) {
+        console.error("問事資料已送出，但 LINE 聊天訊息傳送失敗", lineError);
+      }
       setConfirmSubmit(false);
       location.assign(
         process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL ||
@@ -830,7 +834,7 @@ export default function BookingData() {
         })}
       </div>
       {(savingItems > 0 || submitWaiting) && (
-        <p className="savingNotice">資料儲存傳送中，請稍候…</p>
+        <p className="savingNotice">請勿切換畫面，資料正在儲存並送出，請稍候…</p>
       )}
       {!data?.booking?.data_submitted_at ? (
         <button
@@ -881,7 +885,7 @@ export default function BookingData() {
             </p>
             {msg && <p className="submitError">{msg}</p>}
             {(savingItems > 0 || submitWaiting || saving) && (
-              <p className="savingNotice">資料儲存傳送中，請稍候…</p>
+              <p className="savingNotice">請勿切換畫面，資料正在儲存並送出，請稍候…</p>
             )}
             <button onClick={() => void submitAll()} disabled={saving}>
               {saving ? "儲存傳送中…" : "確認無誤，正式送出"}
