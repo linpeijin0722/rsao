@@ -8,8 +8,12 @@ body .videoBookingSection .videoViewToolbar button{background:#fff!important;bor
 body .videoBookingSection .videoViewToolbar button.active{background:#20423d!important;color:#fff!important}
 body .videoBookingSection .staffDays button.booked{background:#ebfbf9!important;border-color:#a6bbb8!important;color:#20423d!important}
 body .videoBookingSection .staffDays button.selected{background:#20423d!important;color:#fff!important;outline-color:#a6bbb8!important}
+body .videoBookingSection .staffDays button.booked.pastBooked,body .videoBookingSection .staffDays button.booked.pastBooked.selected{background:#66615e!important;border-color:#66615e!important;color:#fff!important;outline-color:#3f3b39!important}
 body .videoBookingSection .staffTableRow{background:#fff!important;border-color:#a6bbb8!important}
-body .videoBookingSection .staffState{color:inherit!important}
+body .videoBookingSection .staffState.paid{color:#168a54!important}
+body .videoBookingSection .staffState.pending,body .videoBookingSection .staffState.cancelled,body .videoBookingSection .staffState.expired{color:#b5233d!important}
+body .videoBookingSection .returned{color:#168a54!important}
+body .videoBookingSection .missing{color:#b5233d!important}
 
 .staffLogin,
 .staffPage {
