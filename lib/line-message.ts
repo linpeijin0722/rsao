@@ -24,6 +24,8 @@ export function bookingFlex(args: {
   method: string;
   total: number;
   slot?: string;
+  slotStart?: string;
+  items?: string[];
   site: string;
 }) {
   const isVideo = args.method === "video",
@@ -36,12 +38,12 @@ export function bookingFlex(args: {
       alignItems: "center",
       spacing: "sm",
       paddingAll: "14px",
-      backgroundColor: "#8A3045",
+      backgroundColor: "#EAF7EE",
       cornerRadius: "10px",
       action: { type: "uri", uri: dataUrl },
       contents: [
         { type: "text", text: "📝", size: "lg", flex: 0 },
-        { type: "text", text: "立即填寫問事資料（必填）", color: "#FFFFFF", weight: "bold", align: "center", flex: 0 },
+        { type: "text", text: "立即填寫問事資料（必填）", color: "#218548", weight: "bold", align: "center", flex: 0 },
       ],
     },
   ];
@@ -89,6 +91,29 @@ export function bookingFlex(args: {
           color: "#8A3045",
           weight: "bold",
         },
+        ...(isVideo && args.slotStart
+          ? [
+              {
+                type: "text",
+                text: `視訊時間\n${new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(args.slotStart))}`,
+                color: "#218548",
+                weight: "bold",
+                size: "xl",
+                align: "center",
+                wrap: true,
+              },
+            ]
+          : []),
+        ...(args.items?.length
+          ? [
+              {
+                type: "text",
+                text: `預約項目\n${args.items.join("\n")}`,
+                color: "#4D453F",
+                wrap: true,
+              },
+            ]
+          : []),
         {
           type: "box",
           layout: "vertical",
