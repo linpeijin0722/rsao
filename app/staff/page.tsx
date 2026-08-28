@@ -82,6 +82,7 @@ export default function Staff() {
     [rows, setRows] = useState<any[]>([]),
     [items, setItems] = useState<any[]>([]),
     [manualCustomers, setManualCustomers] = useState<any[]>([]),
+    [customerProfiles, setCustomerProfiles] = useState<any[]>([]),
     [manualOpen, setManualOpen] = useState(false),
     [manualMethod, setManualMethod] = useState<"video"|"text">("text"),
     [manualCustomerId, setManualCustomerId] = useState(""),
@@ -95,6 +96,7 @@ export default function Staff() {
     [editing, setEditing] = useState<any>(null),
     [userView, setUserView] = useState<any>(null),
     [dataView, setDataView] = useState<any[]>([]),
+    [dataBooking, setDataBooking] = useState<any>(null),
     [dataViewMode, setDataViewMode] = useState<"menu"|"view"|"user"|"answers">("menu"),
     [returnedEdit, setReturnedEdit] = useState<any>(null),
     [returnedEditMode, setReturnedEditMode] = useState<"user"|"answers">("user"),
@@ -206,7 +208,7 @@ export default function Staff() {
   async function load() {
     const r = await fetch("/api/staff/bookings"),
       j = await r.json();
-    if(r.ok){setRows(j.bookings);setManualCustomers(j.customers||[])}else setError(j.error);
+    if(r.ok){setRows(j.bookings);setManualCustomers(j.customers||[]);setCustomerProfiles(j.consultationProfiles||[])}else setError(j.error);
   }
   useEffect(() => {
     const saved=localStorage.getItem("lin_a_sao_staff_password");if(saved){setPassword(saved);setRememberPassword(true)}
@@ -219,6 +221,12 @@ export default function Staff() {
   }, []);
   function toggleManualItem(item:any,checked:boolean){
     setManualLines(value=>checked?[...value,{itemId:item.id,subId:item.sub_items?.length===1?item.sub_items[0].id:"",qty:1}]:value.filter(line=>line.itemId!==item.id));
+  }
+  function openReturnedData(booking:any){
+    const submitted=returnedData(booking),customerId=booking.customers?.id;
+    const savedProfiles=customerProfiles.filter((profile:any)=>profile.customer_id===customerId).map((profile:any)=>({...profile,answerId:null,questions:[],extra_data:{},item_code:"",item_title:"",sub_items:[]}));
+    const merged=[...submitted,...savedProfiles].filter((entry:any,index:number,all:any[])=>entry?.id&&all.findIndex((candidate:any)=>candidate.id===entry.id&&candidate.answerId===entry.answerId)===index);
+    setDataViewMode("menu");setDataView(merged);setDataBooking(booking);
   }
   async function createManualBooking(){
     if(!manualCustomerId)return alert("請選擇用戶");
@@ -579,7 +587,7 @@ export default function Staff() {
                       complete ? (
                         <button
                           className="returned"
-                          onClick={() => {setDataViewMode("menu");setDataView(profiles)}}
+                          onClick={() => openReturnedData(x)}
                         >
                           已回傳
                         </button>
@@ -631,20 +639,20 @@ export default function Staff() {
           </div>
         </div>
       )}
-      {dataView.length > 0 && (
-        <div className="modalBackdrop" onClick={() => setDataView([])}>
+      {dataBooking && (
+        <div className="modalBackdrop" onClick={() => {setDataView([]);setDataBooking(null)}}>
           <div
             className={`modal returnedDataModal mode-${dataViewMode}`}
             onClick={(e) => e.stopPropagation()}
           >
-            <button className="staffModalClose" aria-label="關閉" onClick={() => setDataView([])}>×</button>
+            <button className="staffModalClose" aria-label="關閉" onClick={() => {setDataView([]);setDataBooking(null)}}>×</button>
             <h2>已回傳的諮詢者資料</h2>
-            {dataViewMode==="menu"&&<div className="returnedActionMenu"><button onClick={()=>setDataViewMode("user")}>修改用戶資料</button><button onClick={()=>setDataViewMode("answers")}>修改問事資料</button></div>}
+            {dataViewMode==="menu"&&<div className="returnedActionMenu"><button disabled={!dataView.length} onClick={()=>setDataViewMode("user")}>修改用戶資料</button><button disabled={!dataView.some((p:any)=>Boolean(p.answerId))} onClick={()=>setDataViewMode("answers")}>修改問事資料</button>{!dataView.length&&<p className="staffEmptyReturnedAnswers">此訂單標示為已回傳，但資料庫內找不到可編輯的諮詢者資料。請重新整理；若仍出現此訊息，代表該筆舊資料未正確寫入。</p>}</div>}
             {dataViewMode!=="menu"&&<button className="returnedMenuBack" onClick={()=>setDataViewMode("menu")}>‹ 返回功能選單</button>}
             {dataViewMode==="user"&&<div className="staffProfileTags">{dataView.filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.id===p.id)===i).map((p:any)=>{const category=p.relationship==="本人"&&!p.relationship_detail?"本人":p.profile_type==="person"?"親友":p.profile_type==="pet"?"往生寵物":"過世親友";return <button key={p.id} className="staffProfileTag" onClick={()=>setProfileEditor({...p})}>{p.profile_type==="pet"&&p.photo_data&&<img src={p.photo_data} alt=""/>}<span><b>{p.name}</b><small>{category}{p.relationship_detail?`・${p.relationship_detail}`:""}</small></span></button>})}</div>}
             {dataViewMode==="answers"&&<div className="staffAnswerCards">{dataView.filter((p:any)=>Boolean(p.answerId)).filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.answerId===p.answerId)===i).map((p:any)=>{const people=dataView.filter((person:any)=>person.answerId===p.answerId).filter((person:any,i:number,all:any[])=>all.findIndex(x=>x.id===person.id)===i);return <article key={p.answerId}><div className="answerProfileTags">{people.map((person:any)=><div className="answerProfileTag" key={person.id}>{person.profile_type==="pet"&&person.photo_data&&<img src={person.photo_data} alt=""/>}<span><b>{person.name}</b><small>{person.relationship_detail||person.relationship}</small></span></div>)}</div><h3>{p.item_title}{p.sub_items?.length?`－${p.sub_items.join("、")}`:""}</h3><div className="answerReadContent">{p.questions?.filter(Boolean).length?p.questions.filter(Boolean).map((q:string,n:number)=><p key={n}>問題 {n+1}：{q}</p>):<p>未填寫問題</p>}</div><button className="editAnswerButton" onClick={()=>setAnswerEditor({...p,targetProfileId:people[0]?.id||p.id,targetProfileIds:people.map((person:any)=>person.id),questions:[0,1,2].map(i=>p.questions?.[i]||"")})}>修改該項目問事資料</button></article>})}{!dataView.some((p:any)=>Boolean(p.answerId))&&<p className="staffEmptyReturnedAnswers">這筆預約目前沒有可編輯的問事答案；可返回修改用戶資料。</p>}</div>}
             {dataViewMode==="view"&&<div className="staffAnswerCards">{dataView.filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.answerId===p.answerId)===i).map((p:any)=><article key={p.answerId}><h3>{p.item_title}{p.sub_items?.length?`－${p.sub_items.join("、")}`:""}</h3>{p.questions?.filter(Boolean).map((q:string,n:number)=><p key={n}>問題 {n+1}：{q}</p>)}</article>)}</div>}
-            <button onClick={() => setDataView([])}>關閉</button>
+            <button onClick={() => {setDataView([]);setDataBooking(null)}}>關閉</button>
           </div>
         </div>
       )}
@@ -742,11 +750,7 @@ export default function Staff() {
                   complete ? (
                     <button
                       className="returned"
-                      onClick={() =>
-                        setDataView(
-                          (setDataViewMode("menu"),returnedData(x)),
-                        )
-                      }
+                      onClick={() => openReturnedData(x)}
                     >
                       已回傳
                     </button>
