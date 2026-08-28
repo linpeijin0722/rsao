@@ -81,6 +81,44 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
     const endIndex = contentEnd(footerContent);
     if (endIndex > 1) requests.push({ deleteContentRange: { range: { segmentId: footerId, startIndex: 1, endIndex } } });
   }
+
+  // 「整體運勢」最下方的備註是固定說明，不是老師輸入區。
+  // Apps Script 會先套用共用樣式，這裡再精準覆蓋成黑色 10pt。
+  const bodyRuns: Array<{ text: string; start: number; end: number }> = [];
+  for (const block of document.body?.content || []) {
+    for (const element of block.paragraph?.elements || []) {
+      const runText = String(element.textRun?.content || "");
+      if (runText && Number.isFinite(element.startIndex) && Number.isFinite(element.endIndex)) {
+        bodyRuns.push({ text: runText, start: Number(element.startIndex), end: Number(element.endIndex) });
+      }
+    }
+  }
+  const flatBody = bodyRuns.map((run) => run.text).join("");
+  const noteText = "備註：\n1.以上均為虛歲\n2.如果沒有特別提到的年紀，代表身體狀況大致平順，不需要特別擔心，只要維持日常保養即可。\n3.運勢中的歲數，僅代表在那個年齡段需要特別留意的事項（非今生會活到幾歲喔） 若遇到劫難的時候就要比較小心，通過自己的努力衝過難關，多做福德佈施，化解災劫也能夠延續生命。";
+  let noteOffset = flatBody.indexOf(noteText);
+  while (noteOffset >= 0) {
+    const locate = (offset: number) => {
+      let cursor = 0;
+      for (const run of bodyRuns) {
+        const next = cursor + run.text.length;
+        if (offset < next) return run.start + (offset - cursor);
+        cursor = next;
+      }
+      return bodyRuns.at(-1)?.end || 1;
+    };
+    requests.push({
+      updateTextStyle: {
+        range: { startIndex: locate(noteOffset), endIndex: locate(noteOffset + noteText.length) },
+        textStyle: {
+          foregroundColor: { color: { rgbColor: { red: 0, green: 0, blue: 0 } } },
+          fontSize: { magnitude: 10, unit: "PT" },
+          bold: false,
+        },
+        fields: "foregroundColor,fontSize,bold",
+      },
+    });
+    noteOffset = flatBody.indexOf(noteText, noteOffset + noteText.length);
+  }
   await google(
     `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,
     token,
@@ -376,7 +414,9 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     if (index > 0) content += "[[[PAGE_BREAK]]]\n";
     const offset = content.length;
     const page = documentBody(pageSpec, index + 1, pages.length, ownerName);
-    content += page.content.replace(/(?:[ \t\u00a0]*\n)+$/u, "\n");
+    // 保留 NBSP 組成的老師輸入區；尤其「【綜觀今生】」通常位於頁尾，
+    // 若把 NBSP 一併裁掉，Google 文件就不會留下藍色 12pt 的輸入空間。
+    content += page.content.replace(/(?:[ \t]*\n)+$/u, "\n");
     marks.push(...page.marks.map((mark) => ({ ...mark, start: mark.start + offset, end: mark.end + offset })));
     images.push(...page.images);
   });
@@ -405,7 +445,6 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const result = await response.json();
   if (!response.ok || !result.ok) throw new Error(result.error || "Apps Script 建立文件失敗");
   if (result.version !== requiredAppsScriptVersion) throw new Error(`目前連到舊版 Google Apps Script（目前：${result.version || "無版本資訊"}；需要：${requiredAppsScriptVersion}），請更新 Vercel 的 GOOGLE_APPS_SCRIPT_WEB_APP_URL 後重新部署`);
-  await normalizeDocumentHeaderAndFooter(result.documentId, bookingNo);
   const createdAt = existingDetails.map((detail: any) => detail.google_document_created_at).filter(Boolean).sort()[0] || new Date().toISOString();
   const { error: clearError } = await db.from("booking_details").update({
     google_document_id: null, google_document_url: null, google_document_created_at: null,
@@ -417,4 +456,11 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     google_document_created_at: createdAt,
   }).eq("id", anchor.id);
   if (updateError) throw updateError;
+  // 先把連結寫回資料庫，再處理 Google 文件的頁首頁尾與細部樣式。
+  // 即使 Google Docs 暫時回應較慢，視訊預約後台仍能立即取得諮詢單連結。
+  try {
+    await normalizeDocumentHeaderAndFooter(result.documentId, bookingNo);
+  } catch (formatError) {
+    console.error("諮詢單已建立，但頁首頁尾或樣式調整失敗", formatError);
+  }
 }
