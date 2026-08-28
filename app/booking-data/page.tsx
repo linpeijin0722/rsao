@@ -947,6 +947,10 @@ function Answer({
         .join("、") || "",
     title = detail.item_title || "",
     infantSpirit = code === "infant-spirit" || title.includes("嬰靈"),
+    deceasedPet =
+      code.includes("pet") ||
+      title.includes("過世寵物") ||
+      title.includes("往生寵物"),
     kind =
       code === "deceased-relative"
         ? "deceased"
@@ -993,7 +997,11 @@ function Answer({
         : 1,
     ids = Array.from({ length: count }, (_, i) => profileIds[i] || ""),
     self = profiles.find((p: any) => p.relationship === "本人"),
-    primaryId = profileId || (infantSpirit ? "" : self?.id) || "",
+    // 這三類資料必須由使用者明確選擇，不能在空白時套用「本人」。
+    requiresExplicitProfile =
+      infantSpirit || code === "deceased-relative" || deceasedPet,
+    primaryId =
+      profileId || (requiresExplicitProfile ? "" : self?.id) || "",
     hasDuplicate = [primaryId, ...ids]
       .filter(Boolean)
       .some((id, i, all) => all.indexOf(id) !== i);
@@ -1009,10 +1017,6 @@ function Answer({
       code === "health" ||
       code === "physical-health" ||
       title.includes("身體健康"),
-    deceasedPet =
-      code.includes("pet") ||
-      title.includes("過世寵物") ||
-      title.includes("往生寵物"),
     hideGenericQuestions =
       company ||
       code === "naming" ||
@@ -2364,7 +2368,10 @@ function storedAnswerMissing(detail: any, answer: any, profiles: any[]) {
     ids = participants.filter((id: string) => id !== profileId).slice(0, count);
   while (ids.length < count) ids.push("");
   const self = profiles.find((profile: any) => profile.relationship === "本人"),
-    primaryId = profileId || (infantSpirit ? "" : self?.id) || "",
+    requiresExplicitProfile =
+      infantSpirit || code === "deceased-relative" || deceasedPet,
+    primaryId =
+      profileId || (requiresExplicitProfile ? "" : self?.id) || "",
     hasDuplicate = [primaryId, ...ids]
       .filter(Boolean)
       .some((id, index, all) => all.indexOf(id) !== index);

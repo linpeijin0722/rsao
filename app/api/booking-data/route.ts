@@ -123,16 +123,36 @@ export async function POST(r: NextRequest) {
     const questions = Array.isArray(body.questions)
       ? body.questions.map((value: unknown) => String(value || "").trim()).slice(0, 9)
       : [];
-    const {data:answer}=await x.db.from("booking_consultation_answers").upsert(
+    const {data:answer,error:answerError}=await x.db.from("booking_consultation_answers").upsert(
       { booking_detail_id: body.detailId, profile_id: profileId, questions, extra_data: body.extraData || {}, updated_at: new Date().toISOString() },
       { onConflict: "booking_detail_id" },
     ).select("id").single();
-    if(answer&&Array.isArray(body.profileIds)){
-      await x.db.from("booking_answer_participants").delete().eq("answer_id",answer.id);
-      const participants=body.profileIds.filter(Boolean).map((id:string,position:number)=>({answer_id:answer.id,profile_id:id,position}));
-      if(participants.length)await x.db.from("booking_answer_participants").insert(participants);
+    if(answerError || !answer){
+      console.error("儲存問事資料失敗", answerError);
+      return NextResponse.json({error:"問事資料未能儲存，請稍後再試"},{status:400});
     }
-    if(body.extraData?.pregnancy_losses&&profileId){await x.db.from("consultation_profiles").update({pregnancy_losses:body.extraData.pregnancy_losses,updated_at:new Date().toISOString()}).eq("id",profileId).eq("customer_id",x.c.id)}
+    if(answer&&Array.isArray(body.profileIds)){
+      const {error:deleteParticipantsError}=await x.db.from("booking_answer_participants").delete().eq("answer_id",answer.id);
+      if(deleteParticipantsError){
+        console.error("清除舊諮詢對象失敗", deleteParticipantsError);
+        return NextResponse.json({error:"諮詢對象未能儲存，請稍後再試"},{status:400});
+      }
+      const participants=body.profileIds.filter(Boolean).map((id:string,position:number)=>({answer_id:answer.id,profile_id:id,position}));
+      if(participants.length){
+        const {error:participantError}=await x.db.from("booking_answer_participants").insert(participants);
+        if(participantError){
+          console.error("儲存諮詢對象失敗", participantError);
+          return NextResponse.json({error:"諮詢對象未能儲存，請稍後再試"},{status:400});
+        }
+      }
+    }
+    if(body.extraData?.pregnancy_losses&&profileId){
+      const {error:lossError}=await x.db.from("consultation_profiles").update({pregnancy_losses:body.extraData.pregnancy_losses,updated_at:new Date().toISOString()}).eq("id",profileId).eq("customer_id",x.c.id);
+      if(lossError){
+        console.error("儲存流產日期失敗", lossError);
+        return NextResponse.json({error:"流產日期未能儲存，請稍後再試"},{status:400});
+      }
+    }
     /* 保留舊後台的完成狀態判斷。 */
     await x.db.from("booking_detail_profiles").upsert({ booking_detail_id: body.detailId, profile_id: profileId });
   }
