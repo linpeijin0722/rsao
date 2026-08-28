@@ -409,6 +409,8 @@ export default function Page() {
           sub_item_ids: l.subId ? [l.subId] : [],
         })),
       };
+      const friendshipResponse=await fetch("/api/line/session",{cache:"no-store"}),friendship=await friendshipResponse.json().catch(()=>({}));
+      if(!friendshipResponse.ok||!friendship.isFriend)throw Error("請先加入 LINE 官方帳號好友；若曾封鎖，請先解除封鎖後再進行預約。");
       const createBooking = () => fetch("/api/bookings", {
           method: "POST",
           headers: { "content-type": "application/json" },
