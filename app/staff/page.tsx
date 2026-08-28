@@ -139,7 +139,9 @@ export default function Staff() {
       const response=await staffPost({action:"generate_document",bookingNo:x.booking_no,force:exists,createMode}),result=await response.json();
       if(!response.ok)throw new Error(result.error||"建立文件失敗");
       const lineName=x.customers?.line_display_name||"LINE 用戶";
-      alert(createMode==="new"?`${lineName}新諮詢單已建立，連結已更新。`:exists?`${lineName}諮詢單已重新建立，連結已更新。`:`${lineName}諮詢單已建立完成。`);
+      const customerName=x.customers?.full_name||"未填姓名";
+      const documentNumber=consultationNumberFor(x)||"未編號";
+      alert(createMode==="new"?`【${documentNumber}｜${lineName}．${customerName}】新諮詢單已建立，連結已更新。`:exists?`【${documentNumber}｜${lineName}．${customerName}】諮詢單已重新建立`:`【${documentNumber}｜${lineName}．${customerName}】諮詢單已建立完成。`);
       await load();
     }catch(error){alert(error instanceof Error?error.message:"建立文件失敗")}finally{setGeneratingDocument("")}
   }
