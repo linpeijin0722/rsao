@@ -407,25 +407,25 @@ export default function BookingData() {
       timer = setTimeout(() => controller.abort(), 25000);
     try {
       await prepareLiff();
-      if (!liff.isInClient()) {
-        const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
-        if (liffId) {
-          location.replace(
-            `https://liff.line.me/${liffId}/booking-data?order=${encodeURIComponent(order)}`,
-          );
-          return;
-        }
-        throw new Error("請從 LINE 官方帳號內開啟此頁後再送出");
-      }
+      const submitSource = liff.isInClient() ? "liff" : "web";
       // 先完成資料庫送出；LINE 初始化或聊天室傳訊失敗，不得阻止後台收到資料。
       const r = await fetch("/api/booking-data", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ order, action: "submit" }),
+          body: JSON.stringify({ order, action: "submit", submitSource }),
           signal: controller.signal,
         }),
         responseText = await r.text();
       let j: any = {};
+      if (submitSource === "web") {
+        if (!j.officialLineSent) {
+          setLineSendWarning(
+            `資料已送出，但官方帳號通知未能傳送${j.officialLineError ? `：${j.officialLineError}` : ""}`,
+          );
+        }
+        return;
+      }
+
       try {
         j = responseText ? JSON.parse(responseText) : {};
       } catch {
@@ -2230,11 +2230,9 @@ function Answer({
         disabled={locked}
         onClick={async () => {
           const primary =
-              relation || marriage
-                ? primaryId
-                : newbornNaming
+              newbornNaming
                   ? extra.baby_id
-                  : profileId,
+                  : primaryId,
             allQuestions =
               relation || marriage
                 ? ids.flatMap((id: string) =>
@@ -2247,16 +2245,27 @@ function Answer({
               relation || marriage
                 ? { ...extra, target_questions: targetQuestions }
                 : extra;
-          setSaved(true);
-          setOpen(false);
           const cannotPersist =
             !primary ||
             ((relation || marriage) && (ids.some((x) => !x) || hasDuplicate)) ||
             (newbornNaming &&
               (!extra.mother_id || !extra.father_id || !extra.baby_id));
-          if (cannotPersist) return;
-          if (
-            !(await save(
+          if (cannotPersist) {
+            const missing = answerMissingFields({
+              profileId: primaryId,
+              ids,
+              extra,
+              relation,
+              marriage,
+              newbornNaming,
+              infantSpirit,
+              deceasedPet,
+              code: detail.booking_items?.code,
+            });
+            alert(`尚未儲存，請先完成：\n${missing.join("\n") || "諮詢者資料"}`);
+            return;
+          }
+          const persisted = await save(
               detail.id,
               primary,
               allQuestions,
@@ -2266,11 +2275,15 @@ function Answer({
                   ? [extra.mother_id, extra.father_id, extra.baby_id]
                   : undefined,
               nextExtra,
-            ))
-          ) {
+            );
+          if (!persisted) {
             setSaved(false);
             setOpen(true);
+            alert("資料尚未儲存成功，請稍後再試一次。");
+            return;
           }
+          setSaved(true);
+          setOpen(false);
         }}
       >
         {locked ? "已送出" : "儲存這個項目"}
