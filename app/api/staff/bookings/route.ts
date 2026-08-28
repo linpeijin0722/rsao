@@ -9,6 +9,7 @@ export async function GET() {
     return NextResponse.json({ error: "未登入" }, { status: 401 });
   const db = adminSupabase();
   const [{ data, error }, { data: customers, error: customerError }] = await Promise.all([db
+  const [{ data, error }, { data: customers, error: customerError }, { data: consultationProfiles, error: profileError }] = await Promise.all([db
     .from("bookings")
     .select(
       "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,data_submitted_at,status,cancellation_reason,paid_at,created_at,customers(id,line_user_id,line_display_name,line_picture_url,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,quantity,google_document_id,google_document_url,google_document_created_at,google_sheet_url,booking_items(code),booking_detail_sub_items(sub_item_id,sub_item_title),booking_detail_profiles(profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)),booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data),booking_answer_participants(position,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data))))",
@@ -22,6 +23,15 @@ export async function GET() {
   if (error || customerError)
     return NextResponse.json({ error: error?.message || customerError?.message }, { status: 500 });
   return NextResponse.json({ bookings: data, customers: customers || [] });
+    .not("full_name", "is", null)
+    .neq("full_name", "")
+    .order("line_display_name", { ascending: true }), db
+    .from("consultation_profiles")
+    .select("id,customer_id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data")
+    .order("name", { ascending: true })]);
+  if (error || customerError || profileError)
+    return NextResponse.json({ error: error?.message || customerError?.message || profileError?.message }, { status: 500 });
+  return NextResponse.json({ bookings: data, customers: customers || [], consultationProfiles: consultationProfiles || [] });
 }
 export async function POST(request: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
@@ -37,6 +47,7 @@ export async function POST(request: NextRequest) {
       db.from("consultation_methods").select("id,code,title,base_price,duration_minutes").eq("code", methodCode).eq("is_active", true).single(),
     ]);
     if (!customer?.line_user_id || !customer.profile_completed_at)
+    if (!customer?.line_user_id || !customer.full_name)
       return NextResponse.json({ error: "這位用戶尚未完成 LINE 登入與本人資料" }, { status: 400 });
     if (!method) return NextResponse.json({ error: "諮詢方式目前未開放" }, { status: 400 });
     let slotStart: string | null = null, slotEnd: string | null = null;
