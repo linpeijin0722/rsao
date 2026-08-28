@@ -47,13 +47,19 @@ const money = (v: number) =>
     new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Taipei" }).format(
       new Date(v),
     ),
-  tf = (v: string) =>
-    new Intl.DateTimeFormat("zh-TW", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: "Asia/Taipei",
-    }).format(new Date(v)),
+  tf = (v: string) => {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: "Asia/Taipei",
+      }).formatToParts(new Date(v)),
+      hour = Number(parts.find((part) => part.type === "hour")?.value || 0),
+      minute = parts.find((part) => part.type === "minute")?.value || "00",
+      period = hour < 12 ? "上午" : hour < 13 ? "中午" : "下午",
+      displayHour = hour % 12 || 12;
+    return `${period} ${displayHour}:${minute}`;
+  },
   taiwanToday = () =>
     new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Taipei" }).format(
       new Date(),
@@ -265,8 +271,14 @@ export default function Page() {
       const r = await fetch(`/api/slots?methodId=${selected.id}`),
         j = await r.json();
       if (!r.ok) throw Error(j.error);
-      setSlots(j.slots);
-      setMonth(firstMonth);
+      const loadedSlots: Slot[] = Array.isArray(j.slots) ? j.slots : [];
+      const selectableDates = loadedSlots
+        .map((item) => dk(item.slot_start))
+        .filter((day) => day >= earliestVideoDate && day <= maxDate)
+        .sort();
+      setSlots(loadedSlots);
+      // 當本月沒有可預約時段時，直接顯示最近一個有時段的月份。
+      setMonth(selectableDates[0]?.slice(0, 7) || firstMonth);
       setScreen("slots");
     } catch (e) {
       setError(e instanceof Error ? e.message : "無法讀取時段");
@@ -620,9 +632,15 @@ export default function Page() {
                       )}
                     </div>
                   </div>
+                  {availableDates.size === 0 && (
+                    <div className="videoSlotsEmpty" role="status">
+                      目前所有可預約時段皆已額滿，請稍後再查看。
+                    </div>
+                  )}
                   {date && (
                     <div className="dayTimes">
                       <h3>{date} 可預約時段</h3>
+                      <p className="taiwanTimeNotice">所有時間皆為台灣時間（UTC+8）</p>
                       <div className="times">
                         {daySlots.map((s) => (
                           <button
