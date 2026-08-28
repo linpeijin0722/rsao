@@ -241,7 +241,8 @@ export default function BookingData() {
     [confirmSubmit, setConfirmSubmit] = useState(false),
     [submitSuccess, setSubmitSuccess] = useState(false),
     [lineSendWarning, setLineSendWarning] = useState(""),
-    [missingItems, setMissingItems] = useState<string[]>([]);
+    [missingItems, setMissingItems] = useState<string[]>([]),
+    [loading, setLoading] = useState(true);
   async function restoreLineLogin() {
     const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
     if (!liffId) return false;
@@ -271,19 +272,26 @@ export default function BookingData() {
     return liffReadyRef.current;
   }
   async function load(o = order, retry = true) {
-    let r = await fetch(`/api/booking-data?order=${encodeURIComponent(o)}`, {
-        cache: "no-store",
-      }),
-      j = await r.json();
-    if (!r.ok && r.status === 401 && retry) {
-      try {
-        if (await restoreLineLogin()) return load(o, false);
-      } catch {}
+    if (!data) setLoading(true);
+    try {
+      const r = await fetch(`/api/booking-data?order=${encodeURIComponent(o)}`, {
+          cache: "no-store",
+        }),
+        j = await r.json();
+      if (!r.ok && r.status === 401 && retry) {
+        try {
+          if (await restoreLineLogin()) return await load(o, false);
+        } catch {}
+      }
+      if (r.ok) {
+        setData(j);
+        setMsg("");
+      } else setMsg(j.error);
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "資料載入失敗，請稍後再試");
+    } finally {
+      setLoading(false);
     }
-    if (r.ok) {
-      setData(j);
-      setMsg("");
-    } else setMsg(j.error);
   }
   useEffect(() => {
     const o = new URLSearchParams(location.search).get("order") || "";
@@ -492,6 +500,12 @@ export default function BookingData() {
   const profiles = data?.profiles || [],
     uniqueProfiles = mergeProfiles(profiles),
     details = data?.booking?.booking_details || [];
+  if (loading)
+    return (
+      <main className="questionLoadingScreen">
+        <p>載入中，請稍後10～20秒…</p>
+      </main>
+    );
   return (
     <main className="dataPage questionPage">
       <header>
@@ -518,7 +532,6 @@ export default function BookingData() {
             ＋ 新增資料
           </button>
         </div>
-        {!data && <p className="profilesLoading">載入中，請稍後10～20秒…</p>}
         <div className="savedProfiles">
           {uniqueProfiles.map((p: any) => (
             <article
@@ -1119,7 +1132,11 @@ function Answer({
         >
           <option value="">請選擇資料</option>
           {personOptions
-            .filter((p: any) => !gender || p.gender === gender)
+            .filter(
+              (p: any) =>
+                (!gender || p.gender === gender) &&
+                (!gender || isAtLeast15(p.birth_date)),
+            )
             .map((p: any) => (
               <option key={p.id} value={p.id}>
                 {p.name}（{p.relationship_detail || p.relationship}）
@@ -2186,6 +2203,7 @@ function Answer({
                   <div className="extraFields relationshipFields">
                     <QuestionFields
                       title={`關於${left}與${right}的前世關係，我想問`}
+                      placeholder="例如：我們前世是什麼關係？我前世是否有結婚？有幾個小孩？"
                       questions={list}
                       locked={locked}
                       change={(next: string[]) => {
