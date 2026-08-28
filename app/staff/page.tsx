@@ -15,8 +15,8 @@ const asArray = (value: any): any[] =>
 const isComplete = (x: any) => Boolean(x.data_submitted_at);
 const sheetLinks = (x: any) => asArray(x.booking_details).map((detail: any) => ({...detail,consultation_url:detail.google_document_url||detail.google_sheet_url})).filter((detail: any) => detail.consultation_url);
 const returnedData = (x: any) =>
-  asArray(x.booking_details).flatMap((detail: any) =>
-    asArray(detail.booking_consultation_answers).flatMap((answer: any) => {
+  asArray(x.booking_details).flatMap((detail: any) => {
+    const answerProfiles = asArray(detail.booking_consultation_answers).flatMap((answer: any) => {
       const direct = asArray(answer.consultation_profiles);
       const participants = asArray(answer.booking_answer_participants)
         .sort((a: any, b: any) => Number(a.position || 0) - Number(b.position || 0))
@@ -34,8 +34,26 @@ const returnedData = (x: any) =>
         item_title: detail.item_title,
         sub_items: asArray(detail.booking_detail_sub_items).map((sub: any) => sub.sub_item_title).filter(Boolean),
       }));
-    }),
-  );
+    });
+    const linkedProfiles = asArray(detail.booking_detail_profiles)
+      .flatMap((link: any) => asArray(link.consultation_profiles))
+      .filter(Boolean)
+      .map((profile: any) => ({
+        ...profile,
+        answerId: null,
+        questions: [],
+        extra_data: {},
+        item_code: detail.booking_items?.code || "",
+        item_title: detail.item_title,
+        sub_items: asArray(detail.booking_detail_sub_items).map((sub: any) => sub.sub_item_title).filter(Boolean),
+      }));
+    return [...answerProfiles, ...linkedProfiles].filter(
+      (entry: any, index: number, all: any[]) =>
+        all.findIndex((candidate: any) =>
+          candidate.id === entry.id && candidate.answerId === entry.answerId,
+        ) === index,
+    );
+  });
 const statusKey = (x: any) =>
   x.status === "cancelled"
     ? x.cancellation_reason === "自行取消"
@@ -63,6 +81,14 @@ export default function Staff() {
   const [password, setPassword] = useState(""),
     [rows, setRows] = useState<any[]>([]),
     [items, setItems] = useState<any[]>([]),
+    [manualCustomers, setManualCustomers] = useState<any[]>([]),
+    [manualOpen, setManualOpen] = useState(false),
+    [manualMethod, setManualMethod] = useState<"video"|"text">("text"),
+    [manualCustomerId, setManualCustomerId] = useState(""),
+    [manualSlotStart, setManualSlotStart] = useState(""),
+    [manualLines, setManualLines] = useState<any[]>([]),
+    [manualNotifyPayment, setManualNotifyPayment] = useState(true),
+    [manualSaving, setManualSaving] = useState(false),
     [error, setError] = useState(""),
     [month, setMonth] = useState(new Date().toISOString().slice(0, 7)),
     [selectedDate, setSelectedDate] = useState(""),
@@ -180,7 +206,7 @@ export default function Staff() {
   async function load() {
     const r = await fetch("/api/staff/bookings"),
       j = await r.json();
-    r.ok ? setRows(j.bookings) : setError(j.error);
+    if(r.ok){setRows(j.bookings);setManualCustomers(j.customers||[])}else setError(j.error);
   }
   useEffect(() => {
     const saved=localStorage.getItem("lin_a_sao_staff_password");if(saved){setPassword(saved);setRememberPassword(true)}
@@ -191,6 +217,24 @@ export default function Staff() {
       .then((r) => r.json())
       .then((j) => setItems(j.items || []));
   }, []);
+  function toggleManualItem(item:any,checked:boolean){
+    setManualLines(value=>checked?[...value,{itemId:item.id,subId:item.sub_items?.length===1?item.sub_items[0].id:"",qty:1}]:value.filter(line=>line.itemId!==item.id));
+  }
+  async function createManualBooking(){
+    if(!manualCustomerId)return alert("請選擇用戶");
+    if(!manualLines.length)return alert("請至少選擇一個諮詢項目");
+    if(manualMethod==="video"&&!manualSlotStart)return alert("請選擇視訊日期與時間");
+    const missing=manualLines.find(line=>items.find(item=>item.id===line.itemId)?.option_mode==="single_required"&&!line.subId);
+    if(missing)return alert(`請完成「${items.find(item=>item.id===missing.itemId)?.title||"諮詢項目"}」的子項目選擇`);
+    setManualSaving(true);
+    try{
+      const slotStart=manualSlotStart?`${manualSlotStart}:00+08:00`:null,
+        response=await staffPost({action:"create_manual_booking",customerId:manualCustomerId,methodCode:manualMethod,slotStart,lines:manualLines,notifyPayment:manualNotifyPayment}),result=await response.json();
+      if(!response.ok)throw new Error(result.error||"建立預約失敗");
+      alert(`預約已建立\n訂單編號：${result.bookingNo}\n${result.paymentNotified?"已傳送付款資訊給用戶":"未傳送付款資訊；可在訂單設為已付款後，通知用戶填寫資料"}`);
+      setManualOpen(false);setManualCustomerId("");setManualSlotStart("");setManualLines([]);setManualNotifyPayment(true);await load();
+    }catch(error){alert(error instanceof Error?error.message:"建立預約失敗")}finally{setManualSaving(false)}
+  }
   async function sendLineContact(message:string,action:"text"|"video_reminder"="text"){
     if(!lineContact)return;
     if(action==="text"&&!message.trim())return alert("請輸入要傳送的內容");
@@ -433,7 +477,7 @@ export default function Staff() {
     );
   return (
     <main className={`staffPage returned-edit-${returnedEditMode}`}>
-      <h1>預約工作後台</h1>
+      <div className="staffPageHeading"><h1>預約工作後台</h1><button className="manualBookingEntry" onClick={()=>setManualOpen(true)}>＋ 手動建立預約</button></div>
       {error && <div className="error">{error}</div>}
       <section className="staffBookingSection videoBookingSection">
         <h2 className="staffSectionTitle">視訊預約</h2>
@@ -598,7 +642,7 @@ export default function Staff() {
             {dataViewMode==="menu"&&<div className="returnedActionMenu"><button onClick={()=>setDataViewMode("user")}>修改用戶資料</button><button onClick={()=>setDataViewMode("answers")}>修改問事資料</button></div>}
             {dataViewMode!=="menu"&&<button className="returnedMenuBack" onClick={()=>setDataViewMode("menu")}>‹ 返回功能選單</button>}
             {dataViewMode==="user"&&<div className="staffProfileTags">{dataView.filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.id===p.id)===i).map((p:any)=>{const category=p.relationship==="本人"&&!p.relationship_detail?"本人":p.profile_type==="person"?"親友":p.profile_type==="pet"?"往生寵物":"過世親友";return <button key={p.id} className="staffProfileTag" onClick={()=>setProfileEditor({...p})}>{p.profile_type==="pet"&&p.photo_data&&<img src={p.photo_data} alt=""/>}<span><b>{p.name}</b><small>{category}{p.relationship_detail?`・${p.relationship_detail}`:""}</small></span></button>})}</div>}
-            {dataViewMode==="answers"&&<div className="staffAnswerCards">{dataView.filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.answerId===p.answerId)===i).map((p:any)=>{const people=dataView.filter((person:any)=>person.answerId===p.answerId).filter((person:any,i:number,all:any[])=>all.findIndex(x=>x.id===person.id)===i);return <article key={p.answerId}><div className="answerProfileTags">{people.map((person:any)=><div className="answerProfileTag" key={person.id}>{person.profile_type==="pet"&&person.photo_data&&<img src={person.photo_data} alt=""/>}<span><b>{person.name}</b><small>{person.relationship_detail||person.relationship}</small></span></div>)}</div><h3>{p.item_title}{p.sub_items?.length?`－${p.sub_items.join("、")}`:""}</h3><div className="answerReadContent">{p.questions?.filter(Boolean).length?p.questions.filter(Boolean).map((q:string,n:number)=><p key={n}>問題 {n+1}：{q}</p>):<p>未填寫問題</p>}</div><button className="editAnswerButton" onClick={()=>setAnswerEditor({...p,targetProfileId:people[0]?.id||p.id,targetProfileIds:people.map((person:any)=>person.id),questions:[0,1,2].map(i=>p.questions?.[i]||"")})}>修改該項目問事資料</button></article>})}</div>}
+            {dataViewMode==="answers"&&<div className="staffAnswerCards">{dataView.filter((p:any)=>Boolean(p.answerId)).filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.answerId===p.answerId)===i).map((p:any)=>{const people=dataView.filter((person:any)=>person.answerId===p.answerId).filter((person:any,i:number,all:any[])=>all.findIndex(x=>x.id===person.id)===i);return <article key={p.answerId}><div className="answerProfileTags">{people.map((person:any)=><div className="answerProfileTag" key={person.id}>{person.profile_type==="pet"&&person.photo_data&&<img src={person.photo_data} alt=""/>}<span><b>{person.name}</b><small>{person.relationship_detail||person.relationship}</small></span></div>)}</div><h3>{p.item_title}{p.sub_items?.length?`－${p.sub_items.join("、")}`:""}</h3><div className="answerReadContent">{p.questions?.filter(Boolean).length?p.questions.filter(Boolean).map((q:string,n:number)=><p key={n}>問題 {n+1}：{q}</p>):<p>未填寫問題</p>}</div><button className="editAnswerButton" onClick={()=>setAnswerEditor({...p,targetProfileId:people[0]?.id||p.id,targetProfileIds:people.map((person:any)=>person.id),questions:[0,1,2].map(i=>p.questions?.[i]||"")})}>修改該項目問事資料</button></article>})}{!dataView.some((p:any)=>Boolean(p.answerId))&&<p className="staffEmptyReturnedAnswers">這筆預約目前沒有可編輯的問事答案；可返回修改用戶資料。</p>}</div>}
             {dataViewMode==="view"&&<div className="staffAnswerCards">{dataView.filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.answerId===p.answerId)===i).map((p:any)=><article key={p.answerId}><h3>{p.item_title}{p.sub_items?.length?`－${p.sub_items.join("、")}`:""}</h3>{p.questions?.filter(Boolean).map((q:string,n:number)=><p key={n}>問題 {n+1}：{q}</p>)}</article>)}</div>}
             <button onClick={() => setDataView([])}>關閉</button>
           </div>
@@ -725,6 +769,28 @@ export default function Staff() {
           })}
         </div>
       </section>
+      {manualOpen && (
+        <div className="modalBackdrop" onClick={()=>setManualOpen(false)}>
+          <div className="modal manualBookingModal" onClick={event=>event.stopPropagation()}>
+            <button className="staffModalClose" aria-label="關閉" onClick={()=>setManualOpen(false)}>×</button>
+            <h2>手動建立預約</h2>
+            <p>僅列出已經登入 LINE 並完成本人資料的用戶。</p>
+            <div className="manualMethodTabs">
+              <button className={manualMethod==="text"?"active":""} onClick={()=>setManualMethod("text")}>文字諮詢</button>
+              <button className={manualMethod==="video"?"active":""} onClick={()=>setManualMethod("video")}>視訊諮詢</button>
+            </div>
+            <label className="manualMainField">選擇用戶<select value={manualCustomerId} onChange={event=>setManualCustomerId(event.target.value)}><option value="">請選擇 LINE 用戶</option>{manualCustomers.map(customer=><option key={customer.id} value={customer.id}>{customer.line_display_name||"LINE 用戶"}｜{customer.full_name}</option>)}</select></label>
+            {manualMethod==="video"&&<label className="manualMainField">視訊日期與時間<input type="datetime-local" value={manualSlotStart} onChange={event=>setManualSlotStart(event.target.value)}/><small>後台可依實際需要建立 4 天內的視訊預約；時間為台灣時間。</small></label>}
+            <section className="manualItems"><h3>選擇諮詢項目</h3>{items.map(item=>{const line=manualLines.find(candidate=>candidate.itemId===item.id);return <article key={item.id} className={line?"selected":""}>
+              <label><input type="checkbox" checked={Boolean(line)} onChange={event=>toggleManualItem(item,event.target.checked)}/><b>{item.title}</b><span>NT$ {Number(item.price||0).toLocaleString("zh-TW")}</span></label>
+              {line&&item.sub_items?.length>0&&<select value={line.subId} onChange={event=>setManualLines(value=>value.map(candidate=>candidate.itemId===item.id?{...candidate,subId:event.target.value}:candidate))}><option value="">請選擇子項目</option>{item.sub_items.map((sub:any)=><option key={sub.id} value={sub.id}>{sub.title}　NT$ {Number(sub.price||0).toLocaleString("zh-TW")}</option>)}</select>}
+              {line&&<label className="manualQuantity">數量<input type="number" min="1" max="20" value={line.qty} onChange={event=>setManualLines(value=>value.map(candidate=>candidate.itemId===item.id?{...candidate,qty:Math.max(1,Number(event.target.value)||1)}:candidate))}/></label>}
+            </article>})}</section>
+            <fieldset className="manualPaymentChoice"><legend>建立後是否傳送付款資訊？</legend><label><input type="radio" checked={manualNotifyPayment} onChange={()=>setManualNotifyPayment(true)}/><span><b>傳送付款資訊</b><small>用戶會收到「待付款」訊息，可直接前往付款。</small></span></label><label><input type="radio" checked={!manualNotifyPayment} onChange={()=>setManualNotifyPayment(false)}/><span><b>暫不傳送付款資訊</b><small>適合另外轉帳；後台設為已付款後仍可通知用戶填寫資料。</small></span></label></fieldset>
+            <button className="manualCreateButton" disabled={manualSaving} onClick={createManualBooking}>{manualSaving?"建立中，請稍候…":"確認建立預約"}</button>
+          </div>
+        </div>
+      )}
       {editing && (
         <div className="modalBackdrop" onClick={() => setEditing(null)}>
           <div
