@@ -65,10 +65,18 @@ export async function POST(r: NextRequest) {
   if (x.b.payment_status !== "paid")
     return NextResponse.json({ error: "完成付款後才能填寫問事資料" }, { status: 400 });
   if (body.action === "submit") {
-    const detailIds=(x.b.booking_details||[]).map((d:any)=>d.id),{data:answers}=await x.db.from("booking_consultation_answers").select("booking_detail_id").in("booking_detail_id",detailIds);
+    const detailIds=(x.b.booking_details||[]).map((d:any)=>d.id),{data:answers,error:answersError}=await x.db.from("booking_consultation_answers").select("booking_detail_id").in("booking_detail_id",detailIds);
+    if(answersError){
+      console.error("送出前讀取問事資料失敗",answersError);
+      return NextResponse.json({error:"無法確認已儲存的問事資料，請稍後再試"},{status:500});
+    }
     if (!detailIds.length || new Set((answers||[]).map((a:any)=>a.booking_detail_id)).size !== detailIds.length) return NextResponse.json({error:"請先儲存每一個項目的問事資料"},{status:400});
-    const { error: submittedError } = await x.db.from("bookings").update({data_submitted_at:new Date().toISOString()}).eq("id",x.b.id);
-    if (submittedError) return NextResponse.json({error:"資料送出失敗，請稍後再試"},{status:500});
+    const submittedAt=new Date().toISOString();
+    const {data:submittedBooking,error:submittedError}=await x.db.from("bookings").update({data_submitted_at:submittedAt}).eq("id",x.b.id).select("id,data_submitted_at").maybeSingle();
+    if (submittedError || !submittedBooking?.data_submitted_at){
+      console.error("更新資料回傳狀態失敗",submittedError);
+      return NextResponse.json({error:"資料未能送到後台，請稍後再試"},{status:500});
+    }
     after(async () => {
       try {
         await createConsultationDocuments(x.db,x.b.id,x.b.booking_no);
@@ -76,7 +84,7 @@ export async function POST(r: NextRequest) {
         console.error("建立諮詢 Google 文件失敗", error);
       }
     });
-    return NextResponse.json({ok:true,submitted:true});
+    return NextResponse.json({ok:true,submitted:true,data_submitted_at:submittedBooking.data_submitted_at});
   }
   if (body.action === "update_profile") {
     const profile={...body.profile};if(!profile.owner_profile_id)delete profile.owner_profile_id;for(const key of ["birth_date","death_date","birth_time"])if(!profile[key])delete profile[key];

@@ -238,6 +238,8 @@ export default function BookingData() {
     [savingItems, setSavingItems] = useState(0),
     [submitWaiting, setSubmitWaiting] = useState(false),
     [confirmSubmit, setConfirmSubmit] = useState(false),
+    [submitSuccess, setSubmitSuccess] = useState(false),
+    [lineSendWarning, setLineSendWarning] = useState(""),
     [missingItems, setMissingItems] = useState<string[]>([]);
   async function restoreLineLogin() {
     const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
@@ -389,23 +391,46 @@ export default function BookingData() {
     const controller = new AbortController(),
       timer = setTimeout(() => controller.abort(), 25000);
     try {
-      const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
-      if (!liffId) throw new Error("尚未設定 LIFF ID");
-      await liff.init({ liffId });
-      if (!liff.isInClient()) {
-        const deepLink = `https://liff.line.me/${liffId}/booking-data?order=${encodeURIComponent(order)}`;
-        location.replace(deepLink);
-        return;
-      }
+      // 先完成資料庫送出；LINE 初始化或聊天室傳訊失敗，不得阻止後台收到資料。
       const r = await fetch("/api/booking-data", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ order, action: "submit" }),
           signal: controller.signal,
         }),
-        j = await r.json();
-      if (!r.ok) throw new Error(j.error || "資料送出失敗，請稍後再試");
+        responseText = await r.text();
+      let j: any = {};
       try {
+        j = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        throw new Error(`伺服器回應異常（${r.status}），請稍後再試`);
+      }
+      if (!r.ok) throw new Error(j.error || "資料送出失敗，請稍後再試");
+      if (!j.ok || !j.submitted)
+        throw new Error("伺服器未確認資料已送出，請稍後再試");
+
+      setData((current: any) => ({
+        ...current,
+        booking: {
+          ...current?.booking,
+          data_submitted_at: j.data_submitted_at || new Date().toISOString(),
+        },
+      }));
+      setConfirmSubmit(false);
+      setSubmitSuccess(true);
+      setMsg("");
+
+      const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+      try {
+        if (!liffId) throw new Error("尚未設定 LIFF ID");
+        await Promise.race([
+          liff.init({ liffId }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("LINE 初始化逾時")), 8000),
+          ),
+        ]);
+        if (!liff.isInClient())
+          throw new Error("目前不在 LINE 應用程式內，無法代您傳送聊天室訊息");
         await liff.sendMessages([
           {
             type: "text",
@@ -414,12 +439,10 @@ export default function BookingData() {
         ]);
       } catch (lineError) {
         console.error("問事資料已送出，但 LINE 聊天訊息傳送失敗", lineError);
+        setLineSendWarning(
+          "資料已成功送到後台，但 LINE 聊天訊息未能自動傳送。請回到官方帳號告知助理您已完成填單。",
+        );
       }
-      setConfirmSubmit(false);
-      location.assign(
-        process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL ||
-          `/my-bookings?order=${encodeURIComponent(order)}`,
-      );
     } catch (error) {
       setMsg(
         error instanceof DOMException && error.name === "AbortError"
@@ -433,6 +456,12 @@ export default function BookingData() {
       setSubmitWaiting(false);
       setSaving(false);
     }
+  }
+  function returnToLine() {
+    location.assign(
+      process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL ||
+        `/my-bookings?order=${encodeURIComponent(order)}`,
+    );
   }
   const profiles = data?.profiles || [],
     uniqueProfiles = mergeProfiles(profiles),
@@ -897,6 +926,16 @@ export default function BookingData() {
             >
               返回檢查
             </button>
+          </div>
+        </div>
+      )}
+      {submitSuccess && (
+        <div className="modalBackdrop">
+          <div className="modal submitConfirm submitSuccessModal">
+            <h2>資料已成功送出</h2>
+            <p>後台已收到您的問事資料，系統將接續建立諮詢單。</p>
+            {lineSendWarning && <p className="submitError">{lineSendWarning}</p>}
+            <button onClick={returnToLine}>返回 LINE</button>
           </div>
         </div>
       )}
