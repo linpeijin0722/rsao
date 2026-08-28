@@ -901,15 +901,14 @@ export default function BookingData() {
           );
         })}
       </div>
-      {(savingItems > 0 || submitWaiting) && (
-        <p className="savingNotice">請勿切換畫面，資料正在儲存並送出，請稍候…</p>
-      )}
       {(submitWaiting || (saving && confirmSubmit)) && (
         <div className="submitProgressOverlay" role="alert" aria-live="assertive">
           <div className="submitProgressCard">
             <span className="submitProgressSpinner" aria-hidden="true" />
-            <h2>資料正在送出</h2>
-            <p>請勿切換或關閉畫面，完成後將自動返回 LINE。</p>
+            <h2>資料儲存傳送中</h2>
+            <p>
+              請勿切換或關閉畫面，約需 10～20 秒；完成後將自動返回 LINE。
+            </p>
           </div>
         </div>
       )}
@@ -961,9 +960,6 @@ export default function BookingData() {
               LINE 傳訊息聯絡助理，我們會協助您處理。
             </p>
             {msg && <p className="submitError">{msg}</p>}
-            {(savingItems > 0 || submitWaiting || saving) && (
-              <p className="savingNotice">請勿切換畫面，資料正在儲存並送出，請稍候…</p>
-            )}
             <button onClick={() => void submitAll()} disabled={saving}>
               {saving ? "儲存傳送中…" : "確認無誤，正式送出"}
             </button>
@@ -1106,6 +1102,11 @@ function Answer({
       title.includes("身體健康"),
     hideGenericQuestions =
       company ||
+      overallFortune ||
+      spiritual ||
+      home ||
+      code === "deceased-relative" ||
+      deceasedPet ||
       code === "naming" ||
       title.includes("命名") ||
       title.includes("改名") ||
@@ -1237,6 +1238,16 @@ function Answer({
     code,
     extra,
   });
+  const selectedProfile = profiles.find((p: any) => p.id === primaryId),
+    healthConcernOptions = [
+      "睡眠／精神",
+      "腸胃／消化",
+      "心血管／頭痛",
+      "骨骼／關節",
+      "呼吸／過敏",
+      selectedProfile?.gender === "男" ? "泌尿系統" : "婦科／備孕",
+      "情緒／壓力",
+    ];
   if (saved && !open)
     return (
       <article className="answerCard collapsed">
@@ -1581,17 +1592,9 @@ function Answer({
       )}
       {health && (
         <div className="healthFields">
-          <h3>當前關注的健康問題（可複選）</h3>
+          <h3>當前關注的健康問題</h3>
           <div className="healthConcernOptions">
-            {[
-              "睡眠／精神",
-              "腸胃／消化",
-              "心血管／頭痛",
-              "骨骼／關節",
-              "呼吸／過敏",
-              "婦科／備孕",
-              "情緒／壓力",
-            ].map((name) => {
+            {healthConcernOptions.map((name) => {
               const selected = (extra.health_concerns || []).includes(name);
               return (
                 <label className={selected ? "selected" : ""} key={name}>
@@ -2106,7 +2109,14 @@ function Answer({
                   : `「${primaryPerson?.name || "諮詢者"}」`,
               right =
                 id === self?.id ? "我" : `「${person?.name || "這位對象"}」`,
-              list = targetQuestions[id]?.length ? targetQuestions[id] : [""],
+              list = relation
+                ? Array.from(
+                    { length: 3 },
+                    (_, index) => targetQuestions[id]?.[index] || "",
+                  )
+                : targetQuestions[id]?.length
+                  ? targetQuestions[id]
+                  : [""],
               relationshipData = extra.relationship_details?.[id] || {},
               changeRelationship = (key: string, value: string) =>
                 change("relationship_details", {
@@ -2192,6 +2202,7 @@ function Answer({
                       title={`關於${left}與${right}的感情問題，我想問`}
                       questions={list}
                       locked={locked}
+                      allowAdd={false}
                       change={(next: string[]) => {
                         setTargetQuestions({ ...targetQuestions, [id]: next });
                         setSaved(false);
@@ -2268,19 +2279,10 @@ function Answer({
             ((relation || marriage) && (ids.some((x) => !x) || hasDuplicate)) ||
             (newbornNaming &&
               (!extra.mother_id || !extra.father_id || !extra.baby_id));
+          // 使用者按下後立即收合；完整度由本機欄位立刻判斷，儲存則在背景進行。
+          setSaved(true);
+          setOpen(false);
           if (cannotPersist) {
-            const missing = answerMissingFields({
-              profileId: primaryId,
-              ids,
-              extra,
-              relation,
-              marriage,
-              newbornNaming,
-              infantSpirit,
-              deceasedPet,
-              code: detail.booking_items?.code,
-            });
-            alert(`尚未儲存，請先完成：\n${missing.join("\n") || "諮詢者資料"}`);
             return;
           }
           const persisted = await save(
@@ -2300,8 +2302,6 @@ function Answer({
             alert("資料尚未儲存成功，請稍後再試一次。");
             return;
           }
-          setSaved(true);
-          setOpen(false);
         }}
       >
         {locked ? "已送出" : "儲存這個項目"}
@@ -2538,6 +2538,7 @@ function QuestionFields({
   locked,
   change,
   placeholder = "輸入你想問的問題",
+  allowAdd = true,
 }: any) {
   const [limit, setLimit] = useState(false);
   return (
@@ -2558,7 +2559,7 @@ function QuestionFields({
           }
         />
       ))}
-      {!locked && (
+      {!locked && allowAdd && (
         <button
           type="button"
           className="addQuestion"
