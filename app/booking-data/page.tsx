@@ -425,15 +425,6 @@ export default function BookingData() {
         }),
         responseText = await r.text();
       let j: any = {};
-      if (submitSource === "web") {
-        if (!j.officialLineSent) {
-          setLineSendWarning(
-            `資料已送出，但官方帳號通知未能傳送${j.officialLineError ? `：${j.officialLineError}` : ""}`,
-          );
-        }
-        return;
-      }
-
       try {
         j = responseText ? JSON.parse(responseText) : {};
       } catch {
@@ -454,6 +445,16 @@ export default function BookingData() {
       setSubmitSuccess(true);
       setMsg("");
 
+      if (submitSource === "web") {
+        if (!j.officialLineSent) {
+          setLineSendWarning(
+            `資料已送出，但官方帳號通知未能傳送${j.officialLineError ? `：${j.officialLineError}` : ""}`,
+          );
+        }
+        window.setTimeout(returnToLine, 900);
+        return;
+      }
+
       try {
         const message = {
           type: "text" as const,
@@ -467,7 +468,12 @@ export default function BookingData() {
         }
         await new Promise((resolve) => setTimeout(resolve, 800));
         if (liff.isInClient()) {
-          liff.closeWindow();
+          window.setTimeout(returnToLine, 700);
+          try {
+            liff.closeWindow();
+          } catch {
+            returnToLine();
+          }
           return;
         }
         returnToLine();
