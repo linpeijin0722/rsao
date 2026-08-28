@@ -47,6 +47,58 @@ async function google(url: string, token: string, init: RequestInit = {}) {
   return result;
 }
 
+async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: string) {
+  const token = await accessToken();
+  const document = await google(
+    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,
+    token,
+  );
+  const requests: any[] = [{
+    updateDocumentStyle: {
+      documentStyle: {
+        marginHeader: { magnitude: 14.1732, unit: "PT" },
+        marginFooter: { magnitude: 14.1732, unit: "PT" },
+      },
+      fields: "marginHeader,marginFooter",
+    },
+  }];
+  const headerId = document.documentStyle?.defaultHeaderId;
+  const footerId = document.documentStyle?.defaultFooterId;
+  const headerContent = headerId ? document.headers?.[headerId]?.content || [] : [];
+  const footerContent = footerId ? document.footers?.[footerId]?.content || [] : [];
+  const contentEnd = (content: any[]) => Math.max(
+    1,
+    ...content.map((entry: any) => Number(entry.endIndex || 1) - 1),
+  );
+  if (headerId) {
+    const endIndex = contentEnd(headerContent);
+    if (endIndex > 1) requests.push({ deleteContentRange: { range: { segmentId: headerId, startIndex: 1, endIndex } } });
+    requests.push({ insertText: { location: { segmentId: headerId, index: 1 }, text: `訂單編號：${bookingNo}` } });
+  } else {
+    requests.push({ createHeader: { type: "DEFAULT" } });
+  }
+  if (footerId) {
+    const endIndex = contentEnd(footerContent);
+    if (endIndex > 1) requests.push({ deleteContentRange: { range: { segmentId: footerId, startIndex: 1, endIndex } } });
+  }
+  await google(
+    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,
+    token,
+    { method: "POST", body: JSON.stringify({ requests }) },
+  );
+  if (!headerId) {
+    const refreshed = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+    const createdHeaderId = refreshed.documentStyle?.defaultHeaderId;
+    if (createdHeaderId) {
+      await google(
+        `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,
+        token,
+        { method: "POST", body: JSON.stringify({ requests: [{ insertText: { location: { segmentId: createdHeaderId, index: 1 }, text: `訂單編號：${bookingNo}` } }] }) },
+      );
+    }
+  }
+}
+
 export async function wasDocumentEditedBy(documentId: string, editorEmail: string) {
   if (!documentId || !editorEmail) return false;
   const token = await accessToken();
@@ -153,7 +205,12 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   add(`項目 ${itemIndex}（共 ${totalItems} 個項目）`, "meta");
   const info = detailInfo(detail);
   const { answer, itemCode, title, subItems, subTitle, relation, marriage } = info;
-  add([text(detail.item_title), subItems.join("、")].filter(Boolean).join("｜"), "title");
+  const infantSpirit = itemCode === "infant-spirit" || title.includes("嬰靈");
+  const infantMultiple = subTitle.includes("兩位嬰靈") || subTitle.includes("二位嬰靈") || subTitle.includes("含)以上") || subTitle.includes("含）以上");
+  const renderedSubTitle = infantSpirit
+    ? (infantMultiple ? "兩位嬰靈(含)以上" : "一位嬰靈")
+    : subItems.join("、");
+  add([text(detail.item_title), renderedSubTitle].filter(Boolean).join("｜"), "title");
   add("");
   const participants = (answer?.booking_answer_participants || []).slice().sort((a: any, b: any) => a.position - b.position);
   const selectedParticipants = target ? [target] : participants;
@@ -161,6 +218,19 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     .filter(Boolean).filter((profile: any, index: number, all: any[]) => all.findIndex((entry) => entry.id === profile.id) === index);
   people.forEach((profile: any) => {
     profileLines(profile, ownerName).forEach((line) => add(line));
+    if (infantSpirit) {
+      const losses = Array.isArray(answer?.extra_data?.pregnancy_losses)
+        ? answer.extra_data.pregnancy_losses
+        : (Array.isArray(profile.pregnancy_losses) ? profile.pregnancy_losses : []);
+      const lossLines = losses.filter((loss: any) => text(loss?.lunar || loss?.lunar_birth_text)).map((loss: any, index: number) => {
+        const lunarDate = text(loss.lunar || loss.lunar_birth_text);
+        const shichen = text(loss.shichen) ? `（${shichenName(loss.shichen)}）` : "";
+        const accuracy = text(loss.accuracy).includes("約") ? "大約日期" : "準確日期";
+        const note = text(loss.notes) ? `　備註：${text(loss.notes)}` : "";
+        return `${losses.length > 1 ? `${index + 1}.` : ""}${lunarDate}${shichen}${accuracy}${note}`;
+      });
+      if (lossLines.length) add(`農曆流產日期：${lossLines.join("\n")}`);
+    }
     const photoData = text(profile.photo_data);
     if (profile.profile_type === "pet" && photoData.startsWith("data:image/")) {
       const marker = `[[[PET_IMAGE_${text(profile.id) || itemIndex}]]]`;
@@ -264,7 +334,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   }
   const alreadyHasTeacherLayout = isPastLifePersonal || isPastLifeRelation || isOverallFortune || marriage || itemCode === "date-time-selection" || title.includes("擇日");
   if (!alreadyHasTeacherLayout) {
-    add(`【${subTitle || title}】`, "section");
+    add(infantSpirit ? "【嬰靈】" : `【${subTitle || title}】`, "section");
     for (let index = 0; index < 4; index += 1) add("\u00a0", "teacher");
   }
   return { content, marks, images };
@@ -335,6 +405,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const result = await response.json();
   if (!response.ok || !result.ok) throw new Error(result.error || "Apps Script 建立文件失敗");
   if (result.version !== requiredAppsScriptVersion) throw new Error(`目前連到舊版 Google Apps Script（目前：${result.version || "無版本資訊"}；需要：${requiredAppsScriptVersion}），請更新 Vercel 的 GOOGLE_APPS_SCRIPT_WEB_APP_URL 後重新部署`);
+  await normalizeDocumentHeaderAndFooter(result.documentId, bookingNo);
   const createdAt = existingDetails.map((detail: any) => detail.google_document_created_at).filter(Boolean).sort()[0] || new Date().toISOString();
   const { error: clearError } = await db.from("booking_details").update({
     google_document_id: null, google_document_url: null, google_document_created_at: null,
