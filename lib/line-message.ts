@@ -37,6 +37,19 @@ export async function pushLineText(userId: string, text: string) {
   if (!response.ok)
     throw new Error(`LINE 訊息發送失敗：${await response.text()}`);
 }
+const statusColors={pending:{background:"#FDECEC",text:"#C94040",label:"待付款"},paid:{background:"#EBFBF9",text:"#168A54",label:"已付款"},changed:{background:"#F1F1F1",text:"#444444",label:"預約已變更"}} as const;
+const cleanItemTitle=(value:string)=>value.replace(/(兩位嬰靈[（(]含[）)]以上).*/u,"$1").replace(/[（(]?無論幾位[^）)]*[）)]?/g,"").replace(/^＋加購[：:]\s*/u,"").replace(/\s+/g," ").trim();
+function videoDateParts(slotStart?:string){if(!slotStart)return null;const date=new Date(slotStart);if(Number.isNaN(date.getTime()))return null;const parts=new Intl.DateTimeFormat("zh-TW",{timeZone:"Asia/Taipei",month:"numeric",day:"numeric",weekday:"short"}).formatToParts(date),part=(type:string)=>parts.find(x=>x.type===type)?.value||"",time=new Intl.DateTimeFormat("zh-TW",{timeZone:"Asia/Taipei",hour:"numeric",minute:"2-digit",hour12:true}).format(date).replace(/\s/g,"");return{date:`${part("month")}月${part("day")}日（${part("weekday").replace("週","")}）`,time}}
+export function bookingStatusFlex(args:{status:"pending"|"paid"|"changed";bookingNo:string;method:string;total?:number;slotStart?:string;items?:string[];site:string;expiresAt?:string;calendarSlot?:string}){
+  const theme=statusColors[args.status],isVideo=args.method==="video",video=videoDateParts(args.slotStart),numbered=(args.items||[]).map(cleanItemTitle).filter(Boolean).map((title,index)=>`${["❶","❷","❸","❹","❺","❻","❼","❽","❾"][index]||`${index+1}.`}${title}`).join("\n"),mainUrl=args.status==="pending"?`${args.site}/pay?order=${encodeURIComponent(args.bookingNo)}`:args.status==="paid"?`${args.site}/booking-data?order=${encodeURIComponent(args.bookingNo)}`:`${args.site}/my-bookings?order=${encodeURIComponent(args.bookingNo)}`,buttonLabel=args.status==="pending"?"繼續付款":args.status==="paid"?"📝 立即填寫問事資料（必填）":"查看預約",body:any[]=[{type:"text",text:isVideo?"視訊諮詢":"文字諮詢",align:"center",weight:"bold",size:"lg"},{type:"separator",margin:"md"}];
+  if(video)body.push({type:"text",text:"預約時間",color:"#222222",size:"sm",margin:"lg"},{type:"text",text:video.date,wrap:true,color:"#168A54",weight:"bold",size:"xxl"},{type:"text",text:video.time,wrap:true,color:"#168A54",weight:"bold",size:"xxl"});
+  if(numbered)body.push({type:"text",text:`諮詢項目\n${numbered}`,wrap:true,margin:"lg",color:"#333333",size:"md"});
+  if(typeof args.total==="number")body.push({type:"text",text:`付款金額：NT$ ${args.total.toLocaleString("zh-TW")}`,color:"#8A3045",weight:"bold",margin:"md"});
+  if(args.status==="pending"&&args.expiresAt)body.push({type:"text",text:`請於 ${new Date(args.expiresAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})} 前完成付款，逾期訂單將自動失效。`,wrap:true,color:"#666666",size:"sm"});
+  const footer:any[]=[{type:"button",style:"primary",height:"md",color:args.status==="changed"?"#4A78C2":args.status==="paid"?"#168A54":"#C94040",action:{type:"uri",label:buttonLabel,uri:mainUrl}}];
+  if(args.status==="paid"&&isVideo&&args.calendarSlot)footer.push({type:"button",style:"link",height:"sm",action:{type:"uri",label:"加入 Google 行事曆",uri:`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent("林阿嫂視訊諮詢")}&dates=${args.calendarSlot}`}});
+  return{type:"bubble",header:{type:"box",layout:"vertical",backgroundColor:theme.background,contents:[{type:"text",text:theme.label,color:theme.text,weight:"bold",size:"xl",align:"center"},{type:"text",text:`訂單編號：${args.bookingNo}`,color:"#8B8B8B",size:"xs",align:"center",margin:"sm",wrap:true}]},body:{type:"box",layout:"vertical",spacing:"md",contents:body},footer:{type:"box",layout:"vertical",spacing:"sm",contents:footer}};
+}
 export function bookingFlex(args: {
   bookingNo: string;
   method: string;
@@ -46,6 +59,8 @@ export function bookingFlex(args: {
   items?: string[];
   site: string;
 }) {
+  return bookingStatusFlex({status:"paid",bookingNo:args.bookingNo,method:args.method,total:args.total,slotStart:args.slotStart,items:args.items,site:args.site,calendarSlot:args.slot});
+  /* legacy paid layout
   const isVideo = args.method === "video",
     dataUrl = `${args.site}/booking-data?order=${encodeURIComponent(args.bookingNo)}`;
   const buttons: any[] = [
@@ -160,7 +175,7 @@ export function bookingFlex(args: {
       spacing: "sm",
       contents: buttons,
     },
-  };
+  }; */
 }
 
 export function videoReminderFlex(args: {
