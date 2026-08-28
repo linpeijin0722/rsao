@@ -8,7 +8,6 @@ export async function GET() {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
   const db = adminSupabase();
-  const [{ data, error }, { data: customers, error: customerError }] = await Promise.all([db
   const [{ data, error }, { data: customers, error: customerError }, { data: consultationProfiles, error: profileError }] = await Promise.all([db
     .from("bookings")
     .select(
@@ -18,11 +17,6 @@ export async function GET() {
     .from("customers")
     .select("id,line_user_id,line_display_name,line_picture_url,full_name,birth_date")
     .not("line_user_id", "is", null)
-    .not("profile_completed_at", "is", null)
-    .order("line_display_name", { ascending: true })]);
-  if (error || customerError)
-    return NextResponse.json({ error: error?.message || customerError?.message }, { status: 500 });
-  return NextResponse.json({ bookings: data, customers: customers || [] });
     .not("full_name", "is", null)
     .neq("full_name", "")
     .order("line_display_name", { ascending: true }), db
@@ -46,7 +40,6 @@ export async function POST(request: NextRequest) {
       db.from("customers").select("id,line_user_id,line_display_name,full_name,profile_completed_at").eq("id", body.customerId).single(),
       db.from("consultation_methods").select("id,code,title,base_price,duration_minutes").eq("code", methodCode).eq("is_active", true).single(),
     ]);
-    if (!customer?.line_user_id || !customer.profile_completed_at)
     if (!customer?.line_user_id || !customer.full_name)
       return NextResponse.json({ error: "這位用戶尚未完成 LINE 登入與本人資料" }, { status: 400 });
     if (!method) return NextResponse.json({ error: "諮詢方式目前未開放" }, { status: 400 });
@@ -162,15 +155,50 @@ export async function POST(request: NextRequest) {
   }
   if (action !== "mark_paid") return NextResponse.json({ error: "不支援的操作" }, { status: 400 });
   const db = adminSupabase();
+  const { data: current, error: currentError } = await db.from("bookings").select(
+    "id,booking_no,total_price,slot_start,payment_status,customers(line_user_id),consultation_methods(code),booking_details(item_title,quantity,booking_detail_sub_items(sub_item_title))",
+  ).eq("booking_no", bookingNo).single();
+  if (currentError || !current)
+    return NextResponse.json({ error: currentError?.message || "找不到訂單" }, { status: 404 });
+  if (current.payment_status === "paid")
+    return NextResponse.json({ error: "這筆訂單已是已付款狀態" }, { status: 400 });
   const { data, error } = await db.from("bookings").update({
     payment_status: "paid",
     status: "confirmed",
     collection_source: "manual",
     paid_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-  }).eq("booking_no", bookingNo).neq("status", "cancelled").select("booking_no").single();
+  }).eq("booking_no", bookingNo).neq("payment_status", "paid").select("booking_no").single();
   if (error || !data) return NextResponse.json({ error: error?.message || "找不到訂單" }, { status: 400 });
-  return NextResponse.json({ ok: true });
+  const customer = Array.isArray(current.customers) ? current.customers[0] : current.customers;
+  const method = Array.isArray(current.consultation_methods) ? current.consultation_methods[0] : current.consultation_methods;
+  const details = Array.isArray(current.booking_details) ? current.booking_details : [];
+  const items = details.flatMap((detail: any) => {
+    const subs = Array.isArray(detail.booking_detail_sub_items) ? detail.booking_detail_sub_items : [];
+    const title = [detail.item_title, subs.map((sub: any) => sub.sub_item_title).filter(Boolean).join("、")].filter(Boolean).join("｜");
+    return Array.from({ length: Math.max(1, Number(detail.quantity) || 1) }, () => title);
+  }).filter(Boolean);
+  let lineNotified = false;
+  let lineError = "";
+  if (customer?.line_user_id) {
+    try {
+      const site = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin;
+      await pushLineFlex(customer.line_user_id, "已付款｜請填寫問事資料", bookingStatusFlex({
+        status: "paid",
+        bookingNo: current.booking_no,
+        method: method?.code || "text",
+        total: Number(current.total_price || 0),
+        slotStart: current.slot_start || undefined,
+        items,
+        site,
+      }));
+      lineNotified = true;
+    } catch (notifyError) {
+      lineError = notifyError instanceof Error ? notifyError.message : "LINE 通知失敗";
+      console.error("手動收款 LINE 通知失敗", notifyError);
+    }
+  } else lineError = "此用戶沒有 LINE UID，無法傳送通知";
+  return NextResponse.json({ ok: true, lineNotified, lineError });
 }
 export async function PATCH(request: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
