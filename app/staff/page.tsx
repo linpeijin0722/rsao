@@ -91,6 +91,7 @@ export default function Staff() {
     [rows, setRows] = useState<any[]>([]),
     [items, setItems] = useState<any[]>([]),
     [manualCustomers, setManualCustomers] = useState<any[]>([]),
+    [manualUserSearch, setManualUserSearch] = useState(""),
     [customerProfiles, setCustomerProfiles] = useState<any[]>([]),
     [manualOpen, setManualOpen] = useState(false),
     [manualMethod, setManualMethod] = useState<"video"|"text">("text"),
@@ -480,6 +481,15 @@ export default function Staff() {
       alert("已儲存並發送 LINE 變更通知");
     } else alert((await r.json()).error);
   }
+  const filteredManualCustomers = useMemo(() => {
+    const keyword = manualUserSearch.trim().toLocaleLowerCase("zh-TW");
+    if (!keyword) return manualCustomers;
+    return manualCustomers.filter((customer) =>
+      `${customer.line_display_name || ""} ${customer.full_name || ""}`
+        .toLocaleLowerCase("zh-TW")
+        .includes(keyword),
+    );
+  }, [manualCustomers, manualUserSearch]);
   if (error === "未登入")
     return (
       <main className="adminLogin staffLogin"><div>
@@ -793,7 +803,12 @@ export default function Staff() {
               <button className={manualMethod==="text"?"active":""} onClick={()=>setManualMethod("text")}>文字諮詢</button>
               <button className={manualMethod==="video"?"active":""} onClick={()=>setManualMethod("video")}>視訊諮詢</button>
             </div>
-            <label className="manualMainField">選擇用戶<select value={manualCustomerId} onChange={event=>setManualCustomerId(event.target.value)}><option value="">請選擇 LINE 用戶</option>{manualCustomers.map(customer=><option key={customer.id} value={customer.id}>{customer.line_display_name||"LINE 用戶"}｜{customer.full_name}</option>)}</select></label>
+            <div className="manualUserPicker">
+              <label htmlFor="manual-user-search">選擇用戶</label>
+              <div className="manualUserSearchBox"><span aria-hidden="true">⌕</span><input id="manual-user-search" type="search" value={manualUserSearch} onChange={event=>setManualUserSearch(event.target.value)} placeholder="搜尋 LINE 名稱或姓名" autoComplete="off" /></div>
+              <select value={manualCustomerId} onChange={event=>setManualCustomerId(event.target.value)}><option value="">請選擇 LINE 用戶</option>{filteredManualCustomers.map(customer=><option key={customer.id} value={customer.id}>{customer.line_display_name||"LINE 用戶"}｜{customer.full_name}</option>)}</select>
+              <small>{manualUserSearch.trim() ? `找到 ${filteredManualCustomers.length} 位符合的用戶` : `共 ${manualCustomers.length} 位可選用戶`}</small>
+            </div>
             {manualMethod==="video"&&<label className="manualMainField">視訊日期與時間<input type="datetime-local" value={manualSlotStart} onChange={event=>setManualSlotStart(event.target.value)}/><small>後台可依實際需要建立 4 天內的視訊預約；時間為台灣時間。</small></label>}
             <section className="manualItems"><h3>選擇諮詢項目</h3>{items.map(item=>{const line=manualLines.find(candidate=>candidate.itemId===item.id);return <article key={item.id} className={line?"selected":""}>
               <label><input type="checkbox" checked={Boolean(line)} onChange={event=>toggleManualItem(item,event.target.checked)}/><b>{item.title}</b><span>NT$ {Number(item.price||0).toLocaleString("zh-TW")}</span></label>
