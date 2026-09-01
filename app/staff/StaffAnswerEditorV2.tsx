@@ -16,9 +16,6 @@ const overallFocusFieldLabels: Record<string, string[]> = {
 };
 
 export default function StaffAnswerEditorV2({ value, profiles, change, close, save }: any) {
-  const ids: string[] = value.targetProfileIds?.length
-    ? value.targetProfileIds
-    : [value.targetProfileId].filter(Boolean);
   const extra = value.extra_data || {};
   const code = text(value.item_code);
   const title = text(value.item_title);
@@ -40,6 +37,28 @@ export default function StaffAnswerEditorV2({ value, profiles, change, close, sa
   const infant = title.includes("嬰靈");
   const lawsuit = title.includes("官司") || title.includes("貴人");
   const noGenericQuestions = naming || lawsuit || relation || love || overall || spiritual || home || deceased || deceasedPet;
+  const requestedTargets = (() => {
+    if (!(relation || love)) return 0;
+    const label = sub || title;
+    if (/三位|3\s*位|共三|共\s*3/.test(label)) return 3;
+    if (/兩位|二位|2\s*位|共兩|共二|共\s*2/.test(label)) return 2;
+    return 1;
+  })();
+  const discoveredIds = [
+    value.targetProfileId,
+    ...(value.targetProfileIds || []),
+    extra.primary_profile_id,
+    extra.profile_id,
+    ...(Array.isArray(extra.target_profile_ids) ? extra.target_profile_ids : []),
+    ...Object.keys(extra.target_questions || {}),
+    ...Object.keys(extra.relationship_details || {}),
+  ].filter((id: any) => typeof id === "string" && id);
+  const uniqueIds = Array.from(new Set(discoveredIds)) as string[];
+  const primaryId = uniqueIds[0] || "";
+  const existingTargets = uniqueIds.filter((id) => id !== primaryId).slice(0, requestedTargets);
+  const ids: string[] = (relation || love)
+    ? [primaryId, ...existingTargets, ...Array(Math.max(0, requestedTargets - existingTargets.length)).fill("")]
+    : uniqueIds;
 
   const setExtra = (key: string, next: any) =>
     change({ ...value, extra_data: { ...extra, [key]: next } });
@@ -113,7 +132,7 @@ export default function StaffAnswerEditorV2({ value, profiles, change, close, sa
       })}
       {relation && targetIds.map((id) => <TargetQuestions key={`past-${id}`} primary={profiles.find((p: any) => p.id === ids[0])} profile={profiles.find((p: any) => p.id === id)} kind="前世關係" questions={targetQuestions[id] || []} update={(next: string[]) => setTargetData("target_questions", id, next)} />)}
 
-      {personalLove && <section className="staffAnswerSection">{area("目前感情狀態", "love_status", "例如：單身多久、剛分手沉澱中、空窗期較長等")}{area("目前的社交與生活型態", "social_lifestyle", "例如：生活圈固定不太出門、正積極使用交友軟體或參加活動等")}</section>}
+      {personalLove && <section className="staffAnswerSection">{area("目前感情狀態", "love_status", "例如：單身多久、剛分手沉澱中、空窗期較長等")}{area("目前的社交與生活型態", "social_lifestyle", "例如：生活圈固定不太出門、正積極使用交友軟體或參加活動等")}{area("本次最想瞭解的方向", "consultation_direction", "例如：未來一年內的桃花時機、適合自己的伴侶類型，或個人感情盲點等")}</section>}
       {overall && <section className="staffAnswerSection"><h4>目前最想聚焦、最關心的具體事件</h4><div className="staffHealthChecks">{(extra.overall_focuses || []).map((focus: string) => <label key={focus}><input type="checkbox" checked readOnly/>{focus}</label>)}</div>{(extra.overall_focuses || []).map((focus: string) => { const saved = extra.overall_focus_details?.[focus] || {}; const fields = overallFocusFieldLabels[focus] || Object.keys(saved); return <div className="staffNestedFields" key={focus}><h4>{focus}</h4>{fields.map((field) => <label key={field}>{field}<textarea value={text(saved[field])} onChange={(event) => setExtra("overall_focus_details", {...(extra.overall_focus_details || {}), [focus]: {...saved, [field]: event.target.value}})}/></label>)}</div>})}</section>}
       {spiritual && <section className="staffAnswerSection">{area("請簡述受到干擾的情況", "interference_situation", "例如：反覆做相似的夢、莫名不安，或在特定時間與地點感到異常")}{input("這樣的情況持續多久了？", "interference_duration", "例如：約三個月，或從搬家後開始")}</section>}
       {newborn && <section className="staffAnswerSection">{input("希望寶寶姓氏", "baby_surname")}{area("是否有特別想用的字或喜歡的讀音？", "preferred_characters", "例如：喜歡『安』字、希望讀音溫柔好念")}{area("對名字的風格有沒有什麼想像？", "name_style", "例如：想要響亮一點、優雅一點，還是有想避開的感覺？")}{area("是否有禁忌或避諱的字或諧音？", "name_taboo", "例如：避開長輩同名、特定字或容易產生誤會的諧音")}{area("其他備註", "naming_notes")}</section>}
