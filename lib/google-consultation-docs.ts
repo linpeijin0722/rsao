@@ -417,7 +417,7 @@ function consultationNumber(position: number) {
 }
 
 export async function createConsultationDocuments(db: any, bookingId: string, bookingNo: string, force = false, createMode: "replace" | "new" = "replace") {
-  const { data: booking } = await db.from("bookings").select("slot_start,total_price,consultation_methods(code),customers(line_display_name,full_name)").eq("id", bookingId).single();
+  const { data: booking } = await db.from("bookings").select("created_at,paid_at,slot_start,total_price,consultation_methods(code),customers(line_display_name,full_name)").eq("id", bookingId).single();
   const customer = one(booking?.customers) || {};
   const lineName = text(customer.line_display_name) || "LINE用戶";
   const ownerName = text(customer.full_name) || lineName;
@@ -465,17 +465,20 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     images.push(...page.images);
   });
 
-  const { data: numberedDocuments, error: numberError } = await db.from("booking_details")
-    .select("id,google_document_id,google_document_created_at")
-    .not("google_document_id", "is", null)
-    .order("google_document_created_at", { ascending: true });
+  const { data: numberedBookings, error: numberError } = await db.from("bookings")
+    .select("id,created_at,consultation_methods(code),booking_details(id,google_document_id,google_document_created_at)")
+    .order("created_at", { ascending: true });
   if (numberError) throw numberError;
-  const uniqueDocuments = (numberedDocuments || []).filter((row: any, index: number, rows: any[]) =>
-    rows.findIndex((candidate: any) => candidate.google_document_id === row.google_document_id) === index
-  );
+  const uniqueDocuments = (numberedBookings || []).filter((row: any) => one(row.consultation_methods)?.code !== "video")
+    .flatMap((row: any) => (row.booking_details || []).filter((detail: any) => detail.google_document_id).map((detail: any) => ({...detail,created:detail.google_document_created_at||row.created_at})))
+    .filter((row: any, index: number, rows: any[]) => rows.findIndex((candidate: any) => candidate.google_document_id === row.google_document_id) === index)
+    .sort((a: any,b: any)=>String(a.created).localeCompare(String(b.created)));
   const existingPosition = uniqueDocuments.findIndex((row: any) => detailIds.has(row.id));
   const documentPosition = existingPosition >= 0 ? existingPosition + 1 : uniqueDocuments.length + 1;
-  let fileTitle = `${consultationNumber(documentPosition)}-${lineName}-${ownerName}`;
+  const numberDate=new Date(booking?.paid_at||booking?.created_at||Date.now());
+  const numberMonth=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",month:"short"}).format(numberDate);
+  const numberYear=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"2-digit"}).format(numberDate);
+  let fileTitle = `${consultationNumber(documentPosition)}.${numberMonth}${numberYear}-${lineName}-${ownerName}`;
   if (isVideo) {
     const date = new Date(booking.slot_start);
     const parts = new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", month: "numeric", day: "numeric", weekday: "short" }).formatToParts(date);
