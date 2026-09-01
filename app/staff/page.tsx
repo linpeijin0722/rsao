@@ -647,7 +647,7 @@ export default function Staff() {
         )}
       </section>
       {userView && (
-        <div className="modalBackdrop" onClick={() => setUserView(null)}>
+        <div className="modalBackdrop priorityModal" onClick={() => setUserView(null)}>
           <div
             className="modal userInfoModal"
             onClick={(e) => e.stopPropagation()}
@@ -689,14 +689,18 @@ export default function Staff() {
           </div>
         </div>
       )}
-      {lineContact&&<div className="modalBackdrop" onClick={()=>setLineContact(null)}><div className="modal lineContactModal" onClick={e=>e.stopPropagation()}>
+      {lineContact&&<div className="modalBackdrop priorityModal" onClick={()=>setLineContact(null)}><div className="modal lineContactModal" onClick={e=>e.stopPropagation()}>
         <button className="staffModalClose" onClick={()=>setLineContact(null)}>×</button>
         <h2>💬 LINE 聯絡</h2>
         <p className="lineContactCustomer">{lineContact.line_display_name}・{lineContact.full_name||"尚未填寫姓名"}</p>
         {lineContact._booking?.consultation_methods?.code==="video"&&lineContact._booking?.payment_status==="paid"&&<button className="videoReminderPreset" onClick={()=>setVideoReminderConfirm(true)}>視訊提醒</button>}
-        <label className="lineMessageEditor">自訂訊息<textarea value={lineMessage} onChange={e=>setLineMessage(e.target.value)} placeholder="請輸入要傳送給用戶的訊息"/></label>
+        <section className="lineComposeSection">
+          <div className="lineComposeHeading"><span aria-hidden="true">＋</span><div><h3>新增自訂訊息</h3><p>輸入常用內容後可儲存，下次點一下就能快速帶入。</p></div></div>
+          <label className="lineMessageEditor"><span>訊息內容</span><textarea value={lineMessage} onChange={e=>setLineMessage(e.target.value)} placeholder="請輸入要傳送給用戶的訊息"/></label>
+          <button className="saveLineMessageButton lineComposeSave" onClick={saveLineMessage}>{editingSavedMessage===null?"＋ 儲存為常用訊息":"儲存這次修改"}</button>
+        </section>
         {savedMessages.length>0&&<section className="savedMessagesSection"><h3>已儲存訊息</h3><div className="savedLineMessages">{savedMessages.map((message,index)=><div className="savedLineMessage" key={`${message}-${index}`}><button className="savedMessageText" onClick={()=>{setLineMessage(message);setEditingSavedMessage(null)}}>{message}</button><button className="savedMessageEdit" aria-label="編輯" onClick={()=>{setLineMessage(message);setEditingSavedMessage(index)}}>編輯</button><button className="savedMessageDelete" aria-label="刪除" onClick={()=>deleteLineMessage(index)}>刪除</button></div>)}</div></section>}
-        <div className="lineContactActions"><button className="saveLineMessageButton" onClick={saveLineMessage}>{editingSavedMessage===null?"儲存自訂訊息":"儲存修改"}</button><button className="sendLineMessageButton" onClick={()=>void sendLineContact(lineMessage)}>傳送訊息</button></div>
+        <div className="lineContactActions single"><button className="sendLineMessageButton" onClick={()=>void sendLineContact(lineMessage)}>傳送訊息</button></div>
       </div></div>}
       {videoReminderConfirm&&lineContact&&<div className="modalBackdrop priorityModal" onClick={()=>setVideoReminderConfirm(false)}><div className="modal videoReminderConfirmModal" onClick={e=>e.stopPropagation()}><h2>傳送視訊提醒</h2><p>是否確定要傳送提醒通知給 <strong>{lineContact.line_display_name}・{lineContact.full_name||"尚未填寫姓名"}</strong>？</p><div><button onClick={()=>void sendLineContact("","video_reminder")}>確定傳送</button><button className="cancel" onClick={()=>setVideoReminderConfirm(false)}>取消</button></div></div></div>}
       {returnedEdit && <div className="modalBackdrop returnedEditBackdrop"><div className="modal returnedEditPage"><button className="staffModalClose" onClick={()=>setReturnedEdit(null)}>×</button><header><div><h2>編輯回傳資料</h2><p>{returnedEdit.item_title}{returnedEdit.sub_items?.length?`－${returnedEdit.sub_items.join("、")}`:""}</p></div></header><div className="returnedEditGrid"><label>姓名<input value={returnedEdit.name||""} onChange={e=>setReturnedEdit({...returnedEdit,name:e.target.value})}/></label><label>關係<input value={returnedEdit.relationship_detail||returnedEdit.relationship||""} onChange={e=>setReturnedEdit({...returnedEdit,relationship_detail:e.target.value})}/></label><label>性別<select value={returnedEdit.gender||""} onChange={e=>setReturnedEdit({...returnedEdit,gender:e.target.value})}><option value="">未填</option><option>男</option><option>女</option><option>其他</option></select></label><label>國曆生日<input type="date" value={returnedEdit.birth_date||""} onChange={e=>setReturnedEdit({...returnedEdit,birth_date:e.target.value})}/></label><label>農曆生日<input value={returnedEdit.lunar_birth_text||""} onChange={e=>setReturnedEdit({...returnedEdit,lunar_birth_text:e.target.value})}/></label><label>生肖<input value={returnedEdit.zodiac||""} onChange={e=>setReturnedEdit({...returnedEdit,zodiac:e.target.value})}/></label><label>出生時辰<input value={returnedEdit.birth_shichen||""} onChange={e=>setReturnedEdit({...returnedEdit,birth_shichen:e.target.value})}/></label><label className="wide">地址<textarea value={returnedEdit.address||""} onChange={e=>setReturnedEdit({...returnedEdit,address:e.target.value})}/></label><label>國曆往生日期<input type="date" value={returnedEdit.death_date||""} onChange={e=>setReturnedEdit({...returnedEdit,death_date:e.target.value})}/></label><label>農曆往生日期<input value={returnedEdit.lunar_death_text||""} onChange={e=>setReturnedEdit({...returnedEdit,lunar_death_text:e.target.value})}/></label><label>往生時辰<input value={returnedEdit.death_shichen||""} onChange={e=>setReturnedEdit({...returnedEdit,death_shichen:e.target.value})}/></label><label className="wide">備註<textarea value={returnedEdit.notes||""} onChange={e=>setReturnedEdit({...returnedEdit,notes:e.target.value})}/></label>{returnedEdit.questions.map((q:string,i:number)=><label className="wide" key={i}>問題 {i+1}<textarea value={q} onChange={e=>setReturnedEdit({...returnedEdit,questions:returnedEdit.questions.map((v:string,n:number)=>n===i?e.target.value:v)})}/></label>)}</div><div className="returnedEditActions"><button onClick={()=>void saveReturned()}>儲存所有修改</button><button className="cancel" onClick={()=>setReturnedEdit(null)}>取消</button></div></div></div>}
@@ -819,13 +823,18 @@ export default function Staff() {
             <div className="manualUserPicker">
               <label htmlFor="manual-user-search">選擇用戶</label>
               <div className="manualUserSearchBox"><span aria-hidden="true">⌕</span><input id="manual-user-search" type="search" value={manualUserSearch} onChange={event=>setManualUserSearch(event.target.value)} placeholder="搜尋 LINE 名稱或姓名" autoComplete="off" /></div>
-              <select value={manualCustomerId} onChange={event=>setManualCustomerId(event.target.value)}><option value="">請選擇 LINE 用戶</option>{filteredManualCustomers.map(customer=><option key={customer.id} value={customer.id}>{customer.line_display_name||"LINE 用戶"}｜{customer.full_name}</option>)}</select>
               <small>{manualUserSearch.trim() ? `找到 ${filteredManualCustomers.length} 位符合的用戶` : `共 ${manualCustomers.length} 位可選用戶`}</small>
             </div>
-            {manualCustomerId && (()=>{const customer=manualCustomers.find(item=>item.id===manualCustomerId);return customer?<button type="button" className="manualSelectedCustomer" onClick={()=>setUserView(customer)}>
-              {customer.line_picture_url?<img src={customer.line_picture_url} alt="LINE 頭像"/>:<span className="avatarFallback">LINE</span>}
-              <span><b>{customer.line_display_name||"LINE 用戶"}｜{customer.full_name}</b><small>點此查看基本資料</small></span>
-            </button>:null})()}
+            <div className="manualUserResults" role="listbox" aria-label="符合條件的 LINE 用戶">
+              {filteredManualCustomers.map(customer=><div key={customer.id} className={`manualUserResult ${manualCustomerId===customer.id?"selected":""}`}>
+                <button type="button" className="manualUserSelect" onClick={()=>setManualCustomerId(customer.id)}>
+                  {customer.line_picture_url?<img src={customer.line_picture_url} alt="LINE 頭像"/>:<span className="avatarFallback">LINE</span>}
+                  <span><b>{customer.line_display_name||"LINE 用戶"}｜{customer.full_name}</b><small>{manualCustomerId===customer.id?"已選取":"點此選取"}</small></span>
+                </button>
+                <button type="button" className="manualUserProfileButton" onClick={()=>setUserView(customer)}>查看資料</button>
+              </div>)}
+              {!filteredManualCustomers.length&&<p className="manualUserEmpty">找不到符合條件的用戶</p>}
+            </div>
             {manualMethod==="video"&&<label className="manualMainField">視訊日期與時間<input type="datetime-local" value={manualSlotStart} onChange={event=>setManualSlotStart(event.target.value)}/><small>後台可依實際需要建立 4 天內的視訊預約；時間為台灣時間。</small></label>}
             <section className="manualItems"><h3>選擇諮詢項目</h3>{items.map(item=>{const line=manualLines.find(candidate=>candidate.itemId===item.id);return <article key={item.id} className={line?"selected":""}>
               <label><input type="checkbox" checked={Boolean(line)} onChange={event=>toggleManualItem(item,event.target.checked)}/><b>{item.title}</b><span>NT$ {Number(item.price||0).toLocaleString("zh-TW")}</span></label>
