@@ -274,3 +274,35 @@ body .videoBookingSection .staffPrimaryFilters>label,body .videoBookingSection .
 
 /* 修改問事資料：複選框靠左、單列、無外框，選項採一般字重。 */
 .staffAnswerEditor .staffHealthChecks{display:grid!important;grid-template-columns:1fr!important;gap:7px!important}.staffAnswerEditor .staffHealthChecks label{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;gap:9px!important;min-height:30px!important;margin:0!important;padding:3px 0!important;border:0!important;border-radius:0!important;background:transparent!important;font-weight:400!important}.staffAnswerEditor .staffHealthChecks input{order:-1!important;flex:0 0 auto!important;width:17px!important;height:17px!important;margin:0!important}
+
+/* 手動建立預約：搜尋結果直接列出，最多顯示約八位，點整列即可選取。 */
+.manualUserPicker{grid-template-columns:1fr!important;margin-bottom:8px!important}
+.manualUserResults{display:grid;gap:8px;max-height:536px;margin:0 0 20px;padding:2px 5px 2px 2px;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.manualUserResult{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch;min-width:0;border:1px solid #d9ccc1;border-radius:12px;background:#fff;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.manualUserResult:hover{border-color:#b99d8e;box-shadow:0 2px 8px rgba(80,57,44,.08)}
+.manualUserResult.selected{border-color:#8a3045;box-shadow:0 0 0 2px rgba(138,48,69,.14)}
+.manualUserSelect{display:flex!important;align-items:center;gap:12px;min-width:0;min-height:64px;margin:0!important;padding:8px 13px!important;border:0!important;border-radius:0!important;background:#fff!important;color:#26201d!important;text-align:left!important;cursor:pointer}
+.manualUserSelect img,.manualUserSelect .avatarFallback{flex:0 0 46px;width:46px;height:46px;border-radius:50%;object-fit:cover}
+.manualUserSelect>span:last-child{display:grid;gap:2px;min-width:0}
+.manualUserSelect b{overflow:hidden;color:#211c19!important;font-size:17px;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}
+.manualUserSelect small{color:#756b65!important;font-size:14px!important;font-weight:400!important}
+.manualUserResult.selected .manualUserSelect small{color:#8a3045!important;font-weight:800!important}
+.manualUserProfileButton{min-width:108px;margin:0!important;padding:8px 13px!important;border:0!important;border-left:1px solid #e2d8cf!important;border-radius:0!important;background:#f8f5f2!important;color:#704b3e!important;font-size:15px!important;font-weight:800!important;cursor:pointer}
+.manualUserProfileButton:hover{background:#efe7e1!important}
+.manualUserEmpty{margin:0;padding:20px;border:1px dashed #d8cbc1;border-radius:11px;background:#faf8f6;color:#756b65;text-align:center;font-size:16px}
+
+/* 用戶資料視窗永遠位於手動預約視窗上方。 */
+.priorityModal{z-index:10050!important}
+.priorityModal .userInfoModal{z-index:10051!important}
+
+/* LINE 聯絡：新增常用訊息有清楚、獨立的操作區。 */
+.lineComposeSection{margin-top:16px;padding:16px;border:1px solid #d9cec5;border-radius:13px;background:#fbf8f5}
+.lineComposeHeading{display:flex;align-items:flex-start;gap:11px}
+.lineComposeHeading>span{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;border-radius:50%;background:#8a3045;color:#fff;font-size:24px;font-weight:500;line-height:1}
+.lineComposeHeading h3{margin:0 0 3px;font-size:19px}
+.lineComposeHeading p{margin:0;color:#746a63;font-size:14px;line-height:1.45}
+.lineComposeSection .lineMessageEditor{margin-top:13px!important}
+.lineComposeSave{width:100%;min-height:44px;margin:12px 0 0!important;border:0!important;border-radius:9px!important;background:#9b5c49!important;color:#fff!important;font-size:16px!important;font-weight:800!important}
+.lineContactActions.single{grid-template-columns:1fr!important}
+.lineContactActions.single .sendLineMessageButton{width:100%}
+@media(max-width:700px){.manualUserResults{max-height:504px}.manualUserProfileButton{min-width:88px;padding-inline:9px!important}.manualUserSelect{padding-inline:10px!important}.manualUserSelect b{font-size:15px}}
