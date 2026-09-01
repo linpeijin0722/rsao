@@ -64,3 +64,4 @@
 .questionPage .healthConcernOptions{display:flex!important;flex-direction:column!important;gap:8px!important;width:100%!important}
 .questionPage .healthConcernOptions label{display:grid!important;grid-template-columns:18px minmax(0,1fr)!important;align-items:center!important;column-gap:9px!important;padding:5px 0!important;border:0!important;background:transparent!important;box-shadow:none!important}
 .questionPage .healthConcernOptions span{grid-column:2;white-space:normal!important}
+.questionPage .quickQuestionOptions label,.questionPage .quickQuestionOther{font-size:inherit!important;font-weight:700!important}
