@@ -2582,22 +2582,13 @@ function isAtMostAge(birthDate: string, maximumAge: number) {
 }
 
 const PAST_LIFE_RELATION_QUESTIONS = [
-  "我們前世是否曾互相扶持、共同完成重要的事？",
-  "今生相遇為彼此帶來哪些正面成長？",
-  "如何延續這段關係中好的緣分？",
-  "我們前世是怎麼認識的？",
-  "為什麼今生會有這麼深的牽絆？",
-  "我們之間是否有未完成的課題？",
-  "如果這段關係很痛苦，我該如何善了，才不會把這個因果又帶到下一世？",
+  "我們前世是怎麼認識的？是什麼關係？",
+  "我們前世的性格？當時的相處模式如何？",
 ];
 
 const PERSONAL_PAST_LIFE_QUESTIONS = [
-  "我前世有什麼特別擅長或有興趣的事情？",
-  "我與哪位神佛最有緣？",
-  "前世累積了哪些優點或福報延續到今生？",
-  "今生可以如何發揮前世帶來的天賦？",
-  "前世有哪些珍貴緣分在今生仍守護著我？",
-  "我前世從事什麼職業，對今生有什麼影響？",
+  "我前世是什麼職業？有什麼特質或特長？",
+  "我前世是否有結婚？有幾個小孩？",
 ];
 
 function QuestionFields({
@@ -2647,7 +2638,7 @@ function QuestionFields({
                     }
                   }}
                 />
-                <span>{index + 1}. {suggestion}</span>
+                <span>{suggestion}</span>
               </label>
             );
           })}
@@ -2663,7 +2654,7 @@ function QuestionFields({
               if (!hasBlank) change([...questions, ""]);
             }}
           >
-            {suggestions.length + 1}. 其它（自填）
+            其它（自填）
           </button>
         </div>
       )}
