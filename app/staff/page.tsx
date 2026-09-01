@@ -94,6 +94,21 @@ const bookingItemLines = (booking: any) => asArray(booking.booking_details).map(
   const subs = asArray(detail.booking_detail_sub_items).map((sub: any) => sub.sub_item_title).filter(Boolean);
   return shortText([detail.item_title, ...subs].filter(Boolean).join(" "));
 });
+const videoDateTimeText = (value: string) => {
+  const parts = new Intl.DateTimeFormat("zh-TW", {
+    timeZone: "Asia/Taipei",
+    month: "numeric",
+    day: "numeric",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(new Date(value));
+  const part = (type: string) => parts.find((entry) => entry.type === type)?.value || "";
+  const weekday = part("weekday").replace(/星期|週/g, "");
+  const period = part("dayPeriod").replace("凌晨", "上午");
+  return `${part("month")}/${part("day")}(${weekday})${period}${part("hour").padStart(2, "0")}:${part("minute")}`;
+};
 export default function Staff() {
   const [password, setPassword] = useState(""),
     [rows, setRows] = useState<any[]>([]),
@@ -133,6 +148,8 @@ export default function Staff() {
     [showTextItems,setShowTextItems]=useState(false),
     [showTextAmount,setShowTextAmount]=useState(false),
     [showDocumentNumber,setShowDocumentNumber]=useState(false),
+    [textPageSize,setTextPageSize]=useState(20),
+    [textPage,setTextPage]=useState(1),
     [videoStatusFilter,setVideoStatusFilter]=useState("all"),
     [videoDataFilter,setVideoDataFilter]=useState("all"),
     [videoSortBy,setVideoSortBy]=useState("paid_desc"),
@@ -248,6 +265,9 @@ export default function Staff() {
       .then((r) => r.json())
       .then((j) => setItems(j.items || []));
   }, []);
+  useEffect(() => {
+    setTextPage(1);
+  }, [statusFilter, dataFilter, sortBy, customerSearch, bookingSearch, documentSearch, textDateFrom, textDateTo, textPageSize]);
   function toggleManualItem(item:any,checked:boolean){
     setManualLines(value=>checked?[...value,{itemId:item.id,subId:item.sub_items?.length===1?item.sub_items[0].id:"",qty:1}]:value.filter(line=>line.itemId!==item.id));
   }
@@ -390,6 +410,8 @@ export default function Staff() {
       () => filtered.filter((x) => x.consultation_methods?.code === "text"),
       [filtered],
     ),
+    textPageCount = Math.max(1, Math.ceil(text.length / textPageSize)),
+    visibleText = text.slice((textPage - 1) * textPageSize, textPage * textPageSize),
     bookedDates = new Set(
       video.filter((x) => x.slot_start).map((x) => key(x.slot_start)),
     ),
@@ -616,11 +638,7 @@ export default function Staff() {
                   <article className={`staffTableRow ${new Date(x.slot_start).getTime()<Date.now()?"pastVideoRow":""}`} key={x.id}>
                     <span className="staffPaidTime">{x.paid_at ? new Date(x.paid_at).toLocaleString("zh-TW", {timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}) : "尚未付款"}</span>
                     <span className="staffVideoTime">
-                      {new Date(x.slot_start).toLocaleTimeString("zh-TW", {
-                        timeZone: "Asia/Taipei",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {videoDateTimeText(x.slot_start)}
                     </span>
                     <button
                       className="customerButton"
@@ -779,7 +797,7 @@ export default function Staff() {
             <b>操作</b>
             <b>諮詢單</b>
           </div>
-          {text.map((x) => {
+          {visibleText.map((x) => {
             const complete = isComplete(x),
               paid = x.payment_status === "paid";
             return (
@@ -825,6 +843,11 @@ export default function Staff() {
             );
           })}
         </div>
+        <nav className="staffPagination" aria-label="文字預約分頁">
+          <label>每頁顯示<select value={textPageSize} onChange={(event)=>setTextPageSize(Number(event.target.value))}>{[10,20,50,100].map(size=><option key={size} value={size}>{size} 筆</option>)}</select></label>
+          <span>第 {Math.min(textPage,textPageCount)}／{textPageCount} 頁・共 {text.length} 筆</span>
+          <div><button disabled={textPage<=1} onClick={()=>setTextPage(page=>Math.max(1,page-1))}>‹ 上一頁</button><button disabled={textPage>=textPageCount} onClick={()=>setTextPage(page=>Math.min(textPageCount,page+1))}>下一頁 ›</button></div>
+        </nav>
       </section>
       {manualOpen && (
         <div className="modalBackdrop" onClick={()=>setManualOpen(false)}>
