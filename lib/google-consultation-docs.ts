@@ -73,8 +73,15 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
   };
   if (headerId) {
     const bounds = contentBounds(headerContent);
-    if (bounds.end > bounds.start) requests.push({ deleteContentRange: { range: { segmentId: headerId, startIndex: bounds.start, endIndex: bounds.end } } });
-    requests.push({ insertText: { location: { segmentId: headerId, index: bounds.start }, text: `訂單編號：${bookingNo}` } });
+    if (bounds.end > 0) requests.push({ deleteContentRange: { range: { segmentId: headerId, startIndex: 0, endIndex: bounds.end } } });
+    requests.push({ insertText: { location: { segmentId: headerId, index: 0 }, text: `訂單編號：${bookingNo}` } });
+    requests.push({
+      updateParagraphStyle: {
+        range: { segmentId: headerId, startIndex: 0, endIndex: `訂單編號：${bookingNo}`.length },
+        paragraphStyle: { spaceAbove: { magnitude: 0, unit: "PT" }, spaceBelow: { magnitude: 0, unit: "PT" }, lineSpacing: 100 },
+        fields: "spaceAbove,spaceBelow,lineSpacing",
+      },
+    });
   } else {
     requests.push({ createHeader: { type: "DEFAULT" } });
   }
@@ -95,16 +102,26 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
     }
   }
   const flatBody = bodyRuns.map((run) => run.text).join("");
+  const locateBodyOffset = (offset: number) => {
+    let cursor = 0;
+    for (const run of bodyRuns) {
+      const next = cursor + run.text.length;
+      if (offset < next) return run.start + (offset - cursor);
+      cursor = next;
+    }
+    return bodyRuns.at(-1)?.end || 1;
+  };
   // 視訊諮詢單最上方兩行是老師辨識預約的重點資訊，固定套用指定紅色。
   // 這裡直接透過 Docs API 覆蓋，避免 Apps Script 的一般標題樣式把它改成咖啡色。
-  const videoHeader = flatBody.match(/^\d{4}\/\d{1,2}\/\d{1,2}\([一二三四五六日]\)(?:上午|中午|下午)\d{2}:\d{2}\nLINE名稱：[^\n]+｜視訊時間：\d+分鐘/);
+  const videoHeader = flatBody.match(/\d{4}\/\d{1,2}\/\d{1,2}\([一二三四五六日]\)(?:上午|中午|下午)\d{2}:\d{2}\nLINE名稱：[^\n]+｜視訊時間：\d+分鐘/);
   if (videoHeader) {
+    const videoHeaderOffset = flatBody.indexOf(videoHeader[0]);
     requests.push({
       updateTextStyle: {
-        range: { startIndex: 1, endIndex: 1 + videoHeader[0].length },
+        range: { startIndex: locateBodyOffset(videoHeaderOffset), endIndex: locateBodyOffset(videoHeaderOffset + videoHeader[0].length) },
         textStyle: {
           foregroundColor: { color: { rgbColor: { red: 0.8, green: 0, blue: 0 } } },
-          fontSize: { magnitude: 15, unit: "PT" },
+          fontSize: { magnitude: 20, unit: "PT" },
           bold: true,
         },
         fields: "foregroundColor,fontSize,bold",
@@ -114,18 +131,9 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
   const noteText = "備註：\n1.以上均為虛歲\n2.如果沒有特別提到的年紀，代表身體狀況大致平順，不需要特別擔心，只要維持日常保養即可。\n3.運勢中的歲數，僅代表在那個年齡段需要特別留意的事項（非今生會活到幾歲喔） 若遇到劫難的時候就要比較小心，通過自己的努力衝過難關，多做福德佈施，化解災劫也能夠延續生命。";
   let noteOffset = flatBody.indexOf(noteText);
   while (noteOffset >= 0) {
-    const locate = (offset: number) => {
-      let cursor = 0;
-      for (const run of bodyRuns) {
-        const next = cursor + run.text.length;
-        if (offset < next) return run.start + (offset - cursor);
-        cursor = next;
-      }
-      return bodyRuns.at(-1)?.end || 1;
-    };
     requests.push({
       updateTextStyle: {
-        range: { startIndex: locate(noteOffset), endIndex: locate(noteOffset + noteText.length) },
+        range: { startIndex: locateBodyOffset(noteOffset), endIndex: locateBodyOffset(noteOffset + noteText.length) },
         textStyle: {
           foregroundColor: { color: { rgbColor: { red: 0, green: 0, blue: 0 } } },
           fontSize: { magnitude: 10, unit: "PT" },
