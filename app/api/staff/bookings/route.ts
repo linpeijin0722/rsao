@@ -11,7 +11,7 @@ export async function GET() {
   const [{ data, error }, { data: customers, error: customerError }, { data: consultationProfiles, error: profileError }] = await Promise.all([db
     .from("bookings")
     .select(
-      "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,data_submitted_at,status,cancellation_reason,paid_at,created_at,customers(id,line_user_id,line_display_name,line_picture_url,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,quantity,google_document_id,google_document_url,google_document_created_at,google_sheet_url,booking_items(code),booking_detail_sub_items(sub_item_id,sub_item_title),booking_detail_profiles(profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)),booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data),booking_answer_participants(position,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data))))",
+      "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,data_submitted_at,status,cancellation_reason,paid_at,created_at,customers(id,line_user_id,line_display_name,line_picture_url,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,quantity,google_document_id,google_document_url,google_document_created_at,google_sheet_url,booking_items(code),booking_detail_sub_items(sub_item_id,sub_item_title),booking_detail_profiles(profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)),booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data),booking_answer_participants(position,profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data))))",
     )
     .order("created_at", { ascending: false }), db
     .from("customers")
@@ -125,6 +125,14 @@ export async function POST(request: NextRequest) {
     if(!target)return NextResponse.json({error:"這筆訂單沒有可連結的前世因果（個人）項目"},{status:400});
     const normalized=`https://docs.google.com/document/d/${match[1]}/edit`,{error:updateError}=await db.from("booking_details").update({google_document_id:match[1],google_document_url:normalized,google_document_created_at:target.google_document_created_at||new Date().toISOString()}).eq("id",target.id);
     return updateError?NextResponse.json({error:updateError.message},{status:400}):NextResponse.json({ok:true,url:normalized});
+  }
+  if (action === "get_answer") {
+    if (!body.answerId) return NextResponse.json({ error: "缺少問事資料" }, { status: 400 });
+    const db = adminSupabase(), { data: answer, error } = await db.from("booking_consultation_answers")
+      .select("id,profile_id,questions,extra_data,updated_at,booking_answer_participants(position,profile_id)")
+      .eq("id", body.answerId).single();
+    if (error || !answer) return NextResponse.json({ error: error?.message || "找不到問事資料" }, { status: 404 });
+    return NextResponse.json({ answer });
   }
   if (action === "update_answer") {
     if(!body.answerId||!body.profileId)return NextResponse.json({error:"缺少問事資料"},{status:400});
