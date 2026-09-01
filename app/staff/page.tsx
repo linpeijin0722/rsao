@@ -137,6 +137,7 @@ export default function Staff() {
     [showVideoAmount,setShowVideoAmount]=useState(false),
     [showVideoDocumentNumber,setShowVideoDocumentNumber]=useState(false),
     [showUpcomingVideo,setShowUpcomingVideo]=useState(false),
+    [showNewVideo,setShowNewVideo]=useState(false),
     [rememberPassword, setRememberPassword] = useState(false),
     [generatingDocument, setGeneratingDocument] = useState(""),
     [addPicker, setAddPicker] = useState<any>(null),
@@ -376,7 +377,16 @@ export default function Staff() {
     bookedDates = new Set(
       video.filter((x) => x.slot_start).map((x) => key(x.slot_start)),
     ),
-    daily = video.filter((x) => x.slot_start && (showUpcomingVideo ? ["paid", "pending"].includes(statusKey(x)) && new Date(x.slot_start).getTime() >= Date.now() : key(x.slot_start) === selectedDate))
+    daily = video.filter((x) => {
+      if (!x.slot_start) return false;
+      const slotTime = new Date(x.slot_start).getTime();
+      if (showUpcomingVideo) return ["paid", "pending"].includes(statusKey(x)) && slotTime >= Date.now();
+      if (showNewVideo) {
+        const twoWeeksLater = Date.now() + 14 * 24 * 60 * 60 * 1000;
+        return ["paid", "pending"].includes(statusKey(x)) && slotTime >= Date.now() && slotTime <= twoWeeksLater;
+      }
+      return key(x.slot_start) === selectedDate;
+    })
       .sort((a,b)=>new Date(a.slot_start).getTime()-new Date(b.slot_start).getTime()),
     cal = useMemo(() => {
       const [y, m] = month.split("-").map(Number),
@@ -552,8 +562,8 @@ export default function Staff() {
                 <button
                   key={d}
                   disabled={!bookedDates.has(d)}
-                  className={`${bookedDates.has(d) ? (d < key(new Date().toISOString()) ? "booked pastBooked" : "booked") : "empty"} ${selectedDate === d && !showUpcomingVideo ? "selected" : ""}`}
-                  onClick={() => {setSelectedDate(d);setShowUpcomingVideo(false)}}
+                  className={`${bookedDates.has(d) ? (d < key(new Date().toISOString()) ? "booked pastBooked" : "booked") : "empty"} ${selectedDate === d && !showUpcomingVideo && !showNewVideo ? "selected" : ""}`}
+                  onClick={() => {setSelectedDate(d);setShowUpcomingVideo(false);setShowNewVideo(false)}}
                 >
                   {Number(d.slice(-2))}
                 </button>
@@ -564,13 +574,15 @@ export default function Staff() {
           </div>
         </div>
         <div className="videoViewToolbar">
-          <button className={showUpcomingVideo?"active":""} onClick={()=>{setShowUpcomingVideo(true);setSelectedDate("")}}>即將來臨的視訊</button>
+          <button className={showUpcomingVideo?"active":""} onClick={()=>{setShowUpcomingVideo(true);setShowNewVideo(false);setSelectedDate("")}}>即將來臨的視訊</button>
+          <button className={showNewVideo?"active":""} onClick={()=>{setShowNewVideo(true);setShowUpcomingVideo(false);setSelectedDate("")}}>查看新訂單</button>
         </div>
-        {(selectedDate || showUpcomingVideo) && (
+        {(selectedDate || showUpcomingVideo || showNewVideo) && (
           <div className="dailyBookings">
-            <h3>目前顯示：{showUpcomingVideo?"即將來臨的視訊（含待付款）":selectedDate}</h3>
+            <h3>目前顯示：{showUpcomingVideo?"即將來臨的視訊（含待付款）":showNewVideo?"兩週內的新訂單（含待付款）":selectedDate}</h3>
             <div className="staffBookingTable">
               <div className="staffTableHead">
+                <b>付款時間</b>
                 <b>視訊時間</b>
                 <b>用戶</b>
                 <b>付款狀態</b>
@@ -586,6 +598,7 @@ export default function Staff() {
                   profiles = returnedData(x);
                 return (
                   <article className={`staffTableRow ${new Date(x.slot_start).getTime()<Date.now()?"pastVideoRow":""}`} key={x.id}>
+                    <span className="staffPaidTime">{x.paid_at ? new Date(x.paid_at).toLocaleString("zh-TW", {timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}) : "尚未付款"}</span>
                     <span>
                       {new Date(x.slot_start).toLocaleTimeString("zh-TW", {
                         timeZone: "Asia/Taipei",
@@ -809,6 +822,10 @@ export default function Staff() {
               <select value={manualCustomerId} onChange={event=>setManualCustomerId(event.target.value)}><option value="">請選擇 LINE 用戶</option>{filteredManualCustomers.map(customer=><option key={customer.id} value={customer.id}>{customer.line_display_name||"LINE 用戶"}｜{customer.full_name}</option>)}</select>
               <small>{manualUserSearch.trim() ? `找到 ${filteredManualCustomers.length} 位符合的用戶` : `共 ${manualCustomers.length} 位可選用戶`}</small>
             </div>
+            {manualCustomerId && (()=>{const customer=manualCustomers.find(item=>item.id===manualCustomerId);return customer?<button type="button" className="manualSelectedCustomer" onClick={()=>setUserView(customer)}>
+              {customer.line_picture_url?<img src={customer.line_picture_url} alt="LINE 頭像"/>:<span className="avatarFallback">LINE</span>}
+              <span><b>{customer.line_display_name||"LINE 用戶"}｜{customer.full_name}</b><small>點此查看基本資料</small></span>
+            </button>:null})()}
             {manualMethod==="video"&&<label className="manualMainField">視訊日期與時間<input type="datetime-local" value={manualSlotStart} onChange={event=>setManualSlotStart(event.target.value)}/><small>後台可依實際需要建立 4 天內的視訊預約；時間為台灣時間。</small></label>}
             <section className="manualItems"><h3>選擇諮詢項目</h3>{items.map(item=>{const line=manualLines.find(candidate=>candidate.itemId===item.id);return <article key={item.id} className={line?"selected":""}>
               <label><input type="checkbox" checked={Boolean(line)} onChange={event=>toggleManualItem(item,event.target.checked)}/><b>{item.title}</b><span>NT$ {Number(item.price||0).toLocaleString("zh-TW")}</span></label>
