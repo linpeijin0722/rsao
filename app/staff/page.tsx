@@ -34,9 +34,17 @@ const returnedData = (x: any) =>
         (profile: any, index: number, all: any[]) =>
           profile && all.findIndex((candidate: any) => candidate?.id === profile.id) === index,
       );
+      const primaryProfileId = direct[0]?.id || answer.profile_id || profiles[0]?.id || "";
+      const orderedProfileIds = [
+        primaryProfileId,
+        ...participants.map((profile: any) => profile?.id),
+        ...profiles.map((profile: any) => profile?.id),
+      ].filter((id: any, index: number, all: any[]) => id && all.indexOf(id) === index);
       return profiles.map((profile: any) => ({
         ...profile,
         answerId: answer.id,
+        targetProfileId: primaryProfileId,
+        targetProfileIds: orderedProfileIds,
         questions: asArray(answer.questions),
         extra_data: answer.extra_data || {},
         item_code: detail.booking_items?.code || "",
@@ -579,7 +587,7 @@ export default function Staff() {
         </div>
         {(selectedDate || showUpcomingVideo || showNewVideo) && (
           <div className="dailyBookings">
-            <h3>目前顯示：{showUpcomingVideo?"即將來臨的視訊（含待付款）":showNewVideo?"兩週內的新訂單（含待付款）":selectedDate}</h3>
+            <h3>目前顯示：{showUpcomingVideo?"即將來臨的視訊":showNewVideo?"兩週內的新訂單":selectedDate}</h3>
             <div className="staffBookingTable">
               <div className="staffTableHead">
                 <b>付款時間</b>
@@ -599,7 +607,7 @@ export default function Staff() {
                 return (
                   <article className={`staffTableRow ${new Date(x.slot_start).getTime()<Date.now()?"pastVideoRow":""}`} key={x.id}>
                     <span className="staffPaidTime">{x.paid_at ? new Date(x.paid_at).toLocaleString("zh-TW", {timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}) : "尚未付款"}</span>
-                    <span>
+                    <span className="staffVideoTime">
                       {new Date(x.slot_start).toLocaleTimeString("zh-TW", {
                         timeZone: "Asia/Taipei",
                         hour: "2-digit",
@@ -683,7 +691,7 @@ export default function Staff() {
             {dataViewMode==="menu"&&<div className="returnedActionMenu"><button disabled={!dataView.length} onClick={()=>setDataViewMode("user")}>修改用戶資料</button><button disabled={!dataView.some((p:any)=>Boolean(p.answerId))} onClick={()=>setDataViewMode("answers")}>修改問事資料</button>{!dataView.length&&<p className="staffEmptyReturnedAnswers">此訂單標示為已回傳，但資料庫內找不到可編輯的諮詢者資料。請重新整理；若仍出現此訊息，代表該筆舊資料未正確寫入。</p>}</div>}
             {dataViewMode!=="menu"&&<button className="returnedMenuBack" onClick={()=>setDataViewMode("menu")}>‹ 返回功能選單</button>}
             {dataViewMode==="user"&&<div className="staffProfileTags">{uniquePeople(dataView).map((p:any)=>{const category=p.relationship==="本人"&&!p.relationship_detail?"本人":p.profile_type==="person"?"親友":p.profile_type==="pet"?"往生寵物":"過世親友";return <button key={p.id} className="staffProfileTag" onClick={()=>setProfileEditor({...p})}>{p.profile_type==="pet"&&p.photo_data&&<img src={p.photo_data} alt=""/>}<span><b>{p.name}</b><small>{category}{p.relationship_detail?`・${p.relationship_detail}`:""}</small></span></button>})}</div>}
-            {dataViewMode==="answers"&&<div className="staffAnswerCards">{dataView.filter((p:any)=>Boolean(p.answerId)).filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.answerId===p.answerId)===i).map((p:any)=>{const people=uniquePeople(dataView.filter((person:any)=>person.answerId===p.answerId));return <article key={p.answerId}><div className="answerProfileTags">{people.map((person:any)=><div className="answerProfileTag" key={person.id}>{person.profile_type==="pet"&&person.photo_data&&<img src={person.photo_data} alt=""/>}<span><b>{person.name}</b><small>{person.relationship_detail||person.relationship}</small></span></div>)}</div><h3>{p.item_title}{p.sub_items?.length?`－${p.sub_items.join("、")}`:""}</h3><button className="editAnswerButton" onClick={()=>setAnswerEditor({...p,targetProfileId:people[0]?.id||p.id,targetProfileIds:people.map((person:any)=>person.id),questions:[0,1,2].map(i=>p.questions?.[i]||"")})}>修改該項目問事資料</button></article>})}{!dataView.some((p:any)=>Boolean(p.answerId))&&<p className="staffEmptyReturnedAnswers">這筆預約目前沒有可編輯的問事答案；可返回修改用戶資料。</p>}</div>}
+            {dataViewMode==="answers"&&<div className="staffAnswerCards">{dataView.filter((p:any)=>Boolean(p.answerId)).filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.answerId===p.answerId)===i).map((p:any)=>{const people=uniquePeople(dataView.filter((person:any)=>person.answerId===p.answerId));const orderedIds=asArray(p.targetProfileIds).length?asArray(p.targetProfileIds):people.map((person:any)=>person.id);return <article key={p.answerId}><div className="answerProfileTags">{people.map((person:any)=><div className="answerProfileTag" key={person.id}>{person.profile_type==="pet"&&person.photo_data&&<img src={person.photo_data} alt=""/>}<span><b>{person.name}</b><small>{person.relationship_detail||person.relationship}</small></span></div>)}</div><h3>{p.item_title}{p.sub_items?.length?`－${p.sub_items.join("、")}`:""}</h3><button className="editAnswerButton" onClick={()=>setAnswerEditor({...p,targetProfileId:p.targetProfileId||orderedIds[0]||p.id,targetProfileIds:orderedIds,questions:asArray(p.questions)})}>修改該項目問事資料</button></article>})}{!dataView.some((p:any)=>Boolean(p.answerId))&&<p className="staffEmptyReturnedAnswers">這筆預約目前沒有可編輯的問事答案；可返回修改用戶資料。</p>}</div>}
             {dataViewMode==="view"&&<div className="staffAnswerCards">{dataView.filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.answerId===p.answerId)===i).map((p:any)=><article key={p.answerId}><h3>{p.item_title}{p.sub_items?.length?`－${p.sub_items.join("、")}`:""}</h3>{p.questions?.filter(Boolean).map((q:string,n:number)=><p key={n}>問題 {n+1}：{q}</p>)}</article>)}</div>}
             <button onClick={() => {setDataView([]);setDataBooking(null)}}>關閉</button>
           </div>
