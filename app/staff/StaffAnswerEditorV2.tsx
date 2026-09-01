@@ -3,6 +3,17 @@ import { lunarProfile } from "@/lib/lunar-profile";
 
 const text = (value: unknown) => String(value ?? "");
 const times=["子時（23:00–01:00）","丑時（01:00–03:00）","寅時（03:00–05:00）","卯時（05:00–07:00）","辰時（07:00–09:00）","巳時（09:00–11:00）","午時（11:00–13:00）","未時（13:00–15:00）","申時（15:00–17:00）","酉時（17:00–19:00）","戌時（19:00–21:00）","亥時（21:00–23:00）","不確定"];
+const overallFocusFieldLabels: Record<string, string[]> = {
+  "想換工作": ["目前公司／產業", "目前職位與主要工作內容", "想離開或換工作的主要原因", "希望轉往的方向／職務"],
+  "想問升職或加薪": ["目前公司與職位", "目前任職多久", "近期的升遷或調薪機會", "目前最擔心的阻礙"],
+  "創業或副業發展": ["想做的產業／產品或服務", "目前籌備到哪個階段", "是否有合夥人", "最想確認的方向或風險"],
+  "貴人運": ["目前最需要協助的事情", "希望貴人協助的方向", "身邊是否已有可能協助的人"],
+  "職涯迷惘": ["目前的工作／待業狀態", "目前正在考慮的選擇", "選擇工作時最在意的條件", "目前最大的困難"],
+  "近期財運": ["目前主要收入來源", "最近的財務變化", "最想了解的時間範圍與重點"],
+  "財務壓力": ["目前主要的壓力來源", "這個狀況持續多久了", "最希望改善的事情", "是否有重要期限"],
+  "健康提醒": ["目前最在意的身體狀況", "這個狀況持續多久了", "是否已就醫或做過檢查", "希望老師特別留意的方向"],
+  "其他": ["想聚焦的具體事件", "目前的實際狀況", "這次最想了解的重點"],
+};
 
 export default function StaffAnswerEditorV2({ value, profiles, change, close, save }: any) {
   const ids: string[] = value.targetProfileIds?.length
@@ -103,7 +114,7 @@ export default function StaffAnswerEditorV2({ value, profiles, change, close, sa
       {relation && targetIds.map((id) => <TargetQuestions key={`past-${id}`} primary={profiles.find((p: any) => p.id === ids[0])} profile={profiles.find((p: any) => p.id === id)} kind="前世關係" questions={targetQuestions[id] || []} update={(next: string[]) => setTargetData("target_questions", id, next)} />)}
 
       {personalLove && <section className="staffAnswerSection">{area("目前感情狀態", "love_status", "例如：單身多久、剛分手沉澱中、空窗期較長等")}{area("目前的社交與生活型態", "social_lifestyle", "例如：生活圈固定不太出門、正積極使用交友軟體或參加活動等")}</section>}
-      {overall && <section className="staffAnswerSection"><h4>目前最想聚焦、最關心的具體事件</h4><div className="staffHealthChecks">{(extra.overall_focuses || []).map((focus: string) => <label key={focus}><input type="checkbox" checked readOnly/>{focus}</label>)}</div>{(extra.overall_focuses || []).map((focus: string) => <div className="staffNestedFields" key={focus}><h4>{focus}</h4>{Object.entries(extra.overall_focus_details?.[focus] || {}).map(([field, answer]) => <label key={field}>{field}<textarea value={text(answer)} onChange={(event) => setExtra("overall_focus_details", {...(extra.overall_focus_details || {}), [focus]: {...(extra.overall_focus_details?.[focus] || {}), [field]: event.target.value}})}/></label>)}</div>)}</section>}
+      {overall && <section className="staffAnswerSection"><h4>目前最想聚焦、最關心的具體事件</h4><div className="staffHealthChecks">{(extra.overall_focuses || []).map((focus: string) => <label key={focus}><input type="checkbox" checked readOnly/>{focus}</label>)}</div>{(extra.overall_focuses || []).map((focus: string) => { const saved = extra.overall_focus_details?.[focus] || {}; const fields = overallFocusFieldLabels[focus] || Object.keys(saved); return <div className="staffNestedFields" key={focus}><h4>{focus}</h4>{fields.map((field) => <label key={field}>{field}<textarea value={text(saved[field])} onChange={(event) => setExtra("overall_focus_details", {...(extra.overall_focus_details || {}), [focus]: {...saved, [field]: event.target.value}})}/></label>)}</div>})}</section>}
       {spiritual && <section className="staffAnswerSection">{area("請簡述受到干擾的情況", "interference_situation", "例如：反覆做相似的夢、莫名不安，或在特定時間與地點感到異常")}{input("這樣的情況持續多久了？", "interference_duration", "例如：約三個月，或從搬家後開始")}</section>}
       {newborn && <section className="staffAnswerSection">{input("希望寶寶姓氏", "baby_surname")}{area("是否有特別想用的字或喜歡的讀音？", "preferred_characters", "例如：喜歡『安』字、希望讀音溫柔好念")}{area("對名字的風格有沒有什麼想像？", "name_style", "例如：想要響亮一點、優雅一點，還是有想避開的感覺？")}{area("是否有禁忌或避諱的字或諧音？", "name_taboo", "例如：避開長輩同名、特定字或容易產生誤會的諧音")}{area("其他備註", "naming_notes")}</section>}
       {personalRename && <section className="staffAnswerSection">{area("是否有特別想用的字或喜歡的讀音？", "preferred_characters", "例如：喜歡『安』字、希望讀音溫柔好念")}{area("對名字的風格有沒有什麼想像？", "name_style", "例如：希望名字較穩重、清新或好記")}{area("是否有禁忌或避諱的字或諧音？", "name_taboo", "例如：希望避開的字、長輩同名或不喜歡的諧音")}{area("其他備註", "naming_notes")}</section>}
