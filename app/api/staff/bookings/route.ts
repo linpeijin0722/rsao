@@ -143,14 +143,22 @@ export async function POST(request: NextRequest) {
   if (action === "update_price") {
     const amount=Number(body.totalPrice);
     if(!Number.isInteger(amount)||amount<0||amount>10000000)return NextResponse.json({error:"請輸入正確的整數金額"},{status:400});
-    const db=adminSupabase(),{data:booking,error:findError}=await db.from("bookings").select("id,booking_no,payment_status,status,customers(line_user_id)").eq("booking_no",bookingNo).single();
+    const db=adminSupabase(),{data:booking,error:findError}=await db.from("bookings").select("id,booking_no,total_price,slot_start,expires_at,payment_status,status,customers(line_user_id),consultation_methods(code),booking_details(item_title,quantity,booking_detail_sub_items(sub_item_title))").eq("booking_no",bookingNo).single();
     if(findError||!booking)return NextResponse.json({error:findError?.message||"找不到訂單"},{status:404});
     if(booking.payment_status==="paid")return NextResponse.json({error:"已付款訂單不能修改金額"},{status:400});
     if(booking.status==="cancelled"||booking.status==="expired")return NextResponse.json({error:"已取消或已失效訂單不能修改金額"},{status:400});
     const {data,error}=await db.from("bookings").update({total_price:amount,updated_at:new Date().toISOString()}).eq("id",booking.id).neq("payment_status","paid").select("booking_no,total_price").single();
     if(error||!data)return NextResponse.json({error:error?.message||"訂單狀態已變更，請重新載入"},{status:400});
-    const customer=Array.isArray(booking.customers)?booking.customers[0]:booking.customers,site=process.env.NEXT_PUBLIC_SITE_URL||request.nextUrl.origin;
-    if(customer?.line_user_id)try{await pushLineFlex(customer.line_user_id,"訂單金額已更新",{type:"bubble",header:{type:"box",layout:"vertical",backgroundColor:"#F4EBDD",contents:[{type:"text",text:"訂單已更新",weight:"bold",size:"xl",color:"#8A3045",align:"center"},{type:"text",text:"林阿嫂線上諮詢",size:"sm",color:"#777777",align:"center",margin:"sm"}]},body:{type:"box",layout:"vertical",spacing:"md",contents:[{type:"text",text:"訂單編號："+booking.booking_no,wrap:true},{type:"text",text:"更新後金額：NT$ "+amount.toLocaleString("zh-TW"),weight:"bold",color:"#8A3045",size:"lg"},{type:"text",text:"訂單金額已由工作人員更新，請點選下方按鈕繼續完成付款。",wrap:true,color:"#555555"}]},footer:{type:"box",layout:"vertical",contents:[{type:"button",style:"primary",height:"md",color:"#8A3045",action:{type:"uri",label:"繼續付款",uri:site+"/pay?order="+encodeURIComponent(booking.booking_no)}}]}})}catch(lineError){console.error("訂單改價 LINE 通知失敗",lineError)}
+    const customer=Array.isArray(booking.customers)?booking.customers[0]:booking.customers,
+      method=Array.isArray(booking.consultation_methods)?booking.consultation_methods[0]:booking.consultation_methods,
+      details=Array.isArray(booking.booking_details)?booking.booking_details:[],
+      itemTitles=details.flatMap((detail:any)=>{
+        const subs=Array.isArray(detail.booking_detail_sub_items)?detail.booking_detail_sub_items:[];
+        const title=[detail.item_title,subs.map((sub:any)=>sub.sub_item_title).filter(Boolean).join("、")].filter(Boolean).join("｜");
+        return Array.from({length:Math.max(1,Number(detail.quantity)||1)},()=>title);
+      }).filter(Boolean),
+      site=process.env.NEXT_PUBLIC_SITE_URL||request.nextUrl.origin;
+    if(customer?.line_user_id)try{await pushLineFlex(customer.line_user_id,"訂單已更新",bookingStatusFlex({status:"pending",headerLabel:"訂單已更新",bookingNo:booking.booking_no,method:method?.code||"text",total:amount,slotStart:booking.slot_start||undefined,items:itemTitles,expiresAt:booking.expires_at||undefined,site}))}catch(lineError){console.error("訂單改價 LINE 通知失敗",lineError)}
     return NextResponse.json({ok:true,totalPrice:data.total_price});
   }
   if (action !== "mark_paid") return NextResponse.json({ error: "不支援的操作" }, { status: 400 });
