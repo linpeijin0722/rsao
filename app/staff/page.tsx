@@ -138,12 +138,10 @@ export default function Staff() {
     [videoSortBy,setVideoSortBy]=useState("paid_desc"),
     [videoCustomerSearch,setVideoCustomerSearch]=useState(""),
     [videoBookingSearch,setVideoBookingSearch]=useState(""),
-    [videoDocumentSearch,setVideoDocumentSearch]=useState(""),
     [videoDateFrom,setVideoDateFrom]=useState(""),
     [videoDateTo,setVideoDateTo]=useState(""),
     [showVideoItems,setShowVideoItems]=useState(false),
     [showVideoAmount,setShowVideoAmount]=useState(false),
-    [showVideoDocumentNumber,setShowVideoDocumentNumber]=useState(false),
     [showUpcomingVideo,setShowUpcomingVideo]=useState(false),
     [showNewVideo,setShowNewVideo]=useState(false),
     [rememberPassword, setRememberPassword] = useState(false),
@@ -187,8 +185,8 @@ export default function Staff() {
       if(!response.ok)throw new Error(result.error||"建立文件失敗");
       const lineName=x.customers?.line_display_name||"LINE 用戶";
       const customerName=x.customers?.full_name||"未填姓名";
-      const documentNumber=consultationNumberFor(x)||"未編號";
-      alert(createMode==="new"?`【${documentNumber}｜${lineName}．${customerName}】新諮詢單已建立，連結已更新。`:exists?`【${documentNumber}｜${lineName}．${customerName}】諮詢單已重新建立`:`【${documentNumber}｜${lineName}．${customerName}】諮詢單已建立完成。`);
+      const documentNumber=consultationNumberFor(x),documentLabel=[documentNumber,`${lineName}．${customerName}`].filter(Boolean).join("｜");
+      alert(createMode==="new"?`【${documentLabel}】新諮詢單已建立，連結已更新。`:exists?`【${documentLabel}】諮詢單已重新建立`:`【${documentLabel}】諮詢單已建立完成。`);
       await load();
     }catch(error){alert(error instanceof Error?error.message:"建立文件失敗")}finally{setGeneratingDocument("")}
   }
@@ -208,11 +206,23 @@ export default function Staff() {
     </span>
   }
   function consultationNumberFor(booking:any){
-    const docs=rows.flatMap((row:any)=>asArray(row.booking_details).filter((detail:any)=>detail.google_document_id).map((detail:any)=>({id:detail.google_document_id,created:detail.google_document_created_at||row.created_at}))).filter((doc:any,index:number,all:any[])=>all.findIndex((candidate:any)=>candidate.id===doc.id)===index).sort((a:any,b:any)=>String(a.created).localeCompare(String(b.created)));
+    if(booking.consultation_methods?.code==="video")return "";
+    const docs=rows.filter((row:any)=>row.consultation_methods?.code!=="video").flatMap((row:any)=>asArray(row.booking_details).filter((detail:any)=>detail.google_document_id).map((detail:any)=>({id:detail.google_document_id,created:detail.google_document_created_at||row.created_at}))).filter((doc:any,index:number,all:any[])=>all.findIndex((candidate:any)=>candidate.id===doc.id)===index).sort((a:any,b:any)=>String(a.created).localeCompare(String(b.created)));
     const documentId=asArray(booking.booking_details).find((detail:any)=>detail.google_document_id)?.google_document_id;
     const position=docs.findIndex((doc:any)=>doc.id===documentId)+1;
     if(position<1)return "";
-    return `${String.fromCharCode(65+Math.floor((position-1)/99))}${String(((position-1)%99)+1).padStart(2,"0")}`;
+    const base=`${String.fromCharCode(65+Math.floor((position-1)/99))}${String(((position-1)%99)+1).padStart(2,"0")}`;
+    const date=new Date(booking.paid_at||booking.created_at||Date.now());
+    const month=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",month:"short"}).format(date);
+    const year=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"2-digit"}).format(date);
+    return `${base}.${month}${year}`;
+  }
+  async function openAnswerEditor(latestBase:any,fallbackIds:string[]){
+    const response=await staffPost({action:"get_answer",answerId:latestBase.answerId}),result=await response.json();
+    if(!response.ok)return alert(result.error||"讀取最新問事資料失敗");
+    const answer=result.answer||{},participantIds=asArray(answer.booking_answer_participants).sort((a:any,b:any)=>(a.position||0)-(b.position||0)).map((participant:any)=>participant.profile_id).filter(Boolean);
+    const orderedIds=[answer.profile_id,...participantIds].filter((id:string,index:number,all:string[])=>Boolean(id)&&all.indexOf(id)===index);
+    setAnswerEditor({...latestBase,targetProfileId:answer.profile_id||orderedIds[0]||fallbackIds[0]||latestBase.id,targetProfileIds:orderedIds.length?orderedIds:fallbackIds,questions:asArray(answer.questions),extra_data:answer.extra_data||{}});
   }
   async function savePrice(){
     if(!priceEdit)return;
@@ -363,11 +373,9 @@ export default function Staff() {
         }
         const customerQuery=videoCustomerSearch.trim().toLocaleLowerCase();
         const bookingQuery=videoBookingSearch.trim().toLocaleLowerCase();
-        const documentQuery=videoDocumentSearch.trim().toLocaleLowerCase();
         const customerValue=`${x.customers?.line_display_name||""} ${x.customers?.full_name||""}`.toLocaleLowerCase();
         if(customerQuery&&!customerValue.includes(customerQuery))return false;
         if(bookingQuery&&!String(x.booking_no||"").toLocaleLowerCase().includes(bookingQuery))return false;
-        if(documentQuery&&!consultationNumberFor(x).toLocaleLowerCase().includes(documentQuery))return false;
         const paidDate=key(x.paid_at||x.created_at);
         if(videoDateFrom&&paidDate<videoDateFrom)return false;
         if(videoDateTo&&paidDate>videoDateTo)return false;
@@ -377,7 +385,7 @@ export default function Staff() {
         const comparison=String(a.paid_at||a.created_at).localeCompare(String(b.paid_at||b.created_at));
         return videoSortBy==="paid_asc"?comparison:-comparison;
       });
-    },[rows,videoStatusFilter,videoDataFilter,videoSortBy,videoCustomerSearch,videoBookingSearch,videoDocumentSearch,videoDateFrom,videoDateTo]),
+    },[rows,videoStatusFilter,videoDataFilter,videoSortBy,videoCustomerSearch,videoBookingSearch,videoDateFrom,videoDateTo]),
     text = useMemo(
       () => filtered.filter((x) => x.consultation_methods?.code === "text"),
       [filtered],
@@ -532,11 +540,11 @@ export default function Staff() {
             <label>訂單狀態<select value={videoStatusFilter} onChange={e=>setVideoStatusFilter(e.target.value)}><option value="all">全部</option><option value="paid">已付款</option><option value="pending">待付款</option><option value="cancelled">已取消</option><option value="expired">已失效</option></select></label>
             <label>資料回傳<select value={videoDataFilter} onChange={e=>setVideoDataFilter(e.target.value)}><option value="all">全部</option><option value="returned">已回傳</option><option value="missing">尚未回傳</option></select></label>
             <label>排序<select value={videoSortBy} onChange={e=>setVideoSortBy(e.target.value)}><option value="paid_desc">由新到舊</option><option value="paid_asc">由舊到新</option></select></label>
-            <div className="staffSearchGroup" role="search" aria-label="搜尋視訊預約"><span className="staffSearchIcon" aria-hidden="true">⌕</span><label className="staffSearchField"><input value={videoCustomerSearch} onChange={e=>setVideoCustomerSearch(e.target.value)} placeholder="LINE名或姓名" aria-label="LINE名或姓名"/></label><label className="staffSearchField"><input value={videoBookingSearch} onChange={e=>setVideoBookingSearch(e.target.value)} placeholder="訂單編號" aria-label="訂單編號"/></label><label className="staffSearchField"><input value={videoDocumentSearch} onChange={e=>setVideoDocumentSearch(e.target.value)} placeholder="諮詢單號" aria-label="諮詢單號"/></label></div>
+            <div className="staffSearchGroup" role="search" aria-label="搜尋視訊預約"><span className="staffSearchIcon" aria-hidden="true">⌕</span><label className="staffSearchField"><input value={videoCustomerSearch} onChange={e=>setVideoCustomerSearch(e.target.value)} placeholder="LINE名或姓名" aria-label="LINE名或姓名"/></label><label className="staffSearchField"><input value={videoBookingSearch} onChange={e=>setVideoBookingSearch(e.target.value)} placeholder="訂單編號" aria-label="訂單編號"/></label></div>
           </div>
           <div className="staffSecondaryFilters">
             <div className="staffDateRange"><b>付款日期</b><label><span>從</span><input type="date" value={videoDateFrom} onChange={e=>setVideoDateFrom(e.target.value)}/></label><label><span>到</span><input type="date" value={videoDateTo} min={videoDateFrom||undefined} onChange={e=>setVideoDateTo(e.target.value)}/></label>{(videoDateFrom||videoDateTo)&&<button onClick={()=>{setVideoDateFrom("");setVideoDateTo("")}}>清除日期</button>}</div>
-            <div className="staffDisplayOptions"><b>表格顯示</b><label><input type="checkbox" checked={showVideoItems} onChange={e=>setShowVideoItems(e.target.checked)}/><span>預約項目</span></label><label><input type="checkbox" checked={showVideoAmount} onChange={e=>setShowVideoAmount(e.target.checked)}/><span>訂單金額</span></label><label><input type="checkbox" checked={showVideoDocumentNumber} onChange={e=>setShowVideoDocumentNumber(e.target.checked)}/><span>諮詢單編號</span></label></div>
+            <div className="staffDisplayOptions"><b>表格顯示</b><label><input type="checkbox" checked={showVideoItems} onChange={e=>setShowVideoItems(e.target.checked)}/><span>預約項目</span></label><label><input type="checkbox" checked={showVideoAmount} onChange={e=>setShowVideoAmount(e.target.checked)}/><span>訂單金額</span></label></div>
           </div>
         </div>
         <div className="staffMonthNav">
@@ -645,7 +653,7 @@ export default function Staff() {
                     )}
                     <div className="staffOrderCell"><small>{x.booking_no}</small>{showVideoItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-video-item-${index}`}>{line}</div>)}</div>}</div>
                     <button onClick={() => openEdit(x)}>修改</button>
-                    {documentActions(x,showVideoDocumentNumber)}
+                    {documentActions(x,false)}
                   </article>
                 );
               })}
@@ -691,7 +699,7 @@ export default function Staff() {
             {dataViewMode==="menu"&&<div className="returnedActionMenu"><button disabled={!dataView.length} onClick={()=>setDataViewMode("user")}>修改用戶資料</button><button disabled={!dataView.some((p:any)=>Boolean(p.answerId))} onClick={()=>setDataViewMode("answers")}>修改問事資料</button>{!dataView.length&&<p className="staffEmptyReturnedAnswers">此訂單標示為已回傳，但資料庫內找不到可編輯的諮詢者資料。請重新整理；若仍出現此訊息，代表該筆舊資料未正確寫入。</p>}</div>}
             {dataViewMode!=="menu"&&<button className="returnedMenuBack" onClick={()=>setDataViewMode("menu")}>‹ 返回功能選單</button>}
             {dataViewMode==="user"&&<div className="staffProfileTags">{uniquePeople(dataView).map((p:any)=>{const category=p.relationship==="本人"&&!p.relationship_detail?"本人":p.profile_type==="person"?"親友":p.profile_type==="pet"?"往生寵物":"過世親友";return <button key={p.id} className="staffProfileTag" onClick={()=>setProfileEditor({...p})}>{p.profile_type==="pet"&&p.photo_data&&<img src={p.photo_data} alt=""/>}<span><b>{p.name}</b><small>{category}{p.relationship_detail?`・${p.relationship_detail}`:""}</small></span></button>})}</div>}
-            {dataViewMode==="answers"&&<div className="staffAnswerCards">{dataView.filter((p:any)=>Boolean(p.answerId)).filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.answerId===p.answerId)===i).map((p:any)=>{const people=uniquePeople(dataView.filter((person:any)=>person.answerId===p.answerId));const orderedIds=asArray(p.targetProfileIds).length?asArray(p.targetProfileIds):people.map((person:any)=>person.id);return <article key={p.answerId}><div className="answerProfileTags">{people.map((person:any)=><div className="answerProfileTag" key={person.id}>{person.profile_type==="pet"&&person.photo_data&&<img src={person.photo_data} alt=""/>}<span><b>{person.name}</b><small>{person.relationship_detail||person.relationship}</small></span></div>)}</div><h3>{p.item_title}{p.sub_items?.length?`－${p.sub_items.join("、")}`:""}</h3><button className="editAnswerButton" onClick={()=>setAnswerEditor({...p,targetProfileId:p.targetProfileId||orderedIds[0]||p.id,targetProfileIds:orderedIds,questions:asArray(p.questions)})}>修改該項目問事資料</button></article>})}{!dataView.some((p:any)=>Boolean(p.answerId))&&<p className="staffEmptyReturnedAnswers">這筆預約目前沒有可編輯的問事答案；可返回修改用戶資料。</p>}</div>}
+            {dataViewMode==="answers"&&<div className="staffAnswerCards">{dataView.filter((p:any)=>Boolean(p.answerId)).filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.answerId===p.answerId)===i).map((p:any)=>{const people=uniquePeople(dataView.filter((person:any)=>person.answerId===p.answerId));const orderedIds=asArray(p.targetProfileIds).length?asArray(p.targetProfileIds):people.map((person:any)=>person.id);return <article key={p.answerId}><div className="answerProfileTags">{people.map((person:any)=><div className="answerProfileTag" key={person.id}>{person.profile_type==="pet"&&person.photo_data&&<img src={person.photo_data} alt=""/>}<span><b>{person.name}</b><small>{person.relationship_detail||person.relationship}</small></span></div>)}</div><h3>{p.item_title}{p.sub_items?.length?`－${p.sub_items.join("、")}`:""}</h3><button className="editAnswerButton" onClick={()=>openAnswerEditor(p,orderedIds)}>修改該項目問事資料</button></article>})}{!dataView.some((p:any)=>Boolean(p.answerId))&&<p className="staffEmptyReturnedAnswers">這筆預約目前沒有可編輯的問事答案；可返回修改用戶資料。</p>}</div>}
             {dataViewMode==="view"&&<div className="staffAnswerCards">{dataView.filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.answerId===p.answerId)===i).map((p:any)=><article key={p.answerId}><h3>{p.item_title}{p.sub_items?.length?`－${p.sub_items.join("、")}`:""}</h3>{p.questions?.filter(Boolean).map((q:string,n:number)=><p key={n}>問題 {n+1}：{q}</p>)}</article>)}</div>}
             <button onClick={() => {setDataView([]);setDataBooking(null)}}>關閉</button>
           </div>
