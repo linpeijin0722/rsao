@@ -62,12 +62,24 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
       fields: "marginHeader,marginFooter",
     },
   }];
-  const headerId = document.documentStyle?.defaultHeaderId;
-  const footerId = document.documentStyle?.defaultFooterId;
+  // Google Docs 的頁首頁尾 ID 位於各 sectionBreak.sectionStyle，並不在 documentStyle。
+  // 舊版讀錯位置，導致一直找不到模板既有的頁首／頁尾，格式更新也因此沒有生效。
+  const sectionStyles = (document.body?.content || [])
+    .map((block: any) => block.sectionBreak?.sectionStyle)
+    .filter(Boolean);
+  const collectSegmentIds = (kind: "Header" | "Footer") => Array.from(new Set(
+    sectionStyles.flatMap((style: any) => [
+      style[`default${kind}Id`],
+      style[`firstPage${kind}Id`],
+      style[`evenPage${kind}Id`],
+    ]).filter(Boolean),
+  )) as string[];
+  const headerIds = collectSegmentIds("Header");
+  const footerIds = collectSegmentIds("Footer");
   // 不再只清空舊內容：直接移除整個舊頁首／頁尾，避免模板殘留的空白段落。
   // 頁首會在本批更新完成後重新建立為單一段落；頁尾則完全不建立。
-  if (headerId) requests.push({ deleteHeader: { headerId } });
-  if (footerId) requests.push({ deleteFooter: { footerId } });
+  for (const headerId of headerIds) requests.push({ deleteHeader: { headerId } });
+  for (const footerId of footerIds) requests.push({ deleteFooter: { footerId } });
 
   // 「整體運勢」最下方的備註是固定說明，不是老師輸入區。
   // Apps Script 會先套用共用樣式，這裡再精準覆蓋成黑色 10pt。
@@ -128,13 +140,12 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
     token,
     { method: "POST", body: JSON.stringify({ requests }) },
   );
-  await google(
+  const createHeaderResult = await google(
     `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,
     token,
     { method: "POST", body: JSON.stringify({ requests: [{ createHeader: { type: "DEFAULT" } }] }) },
   );
-  const refreshed = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
-  const createdHeaderId = refreshed.documentStyle?.defaultHeaderId;
+  const createdHeaderId = createHeaderResult.replies?.[0]?.createHeader?.headerId;
   if (!createdHeaderId) throw new Error("Google 文件頁首建立失敗");
   const headerText = `訂單編號：${bookingNo}`;
   await google(
@@ -502,6 +513,9 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const result = await response.json();
   if (!response.ok || !result.ok) throw new Error(result.error || "Apps Script 建立文件失敗");
   if (result.version !== requiredAppsScriptVersion) throw new Error(`目前連到舊版 Google Apps Script（目前：${result.version || "無版本資訊"}；需要：${requiredAppsScriptVersion}），請更新 Vercel 的 GOOGLE_APPS_SCRIPT_WEB_APP_URL 後重新部署`);
+  // 必須先確認頁首頁尾與樣式都處理成功，才把新文件連結寫回資料庫。
+  // 這樣發生 Google API 錯誤時，後台會顯示真正原因，不會誤報建立成功。
+  await normalizeDocumentHeaderAndFooter(result.documentId, bookingNo);
   const createdAt = existingDetails.map((detail: any) => detail.google_document_created_at).filter(Boolean).sort()[0] || new Date().toISOString();
   const { error: clearError } = await db.from("booking_details").update({
     google_document_id: null, google_document_url: null, google_document_created_at: null,
@@ -513,11 +527,4 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     google_document_created_at: createdAt,
   }).eq("id", anchor.id);
   if (updateError) throw updateError;
-  // 先把連結寫回資料庫，再處理 Google 文件的頁首頁尾與細部樣式。
-  // 即使 Google Docs 暫時回應較慢，視訊預約後台仍能立即取得諮詢單連結。
-  try {
-    await normalizeDocumentHeaderAndFooter(result.documentId, bookingNo);
-  } catch (formatError) {
-    console.error("諮詢單已建立，但頁首頁尾或樣式調整失敗", formatError);
-  }
 }
