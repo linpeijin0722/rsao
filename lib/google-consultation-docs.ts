@@ -66,20 +66,21 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
   const footerId = document.documentStyle?.defaultFooterId;
   const headerContent = headerId ? document.headers?.[headerId]?.content || [] : [];
   const footerContent = footerId ? document.footers?.[footerId]?.content || [] : [];
-  const contentEnd = (content: any[]) => Math.max(
-    1,
-    ...content.map((entry: any) => Number(entry.endIndex || 1) - 1),
-  );
+  const contentBounds = (content: any[]) => {
+    const starts = content.map((entry: any) => Number(entry.startIndex)).filter(Number.isFinite);
+    const ends = content.map((entry: any) => Number(entry.endIndex) - 1).filter(Number.isFinite);
+    return { start: starts.length ? Math.min(...starts) : 0, end: ends.length ? Math.max(...ends) : 0 };
+  };
   if (headerId) {
-    const endIndex = contentEnd(headerContent);
-    if (endIndex > 1) requests.push({ deleteContentRange: { range: { segmentId: headerId, startIndex: 1, endIndex } } });
-    requests.push({ insertText: { location: { segmentId: headerId, index: 1 }, text: `訂單編號：${bookingNo}` } });
+    const bounds = contentBounds(headerContent);
+    if (bounds.end > bounds.start) requests.push({ deleteContentRange: { range: { segmentId: headerId, startIndex: bounds.start, endIndex: bounds.end } } });
+    requests.push({ insertText: { location: { segmentId: headerId, index: bounds.start }, text: `訂單編號：${bookingNo}` } });
   } else {
     requests.push({ createHeader: { type: "DEFAULT" } });
   }
   if (footerId) {
-    const endIndex = contentEnd(footerContent);
-    if (endIndex > 1) requests.push({ deleteContentRange: { range: { segmentId: footerId, startIndex: 1, endIndex } } });
+    const bounds = contentBounds(footerContent);
+    if (bounds.end > bounds.start) requests.push({ deleteContentRange: { range: { segmentId: footerId, startIndex: bounds.start, endIndex: bounds.end } } });
   }
 
   // 「整體運勢」最下方的備註是固定說明，不是老師輸入區。
@@ -103,7 +104,7 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
         range: { startIndex: 1, endIndex: 1 + videoHeader[0].length },
         textStyle: {
           foregroundColor: { color: { rgbColor: { red: 0.8, green: 0, blue: 0 } } },
-          fontSize: { magnitude: 14, unit: "PT" },
+          fontSize: { magnitude: 15, unit: "PT" },
           bold: true,
         },
         fields: "foregroundColor,fontSize,bold",
@@ -147,7 +148,7 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
       await google(
         `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,
         token,
-        { method: "POST", body: JSON.stringify({ requests: [{ insertText: { location: { segmentId: createdHeaderId, index: 1 }, text: `訂單編號：${bookingNo}` } }] }) },
+        { method: "POST", body: JSON.stringify({ requests: [{ insertText: { location: { segmentId: createdHeaderId, index: 0 }, text: `訂單編號：${bookingNo}` } }] }) },
       );
     }
   }
