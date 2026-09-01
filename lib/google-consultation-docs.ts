@@ -94,6 +94,22 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
     }
   }
   const flatBody = bodyRuns.map((run) => run.text).join("");
+  // 視訊諮詢單最上方兩行是老師辨識預約的重點資訊，固定套用指定紅色。
+  // 這裡直接透過 Docs API 覆蓋，避免 Apps Script 的一般標題樣式把它改成咖啡色。
+  const videoHeader = flatBody.match(/^\d{4}\/\d{1,2}\/\d{1,2}\([一二三四五六日]\)(?:上午|中午|下午)\d{2}:\d{2}\nLINE名稱：[^\n]+｜視訊時間：\d+分鐘/);
+  if (videoHeader) {
+    requests.push({
+      updateTextStyle: {
+        range: { startIndex: 1, endIndex: 1 + videoHeader[0].length },
+        textStyle: {
+          foregroundColor: { color: { rgbColor: { red: 0.8, green: 0, blue: 0 } } },
+          fontSize: { magnitude: 14, unit: "PT" },
+          bold: true,
+        },
+        fields: "foregroundColor,fontSize,bold",
+      },
+    });
+  }
   const noteText = "備註：\n1.以上均為虛歲\n2.如果沒有特別提到的年紀，代表身體狀況大致平順，不需要特別擔心，只要維持日常保養即可。\n3.運勢中的歲數，僅代表在那個年齡段需要特別留意的事項（非今生會活到幾歲喔） 若遇到劫難的時候就要比較小心，通過自己的努力衝過難關，多做福德佈施，化解災劫也能夠延續生命。";
   let noteOffset = flatBody.indexOf(noteText);
   while (noteOffset >= 0) {
@@ -204,6 +220,20 @@ type Mark = { start: number; end: number; kind: "meta" | "title" | "section" | "
 type DocumentImage = { marker: string; dataUrl: string; width: number };
 type PageSpec = { detail: any; target?: any; targetIndex?: number; targetCount?: number };
 const cleanSubItemTitle = (value: unknown) => text(value).replace(/^\s*[＋+]\s*加購\s*[：:]?\s*(?:你)?/, "");
+const taipeiClock = (value: Date) => {
+  const parts = new Intl.DateTimeFormat("zh-TW", {
+    timeZone: "Asia/Taipei", hour: "numeric", minute: "2-digit", hour12: true,
+  }).formatToParts(value);
+  const period = (parts.find((entry) => entry.type === "dayPeriod")?.value || "").replace("凌晨", "上午");
+  const hour = (parts.find((entry) => entry.type === "hour")?.value || "0").padStart(2, "0");
+  const minute = (parts.find((entry) => entry.type === "minute")?.value || "00").padStart(2, "0");
+  return `${period}${hour}:${minute}`;
+};
+const videoConsultationMinutes = (amount: number) => {
+  if (amount <= 5700) return 30;
+  if (amount <= 7900) return 35;
+  return 40 + Math.floor((amount - 7900) / 1200) * 5;
+};
 const detailInfo = (detail: any) => {
   const answer = one(detail.booking_consultation_answers);
   const itemCode = one(detail.booking_items)?.code || "";
@@ -386,10 +416,11 @@ function consultationNumber(position: number) {
 }
 
 export async function createConsultationDocuments(db: any, bookingId: string, bookingNo: string, force = false, createMode: "replace" | "new" = "replace") {
-  const { data: booking } = await db.from("bookings").select("customers(line_display_name,full_name)").eq("id", bookingId).single();
+  const { data: booking } = await db.from("bookings").select("slot_start,total_price,consultation_methods(code),customers(line_display_name,full_name)").eq("id", bookingId).single();
   const customer = one(booking?.customers) || {};
   const lineName = text(customer.line_display_name) || "LINE用戶";
   const ownerName = text(customer.full_name) || lineName;
+  const isVideo = one(booking?.consultation_methods)?.code === "video" && Boolean(booking?.slot_start);
   const { data: details, error } = await db.from("booking_details").select(`
     id,item_title,created_at,google_document_id,google_document_created_at,
     booking_items(code),booking_detail_sub_items(sub_item_title),
@@ -410,6 +441,18 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const marks: Mark[] = [];
   const images: DocumentImage[] = [];
   const pages = expandPages(allDetails);
+  if (isVideo) {
+    const videoDate = new Date(booking.slot_start);
+    const dateParts = new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", year: "numeric", month: "numeric", day: "numeric", weekday: "short" }).formatToParts(videoDate);
+    const part = (type: string) => dateParts.find((entry) => entry.type === type)?.value || "";
+    const week = part("weekday").replace("週", "").replace("星期", "");
+    const time = taipeiClock(videoDate);
+    const amount = Number(booking.total_price || 0);
+    const minutes = videoConsultationMinutes(amount);
+    const header = `${part("year")}/${part("month")}/${part("day")}(${week})${time}\nLINE名稱：${lineName}｜視訊時間：${minutes}分鐘\n`;
+    content += header;
+    marks.push({ start: 0, end: header.length - 1, kind: "title" });
+  }
   pages.forEach((pageSpec: PageSpec, index: number) => {
     if (index > 0) content += "[[[PAGE_BREAK]]]\n";
     const offset = content.length;
@@ -431,7 +474,15 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   );
   const existingPosition = uniqueDocuments.findIndex((row: any) => detailIds.has(row.id));
   const documentPosition = existingPosition >= 0 ? existingPosition + 1 : uniqueDocuments.length + 1;
-  const fileTitle = `${consultationNumber(documentPosition)}-${lineName}-${ownerName}`;
+  let fileTitle = `${consultationNumber(documentPosition)}-${lineName}-${ownerName}`;
+  if (isVideo) {
+    const date = new Date(booking.slot_start);
+    const parts = new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", month: "numeric", day: "numeric", weekday: "short" }).formatToParts(date);
+    const get = (type: string) => parts.find((entry) => entry.type === type)?.value || "";
+    const week = get("weekday").replace("週", "").replace("星期", "");
+    const time = taipeiClock(date);
+    fileTitle = `${get("month")}/${get("day")}(${week})${time} ${lineName}．${ownerName}`;
+  }
   const response = await fetch(appsScriptUrl, {
     method: "POST",
     headers: { "content-type": "text/plain;charset=utf-8" },
