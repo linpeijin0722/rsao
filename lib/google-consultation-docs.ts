@@ -64,18 +64,20 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
   }];
   // Google Docs 的頁首頁尾 ID 位於各 sectionBreak.sectionStyle，並不在 documentStyle。
   // 舊版讀錯位置，導致一直找不到模板既有的頁首／頁尾，格式更新也因此沒有生效。
-  const sectionStyles = (document.body?.content || [])
-    .map((block: any) => block.sectionBreak?.sectionStyle)
-    .filter(Boolean);
-  const collectSegmentIds = (kind: "Header" | "Footer") => Array.from(new Set(
-    sectionStyles.flatMap((style: any) => [
-      style[`default${kind}Id`],
-      style[`firstPage${kind}Id`],
-      style[`evenPage${kind}Id`],
-    ]).filter(Boolean),
-  )) as string[];
-  const headerIds = collectSegmentIds("Header");
-  const footerIds = collectSegmentIds("Footer");
+  const collectSegmentIds = (sourceDocument: any, kind: "Header" | "Footer") => {
+    const sectionStyles = (sourceDocument.body?.content || [])
+      .map((block: any) => block.sectionBreak?.sectionStyle)
+      .filter(Boolean);
+    return Array.from(new Set(
+      sectionStyles.flatMap((style: any) => [
+        style[`default${kind}Id`],
+        style[`firstPage${kind}Id`],
+        style[`evenPage${kind}Id`],
+      ]).filter(Boolean),
+    )) as string[];
+  };
+  const headerIds = collectSegmentIds(document, "Header");
+  const footerIds = collectSegmentIds(document, "Footer");
   // 不再只清空舊內容：直接移除整個舊頁首／頁尾，避免模板殘留的空白段落。
   // 頁首會在本批更新完成後重新建立為單一段落；頁尾則完全不建立。
   for (const headerId of headerIds) requests.push({ deleteHeader: { headerId } });
@@ -145,7 +147,18 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
     token,
     { method: "POST", body: JSON.stringify({ requests: [{ createHeader: { type: "DEFAULT" } }] }) },
   );
-  const createdHeaderId = createHeaderResult.replies?.[0]?.createHeader?.headerId;
+  // 某些 Google Docs 文件的 createHeader 回應不會附回 headerId。
+  // 建立後重新讀取文件，從實際 sectionStyle／headers 取得新頁首，避免誤判失敗。
+  const refreshedDocument = await google(
+    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,
+    token,
+  );
+  const refreshedHeaderIds = collectSegmentIds(refreshedDocument, "Header");
+  const responseHeaderId = createHeaderResult.replies?.[0]?.createHeader?.headerId;
+  const createdHeaderId = responseHeaderId
+    || refreshedHeaderIds.find((headerId) => !headerIds.includes(headerId))
+    || refreshedHeaderIds[0]
+    || Object.keys(refreshedDocument.headers || {})[0];
   if (!createdHeaderId) throw new Error("Google 文件頁首建立失敗");
   const headerText = `訂單編號：${bookingNo}`;
   await google(
