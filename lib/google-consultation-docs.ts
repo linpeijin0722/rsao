@@ -64,31 +64,10 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
   }];
   const headerId = document.documentStyle?.defaultHeaderId;
   const footerId = document.documentStyle?.defaultFooterId;
-  const headerContent = headerId ? document.headers?.[headerId]?.content || [] : [];
-  const footerContent = footerId ? document.footers?.[footerId]?.content || [] : [];
-  const contentBounds = (content: any[]) => {
-    const starts = content.map((entry: any) => Number(entry.startIndex)).filter(Number.isFinite);
-    const ends = content.map((entry: any) => Number(entry.endIndex) - 1).filter(Number.isFinite);
-    return { start: starts.length ? Math.min(...starts) : 0, end: ends.length ? Math.max(...ends) : 0 };
-  };
-  if (headerId) {
-    const bounds = contentBounds(headerContent);
-    if (bounds.end > 0) requests.push({ deleteContentRange: { range: { segmentId: headerId, startIndex: 0, endIndex: bounds.end } } });
-    requests.push({ insertText: { location: { segmentId: headerId, index: 0 }, text: `訂單編號：${bookingNo}` } });
-    requests.push({
-      updateParagraphStyle: {
-        range: { segmentId: headerId, startIndex: 0, endIndex: `訂單編號：${bookingNo}`.length },
-        paragraphStyle: { spaceAbove: { magnitude: 0, unit: "PT" }, spaceBelow: { magnitude: 0, unit: "PT" }, lineSpacing: 100 },
-        fields: "spaceAbove,spaceBelow,lineSpacing",
-      },
-    });
-  } else {
-    requests.push({ createHeader: { type: "DEFAULT" } });
-  }
-  if (footerId) {
-    const bounds = contentBounds(footerContent);
-    if (bounds.end > bounds.start) requests.push({ deleteContentRange: { range: { segmentId: footerId, startIndex: bounds.start, endIndex: bounds.end } } });
-  }
+  // 不再只清空舊內容：直接移除整個舊頁首／頁尾，避免模板殘留的空白段落。
+  // 頁首會在本批更新完成後重新建立為單一段落；頁尾則完全不建立。
+  if (headerId) requests.push({ deleteHeader: { headerId } });
+  if (footerId) requests.push({ deleteFooter: { footerId } });
 
   // 「整體運勢」最下方的備註是固定說明，不是老師輸入區。
   // Apps Script 會先套用共用樣式，這裡再精準覆蓋成黑色 10pt。
@@ -149,17 +128,32 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
     token,
     { method: "POST", body: JSON.stringify({ requests }) },
   );
-  if (!headerId) {
-    const refreshed = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
-    const createdHeaderId = refreshed.documentStyle?.defaultHeaderId;
-    if (createdHeaderId) {
-      await google(
-        `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,
-        token,
-        { method: "POST", body: JSON.stringify({ requests: [{ insertText: { location: { segmentId: createdHeaderId, index: 0 }, text: `訂單編號：${bookingNo}` } }] }) },
-      );
-    }
-  }
+  await google(
+    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,
+    token,
+    { method: "POST", body: JSON.stringify({ requests: [{ createHeader: { type: "DEFAULT" } }] }) },
+  );
+  const refreshed = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const createdHeaderId = refreshed.documentStyle?.defaultHeaderId;
+  if (!createdHeaderId) throw new Error("Google 文件頁首建立失敗");
+  const headerText = `訂單編號：${bookingNo}`;
+  await google(
+    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({ requests: [
+        { insertText: { location: { segmentId: createdHeaderId, index: 0 }, text: headerText } },
+        {
+          updateParagraphStyle: {
+            range: { segmentId: createdHeaderId, startIndex: 0, endIndex: headerText.length },
+            paragraphStyle: { spaceAbove: { magnitude: 0, unit: "PT" }, spaceBelow: { magnitude: 0, unit: "PT" }, lineSpacing: 100 },
+            fields: "spaceAbove,spaceBelow,lineSpacing",
+          },
+        },
+      ] }),
+    },
+  );
 }
 
 export async function wasDocumentEditedBy(documentId: string, editorEmail: string) {
