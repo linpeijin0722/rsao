@@ -230,9 +230,10 @@ export default function Staff() {
     if(position<1)return "";
     const base=`${String.fromCharCode(65+Math.floor((position-1)/99))}${String(((position-1)%99)+1).padStart(2,"0")}`;
     const date=new Date(booking.paid_at||booking.created_at||Date.now());
-    const month=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",month:"short"}).format(date);
-    const year=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"2-digit"}).format(date);
-    return `${base}.${month}${year}`;
+    const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit"}).formatToParts(date);
+    const year=parts.find((part)=>part.type==="year")?.value||String(date.getFullYear());
+    const month=parts.find((part)=>part.type==="month")?.value||String(date.getMonth()+1).padStart(2,"0");
+    return `${base}.${year}${month}`;
   }
   async function openAnswerEditor(latestBase:any,fallbackIds:string[]){
     const response=await staffPost({action:"get_answer",answerId:latestBase.answerId}),result=await response.json();
@@ -920,13 +921,12 @@ export default function Staff() {
               )}
             </div>
             {editing.payment_status !== "paid" && <button className="manualPaidButton" onClick={() => markPaid(editing.booking_no)}>設為已付款（手動收款）</button>}
-            {editing.payment_status === "paid" &&
-              !isComplete(editing) && (
+            {editing.payment_status === "paid" && (
                 <button
                   className="remindButton"
                   onClick={() => remind(editing.booking_no, editing.customers)}
                 >
-                  通知客人填寫資料
+                  請用戶填資料
                 </button>
               )}
             {editing.consultation_methods?.code === "video" && (
