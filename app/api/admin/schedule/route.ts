@@ -44,8 +44,27 @@ export async function POST(r: NextRequest) {
       valid_until: b.validUntil || null,
       is_active: true,
       is_open: b.isOpen !== false,
-    })),
-    { error } = await adminSupabase().from("availability_rules").insert(rows);
+    }));
+  const db=adminSupabase();
+  // 新套用的規則應取代同星期、重疊時段的舊規則，否則舊的「關閉」
+  // 規則會讓總覽中間留下零星灰格。
+  const {data:oldRules,error:oldRuleError}=await db
+    .from("availability_rules")
+    .select("id,weekday,start_time,end_time")
+    .in("weekday",b.weekdays);
+  if(oldRuleError)return NextResponse.json({error:oldRuleError.message},{status:500});
+  const overlappingIds=(oldRules||[])
+    .filter((rule:any)=>rule.start_time.slice(0,5)<b.endTime&&rule.end_time.slice(0,5)>b.startTime)
+    .map((rule:any)=>rule.id);
+  if(overlappingIds.length){
+    const {error:deleteRuleError}=await db.from("availability_rules").delete().in("id",overlappingIds);
+    if(deleteRuleError)return NextResponse.json({error:deleteRuleError.message},{status:500});
+  }
+  const { error } = await db.from("availability_rules").insert(rows);
+  if(!error){
+    const {error:overrideError}=await db.from("weekly_slot_overrides").delete().in("weekday",b.weekdays).gte("start_time",b.startTime).lt("start_time",b.endTime);
+    if(overrideError)return NextResponse.json({error:overrideError.message},{status:500});
+  }
   return error
     ? NextResponse.json({ error: error.message }, { status: 500 })
     : NextResponse.json({ ok: true });
