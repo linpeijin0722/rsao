@@ -119,13 +119,19 @@ export default function Page() {
         const liffId=process.env.NEXT_PUBLIC_LIFF_ID;
         if(liffId&&location.hostname!=="localhost"){
           await liff.init({liffId});
-          const url=new URL(location.href);
-          if(!liff.isInClient()&&!url.searchParams.has("from")){
-            location.replace(`https://liff.line.me/${liffId}/?from=liff`);
+          const url=new URL(location.href),mobile=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+          if(mobile&&!liff.isInClient()){
+            const officialAccountUrl=process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL;
+            if(!officialAccountUrl)throw Error("系統尚未設定 LINE 官方帳號連結");
+            location.replace(officialAccountUrl);
             return;
           }
-          if(url.searchParams.get("from")==="liff"){
+          if(liff.isInClient()){
+            sessionStorage.setItem("lin_a_sao_verified_liff_entry","1");
+          }
+          if(url.searchParams.has("from")||url.searchParams.has("liff.state")){
             url.searchParams.delete("from");
+            url.searchParams.delete("liff.state");
             history.replaceState(null,"",`${url.pathname}${url.search}${url.hash}`);
           }
         }
