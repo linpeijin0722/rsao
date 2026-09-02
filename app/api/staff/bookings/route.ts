@@ -25,7 +25,27 @@ export async function GET() {
     .order("name", { ascending: true })]);
   if (error || customerError || profileError)
     return NextResponse.json({ error: error?.message || customerError?.message || profileError?.message }, { status: 500 });
-  return NextResponse.json({ bookings: data, customers: customers || [], consultationProfiles: consultationProfiles || [] });
+  const bookings:any[]=(data||[]) as any[];
+  const answers=bookings.flatMap((booking:any)=>(booking.booking_details||[]).flatMap((detail:any)=>detail.booking_consultation_answers||[]));
+  const answerIds=[...new Set(answers.map((answer:any)=>answer.id).filter(Boolean))];
+  // PostgREST 的深層關聯在舊資料上偶爾只回第一位參與者；另查一次並依位置
+  // 補回，確保「修改用戶資料」能顯示該筆問事實際選到的所有人物。
+  if(answerIds.length){
+    const {data:participants,error:participantError}=await db
+      .from("booking_answer_participants")
+      .select("answer_id,position,profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)")
+      .in("answer_id",answerIds)
+      .order("position",{ascending:true});
+    if(participantError)return NextResponse.json({error:participantError.message},{status:500});
+    const grouped=new Map<string,any[]>();
+    for(const participant of participants||[]){
+      const list=grouped.get((participant as any).answer_id)||[];
+      list.push(participant);
+      grouped.set((participant as any).answer_id,list);
+    }
+    for(const answer of answers)answer.booking_answer_participants=grouped.get(answer.id)||answer.booking_answer_participants||[];
+  }
+  return NextResponse.json({ bookings, customers: customers || [], consultationProfiles: consultationProfiles || [] });
 }
 export async function POST(request: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
