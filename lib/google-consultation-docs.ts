@@ -529,9 +529,13 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const result = await response.json();
   if (!response.ok || !result.ok) throw new Error(result.error || "Apps Script 建立文件失敗");
   if (result.version !== requiredAppsScriptVersion) throw new Error(`目前連到舊版 Google Apps Script（目前：${result.version || "無版本資訊"}；需要：${requiredAppsScriptVersion}），請更新 Vercel 的 GOOGLE_APPS_SCRIPT_WEB_APP_URL 後重新部署`);
-  // 必須先確認頁首頁尾與樣式都處理成功，才把新文件連結寫回資料庫。
-  // 這樣發生 Google API 錯誤時，後台會顯示真正原因，不會誤報建立成功。
-  await normalizeDocumentHeaderAndFooter(result.documentId, bookingNo);
+  // Apps Script 已負責頁首頁尾；Docs API 的二次格式整理失敗時，不應阻止
+  // 已成功建立的文件連結寫回後台。
+  try {
+    await normalizeDocumentHeaderAndFooter(result.documentId, bookingNo);
+  } catch (error) {
+    console.error("Google 文件二次格式整理失敗，保留已建立文件並繼續寫回連結", error);
+  }
   const createdAt = existingDetails.map((detail: any) => detail.google_document_created_at).filter(Boolean).sort()[0] || new Date().toISOString();
   const { error: updateError } = await db.from("booking_details").update({
     google_document_id: result.documentId,
