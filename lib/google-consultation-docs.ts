@@ -371,7 +371,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   questions.map(text).filter(Boolean).forEach((question: string, index: number) => {
     add(`Q${index + 1}:${question}`, "question");
     add(`A${index + 1}:`, "answer");
-    add("");
+    for (let line = 0; line < 4; line += 1) add("\u00a0", "answer");
   });
   add("");
   const isPastLifePersonal = itemCode === "past-life-personal" || text(detail.item_title).includes("前世因果（個人）");

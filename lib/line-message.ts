@@ -37,11 +37,16 @@ export async function pushLineText(userId: string, text: string) {
   if (!response.ok)
     throw new Error(`LINE 訊息發送失敗：${await response.text()}`);
 }
-const statusColors={pending:{background:"#FDECEC",text:"#C94040",label:"待付款"},paid:{background:"#EBFBF9",text:"#168A54",label:"已付款"},changed:{background:"#F1F1F1",text:"#444444",label:"預約已變更"}} as const;
+const statusColors={pending:{background:"#FDECEC",text:"#C94040",label:"待付款"},paid:{background:"#EBFBF9",text:"#168A54",label:"已付款"},data_required:{background:"#FDECEC",text:"#C94040",label:"請填寫諮詢者資料"},changed:{background:"#F1F1F1",text:"#444444",label:"預約已變更"}} as const;
+const bookingLiffId = process.env.NEXT_PUBLIC_LIFF_ID || "2010145548-jmc9lP5o";
+export const liffPageUrl = (path: string, params?: URLSearchParams) =>
+  `https://liff.line.me/${bookingLiffId}${path}${params?.size ? `?${params}` : ""}`;
+export const liffBookingDataUrl = (bookingNo: string) =>
+  liffPageUrl("/booking-data", new URLSearchParams({ order: bookingNo }));
 const cleanItemTitle=(value:string)=>value.replace(/(兩位嬰靈[（(]含[）)]以上).*/u,"$1").replace(/[（(]?無論幾位[^）)]*[）)]?/g,"").replace(/^＋加購[：:]\s*/u,"").replace(/\s+/g," ").trim();
 function videoDateParts(slotStart?:string){if(!slotStart)return null;const date=new Date(slotStart);if(Number.isNaN(date.getTime()))return null;const parts=new Intl.DateTimeFormat("zh-TW",{timeZone:"Asia/Taipei",month:"numeric",day:"numeric",weekday:"short"}).formatToParts(date),part=(type:string)=>parts.find(x=>x.type===type)?.value||"",time=new Intl.DateTimeFormat("zh-TW",{timeZone:"Asia/Taipei",hour:"numeric",minute:"2-digit",hour12:true}).format(date).replace(/\s/g,"");return{date:`${part("month")}月${part("day")}日（${part("weekday").replace("週","")}）`,time}}
-export function bookingStatusFlex(args:{status:"pending"|"paid"|"changed";headerLabel?:string;bookingNo:string;method:string;total?:number;slotStart?:string;items?:string[];site:string;expiresAt?:string;calendarSlot?:string}){
-  const theme=statusColors[args.status],isVideo=args.method==="video",video=videoDateParts(args.slotStart),numbered=(args.items||[]).map(cleanItemTitle).filter(Boolean).map((title,index)=>`${["❶","❷","❸","❹","❺","❻","❼","❽","❾"][index]||`${index+1}.`}${title}`).join("\n"),mainUrl=args.status==="pending"?`${args.site}/pay?order=${encodeURIComponent(args.bookingNo)}`:args.status==="paid"?`${args.site}/booking-data?order=${encodeURIComponent(args.bookingNo)}`:`${args.site}/my-bookings?order=${encodeURIComponent(args.bookingNo)}`,buttonLabel=args.status==="pending"?"繼續付款":args.status==="paid"?"📝 立即填寫問事資料（必填）":"查看預約",body:any[]=[{type:"text",text:isVideo?"視訊諮詢":"文字諮詢",align:"center",weight:"bold",size:"lg"},{type:"separator",margin:"md"}];
+export function bookingStatusFlex(args:{status:"pending"|"paid"|"data_required"|"changed";headerLabel?:string;bookingNo:string;method:string;total?:number;slotStart?:string;items?:string[];site:string;expiresAt?:string;calendarSlot?:string}){
+  const theme=statusColors[args.status],isVideo=args.method==="video",needsData=args.status==="paid"||args.status==="data_required",video=videoDateParts(args.slotStart),numbered=(args.items||[]).map(cleanItemTitle).filter(Boolean).map((title,index)=>`${["❶","❷","❸","❹","❺","❻","❼","❽","❾"][index]||`${index+1}.`}${title}`).join("\n"),mainUrl=args.status==="pending"?`${args.site}/pay?order=${encodeURIComponent(args.bookingNo)}`:needsData?liffBookingDataUrl(args.bookingNo):`${args.site}/my-bookings?order=${encodeURIComponent(args.bookingNo)}`,buttonLabel=args.status==="pending"?"繼續付款":needsData?"📝 立即填寫問事資料（必填）":"查看預約",body:any[]=[{type:"text",text:isVideo?"視訊諮詢":"文字諮詢",align:"center",weight:"bold",size:"lg"},{type:"separator",margin:"md"}];
   if(video)body.push({type:"text",text:"預約時間",color:"#222222",size:"sm",margin:"lg"},{type:"text",text:video.date,wrap:true,color:"#168A54",weight:"bold",size:"xxl"},{type:"text",text:video.time,wrap:true,color:"#168A54",weight:"bold",size:"xxl"});
   if(numbered)body.push({type:"text",text:`諮詢項目\n${numbered}`,wrap:true,margin:"lg",color:"#333333",size:"md"});
   if(typeof args.total==="number")body.push({type:"text",text:`付款金額：NT$ ${args.total.toLocaleString("zh-TW")}`,color:"#8A3045",weight:"bold",margin:"md"});
@@ -196,6 +201,13 @@ export function videoReminderFlex(args: {
   }).format(new Date(args.slotStart));
   return {
     type: "bubble",
+    hero: {
+      type: "image",
+      url: `${args.site}/video-reminder-guide.png`,
+      size: "full",
+      aspectRatio: "1:1",
+      aspectMode: "cover",
+    },
     header: {
       type: "box",
       layout: "vertical",
@@ -203,12 +215,12 @@ export function videoReminderFlex(args: {
       contents: [
         {
           type: "text",
-          text: args.isTomorrow ? "明日視訊諮詢提醒" : "視訊諮詢提醒",
+          text: "【諮詢提醒】明天準時與老師視訊對談喔！",
           color: "#8A5A24",
           weight: "bold",
           size: "xl",
         },
-        { type: "text", text: "林阿嫂線上諮詢", color: "#6B625B", size: "sm" },
+        { type: "text", text: `預約時間：${date}`, color: "#6B625B", size: "sm", wrap: true },
       ],
     },
     body: {
@@ -216,14 +228,13 @@ export function videoReminderFlex(args: {
       layout: "vertical",
       spacing: "md",
       contents: [
-        { type: "text", text: `預約時間：${date}`, weight: "bold", wrap: true },
-        { type: "text", text: `訂單編號：${args.bookingNo}`, wrap: true, color: "#6B625B" },
         {
           type: "text",
-          text: args.isTomorrow ? "溫馨提醒您，明天有林阿嫂視訊諮詢預約。請預先確認 LINE 訊息與網路連線正常，並留意助理傳送的視訊連結。" : "溫馨提醒您，視訊諮詢時間即將到來。請預先確認 LINE 訊息與網路連線正常，並留意助理傳送的視訊連結。",
+          text: "提醒您：您預約的視訊諮詢時間是 明天～\n建議可以先準備好想詢問的問題唷！\n\n提醒您：視訊諮詢的預約時段一律以台灣時間（GMT+8）為準，請您確認時區無誤喔！😊\n\n我們會在時間到時 主動發送通話邀請 給您，請留意訊息通知。\n\n收到邀請後，請依照下方步驟操作，即可開始視訊：\n\n👉 點選「通話」\n👉 再點「開始視訊」\n\n⚠️ 請記得保持 LINE 開啟，並連上網路，才不會錯過通話邀請～\n\n期待與您線上見面🙏",
           wrap: true,
           color: "#4D453F",
         },
+        { type: "text", text: `訂單編號：${args.bookingNo}`, wrap: true, color: "#8B8B8B", size: "xs" },
       ],
     },
     footer: {
