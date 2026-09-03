@@ -246,7 +246,7 @@ export function videoReminderFlex(args: {
       contents: [
         {
           type: "text",
-          text: "提醒您：您預約的視訊諮詢時間如下～",
+          text: "提醒您：您預約的視訊諮詢時間如下：",
           color: "#4D453F",
           size: "lg",
           wrap: true,
