@@ -68,20 +68,27 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
     const sectionStyles = (sourceDocument.body?.content || [])
       .map((block: any) => block.sectionBreak?.sectionStyle)
       .filter(Boolean);
-    return Array.from(new Set(
+    const ids = Array.from(new Set(
       sectionStyles.flatMap((style: any) => [
         style[`default${kind}Id`],
         style[`firstPage${kind}Id`],
         style[`evenPage${kind}Id`],
       ]).filter(Boolean),
     )) as string[];
+    const segments = kind === "Header" ? sourceDocument.headers : sourceDocument.footers;
+    return Array.from(new Set([...ids, ...Object.keys(segments || {})]));
   };
   const headerIds = collectSegmentIds(document, "Header");
   const footerIds = collectSegmentIds(document, "Footer");
-  // 不再只清空舊內容：直接移除整個舊頁首／頁尾，避免模板殘留的空白段落。
-  // 頁首會在本批更新完成後重新建立為單一段落；頁尾則完全不建立。
-  for (const headerId of headerIds) requests.push({ deleteHeader: { headerId } });
+  // 保留模板原本的頁首區段，清空內容後直接寫入訂單編號，避免刪除後重新建立時
+  // Google API 偶爾未回傳 headerId。頁尾則整段刪除，不保留任何內容。
   for (const footerId of footerIds) requests.push({ deleteFooter: { footerId } });
+  const existingHeaderId = headerIds[0];
+  if (existingHeaderId) {
+    const headerContent = document.headers?.[existingHeaderId]?.content || [];
+    const headerEnd = Math.max(1, ...headerContent.map((block: any) => Number(block.endIndex || 1)));
+    if (headerEnd > 1) requests.push({ deleteContentRange: { range: { segmentId: existingHeaderId, startIndex: 0, endIndex: headerEnd - 1 } } });
+  }
 
   // 「整體運勢」最下方的備註是固定說明，不是老師輸入區。
   // Apps Script 會先套用共用樣式，這裡再精準覆蓋成黑色 10pt。
@@ -142,23 +149,19 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
     token,
     { method: "POST", body: JSON.stringify({ requests }) },
   );
-  const createHeaderResult = await google(
-    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,
-    token,
-    { method: "POST", body: JSON.stringify({ requests: [{ createHeader: { type: "DEFAULT" } }] }) },
-  );
-  // 某些 Google Docs 文件的 createHeader 回應不會附回 headerId。
-  // 建立後重新讀取文件，從實際 sectionStyle／headers 取得新頁首，避免誤判失敗。
-  const refreshedDocument = await google(
-    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,
-    token,
-  );
-  const refreshedHeaderIds = collectSegmentIds(refreshedDocument, "Header");
-  const responseHeaderId = createHeaderResult.replies?.[0]?.createHeader?.headerId;
-  const createdHeaderId = responseHeaderId
-    || refreshedHeaderIds.find((headerId) => !headerIds.includes(headerId))
-    || refreshedHeaderIds[0]
-    || Object.keys(refreshedDocument.headers || {})[0];
+  let createdHeaderId = existingHeaderId;
+  if (!createdHeaderId) {
+    const createHeaderResult = await google(
+      `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,
+      token,
+      { method: "POST", body: JSON.stringify({ requests: [{ createHeader: { type: "DEFAULT" } }] }) },
+    );
+    createdHeaderId = createHeaderResult.replies?.[0]?.createHeader?.headerId;
+    if (!createdHeaderId) {
+      const refreshedDocument = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+      createdHeaderId = collectSegmentIds(refreshedDocument, "Header")[0];
+    }
+  }
   if (!createdHeaderId) throw new Error("Google 文件頁首建立失敗");
   const headerText = `訂單編號：${bookingNo}`;
   await google(
@@ -530,14 +533,14 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   // 這樣發生 Google API 錯誤時，後台會顯示真正原因，不會誤報建立成功。
   await normalizeDocumentHeaderAndFooter(result.documentId, bookingNo);
   const createdAt = existingDetails.map((detail: any) => detail.google_document_created_at).filter(Boolean).sort()[0] || new Date().toISOString();
-  const { error: clearError } = await db.from("booking_details").update({
-    google_document_id: null, google_document_url: null, google_document_created_at: null,
-  }).eq("booking_id", bookingId);
-  if (clearError) throw clearError;
   const { error: updateError } = await db.from("booking_details").update({
     google_document_id: result.documentId,
-    google_document_url: result.documentUrl,
+    google_document_url: result.documentUrl || `https://docs.google.com/document/d/${result.documentId}/edit`,
     google_document_created_at: createdAt,
   }).eq("id", anchor.id);
   if (updateError) throw updateError;
+  const { error: clearError } = await db.from("booking_details").update({
+    google_document_id: null, google_document_url: null, google_document_created_at: null,
+  }).eq("booking_id", bookingId).neq("id", anchor.id);
+  if (clearError) throw clearError;
 }
