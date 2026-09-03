@@ -46,6 +46,8 @@ export default function Admin() {
     [date, setDate] = useState(today()),
     [openTimes, setOpenTimes] = useState<string[]>([]),
     [openDates, setOpenDates] = useState<string[]>([]),
+    [confirmCloseDate, setConfirmCloseDate] = useState(false),
+    [closingDate, setClosingDate] = useState(false),
     [holidayDate, setHolidayDate] = useState(today()),
     [note, setNote] = useState(""),
     [textSaveMessage, setTextSaveMessage] = useState("");
@@ -67,7 +69,11 @@ export default function Admin() {
     const r = await fetch("/api/admin/schedule"),
       j = await r.json();
     if (r.status === 401) return;
-    if (!r.ok) return setError(j.error);
+    if (!r.ok) {
+      window.alert(`⚠️ 登入失敗\n\n${j.error || "管理密碼錯誤，請重新輸入。"}`);
+      setError("");
+      return;
+    }
     setLogin(true);
     setRules(j.rules);
     setWeekly(j.weekly);
@@ -224,6 +230,29 @@ export default function Admin() {
       });
     if (r.ok) dayLoad();
   }
+  async function closeAllDaySlots() {
+    setClosingDate(true);
+    const response = await fetch("/api/admin/slots", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ methodId, date, action: "close_day" }),
+    });
+    const result = await response.json().catch(() => ({}));
+    setClosingDate(false);
+    if (!response.ok) {
+      setConfirmCloseDate(false);
+      window.alert(`關閉失敗：${result.error || "請稍後再試"}`);
+      return;
+    }
+    setConfirmCloseDate(false);
+    setOpenTimes([]);
+    await Promise.all([dayLoad(), monthLoad()]);
+  }
+  const selectedDateLabel = (() => {
+    const [year, monthValue, dayValue] = date.split("-").map(Number),
+      weekday = days[(new Date(year, monthValue - 1, dayValue).getDay() + 6) % 7];
+    return `${monthValue}/${dayValue}(${weekday})`;
+  })();
   async function holidayAdd() {
     if (holidayDate < today()) return setError("休假日不能早於今天");
     await fetch("/api/admin/holidays", {
@@ -386,135 +415,6 @@ export default function Admin() {
         <p>以下設定只影響視訊諮詢可預約時間。</p>
       </div>
       <section className="adminCard">
-        <h2>建立每週開放規則</h2>
-        <div className="weekdayRow">
-          {days.map((d, i) => (
-            <button
-              key={d}
-              className={picked.includes(i + 1) ? "selected" : ""}
-              onClick={() =>
-                setPicked((v) =>
-                  v.includes(i + 1)
-                    ? v.filter((x) => x !== i + 1)
-                    : [...v, i + 1],
-                )
-              }
-            >
-              {d}
-            </button>
-          ))}
-        </div>
-        <div className="adminGrid">
-          <label>
-            開始時間
-            <input
-              type="time"
-              min="07:00"
-              max="22:30"
-              step="1800"
-              value={start}
-              onChange={(e) => setStart(e.target.value)}
-            />
-          </label>
-          <label>
-            結束時間
-            <input
-              type="time"
-              min="07:30"
-              max="23:00"
-              step="1800"
-              value={end}
-              onChange={(e) => setEnd(e.target.value)}
-            />
-          </label>
-        </div>
-        <select value={scope} onChange={(e) => setScope(e.target.value)}>
-          <option value="all">所有日期</option>
-          <option value="from">指定日期以後</option>
-          <option value="until">指定日期以前</option>
-          <option value="range">日期區間</option>
-        </select>
-        {(scope === "from" || scope === "range") && (
-          <input
-            type="date"
-            min={today()}
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-          />
-        )}{" "}
-        {(scope === "until" || scope === "range") && (
-          <input
-            type="date"
-            min={today()}
-            value={until}
-            onChange={(e) => setUntil(e.target.value)}
-          />
-        )}
-        <div className="ruleActions">
-          <button
-            className={!opening ? "closeMode" : ""}
-            onClick={() => setOpening(false)}
-          >
-            關閉
-          </button>
-          <button
-            className={opening ? "openMode" : ""}
-            onClick={() => setOpening(true)}
-          >
-            開啟
-          </button>
-          <button className="primary" onClick={save}>
-            套用規則
-          </button>
-        </div>
-      </section>
-      <section className="adminCard wide">
-        <h2>每週時段總覽</h2>
-        <p className="legend">
-          <i />
-          開放　
-          <span />
-          不開放　點擊格子可切換
-        </p>
-        <div className="weekChart">
-          <div className="timeHeader">
-            <b></b>
-            {times.map((t) => (
-              <small key={t}>{t.endsWith("00") ? t : ""}</small>
-            ))}
-          </div>
-          {days.map((d, di) => (
-            <div className="weekRow" key={d}>
-              <b>週{d}</b>
-              {times.map((t) => (
-                <button
-                  key={t}
-                  title={`週${d} ${t}`}
-                  className={weeklyOpen(di + 1, t) ? "open" : "closed"}
-                  onClick={() => weekToggle(di + 1, t)}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-        <h3>規則清單</h3>
-        {rules.map((r) => (
-          <div className="rule" key={r.id}>
-            <span>
-              <b className={r.is_open ? "greenText" : "redText"}>
-                {r.is_open ? "開啟" : "關閉"}
-              </b>
-              　週{days[r.weekday - 1]} {r.start_time.slice(0, 5)}–
-              {r.end_time.slice(0, 5)}
-              <small>
-                {r.valid_from || "不限"} ～ {r.valid_until || "不限"}
-              </small>
-            </span>
-            <button onClick={() => ruleDel(r.id)}>刪除</button>
-          </div>
-        ))}
-      </section>
-      <section className="adminCard">
         <h2>特定休假日</h2>
         <div className="adminGrid">
           <input
@@ -598,6 +498,9 @@ export default function Admin() {
           </div>
         </div>
         <h3>{date} 的時段</h3>
+        <button className="closeAllDayButton" onClick={() => setConfirmCloseDate(true)} disabled={!methodId || closingDate}>
+          關閉{selectedDateLabel}所有時段
+        </button>
         {holidays.some((h) => h.holiday_date === date) && (
           <div className="holidayNotice">此日為休假日</div>
         )}
@@ -613,6 +516,20 @@ export default function Admin() {
           ))}
         </div>
       </section>
+      {confirmCloseDate && (
+        <div className="modalBackdrop" onClick={() => !closingDate && setConfirmCloseDate(false)}>
+          <div className="modal closeDayConfirmModal" onClick={(event) => event.stopPropagation()}>
+            <div className="closeDayIcon">!</div>
+            <h2>關閉當日所有時段？</h2>
+            <p>確定要關閉 <b>{selectedDateLabel}</b> 的所有視訊諮詢時段嗎？</p>
+            <small>關閉後，該日期將不再提供新的時段預約。</small>
+            <div className="closeDayActions">
+              <button className="cancel" disabled={closingDate} onClick={() => setConfirmCloseDate(false)}>取消</button>
+              <button className="confirmClose" disabled={closingDate} onClick={() => void closeAllDaySlots()}>{closingDate ? "關閉中…" : `確認關閉 ${selectedDateLabel}`}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
