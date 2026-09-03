@@ -204,6 +204,9 @@ export function videoReminderFlex(args: {
   const period = hour24 >= 13 ? "下午" : hour24 === 12 ? "中午" : hour24 >= 5 ? "上午" : "凌晨";
   const displayHour = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
   const appointmentTime = `${part("month")}/${part("day")}(${weekday})${period}${displayHour}:${part("minute")}`;
+  const taipeiDateKey = (value: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Taipei" }).format(value);
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const isTomorrow = taipeiDateKey(new Date(args.slotStart)) === taipeiDateKey(tomorrow);
   return {
     type: "bubble",
     hero: {
@@ -218,10 +221,16 @@ export function videoReminderFlex(args: {
       layout: "vertical",
       backgroundColor: "#FFF4E5",
       contents: [
+      layout: "vertical",
+      backgroundColor: "#FFF4E5",
+      paddingAll: "10px",
+      contents: [
         {
           type: "text",
           text: "【諮詢提醒】明天準時與老師視訊對談喔！",
           color: "#8A5A24",
+          text: isTomorrow ? "【諮詢提醒】明天準時與老師視訊對談喔！" : "【諮詢提醒】即將來臨的視訊諮詢",
+          color: "#111111",
           weight: "bold",
           size: "xxl",
           wrap: true,
@@ -231,23 +240,35 @@ export function videoReminderFlex(args: {
     body: {
       type: "box",
       layout: "vertical",
+      layout: "vertical",
       spacing: "md",
+      paddingAll: "10px",
       contents: [
+        {
+          type: "text",
+          text: "提醒您：您預約的視訊諮詢時間如下～",
+          color: "#4D453F",
+          size: "lg",
+          wrap: true,
+        },
         {
           type: "text",
           text: `⏰ ${appointmentTime}`,
           color: "#168A54",
           weight: "bold",
           size: "3xl",
+          size: "xxl",
           align: "center",
           wrap: true,
         },
         {
           type: "text",
           text: "提醒您：您預約的視訊諮詢時間如下～\n建議可以先準備好想詢問的問題唷！\n\n提醒您：視訊諮詢的預約時段一律以台灣時間（GMT+8）為準，請您確認時區無誤喔！😊\n\n我們會在時間到時 主動發送通話邀請 給您，請留意訊息通知。\n\n收到邀請後，請依照下方步驟操作，即可開始視訊：\n\n👉 點選「通話」\n👉 再點「開始視訊」\n\n⚠️ 請記得保持 LINE 開啟，並連上網路，才不會錯過通話邀請～\n\n期待與您線上見面🙏",
+          text: "建議可以先準備好想詢問的問題唷！\n\n提醒您：視訊諮詢的預約時段一律以台灣時間（GMT+8）為準，請您確認時區無誤喔！😊\n\n我們會在時間到時 主動發送通話邀請 給您，請留意訊息通知。\n\n收到邀請後，請依照下方步驟操作，即可開始視訊：\n\n👉 點選「通話」\n👉 再點「開始視訊」\n\n⚠️ 請記得保持 LINE 開啟，並連上網路，才不會錯過通話邀請～\n\n期待與您線上見面🙏",
           wrap: true,
           color: "#4D453F",
           size: "xl",
+          size: "lg",
         },
       ],
     },
