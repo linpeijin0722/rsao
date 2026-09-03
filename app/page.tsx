@@ -2,6 +2,7 @@
 import liff from "@line/liff";
 import { addCalendarDays } from "@/lib/video-booking-window";
 import { useEffect, useMemo, useState } from "react";
+const bookingLiffId = "2010145548-jmc9lP5o";
 type Method = {
   id: string;
   code: "video" | "text";
@@ -116,24 +117,20 @@ export default function Page() {
   useEffect(() => {
     (async () => {
       try {
-        const liffId=process.env.NEXT_PUBLIC_LIFF_ID;
+        const liffId=bookingLiffId;
         if(liffId&&location.hostname!=="localhost"){
           await liff.init({liffId});
-          const url=new URL(location.href),mobile=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-          if(mobile&&!liff.isInClient()){
+          const url=new URL(location.href);
+          if(!liff.isInClient()){
             const officialAccountUrl=process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL;
             if(!officialAccountUrl)throw Error("系統尚未設定 LINE 官方帳號連結");
             location.replace(officialAccountUrl);
             return;
           }
-          if(liff.isInClient()){
-            sessionStorage.setItem("lin_a_sao_verified_liff_entry","1");
-          }
-          if(url.searchParams.has("from")||url.searchParams.has("liff.state")){
-            url.searchParams.delete("from");
-            url.searchParams.delete("liff.state");
-            history.replaceState(null,"",`${url.pathname}${url.search}${url.hash}`);
-          }
+          sessionStorage.setItem("lin_a_sao_verified_liff_entry","1");
+          url.searchParams.delete("from");
+          url.searchParams.delete("liff.state");
+          history.replaceState(null,"",`${url.pathname}${url.search}${url.hash}`);
         }
         const cacheKey = "lin_a_sao_line_ready",
           cached = sessionStorage.getItem(cacheKey);
@@ -162,7 +159,7 @@ export default function Page() {
           return true;
         };
         const hasOfficialAccountFriendship = async (fallback:boolean) => {
-          const liffId=process.env.NEXT_PUBLIC_LIFF_ID;
+          const liffId=bookingLiffId;
           if(!liffId)return fallback;
           try{await liff.init({liffId});if(liff.isLoggedIn()){const friendship=await liff.getFriendship();return friendship.friendFlag}}catch{}
           return fallback;
@@ -177,7 +174,7 @@ export default function Page() {
           setAuth("ready");
           return;
         }
-        const id = process.env.NEXT_PUBLIC_LIFF_ID;
+        const id = bookingLiffId;
         if (!id) throw Error("尚未設定 LIFF ID");
         await liff.init({ liffId: id });
         if (!liff.isLoggedIn()) {
@@ -405,6 +402,14 @@ export default function Page() {
   async function submit() {
     setBusy(true);
     try {
+      const liffId = bookingLiffId;
+      if (!liffId) throw Error("尚未設定 LIFF ID");
+      await liff.init({ liffId });
+      if (!liff.isInClient() || sessionStorage.getItem("lin_a_sao_verified_liff_entry") !== "1") {
+        const officialAccountUrl = process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL;
+        if (officialAccountUrl) location.replace(officialAccountUrl);
+        throw Error("請從 LINE 官方帳號圖文選單重新進入預約頁面。");
+      }
       const bookingPayload = {
         methodId: method?.id,
         slotStart: slot || null,
@@ -424,7 +429,7 @@ export default function Page() {
         });
       let r = await createBooking();
       if (r.status === 401) {
-        const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+        const liffId = bookingLiffId;
         if (!liffId) throw Error("LINE 登入已失效，請重新開啟預約頁面");
         await liff.init({ liffId });
         if (!liff.isLoggedIn()) {
@@ -443,7 +448,7 @@ export default function Page() {
       if (!r.ok) throw Error(j.error);
       setBookingNo(j.booking.booking_no);
       try {
-        const liffId=process.env.NEXT_PUBLIC_LIFF_ID;
+        const liffId=bookingLiffId;
         if(liffId){await liff.init({liffId});if(liff.isInClient())await liff.sendMessages([{type:"text",text:"我已送出預約，訂單待付款。"}])}
       } catch (error) {
         console.error("LIFF 用戶訊息發送失敗",error);
