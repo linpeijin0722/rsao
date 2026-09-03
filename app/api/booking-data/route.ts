@@ -30,6 +30,11 @@ export async function GET(r: NextRequest) {
       { error: "找不到訂單或登入已失效" },
       { status: 401 },
     );
+  if(r.nextUrl.searchParams.get("refill")==="1"&&x.b.data_submitted_at){
+    const {error:reopenError}=await x.db.from("bookings").update({data_submitted_at:null,updated_at:new Date().toISOString()}).eq("id",x.b.id);
+    if(reopenError)return NextResponse.json({error:"無法重新開放填寫，請稍後再試"},{status:500});
+    x.b.data_submitted_at=null;
+  }
   const { data: selfProfile } = await x.db.from("consultation_profiles").select("id").eq("customer_id", x.c.id).eq("relationship", "本人").maybeSingle();
   if (!selfProfile && x.c.full_name) {
     await x.db.from("consultation_profiles").insert({ customer_id:x.c.id, profile_type:"person", relationship:"本人", name:x.c.full_name, gender:x.c.gender, address:x.c.full_address, birth_date:x.c.birth_date, lunar_birth_text:x.c.lunar_birth_text, zodiac:x.c.zodiac, birth_shichen:x.c.birth_shichen });

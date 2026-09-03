@@ -260,7 +260,7 @@ body .videoBookingSection .staffPrimaryFilters>label,body .videoBookingSection .
 .manualBookingModal{width:min(1080px,calc(100vw - 40px))!important}
 .manualItems article{grid-template-columns:minmax(280px,1.15fr) minmax(300px,1fr) 110px!important}
 .returnedActionMenu button:disabled{opacity:.48;cursor:not-allowed}
-.returnedActionMenu .refillDataButton{min-height:56px!important;border:2px solid #a92222!important;background:#c94040!important;color:#fff!important;font-size:17px!important;font-weight:900!important;box-shadow:0 6px 16px rgba(201,64,64,.28)!important}.returnedActionMenu .refillDataButton::after{content:"將透過 LINE 要求對方再次填寫";display:block;margin-top:3px;font-size:12px;font-weight:500;opacity:.92}
+.returnedActionMenu .refillDataButton{min-height:56px!important;border:2px solid #a92222!important;background:#c94040!important;color:#fff!important;font-size:17px!important;font-weight:900!important;box-shadow:0 6px 16px rgba(201,64,64,.28)!important}
 @media(max-width:760px){.manualBookingModal{width:calc(100vw - 24px)!important}.manualItems article{grid-template-columns:1fr!important}}
 
 /* 手動建立預約：用戶搜尋與穩定的項目欄位版面 */
