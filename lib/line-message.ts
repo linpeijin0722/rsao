@@ -200,8 +200,10 @@ export function videoReminderFlex(args: {
   }).formatToParts(new Date(args.slotStart));
   const part = (type: string) => dateParts.find((entry) => entry.type === type)?.value || "";
   const weekday = part("weekday").replace(/星期|週/g, "");
-  const period = part("dayPeriod").replace("凌晨", "上午");
-  const appointmentTime = `${part("month")}/${part("day")}(${weekday})${period}${Number(part("hour"))}:${part("minute")}`;
+  const hour24 = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Taipei", hour: "numeric", hourCycle: "h23" }).format(new Date(args.slotStart)));
+  const period = hour24 >= 13 ? "下午" : hour24 === 12 ? "中午" : hour24 >= 5 ? "上午" : "凌晨";
+  const displayHour = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+  const appointmentTime = `${part("month")}/${part("day")}(${weekday})${period}${displayHour}:${part("minute")}`;
   return {
     type: "bubble",
     hero: {
@@ -221,9 +223,9 @@ export function videoReminderFlex(args: {
           text: "【諮詢提醒】明天準時與老師視訊對談喔！",
           color: "#8A5A24",
           weight: "bold",
-          size: "xl",
+          size: "xxl",
+          wrap: true,
         },
-        { type: "text", text: `預約時間：${appointmentTime}`, color: "#6B625B", size: "sm", wrap: true },
       ],
     },
     body: {
@@ -233,11 +235,20 @@ export function videoReminderFlex(args: {
       contents: [
         {
           type: "text",
-          text: `提醒您：您預約的視訊諮詢時間是 ${appointmentTime}\n建議可以先準備好想詢問的問題唷！\n\n提醒您：視訊諮詢的預約時段一律以台灣時間（GMT+8）為準，請您確認時區無誤喔！😊\n\n我們會在時間到時 主動發送通話邀請 給您，請留意訊息通知。\n\n收到邀請後，請依照下方步驟操作，即可開始視訊：\n\n👉 點選「通話」\n👉 再點「開始視訊」\n\n⚠️ 請記得保持 LINE 開啟，並連上網路，才不會錯過通話邀請～\n\n期待與您線上見面🙏`,
+          text: `⏰ ${appointmentTime}`,
+          color: "#168A54",
+          weight: "bold",
+          size: "3xl",
+          align: "center",
+          wrap: true,
+        },
+        {
+          type: "text",
+          text: "提醒您：您預約的視訊諮詢時間如下～\n建議可以先準備好想詢問的問題唷！\n\n提醒您：視訊諮詢的預約時段一律以台灣時間（GMT+8）為準，請您確認時區無誤喔！😊\n\n我們會在時間到時 主動發送通話邀請 給您，請留意訊息通知。\n\n收到邀請後，請依照下方步驟操作，即可開始視訊：\n\n👉 點選「通話」\n👉 再點「開始視訊」\n\n⚠️ 請記得保持 LINE 開啟，並連上網路，才不會錯過通話邀請～\n\n期待與您線上見面🙏",
           wrap: true,
           color: "#4D453F",
+          size: "xl",
         },
-        { type: "text", text: `訂單編號：${args.bookingNo}`, wrap: true, color: "#8B8B8B", size: "xs" },
       ],
     },
     footer: {
