@@ -21,6 +21,8 @@ const profileIdentity = (profile: any) => {
 };
 const uniquePeople = (profiles: any[]) =>
   profiles.filter((profile: any, index: number, all: any[]) => profile && all.findIndex((candidate: any) => profileIdentity(candidate) === profileIdentity(profile)) === index);
+const uniqueProfilesById = (profiles: any[]) =>
+  profiles.filter((profile: any, index: number, all: any[]) => profile?.id && all.findIndex((candidate: any) => candidate?.id === profile.id) === index);
 const isComplete = (x: any) => Boolean(x.data_submitted_at);
 const sheetLinks = (x: any) => asArray(x.booking_details).map((detail: any) => ({...detail,consultation_url:detail.google_document_url||detail.google_sheet_url})).filter((detail: any) => detail.consultation_url);
 const returnedData = (x: any) =>
@@ -130,6 +132,7 @@ export default function Staff() {
     [userView, setUserView] = useState<any>(null),
     [dataView, setDataView] = useState<any[]>([]),
     [dataBooking, setDataBooking] = useState<any>(null),
+    [resendingData, setResendingData] = useState(false),
     [dataViewMode, setDataViewMode] = useState<"menu"|"view"|"user"|"answers">("menu"),
     [returnedEdit, setReturnedEdit] = useState<any>(null),
     [returnedEditMode, setReturnedEditMode] = useState<"user"|"answers">("user"),
@@ -320,16 +323,30 @@ export default function Staff() {
       if(rememberPassword)localStorage.setItem("lin_a_sao_staff_password",password);else localStorage.removeItem("lin_a_sao_staff_password");
       setError("");
       load();
-    } else setError("密碼錯誤");
+    } else {
+      window.alert("⚠️ 登入失敗\n\n管理密碼錯誤，請重新輸入。");
+      setError("未登入");
+    }
   }
-  async function remind(no: string, customer?: any) {
-    if(customer&&!confirm(`是否確定發送 LINE 通知 ${customer.line_display_name || "LINE 用戶"} (${customer.full_name || "尚未填寫姓名"}) 填寫資料？`))return;
+  async function remind(no: string, customer?: any, reopen = false) {
+    const displayName = customer?.line_display_name || "LINE 用戶",
+      fullName = customer?.full_name || "尚未填寫姓名";
+    if(customer&&!confirm(reopen ? `是否確定 LINE 通知 ${displayName} (${fullName}) 重新填寫資料？` : `是否確定發送 LINE 通知 ${displayName} (${fullName}) 填寫資料？`))return;
+    if (reopen) setResendingData(true);
     const r = await fetch("/api/staff/remind", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ bookingNo: no }),
+      body: JSON.stringify({ bookingNo: no, reopen }),
     });
-    alert(r.ok ? "已發送提醒" : "發送失敗");
+    const result = await r.json().catch(() => ({}));
+    if (reopen) setResendingData(false);
+    if (!r.ok) return alert(result.error || "發送失敗");
+    if (reopen) {
+      setDataView([]); setDataBooking(null); await load();
+      alert("已重新開放填寫，並發送 LINE 通知");
+      return;
+    }
+    alert("已發送提醒");
   }
   async function markPaid(no: string) {
     if (!confirm("確定已收到這筆款項，並將訂單標記為已付款嗎？")) return;
@@ -715,7 +732,7 @@ export default function Staff() {
           >
             <button className="staffModalClose" aria-label="關閉" onClick={() => {setDataView([]);setDataBooking(null)}}>×</button>
             <h2>已回傳的諮詢者資料</h2>
-            {dataViewMode==="menu"&&<div className="returnedActionMenu"><button disabled={!dataView.length} onClick={()=>setDataViewMode("user")}>修改用戶資料</button><button disabled={!dataView.some((p:any)=>Boolean(p.answerId))} onClick={()=>setDataViewMode("answers")}>修改問事資料</button>{!dataView.length&&<p className="staffEmptyReturnedAnswers">此訂單標示為已回傳，但資料庫內找不到可編輯的諮詢者資料。請重新整理；若仍出現此訊息，代表該筆舊資料未正確寫入。</p>}</div>}
+            {dataViewMode==="menu"&&<div className="returnedActionMenu"><button className="refillDataButton" disabled={resendingData} onClick={()=>void remind(dataBooking.booking_no,dataBooking.customers,true)}>{resendingData?"通知傳送中…":"重新填寫資料"}</button><button disabled={!dataView.length} onClick={()=>setDataViewMode("user")}>修改用戶資料</button><button disabled={!dataView.some((p:any)=>Boolean(p.answerId))} onClick={()=>setDataViewMode("answers")}>修改問事資料</button>{!dataView.length&&<p className="staffEmptyReturnedAnswers">此訂單標示為已回傳，但資料庫內找不到可編輯的諮詢者資料。請重新整理；若仍出現此訊息，代表該筆舊資料未正確寫入。</p>}</div>}
             {dataViewMode!=="menu"&&<button className="returnedMenuBack" onClick={()=>setDataViewMode("menu")}>‹ 返回功能選單</button>}
             {dataViewMode==="user"&&<div className="staffProfileTags">{uniquePeople(dataView).map((p:any)=>{const category=p.relationship==="本人"&&!p.relationship_detail?"本人":p.profile_type==="person"?"親友":p.profile_type==="pet"?"往生寵物":"過世親友";return <button key={p.id} className="staffProfileTag" onClick={()=>setProfileEditor({...p})}>{p.profile_type==="pet"&&p.photo_data&&<img src={p.photo_data} alt=""/>}<span><b>{p.name}</b><small>{category}{p.relationship_detail?`・${p.relationship_detail}`:""}</small></span></button>})}</div>}
             {dataViewMode==="answers"&&<div className="staffAnswerCards">{dataView.filter((p:any)=>Boolean(p.answerId)).filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.answerId===p.answerId)===i).map((p:any)=>{const people=uniquePeople(dataView.filter((person:any)=>person.answerId===p.answerId));const orderedIds=asArray(p.targetProfileIds).length?asArray(p.targetProfileIds):people.map((person:any)=>person.id);return <article key={p.answerId}><div className="answerProfileTags">{people.map((person:any)=><div className="answerProfileTag" key={person.id}>{person.profile_type==="pet"&&person.photo_data&&<img src={person.photo_data} alt=""/>}<span><b>{person.name}</b><small>{person.relationship_detail||person.relationship}</small></span></div>)}</div><h3>{p.item_title}{p.sub_items?.length?`－${p.sub_items.join("、")}`:""}</h3><button className="editAnswerButton" onClick={()=>openAnswerEditor(p,orderedIds)}>修改該項目問事資料</button></article>})}{!dataView.some((p:any)=>Boolean(p.answerId))&&<p className="staffEmptyReturnedAnswers">這筆預約目前沒有可編輯的問事答案；可返回修改用戶資料。</p>}</div>}
@@ -740,7 +757,7 @@ export default function Staff() {
       {videoReminderConfirm&&lineContact&&<div className="modalBackdrop priorityModal" onClick={()=>setVideoReminderConfirm(false)}><div className="modal videoReminderConfirmModal" onClick={e=>e.stopPropagation()}><h2>傳送視訊提醒</h2><p>是否確定要傳送提醒通知給 <strong>{lineContact.line_display_name}・{lineContact.full_name||"尚未填寫姓名"}</strong>？</p><div><button onClick={()=>void sendLineContact("","video_reminder")}>確定傳送</button><button className="cancel" onClick={()=>setVideoReminderConfirm(false)}>取消</button></div></div></div>}
       {returnedEdit && <div className="modalBackdrop returnedEditBackdrop"><div className="modal returnedEditPage"><button className="staffModalClose" onClick={()=>setReturnedEdit(null)}>×</button><header><div><h2>編輯回傳資料</h2><p>{returnedEdit.item_title}{returnedEdit.sub_items?.length?`－${returnedEdit.sub_items.join("、")}`:""}</p></div></header><div className="returnedEditGrid"><label>姓名<input value={returnedEdit.name||""} onChange={e=>setReturnedEdit({...returnedEdit,name:e.target.value})}/></label><label>關係<input value={returnedEdit.relationship_detail||returnedEdit.relationship||""} onChange={e=>setReturnedEdit({...returnedEdit,relationship_detail:e.target.value})}/></label><label>性別<select value={returnedEdit.gender||""} onChange={e=>setReturnedEdit({...returnedEdit,gender:e.target.value})}><option value="">未填</option><option>男</option><option>女</option><option>其他</option></select></label><label>國曆生日<input type="date" value={returnedEdit.birth_date||""} onChange={e=>setReturnedEdit({...returnedEdit,birth_date:e.target.value})}/></label><label>農曆生日<input value={returnedEdit.lunar_birth_text||""} onChange={e=>setReturnedEdit({...returnedEdit,lunar_birth_text:e.target.value})}/></label><label>生肖<input value={returnedEdit.zodiac||""} onChange={e=>setReturnedEdit({...returnedEdit,zodiac:e.target.value})}/></label><label>出生時辰<input value={returnedEdit.birth_shichen||""} onChange={e=>setReturnedEdit({...returnedEdit,birth_shichen:e.target.value})}/></label><label className="wide">地址<textarea value={returnedEdit.address||""} onChange={e=>setReturnedEdit({...returnedEdit,address:e.target.value})}/></label><label>國曆往生日期<input type="date" value={returnedEdit.death_date||""} onChange={e=>setReturnedEdit({...returnedEdit,death_date:e.target.value})}/></label><label>農曆往生日期<input value={returnedEdit.lunar_death_text||""} onChange={e=>setReturnedEdit({...returnedEdit,lunar_death_text:e.target.value})}/></label><label>往生時辰<input value={returnedEdit.death_shichen||""} onChange={e=>setReturnedEdit({...returnedEdit,death_shichen:e.target.value})}/></label><label className="wide">備註<textarea value={returnedEdit.notes||""} onChange={e=>setReturnedEdit({...returnedEdit,notes:e.target.value})}/></label>{returnedEdit.questions.map((q:string,i:number)=><label className="wide" key={i}>問題 {i+1}<textarea value={q} onChange={e=>setReturnedEdit({...returnedEdit,questions:returnedEdit.questions.map((v:string,n:number)=>n===i?e.target.value:v)})}/></label>)}</div><div className="returnedEditActions"><button onClick={()=>void saveReturned()}>儲存所有修改</button><button className="cancel" onClick={()=>setReturnedEdit(null)}>取消</button></div></div></div>}
       {profileEditor&&<StaffProfileEditor value={profileEditor} profiles={uniquePeople(dataView)} change={setProfileEditor} close={()=>setProfileEditor(null)} save={saveProfileEditor}/>}
-      {answerEditor&&<StaffAnswerEditorV2 value={answerEditor} profiles={uniquePeople(dataView)} change={setAnswerEditor} close={()=>setAnswerEditor(null)} save={saveAnswerEditor}/>}
+      {answerEditor&&<StaffAnswerEditorV2 value={answerEditor} profiles={uniqueProfilesById(dataView)} change={setAnswerEditor} close={()=>setAnswerEditor(null)} save={saveAnswerEditor}/>}
       <section className="staffBookingSection textBookingSection">
         <h2 className="staffSectionTitle">文字預約</h2>
         <div className="textBookingTools">
