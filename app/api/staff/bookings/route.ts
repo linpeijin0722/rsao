@@ -45,6 +45,12 @@ export async function GET() {
     }
     for(const answer of answers)answer.booking_answer_participants=grouped.get(answer.id)||answer.booking_answer_participants||[];
   }
+  const bookingIds=bookings.map((booking:any)=>booking.id).filter(Boolean);
+  if(bookingIds.length){
+    const {data:submissions,error:submissionError}=await db.from("booking_data_submissions").select("id,booking_id,submitted_at,payload").in("booking_id",bookingIds).order("submitted_at",{ascending:false});
+    if(submissionError)return NextResponse.json({error:submissionError.message},{status:500});
+    for(const booking of bookings)booking.data_submissions=(submissions||[]).filter((submission:any)=>submission.booking_id===booking.id);
+  }
   return NextResponse.json({ bookings, customers: customers || [], consultationProfiles: consultationProfiles || [] });
 }
 export async function POST(request: NextRequest) {

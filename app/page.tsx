@@ -115,6 +115,11 @@ export default function Page() {
     [error, setError] = useState(""),
     [bookingNo, setBookingNo] = useState("");
   useEffect(() => {
+    if (!error) return;
+    setAlertMessage(error);
+    setError("");
+  }, [error]);
+  useEffect(() => {
     (async () => {
       try {
         const liffId=bookingLiffId;

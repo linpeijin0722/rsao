@@ -244,7 +244,7 @@ export default function BookingData() {
     [missingItems, setMissingItems] = useState<string[]>([]),
     [loading, setLoading] = useState(true);
   async function restoreLineLogin() {
-    const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+    const liffId = process.env.NEXT_PUBLIC_LIFF_ID || "2010145548-jmc9lP5o";
     if (!liffId) return false;
     await liff.init({ liffId });
     if (!liff.isLoggedIn()) {
@@ -261,7 +261,7 @@ export default function BookingData() {
     return response.ok;
   }
   function prepareLiff() {
-    const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+    const liffId = process.env.NEXT_PUBLIC_LIFF_ID || "2010145548-jmc9lP5o";
     if (!liffId) return Promise.reject(new Error("尚未設定 LIFF ID"));
     if (!liffReadyRef.current) {
       liffReadyRef.current = liff.init({ liffId }).catch((error) => {
@@ -911,10 +911,8 @@ export default function BookingData() {
         <div className="submitProgressOverlay" role="alert" aria-live="assertive">
           <div className="submitProgressCard">
             <span className="submitProgressSpinner" aria-hidden="true" />
-            <h2>資料儲存傳送中</h2>
-            <p>
-              請勿切換或關閉畫面，約需 10～20 秒；完成後將自動返回 LINE。
-            </p>
+            <h2>{savingItems > 0 ? "資料儲存中" : "資料傳送中"}</h2>
+            <p>{savingItems > 0 ? "請勿切換畫面，資料儲存中請稍後..." : "請勿切換或關閉畫面，完成後將自動返回 LINE。"}</p>
           </div>
         </div>
       )}
@@ -922,6 +920,10 @@ export default function BookingData() {
         <button
           className="submitAllData"
           onClick={() => {
+            if (savingRef.current > 0) {
+              setConfirmSubmit(true);
+              return;
+            }
             const missing = details.flatMap((d: any) =>
               storedAnswerMissing(
                 d,
@@ -2173,7 +2175,7 @@ function Answer({
                     <label>
                       目前關係狀態
                       <select
-                        value={relationshipData.relationship_status || ""}
+                        value={relationshipData.relationship_status === "分手想復合" ? "已分手" : relationshipData.relationship_status || ""}
                         onChange={(e) =>
                           changeRelationship(
                             "relationship_status",
@@ -2183,11 +2185,14 @@ function Answer({
                       >
                         {[
                           "",
+                          "夫妻",
+                          "已離婚",
                           "單戀中",
                           "交往中",
                           "情侶吵架",
-                          "分手想復合",
+                          "已分手",
                           "曖昧卡住",
+                          "外遇對象",
                           "複雜關係",
                           "其他",
                         ].map((x) => (
@@ -2195,6 +2200,16 @@ function Answer({
                         ))}
                       </select>
                     </label>
+                    {relationshipData.relationship_status === "其他" && (
+                      <label>
+                        請填寫其他關係狀態
+                        <input
+                          value={relationshipData.relationship_status_other || ""}
+                          onChange={(e) => changeRelationship("relationship_status_other", e.target.value)}
+                          placeholder="請自行填寫目前關係狀態"
+                        />
+                      </label>
+                    )}
                     <label>
                       這段關係多久了？
                       <input
@@ -2372,6 +2387,8 @@ function answerMissingFields(value: any) {
         prefix = `第 ${index + 1} 位對象`;
       if (!filled(row.relationship_status))
         missing.push(`${prefix}：目前關係狀態`);
+      if (row.relationship_status === "其他" && !filled(row.relationship_status_other))
+        missing.push(`${prefix}：其他關係狀態`);
     });
   if (value.infantSpirit) {
     const losses = extra.pregnancy_losses || [];
