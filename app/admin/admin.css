@@ -236,6 +236,9 @@
   grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
   gap: 8px;
 }
+.closeAllDayButton{width:100%;margin:0 0 16px;padding:13px 16px;border:1px solid #c94040;border-radius:11px;background:#fff4f4;color:#b52f38;font-size:16px;font-weight:800;box-shadow:0 4px 12px rgba(181,47,56,.09)}
+.closeAllDayButton:hover{background:#c94040;color:#fff}.closeAllDayButton:disabled{opacity:.5;cursor:not-allowed}
+.closeDayConfirmModal{width:min(430px,92vw);padding:28px;text-align:center}.closeDayIcon{display:grid;place-items:center;width:54px;height:54px;margin:0 auto 14px;border-radius:50%;background:#fdecec;color:#c94040;font-size:30px;font-weight:900}.closeDayConfirmModal h2{margin:0 0 10px;color:#352b26}.closeDayConfirmModal p{margin:0 0 8px;font-size:17px;line-height:1.6}.closeDayConfirmModal small{display:block;color:#776b63;line-height:1.5}.closeDayActions{display:grid;grid-template-columns:1fr 1.35fr;gap:10px;margin-top:24px}.closeDayActions button{min-height:46px;border-radius:10px;font-weight:800}.closeDayActions .cancel{background:#eee8e2;color:#51463f}.closeDayActions .confirmClose{background:#c94040;color:#fff}.closeDayActions button:disabled{opacity:.55}
 .daySlots button {
   border: 0;
   border-radius: 8px;
