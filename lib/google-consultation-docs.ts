@@ -340,8 +340,8 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   const extra = answer?.extra_data || {};
   const targetProfile = one(target?.consultation_profiles);
   const targetId = text(targetProfile?.id);
-  const questions = targetId && Array.isArray(extra.target_questions?.[targetId])
-    ? extra.target_questions[targetId]
+  const questions = targetId
+    ? (Array.isArray(extra.target_questions?.[targetId]) ? extra.target_questions[targetId] : [])
     : (answer?.questions || []);
   const addField = (label: string, value: unknown) => {
     const rendered = Array.isArray(value) ? value.map(text).filter(Boolean).join("、") : text(value);
@@ -459,6 +459,22 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   if (error) throw error;
   const allDetails = details || [];
   if (!allDetails.length) return;
+  const allAnswers = allDetails.flatMap((detail: any) => detail.booking_consultation_answers || []);
+  const profileIds = Array.from(new Set(allAnswers.flatMap((answer: any) => [
+    answer.profile_id,
+    ...(answer.booking_answer_participants || []).map((participant: any) => participant.profile_id),
+  ]).filter(Boolean))) as string[];
+  if (profileIds.length) {
+    const { data: profiles, error: profileError } = await db.from("consultation_profiles").select("*").in("id", profileIds);
+    if (profileError) throw profileError;
+    const profilesById = new Map((profiles || []).map((profile: any) => [profile.id, profile]));
+    allAnswers.forEach((answer: any) => {
+      if (!one(answer.consultation_profiles) && profilesById.has(answer.profile_id)) answer.consultation_profiles = profilesById.get(answer.profile_id);
+      (answer.booking_answer_participants || []).forEach((participant: any) => {
+        if (!one(participant.consultation_profiles) && profilesById.has(participant.profile_id)) participant.consultation_profiles = profilesById.get(participant.profile_id);
+      });
+    });
+  }
   if (!folderId) throw new Error("尚未設定 GOOGLE_DRIVE_OUTPUT_FOLDER_ID");
   if (!appsScriptUrl) throw new Error("尚未設定 GOOGLE_APPS_SCRIPT_WEB_APP_URL");
   if (!appsScriptSecret) throw new Error("尚未設定 GOOGLE_APPS_SCRIPT_SECRET");
@@ -470,7 +486,18 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   let content = "";
   const marks: Mark[] = [];
   const images: DocumentImage[] = [];
-  const pages = expandPages(allDetails);
+  const pages = expandPages(allDetails).filter((pageSpec) => {
+    const answer = one(pageSpec.detail.booking_consultation_answers);
+    const selected = pageSpec.target ? [pageSpec.target] : (answer?.booking_answer_participants || []);
+    const hasProfile = Boolean(one(answer?.consultation_profiles)) || selected.some((participant: any) => Boolean(one(participant.consultation_profiles)));
+    const targetProfileId = text(one(pageSpec.target?.consultation_profiles)?.id);
+    const hasQuestions = pageSpec.target
+      ? (answer?.extra_data?.target_questions?.[targetProfileId] || []).some((question: unknown) => text(question))
+      : (answer?.questions || []).some((question: unknown) => text(question));
+    const serializedExtra = JSON.stringify(answer?.extra_data || {}).replace(/[\s{}\[\]",:]/g, "");
+    return hasProfile || hasQuestions || Boolean(serializedExtra);
+  });
+  if (!pages.length && !isVideo) throw new Error("這筆訂單沒有可輸出的諮詢者資料或問事內容，未建立空白諮詢單");
   if (isVideo) {
     const videoDate = new Date(booking.slot_start);
     const dateParts = new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", year: "numeric", month: "numeric", day: "numeric", weekday: "short" }).formatToParts(videoDate);
@@ -493,6 +520,8 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     marks.push(...page.marks.map((mark) => ({ ...mark, start: mark.start + offset, end: mark.end + offset })));
     images.push(...page.images);
   });
+  if (!content.replace(/\[\[\[PAGE_BREAK\]\]\]/g, "").replace(/[\s\u00a0]/g, ""))
+    throw new Error("這筆訂單沒有可輸出的文件內容，未建立空白諮詢單");
 
   const { data: numberedBookings, error: numberError } = await db.from("bookings")
     .select("id,created_at,consultation_methods(code),booking_details(id,google_document_id,google_document_created_at)")
