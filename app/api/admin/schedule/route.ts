@@ -14,23 +14,29 @@ export async function GET() {
       { data: weekly, error: e2 },
       { data: holidays, error: e3 },
       { data: method, error: e4 },
+      { data: settings, error: e5 },
     ] = await Promise.all([
       d.from("availability_rules").select("*").order("weekday"),
       d.from("weekly_slot_overrides").select("*"),
       d.from("holidays").select("*").order("holiday_date"),
       d.from("consultation_methods").select("id").eq("code", "video").single(),
+      d.from("booking_system_settings").select("video_booking_enabled").eq("id", true).maybeSingle(),
     ]);
-  return e1 || e2 || e3 || e4
+  return e1 || e2 || e3 || e4 || e5
     ? NextResponse.json(
-        { error: (e1 || e2 || e3 || e4)?.message },
+        { error: (e1 || e2 || e3 || e4 || e5)?.message },
         { status: 500 },
       )
-    : NextResponse.json({ rules, weekly, holidays, methodId: method.id });
+    : NextResponse.json({ rules, weekly, holidays, methodId: method.id, videoBookingEnabled: settings?.video_booking_enabled !== false });
 }
 export async function POST(r: NextRequest) {
   if (!(await ok()))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
   const b = await r.json();
+  if (b.action === "set_video_booking_enabled") {
+    const { error } = await adminSupabase().from("booking_system_settings").upsert({ id: true, video_booking_enabled: Boolean(b.enabled), updated_at: new Date().toISOString() });
+    return error ? NextResponse.json({ error: error.message }, { status: 500 }) : NextResponse.json({ ok: true, enabled: Boolean(b.enabled) });
+  }
   if (!b.weekdays?.length || !b.startTime || !b.endTime)
     return NextResponse.json(
       { error: "請完整選擇星期與時間" },
