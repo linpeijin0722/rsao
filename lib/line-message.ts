@@ -189,16 +189,19 @@ export function videoReminderFlex(args: {
   site: string;
   isTomorrow?: boolean;
 }) {
-  const date = new Intl.DateTimeFormat("zh-TW", {
+  const dateParts = new Intl.DateTimeFormat("zh-TW", {
     timeZone: "Asia/Taipei",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
+    month: "numeric",
+    day: "numeric",
     weekday: "short",
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
-    hour12: false,
-  }).format(new Date(args.slotStart));
+    hour12: true,
+  }).formatToParts(new Date(args.slotStart));
+  const part = (type: string) => dateParts.find((entry) => entry.type === type)?.value || "";
+  const weekday = part("weekday").replace(/星期|週/g, "");
+  const period = part("dayPeriod").replace("凌晨", "上午");
+  const appointmentTime = `${part("month")}/${part("day")}(${weekday})${period}${Number(part("hour"))}:${part("minute")}`;
   return {
     type: "bubble",
     hero: {
@@ -220,7 +223,7 @@ export function videoReminderFlex(args: {
           weight: "bold",
           size: "xl",
         },
-        { type: "text", text: `預約時間：${date}`, color: "#6B625B", size: "sm", wrap: true },
+        { type: "text", text: `預約時間：${appointmentTime}`, color: "#6B625B", size: "sm", wrap: true },
       ],
     },
     body: {
@@ -230,7 +233,7 @@ export function videoReminderFlex(args: {
       contents: [
         {
           type: "text",
-          text: "提醒您：您預約的視訊諮詢時間是 明天～\n建議可以先準備好想詢問的問題唷！\n\n提醒您：視訊諮詢的預約時段一律以台灣時間（GMT+8）為準，請您確認時區無誤喔！😊\n\n我們會在時間到時 主動發送通話邀請 給您，請留意訊息通知。\n\n收到邀請後，請依照下方步驟操作，即可開始視訊：\n\n👉 點選「通話」\n👉 再點「開始視訊」\n\n⚠️ 請記得保持 LINE 開啟，並連上網路，才不會錯過通話邀請～\n\n期待與您線上見面🙏",
+          text: `提醒您：您預約的視訊諮詢時間是 ${appointmentTime}\n建議可以先準備好想詢問的問題唷！\n\n提醒您：視訊諮詢的預約時段一律以台灣時間（GMT+8）為準，請您確認時區無誤喔！😊\n\n我們會在時間到時 主動發送通話邀請 給您，請留意訊息通知。\n\n收到邀請後，請依照下方步驟操作，即可開始視訊：\n\n👉 點選「通話」\n👉 再點「開始視訊」\n\n⚠️ 請記得保持 LINE 開啟，並連上網路，才不會錯過通話邀請～\n\n期待與您線上見面🙏`,
           wrap: true,
           color: "#4D453F",
         },
