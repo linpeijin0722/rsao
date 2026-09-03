@@ -28,7 +28,18 @@ export async function POST(r: NextRequest) {
   if (!(await allowed()))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
   const b = await r.json(),
-    { error } = await adminSupabase().from("slot_overrides").upsert(
+    db = adminSupabase();
+  if (b.action === "close_day") {
+    if (!b.methodId || !/^\d{4}-\d{2}-\d{2}$/.test(b.date || ""))
+      return NextResponse.json({ error: "日期資料不完整" }, { status: 400 });
+    const rows = Array.from({ length: 32 }, (_, index) => {
+      const hour = 7 + Math.floor(index / 2), minute = index % 2 ? "30" : "00";
+      return { consultation_method_id: b.methodId, slot_start: `${b.date}T${String(hour).padStart(2, "0")}:${minute}:00+08:00`, is_open: false, updated_at: new Date().toISOString() };
+    });
+    const { error } = await db.from("slot_overrides").upsert(rows, { onConflict: "consultation_method_id,slot_start" });
+    return error ? NextResponse.json({ error: error.message }, { status: 500 }) : NextResponse.json({ ok: true, closed: rows.length });
+  }
+  const { error } = await db.from("slot_overrides").upsert(
       {
         consultation_method_id: b.methodId,
         slot_start: b.slotStart,
