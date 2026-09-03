@@ -48,6 +48,9 @@ export default function Admin() {
     [openDates, setOpenDates] = useState<string[]>([]),
     [confirmCloseDate, setConfirmCloseDate] = useState(false),
     [closingDate, setClosingDate] = useState(false),
+    [videoBookingEnabled, setVideoBookingEnabled] = useState(true),
+    [videoControlConfirm, setVideoControlConfirm] = useState<"close" | "open" | "close_all" | null>(null),
+    [videoControlSaving, setVideoControlSaving] = useState(false),
     [holidayDate, setHolidayDate] = useState(today()),
     [note, setNote] = useState(""),
     [textSaveMessage, setTextSaveMessage] = useState("");
@@ -79,6 +82,7 @@ export default function Admin() {
     setWeekly(j.weekly);
     setHolidays(j.holidays);
     setMethodId(j.methodId);
+    setVideoBookingEnabled(j.videoBookingEnabled !== false);
     dayLoad(j.methodId, date);
     fetch("/api/admin/text-capacity").then(async (x) => {
       if (x.ok) {
@@ -247,6 +251,32 @@ export default function Admin() {
     setConfirmCloseDate(false);
     setOpenTimes([]);
     await Promise.all([dayLoad(), monthLoad()]);
+  }
+  async function setVideoBookingAccess(enabled: boolean) {
+    setVideoControlSaving(true);
+    const response = await fetch("/api/admin/schedule", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "set_video_booking_enabled", enabled }),
+    });
+    const result = await response.json().catch(() => ({}));
+    setVideoControlSaving(false);
+    if (!response.ok) return window.alert(result.error || "設定失敗，請稍後再試");
+    setVideoBookingEnabled(enabled);
+    setVideoControlConfirm(null);
+  }
+  async function closeEverySlot() {
+    setVideoControlSaving(true);
+    const response = await fetch("/api/admin/slots", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "close_all" }),
+    });
+    const result = await response.json().catch(() => ({}));
+    setVideoControlSaving(false);
+    if (!response.ok) return window.alert(result.error || "關閉失敗，請稍後再試");
+    setVideoControlConfirm(null);
+    await Promise.all([dayLoad(), monthLoad(), load()]);
   }
   const selectedDateLabel = (() => {
     const [year, monthValue, dayValue] = date.split("-").map(Number),
@@ -498,6 +528,17 @@ export default function Admin() {
           </div>
         </div>
         <h3>{date} 的時段</h3>
+        <div className="videoBookingMasterControl">
+          <div><b>前台視訊預約</b><span className={videoBookingEnabled ? "enabled" : "disabled"}>{videoBookingEnabled ? "目前開啟" : "目前關閉"}</span></div>
+          <p>關閉時前台會顯示所有時段已額滿，後台下方的時段設定不會變更。</p>
+          <div className="videoBookingMasterActions">
+            <button className={!videoBookingEnabled ? "activeClose" : ""} onClick={() => setVideoControlConfirm("close")}>關閉</button>
+            <button className={videoBookingEnabled ? "activeOpen" : ""} onClick={() => setVideoControlConfirm("open")}>開啟</button>
+          </div>
+        </div>
+        <button className="closeAllDayButton closeEverySlotButton" onClick={() => setVideoControlConfirm("close_all")} disabled={videoControlSaving}>
+          關閉所有時段
+        </button>
         <button className="closeAllDayButton" onClick={() => setConfirmCloseDate(true)} disabled={!methodId || closingDate}>
           關閉{selectedDateLabel}所有時段
         </button>
@@ -526,6 +567,22 @@ export default function Admin() {
             <div className="closeDayActions">
               <button className="cancel" disabled={closingDate} onClick={() => setConfirmCloseDate(false)}>取消</button>
               <button className="confirmClose" disabled={closingDate} onClick={() => void closeAllDaySlots()}>{closingDate ? "關閉中…" : `確認關閉 ${selectedDateLabel}`}</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {videoControlConfirm && (
+        <div className="modalBackdrop" onClick={() => !videoControlSaving && setVideoControlConfirm(null)}>
+          <div className="modal closeDayConfirmModal" onClick={(event) => event.stopPropagation()}>
+            <div className={`closeDayIcon ${videoControlConfirm === "open" ? "openIcon" : ""}`}>{videoControlConfirm === "open" ? "✓" : "!"}</div>
+            <h2>{videoControlConfirm === "open" ? "開啟前台視訊預約？" : videoControlConfirm === "close" ? "關閉前台視訊預約？" : "關閉不限日期的所有時段？"}</h2>
+            <p>{videoControlConfirm === "open" ? "開啟後，前台將重新套用下方設定的開放時間。" : videoControlConfirm === "close" ? "關閉後，前台會顯示所有時段已額滿；後台時段設定不會改變。" : "確定要關閉所有日期、所有時間的視訊諮詢時段嗎？"}</p>
+            {videoControlConfirm === "close_all" && <small>此操作與下方「關閉指定日期所有時段」不同，將套用到不限日期。</small>}
+            <div className="closeDayActions">
+              <button className="cancel" disabled={videoControlSaving} onClick={() => setVideoControlConfirm(null)}>取消</button>
+              <button className={videoControlConfirm === "open" ? "confirmOpen" : "confirmClose"} disabled={videoControlSaving} onClick={() => videoControlConfirm === "close_all" ? void closeEverySlot() : void setVideoBookingAccess(videoControlConfirm === "open")}>
+                {videoControlSaving ? "處理中…" : videoControlConfirm === "open" ? "確認開啟" : videoControlConfirm === "close" ? "確認關閉" : "確認關閉所有時段"}
+              </button>
             </div>
           </div>
         </div>
