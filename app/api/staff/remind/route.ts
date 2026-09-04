@@ -19,21 +19,6 @@ export async function POST(r: NextRequest) {
     site = process.env.NEXT_PUBLIC_SITE_URL || r.nextUrl.origin;
   if (reopen) {
     if (!b.data_submitted_at) return NextResponse.json({ error: "這筆訂單已重新開放填寫，未重複發送通知" }, { status: 409 });
-    const detailIds = (b.booking_details || []).map((detail: any) => detail.id).filter(Boolean);
-    if (detailIds.length) {
-      const { data: answers, error: answersError } = await db
-        .from("booking_consultation_answers")
-        .select("id")
-        .in("booking_detail_id", detailIds);
-      if (answersError) return NextResponse.json({ error: "無法讀取上一輪問事資料，請稍後再試" }, { status: 500 });
-      const answerIds = (answers || []).map((answer: any) => answer.id);
-      if (answerIds.length) {
-        const { error: participantsError } = await db.from("booking_answer_participants").delete().in("answer_id", answerIds);
-        if (participantsError) return NextResponse.json({ error: "無法清除上一輪諮詢對象，請稍後再試" }, { status: 500 });
-        const { error: clearAnswersError } = await db.from("booking_consultation_answers").delete().in("id", answerIds);
-        if (clearAnswersError) return NextResponse.json({ error: "無法建立全新的填寫內容，請稍後再試" }, { status: 500 });
-      }
-    }
     const { data: reopened, error } = await db.from("bookings").update({ data_submitted_at: null, updated_at: new Date().toISOString() }).eq("id", b.id).eq("data_submitted_at", b.data_submitted_at).select("id").maybeSingle();
     if (error) return NextResponse.json({ error: "無法重新開放填寫，請稍後再試" }, { status: 500 });
     if (!reopened) return NextResponse.json({ error: "這筆訂單已由其他操作重新開放，未重複發送通知" }, { status: 409 });
