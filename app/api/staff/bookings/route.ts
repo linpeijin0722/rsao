@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
     if(error||!booking)return NextResponse.json({error:"找不到訂單"},{status:404});
     if(!booking.data_submitted_at)return NextResponse.json({error:"用戶尚未回傳問事資料，不能建立諮詢單"},{status:400});
     try{
-      await createConsultationDocuments(db,booking.id,booking.booking_no,Boolean(body.force),body.createMode==="new"?"new":"replace");
+      await createConsultationDocuments(db,booking.id,booking.booking_no,Boolean(body.force),body.createMode==="new"?"new":"replace",body.submissionId||undefined);
       const {data:details}=await db.from("booking_details").select("id,item_title,google_document_url").eq("booking_id",booking.id).not("google_document_url","is",null);
       if(!details?.length)return NextResponse.json({error:"這筆訂單沒有可建立的問事資料"},{status:400});
       return NextResponse.json({ok:true,documents:details});
@@ -164,6 +164,27 @@ export async function POST(request: NextRequest) {
     if(!body.answerId||!body.profileId)return NextResponse.json({error:"缺少問事資料"},{status:400});
     const db=adminSupabase(),{error}=await db.from("booking_consultation_answers").update({profile_id:body.profileId,questions:(body.questions||[]).slice(0,3),extra_data:body.extraData||{},updated_at:new Date().toISOString()}).eq("id",body.answerId);
     if(!error&&Array.isArray(body.profileIds)){await db.from("booking_answer_participants").delete().eq("answer_id",body.answerId);const rows=body.profileIds.filter(Boolean).filter((id:string,i:number,a:string[])=>a.indexOf(id)===i).map((profile_id:string,position:number)=>({answer_id:body.answerId,profile_id,position}));if(rows.length)await db.from("booking_answer_participants").insert(rows)}
+    return error?NextResponse.json({error:error.message},{status:400}):NextResponse.json({ok:true});
+  }
+  if (action === "update_submission_answer") {
+    if(!body.submissionId||!body.answerId)return NextResponse.json({error:"缺少填寫版本資料"},{status:400});
+    const db=adminSupabase(),{data:submission,error:readError}=await db.from("booking_data_submissions").select("payload").eq("id",body.submissionId).single();
+    if(readError||!submission)return NextResponse.json({error:"找不到填寫版本"},{status:404});
+    const payload={...(submission.payload||{})},answers=Array.isArray(payload.answers)?[...payload.answers]:[],index=answers.findIndex((answer:any)=>answer.id===body.answerId);
+    if(index<0)return NextResponse.json({error:"版本中找不到這筆問事資料"},{status:404});
+    answers[index]={...answers[index],profile_id:body.profileId,questions:(body.questions||[]).slice(0,3),extra_data:body.extraData||{},booking_answer_participants:(body.profileIds||[]).filter(Boolean).map((profile_id:string,position:number)=>({profile_id,position}))};
+    const {error}=await db.from("booking_data_submissions").update({payload:{...payload,answers}}).eq("id",body.submissionId);
+    return error?NextResponse.json({error:error.message},{status:400}):NextResponse.json({ok:true});
+  }
+  if (action === "update_submission_profile") {
+    if(!body.submissionId||!body.profileId)return NextResponse.json({error:"缺少填寫版本資料"},{status:400});
+    const db=adminSupabase(),{data:submission,error:readError}=await db.from("booking_data_submissions").select("payload").eq("id",body.submissionId).single();
+    if(readError||!submission)return NextResponse.json({error:"找不到填寫版本"},{status:404});
+    const payload={...(submission.payload||{})},profiles=Array.isArray(payload.profiles)?[...payload.profiles]:[],index=profiles.findIndex((profile:any)=>profile.id===body.profileId);
+    if(index<0)return NextResponse.json({error:"版本中找不到這位諮詢者"},{status:404});
+    const allowed=["name","relationship_detail","gender","birth_date","lunar_birth_text","zodiac","birth_shichen","address","death_date","lunar_death_text","death_shichen","notes","owner_profile_id","photo_data"];
+    profiles[index]={...profiles[index],...Object.fromEntries(allowed.filter(key=>key in body.profile).map(key=>[key,body.profile[key]||null]))};
+    const {error}=await db.from("booking_data_submissions").update({payload:{...payload,profiles}}).eq("id",body.submissionId);
     return error?NextResponse.json({error:error.message},{status:400}):NextResponse.json({ok:true});
   }
   if (action === "update_consultation_profile") {
