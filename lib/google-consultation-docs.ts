@@ -445,7 +445,7 @@ function consultationNumber(position: number) {
   return `${String.fromCharCode(65 + letterIndex)}${String(((safe - 1) % 99) + 1).padStart(2, "0")}`;
 }
 
-export async function createConsultationDocuments(db: any, bookingId: string, bookingNo: string, force = false, createMode: "replace" | "new" = "replace") {
+export async function createConsultationDocuments(db: any, bookingId: string, bookingNo: string, force = false, createMode: "replace" | "new" = "replace", submissionId?: string) {
   const { data: booking } = await db.from("bookings").select("created_at,paid_at,slot_start,total_price,consultation_methods(code),customers(line_display_name,full_name)").eq("id", bookingId).single();
   const customer = one(booking?.customers) || {};
   const lineName = text(customer.line_display_name) || "LINE用戶";
@@ -458,6 +458,18 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   `).eq("booking_id", bookingId).order("created_at", { ascending: true });
   if (error) throw error;
   const allDetails = details || [];
+  if (submissionId) {
+    const { data: submission, error: submissionError } = await db.from("booking_data_submissions").select("payload").eq("id", submissionId).eq("booking_id", bookingId).single();
+    if (submissionError || !submission) throw new Error("找不到選擇的填寫版本");
+    const snapshotProfiles = new Map((submission.payload?.profiles || []).map((profile: any) => [profile.id, profile]));
+    for (const detail of allDetails) {
+      detail.booking_consultation_answers = (submission.payload?.answers || []).filter((answer: any) => answer.booking_detail_id === detail.id).map((answer: any) => ({
+        ...answer,
+        consultation_profiles: snapshotProfiles.get(answer.profile_id),
+        booking_answer_participants: (answer.booking_answer_participants || []).map((participant: any) => ({...participant, consultation_profiles: snapshotProfiles.get(participant.profile_id)})),
+      }));
+    }
+  }
   if (!allDetails.length) return;
   const allAnswers = allDetails.flatMap((detail: any) => detail.booking_consultation_answers || []);
   const profileIds = Array.from(new Set(allAnswers.flatMap((answer: any) => [
