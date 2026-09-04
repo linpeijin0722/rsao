@@ -1,315 +1,507 @@
-/* 視訊預約沿用文字預約的白底邏輯，只把咖啡色系替換為綠色系。 */
-body .videoBookingSection .staffSectionTitle,body .videoBookingSection .staffTableHead{background:#20423d!important;color:#fff!important}
-body .videoBookingSection .textBookingTools,body .videoBookingSection .staffPrimaryFilters,body .videoBookingSection .staffSecondaryFilters,body .videoBookingSection .videoBookingTools,body .videoBookingSection .dailyBookings,body .videoBookingSection .staffDateRange,body .videoBookingSection .staffDisplayOptions{background:#fff!important;border-color:#a6bbb8!important}
-body .videoBookingSection .staffPrimaryFilters input,body .videoBookingSection .staffPrimaryFilters select,body .videoBookingSection .staffSecondaryFilters input,body .videoBookingSection .staffSecondaryFilters select{background:#fff!important;border-color:#a6bbb8!important;color:inherit!important}
-body .videoBookingSection .staffPrimaryFilters>label,body .videoBookingSection .staffSecondaryFilters>label,body .videoBookingSection .staffDateRange,body .videoBookingSection .staffDisplayOptions{color:inherit!important}
-body .videoBookingSection .staffSearchIcon,body .videoBookingSection .staffMonthNav,body .videoBookingSection .staffMonthNav button{color:#20423d!important}
-body .videoBookingSection .videoViewToolbar button{background:#fff!important;border-color:#a6bbb8!important;color:#20423d!important}
-body .videoBookingSection .videoViewToolbar button.active{background:#20423d!important;color:#fff!important}
-body .videoBookingSection .staffDays button.booked{background:#ebfbf9!important;border-color:#a6bbb8!important;color:#20423d!important}
-body .videoBookingSection .staffDays button.selected{background:#20423d!important;color:#fff!important;outline-color:#a6bbb8!important}
-body .videoBookingSection .staffDays button.booked.pastBooked,body .videoBookingSection .staffDays button.booked.pastBooked.selected{background:#66615e!important;border-color:#66615e!important;color:#fff!important;outline-color:#3f3b39!important}
-body .videoBookingSection .staffTableRow{background:#fff!important;border-color:#a6bbb8!important}
-body .videoBookingSection .staffState.paid{color:#168a54!important}
-body .videoBookingSection .staffState.pending,body .videoBookingSection .staffState.cancelled,body .videoBookingSection .staffState.expired{color:#b5233d!important}
-body .videoBookingSection .returned{color:#168a54!important}
-body .videoBookingSection .missing{color:#b5233d!important}
-
-.staffLogin,
-.staffPage {
-  max-width: 1560px;
-  width: min(98vw, 1560px);
-  margin: auto;
-  padding: 28px;
-}
-.staffLogin {
-  display: grid;
-  gap: 12px;
-  max-width: 380px;
-}
-.staffLogin input,
-.staffLogin button {
-  padding: 13px;
-}
-.staffPage section {
-  background: #fff;
-  border-radius: 15px;
-  padding: 22px;
-  margin: 16px 0;
-}
-.staffMonthNav {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 25px;
-  margin: 15px;
-}
-.staffMonthNav button {
-  border: 0;
-  background: #fff;
-  font-size: 27px;
-}
-.staffMonthNav b{font-size:21px;line-height:1.3}.staffCalendar{max-width:690px}.staffWeek b{font-size:18px;line-height:1.5}.staffDays button{font-size:16px}
-.staffCalendar {
-  max-width: 650px;
-  margin: auto;
-}
-.staffWeek,
-.staffDays {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 7px;
-}
-.staffWeek b {
-  text-align: center;
-}
-.staffDays button,
-.staffDays span {
-  aspect-ratio: 1;
-  border: 0;
-  border-radius: 10px;
-}
-.staffDays .booked {
-  background: #43a36d;
-  color: #fff;
-  font-weight: 700;
-}
-.staffDays .empty {
-  background: #e3e1df;
-  color: #aaa;
-}
-.staffDays .selected {
-  outline: 3px solid #82384b;
-}
-.staffDays .pastBooked{background:#66615e;color:#fff}
-.videoViewToolbar{width:min(650px,calc(100% - 40px));box-sizing:border-box;margin:15px auto 5px;display:flex;justify-content:center}.videoViewToolbar button{min-width:230px;padding:11px 20px;border:1px solid #315e57;border-radius:999px;background:#f3f8f7;color:#315e57;font-size:16px;font-weight:800;white-space:nowrap;cursor:pointer;box-shadow:0 2px 7px rgba(49,94,87,.12)}.videoViewToolbar button:hover,.videoViewToolbar button.active{background:#315e57;color:#fff}.dailyBookings>h3{font-size:20px!important;font-weight:900!important;color:#263e39;margin-top:12px!important}
-.dailyBookings .pastVideoRow{background:#e4e1de!important;border-color:#c8c2bd!important}
-.dailyBookings {
-  max-width: 650px;
-  margin: 20px auto;
-}
-.dailyBookings > button {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 80px 1fr 1fr;
-  gap: 10px;
-  text-align: left;
-  padding: 14px;
-  margin: 7px 0;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  background: #fff;
-}
-.staffTable {
-  display: grid;
-  gap: 9px;
-}
-.staffTable article {
-  display: grid;
-  grid-template-columns: 1fr 1.3fr 1fr 1fr auto;
-  gap: 9px;
-  align-items: center;
-  padding: 13px;
-  border: 1px solid #ddd;
-  border-radius: 9px;
-  cursor: pointer;
-}
-.staffTable button,
-.remindButton {
-  background: #8a3045;
-  color: #fff;
-  border: 0;
-  padding: 9px;
-  border-radius: 7px;
-}
-.staffEditModal {
-  max-height: 92vh;
-  overflow: auto;
-  width: min(94vw, 680px);
-}
-.staffEditModal header {
-  display: flex;
-  height: auto;
-  gap: 13px;
-  padding: 0 0 15px;
-  background: #fff;
-}
-.staffEditModal header img,
-.avatarFallback {
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-.avatarFallback {
-  display: grid;
-  place-items: center;
-  background: #ddd;
-}
-.staffEditModal header h2,
-.staffEditModal header p {
-  margin: 0;
-}
-.bookingStatus {
-  display: flex;
-  gap: 8px;
-  margin: 10px 0;
-}
-.bookingStatus b {
-  padding: 7px 10px;
-  border-radius: 8px;
-  background: #eee;
-}
-.editTime {
-  display: grid;
-  gap: 5px;
-  margin: 14px 0;
-}
-.editTime input {
-  padding: 11px;
-}
-.staffEditItems {
-  display: grid;
-  gap: 8px;
-}
-.staffEditItems article {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-}
-.staffEditItems article > div:first-child {
-  display: grid;
-  gap: 5px;
-  flex: 1;
-}
-.staffEditItems small {
-  color: #777;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.staffEditItems select {
-  padding: 9px;
-}
-.staffQty {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.staffQty button {
-  width: 35px;
-  height: 35px;
-  border: 1px solid #ddd;
-  border-radius: 50%;
-  background: #fff;
-  color: #8a3045;
-}
-.staffEditModal > button {
-  margin-top: 10px;
-}
-@media (max-width: 700px) {
-  .staffTable article {
-    grid-template-columns: 1fr;
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { isAdminSession } from "@/lib/admin-session";
+import { adminSupabase } from "@/lib/supabase";
+import { bookingStatusFlex, pushLineFlex } from "@/lib/line-message";
+import { createConsultationDocuments, wasDocumentEditedBy } from "@/lib/google-consultation-docs";
+export async function GET() {
+  if (!isAdminSession((await cookies()).get("admin_session")?.value))
+    return NextResponse.json({ error: "未登入" }, { status: 401 });
+  const db = adminSupabase();
+  const [{ data, error }, { data: customers, error: customerError }, { data: consultationProfiles, error: profileError }] = await Promise.all([db
+    .from("bookings")
+    .select(
+      "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,data_submitted_at,status,cancellation_reason,paid_at,created_at,customers(id,line_user_id,line_display_name,line_picture_url,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,quantity,google_document_id,google_document_url,google_document_created_at,google_sheet_url,booking_items(code),booking_detail_sub_items(sub_item_id,sub_item_title),booking_detail_profiles(profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)),booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data),booking_answer_participants(position,profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data))))",
+    )
+    .order("created_at", { ascending: false }), db
+    .from("customers")
+    .select("id,line_user_id,line_display_name,line_picture_url,full_name,birth_date")
+    .not("line_user_id", "is", null)
+    .not("full_name", "is", null)
+    .neq("full_name", "")
+    .order("line_display_name", { ascending: true }), db
+    .from("consultation_profiles")
+    .select("id,customer_id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data")
+    .order("name", { ascending: true })]);
+  if (error || customerError || profileError)
+    return NextResponse.json({ error: error?.message || customerError?.message || profileError?.message }, { status: 500 });
+  const bookings:any[]=(data||[]) as any[];
+  const answers=bookings.flatMap((booking:any)=>(booking.booking_details||[]).flatMap((detail:any)=>detail.booking_consultation_answers||[]));
+  const answerIds=[...new Set(answers.map((answer:any)=>answer.id).filter(Boolean))];
+  // PostgREST 的深層關聯在舊資料上偶爾只回第一位參與者；另查一次並依位置
+  // 補回，確保「修改用戶資料」能顯示該筆問事實際選到的所有人物。
+  if(answerIds.length){
+    const {data:participants,error:participantError}=await db
+      .from("booking_answer_participants")
+      .select("answer_id,position,profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)")
+      .in("answer_id",answerIds)
+      .order("position",{ascending:true});
+    if(participantError)return NextResponse.json({error:participantError.message},{status:500});
+    const grouped=new Map<string,any[]>();
+    for(const participant of participants||[]){
+      const list=grouped.get((participant as any).answer_id)||[];
+      list.push(participant);
+      grouped.set((participant as any).answer_id,list);
+    }
+    for(const answer of answers)answer.booking_answer_participants=grouped.get(answer.id)||answer.booking_answer_participants||[];
   }
-  .dailyBookings > button {
-    grid-template-columns: 60px 1fr;
+  const bookingIds=bookings.map((booking:any)=>booking.id).filter(Boolean);
+  if(bookingIds.length){
+    const {data:submissions,error:submissionError}=await db.from("booking_data_submissions").select("id,booking_id,submitted_at,payload").in("booking_id",bookingIds).order("submitted_at",{ascending:false});
+    if(submissionError)return NextResponse.json({error:submissionError.message},{status:500});
+    for(const booking of bookings)booking.data_submissions=(submissions||[]).filter((submission:any)=>submission.booking_id===booking.id);
   }
-  .staffPage {
-    padding: 15px;
-  }
+  return NextResponse.json({ bookings, customers: customers || [], consultationProfiles: consultationProfiles || [] });
 }
-.rememberStaff{display:flex!important;align-items:center;gap:7px;margin-top:12px;font-size:14px}.rememberStaff input{width:auto!important;margin:0!important}.staffTableHead b{font-size:19px!important}.staffTableRow>*:not(:first-child){font-size:16px!important}
-.staffExactAnswerFields{gap:16px!important}.staffAnswerTargetGroup,.staffAnswerSection{display:grid;gap:11px;width:100%;padding:14px;border:1px solid #e2d8cf;border-radius:12px;background:#fbf8f4}.staffAnswerTargetGroup>b,.staffAnswerSection h4{margin:0;font-size:17px}.staffNestedFields{display:grid;gap:10px;padding:12px;border-radius:10px;background:#f5efe8}.staffAnswerEditor{width:min(720px,96vw)!important}.staffAnswerEditor .staffAnswerItem{padding-right:42px}.staffAnswerEditor .returnedEditActions{position:sticky;bottom:-24px;padding-top:14px;background:#fff}
-.staffEditModal,.staffEditModal input,.staffEditModal select,.staffEditModal button{font-size:17px!important}.staffEditModal h2{font-size:25px!important}.staffEditItems b{font-size:18px!important}.staffEditItems small{font-size:15px!important}.staffQty span{font-size:18px!important;font-weight:700}.staffFrontFields input,.staffFrontFields select,.staffFrontFields textarea,.staffAnswerSection textarea{font-weight:400!important}.staffFrontFields label,.staffAnswerSection h4,.staffAnswerTargetGroup>b{font-weight:800!important}.returnedEditActions button{font-size:17px!important;font-weight:800!important;padding:12px 18px!important}
-.staffAnswerSection textarea,.staffNestedFields input,.staffNestedFields select,.staffNestedFields textarea{font-size:16px!important;font-weight:400!important;line-height:1.55}.staffAnswerSection h4,.staffAnswerTargetGroup>b{font-size:17px!important}.staffFrontFields input,.staffFrontFields select,.staffFrontFields textarea{font-size:16px!important;font-weight:400!important}
-.textBookingSection .staffState,.textBookingSection .returned,.textBookingSection .missing{white-space:nowrap;min-width:104px}.textBookingSection .staffTableHead,.textBookingSection .staffTableRow{width:100%}
-.staffCatalogItems h3,.staffSubPicker h2{font-size:24px!important}.staffCatalogItems article>b{font-size:19px!important}.staffSubPicker>p{font-size:17px!important}.staffSubOptions button b{font-size:18px!important}.staffSubOptions button span{font-size:16px!important}.consultationSheetLinks{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:nowrap}.consultationSheetLink{display:grid;place-items:center;width:34px;height:34px;min-width:34px;padding:0;border:1px solid #dccdc3;border-radius:8px;background:#f4ece5;text-decoration:none;font-size:18px;line-height:1;cursor:pointer}.documentGenerateButton{color:#8a3045}.documentGenerateButton:disabled{cursor:wait;opacity:.55}.sheetPending{text-align:center;color:#999}
-.textBookingSection .staffBookingTable{overflow-x:visible}.textBookingSection .staffTableHead,.textBookingSection .staffTableRow{grid-template-columns:minmax(145px,.85fr) minmax(205px,1.15fr) minmax(150px,.85fr) minmax(112px,.7fr) minmax(235px,1.35fr) 76px minmax(150px,.8fr);min-width:0;width:100%;box-sizing:border-box}.textBookingSection .staffTableRow>*{min-width:0}.textBookingSection .staffTableRow small{overflow-wrap:anywhere}
-@media(max-width:1050px){.textBookingSection .staffBookingTable{overflow-x:auto}.textBookingSection .staffTableHead,.textBookingSection .staffTableRow{min-width:980px}}
-.documentLinkModal{width:min(520px,calc(100vw - 32px));padding:28px}.documentLinkModal h2{margin:0 44px 10px 0}.documentLinkModal p{line-height:1.6;color:#645b55}.documentLinkModal label{display:grid;gap:8px;margin-top:18px;font-weight:700}.documentLinkModal input{width:100%;box-sizing:border-box;padding:12px;border:1px solid #bdb3aa;border-radius:8px;font-size:16px;font-weight:400}.openGoogleDrive{display:inline-flex;padding:10px 14px;border-radius:8px;background:#f2eee8;color:#704a38;font-weight:700;text-decoration:none}.documentLinkActions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}.documentLinkActions button{min-height:44px;border:0;border-radius:8px;background:#8a3045;color:#fff;font-size:16px;font-weight:700}.documentLinkActions .cancel{background:#dedad6;color:#4c4540}.documentRelinkButton{filter:none}
-.openGoogleDrive strong{margin:0 2px;font-weight:900}.staffFilters label{font-size:17px!important;font-weight:800!important;gap:7px}.staffFilters select{min-height:42px;padding:8px 34px 8px 11px;font-size:17px!important}.staffTableHead>*{text-align:center!important;justify-self:stretch}.staffTableHead b{display:flex;align-items:center;justify-content:center;text-align:center}.staffTableRow>span:first-child{font-size:17px!important;line-height:1.45}
-.textBookingTools{margin:0 20px 18px;display:flex;align-items:flex-end;gap:10px;border:0;background:transparent;overflow:visible}.staffPrimaryFilters,.staffSecondaryFilters{display:contents!important}.staffPrimaryFilters>label{display:grid;gap:5px;white-space:nowrap;font-size:15px}.staffPrimaryFilters select{background:#fff;min-width:108px}.staffSearchGroup{display:grid;grid-template-columns:28px 132px 126px 94px;align-items:end;gap:6px;min-width:0}.staffSearchIcon{display:grid;place-items:center;height:40px;font-size:24px;line-height:1;color:#744d3d}.staffSearchField{display:grid!important;gap:4px;min-width:0}.staffSearchField input{width:100%;min-width:0;height:40px;box-sizing:border-box;padding:7px 9px!important;border:1px solid #bba995!important;border-radius:10px!important;background:#fff!important;font-size:14px;font-weight:400}.staffDateRange,.staffDisplayOptions{display:flex;align-items:center;gap:6px;padding:7px 8px;border:1px solid #dfd2c6;border-radius:10px;background:#fff}.staffDateRange>b,.staffDisplayOptions>b{color:#5c4538;font-size:15px;white-space:nowrap}.staffDateRange label{display:flex;align-items:center;gap:4px}.staffDateRange input{box-sizing:border-box;width:112px;height:36px;padding:5px 7px;border:1px solid #c9b9ad;border-radius:8px;background:#fff;font-size:14px;font-weight:400}.staffDateRange button{padding:6px 5px;border:0;background:transparent;color:#8a3045;font-weight:700;cursor:pointer}.staffDisplayOptions label{display:flex!important;align-items:center;gap:5px!important;padding:6px 7px;border:1px solid #ddd0c6;border-radius:8px;background:#faf7f3;white-space:nowrap;cursor:pointer;font-size:14px}.staffDisplayOptions input{min-height:0;width:16px;height:16px;margin:0;padding:0}.staffState{display:flex!important;align-items:center;justify-content:center;gap:5px}.staffState>span{font:inherit;color:inherit}.staffOrderAmount{color:#191919!important;font-size:15px!important;font-weight:400!important;white-space:nowrap}.staffOrderCell{display:grid;align-content:center;gap:7px;min-width:0}.staffOrderCell>small{font-size:15px;line-height:1.35;white-space:nowrap;overflow-wrap:normal}.staffOrderItems{display:grid!important;grid-auto-flow:row;gap:4px;width:100%;padding-top:6px;border-top:1px dashed #d8cdc4;color:#554d48;font-size:14px;line-height:1.35}.staffOrderItems>div{display:block!important;width:100%;white-space:normal;overflow-wrap:anywhere}.consultationSheetLinks,.consultationDocumentLink,.consultationDocumentLink small{white-space:nowrap!important}.teacherOverwriteModal{max-width:520px}.teacherOverwriteModal>input{width:100%;box-sizing:border-box;margin:12px 0;padding:12px;border:1px solid #bba995;border-radius:9px;font-size:16px}.teacherOverwriteModal>button:disabled{opacity:.45;cursor:not-allowed}.lineContactButton{margin-top:8px}.lineContactModal textarea{width:100%;min-height:110px;box-sizing:border-box}.lineContactActions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.savedLineMessages{display:grid;gap:7px;margin:10px 0}.savedLineMessages button{background:#f2ece6;color:#46382f;text-align:left}
-@media(max-width:1450px){.textBookingTools{flex-wrap:wrap}.staffSearchGroup{flex:1;grid-template-columns:28px repeat(3,minmax(100px,1fr))}.staffDateRange,.staffDisplayOptions{flex-wrap:wrap}}@media(max-width:900px){.textBookingTools{display:grid}.staffPrimaryFilters,.staffSecondaryFilters{display:flex!important;flex-wrap:wrap;padding:0!important;background:transparent!important;border:0!important}.staffSearchGroup{width:100%;grid-template-columns:28px repeat(3,minmax(0,1fr))}.videoViewToolbar{align-items:stretch;flex-direction:column}.videoViewToolbar button{width:100%}}
-.rebuildDocumentModal{width:min(500px,calc(100vw - 32px));display:grid;gap:12px;padding:28px}.rebuildDocumentModal h2,.rebuildDocumentModal p{margin:0}.rebuildDocumentModal>button:not(.staffModalClose){display:grid!important;gap:5px;width:100%;padding:15px;border:1px solid #d8c8bd!important;border-radius:11px;background:#fff!important;color:#352d29!important;text-align:left;font-size:17px;opacity:1!important}.rebuildDocumentModal>button b{font-size:18px;color:#8a3045!important}.rebuildDocumentModal>button small{font-size:14px;color:#756b65!important}.rebuildDocumentModal>button.cancel{display:block!important;background:#e4dfda!important;color:#4c4540!important;text-align:center;font-weight:800}
-.staffSecondaryFilters{align-items:stretch!important;gap:16px!important;padding:16px!important}.staffDateRange,.staffDisplayOptions{padding:11px 13px!important;border:1px solid #ddd0c6!important;border-radius:12px!important;background:#faf7f3!important}.staffDateRange>b,.staffDisplayOptions>b{font-size:17px!important}.staffDateRange label,.staffDisplayOptions label{font-size:16px!important}.staffDateRange input{height:40px!important;border-radius:9px!important;font-size:16px!important}.staffDateRange button{padding:8px 10px!important;border:1px solid #dacbc0!important;border-radius:8px!important;background:#fff!important;font-size:15px!important;font-weight:800!important}.staffDisplayOptions label{padding:8px 11px!important;border-radius:9px!important;background:#fff!important}
-.staffTotalPrice{display:flex;align-items:center;gap:10px;margin:18px 0;padding:14px 16px;border:1px solid #dccbbb;border-radius:12px;background:#fffaf5}.staffTotalPrice strong{color:#b51f39;font-size:20px}.staffTotalPrice button{width:auto!important;margin:0!important;padding:7px 12px!important;background:#fff!important;color:#8a3045!important;border:1px solid #cdaeb6!important}.staffPriceModal{max-width:430px}.staffPriceModal label{display:block;font-weight:700;margin:18px 0}.staffPriceModal .priceInput{display:flex;align-items:center;margin-top:8px;border:1px solid #cdbfb3;border-radius:10px;overflow:hidden;background:#fff}.staffPriceModal .priceInput span{padding:0 12px;color:#6c625c}.staffPriceModal .priceInput input{border:0!important;margin:0!important;border-radius:0!important;font-size:20px!important}.consultationDocumentLink{display:inline-flex!important;align-items:center!important;gap:2px!important;width:auto!important;min-width:34px!important;padding:0 6px!important}.consultationDocumentLink small{font-size:13px;font-weight:700;color:#5b382b}.staffDisplayOptions{flex-wrap:wrap}.staffDisplayOptions label{white-space:nowrap}
-.staffHealthChecks{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:6px 0 14px}.staffHealthChecks label{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid #ddcfbf;border-radius:10px;background:#fff}.staffHealthChecks input{width:auto!important;margin:0}
-.submissionHistory{display:grid;gap:10px;margin:12px 0 20px}.submissionHistory h3{margin:0}.submissionHistory details{border:1px solid #ddcfbf;border-radius:10px;background:#faf7f3;overflow:hidden}.submissionHistory summary{padding:12px 14px;color:#8a3045;font-weight:800;cursor:pointer}.submissionHistory details>div{padding:2px 14px 12px}.submissionHistory article{padding:8px 0;border-top:1px solid #eadfd6}.submissionHistory p{margin:5px 0}
-.textBookingTools{display:grid!important;grid-template-columns:minmax(0,1fr)!important;align-items:stretch!important}.staffPrimaryFilters{display:flex!important;align-items:flex-end;gap:10px;flex-wrap:wrap;width:100%}.staffSecondaryFilters{display:flex!important;align-items:center!important;justify-content:space-between;gap:12px!important;flex-wrap:wrap;width:100%;padding-top:10px!important}@media(max-width:900px){.staffPrimaryFilters,.staffSecondaryFilters{width:100%}.staffDateRange,.staffDisplayOptions{width:auto}}
-.staffPrimaryFilters .staffSearchGroup{margin-left:auto;grid-template-columns:28px 145px 168px 105px}
-.userInfoActions{display:grid;grid-template-columns:1fr;gap:10px;margin-top:18px}.userInfoActions button{position:static!important;width:100%!important;min-height:46px!important;margin:0!important;border-radius:10px!important;font-size:17px!important;font-weight:800!important}.userInfoActions .lineContactButton{border:1px solid #06a84f!important;background:#06c755!important;color:#fff!important}.userInfoActions .userInfoClose{border:1px solid #d7cec7!important;background:#f1eeeb!important;color:#403833!important}
-.lineContactModal{width:min(620px,calc(100vw - 32px));padding:30px!important}.lineContactModal h2{margin:0 44px 5px 0;font-size:25px!important}.lineContactCustomer{margin:0 0 16px;color:#675d57;font-size:17px!important}.lineContactModal .videoReminderPreset{display:grid!important;grid-template-columns:46px 1fr!important;grid-template-rows:auto auto!important;align-items:center!important;width:100%;min-height:70px;padding:12px 16px!important;border:2px solid #d6a23d!important;border-radius:12px!important;background:#fff7df!important;color:#5c3b12!important;text-align:left!important;box-shadow:0 5px 15px rgba(128,86,20,.14)!important}.videoReminderPreset>span{grid-row:1/3;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:#e39c23;color:#fff;font-size:23px}.videoReminderPreset>b{font-size:18px}.videoReminderPreset>small{color:#786544;font-size:13px;font-weight:500}.lineMessageEditor{display:grid!important;gap:8px;margin-top:16px;font-size:17px!important;font-weight:800!important}.lineContactModal textarea{width:100%;min-height:126px;box-sizing:border-box;padding:12px 14px;border:1px solid #cbbdb2;border-radius:10px;font-size:17px!important;line-height:1.55;font-weight:400}.savedMessagesSection{margin-top:18px}.savedMessagesSection h3{margin:0 0 9px;font-size:18px}.savedLineMessages{display:grid;gap:9px;margin:0}.savedLineMessage{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;align-items:stretch}.savedLineMessage button{min-height:42px!important;margin:0!important;border-radius:9px!important;font-size:15px!important}.savedLineMessage .savedMessageText{padding:9px 12px!important;border:1px solid #ded4cc!important;background:#f7f3ef!important;color:#46382f!important;text-align:left!important;line-height:1.4}.savedLineMessage .savedMessageEdit{padding:7px 11px!important;border:1px solid #b99986!important;background:#fff!important;color:#704a38!important}.savedLineMessage .savedMessageDelete{padding:7px 11px!important;border:1px solid #d9d0ca!important;background:#ece8e5!important;color:#655b55!important}.lineContactActions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.lineContactActions button{min-height:48px!important;margin:0!important;border-radius:10px!important;font-size:17px!important;font-weight:800!important}.lineContactActions .saveLineMessageButton{background:#9b5c49!important;color:#fff!important}.lineContactActions .sendLineMessageButton{background:#06c755!important;color:#fff!important}
-.priorityModal{z-index:10000!important}.videoReminderConfirmModal{width:min(460px,calc(100vw - 32px));padding:28px!important}.videoReminderConfirmModal h2{margin:0 0 12px;font-size:23px}.videoReminderConfirmModal p{font-size:17px;line-height:1.65}.videoReminderConfirmModal>div{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px}.videoReminderConfirmModal>div button{min-height:46px;margin:0!important;border-radius:10px!important;font-size:17px!important;font-weight:800!important}.videoReminderConfirmModal>div .cancel{background:#e8e3df!important;color:#4d4540!important}
-@media(max-width:900px){.staffPrimaryFilters .staffSearchGroup{margin-left:0;grid-template-columns:28px minmax(0,1fr) minmax(0,1.33fr) minmax(0,.85fr)}.lineContactModal{padding:24px 18px!important}.savedLineMessage{grid-template-columns:minmax(0,1fr) auto}.savedLineMessage .savedMessageDelete{grid-column:2}.lineContactActions{grid-template-columns:1fr}}
-.videoBookingTools{margin-top:16px!important;margin-bottom:20px!important;padding-bottom:16px;border-bottom:1px solid #e7ddd4}.videoBookingSection .dailyBookings{max-width:none;width:100%;margin:20px 0 0}.videoBookingSection .staffBookingTable{overflow-x:visible}.videoBookingSection .staffTableHead,.videoBookingSection .staffTableRow{grid-template-columns:minmax(145px,.85fr) minmax(205px,1.15fr) minmax(150px,.85fr) minmax(112px,.7fr) minmax(235px,1.35fr) 76px minmax(150px,.8fr);min-width:0;width:100%;box-sizing:border-box}.videoBookingSection .staffTableRow>*{min-width:0}.staffEmptyState{grid-column:1/-1;padding:26px;text-align:center;color:#756b65;font-size:17px;font-weight:700;background:#faf8f6;border:1px dashed #d8cbc1;border-radius:10px}@media(max-width:1050px){.videoBookingSection .staffBookingTable{overflow-x:auto}.videoBookingSection .staffTableHead,.videoBookingSection .staffTableRow{min-width:980px}}
-.staffPageHeading{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:20px}.staffPageHeading h1{margin:0}.staffPageHeading>button{min-height:46px;padding:10px 18px;border:0;border-radius:11px;background:#8a3045;color:#fff;font-size:17px;font-weight:800;cursor:pointer}.manualBookingModal{width:min(780px,calc(100vw - 32px));max-height:90vh;overflow:auto;padding:30px!important}.manualBookingModal h2{margin:0 44px 5px 0;font-size:27px}.manualBookingModal>p{margin:0 0 18px;color:#716760;font-size:16px}.manualMethodTabs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 18px}.manualMethodTabs button{min-height:48px;border:1px solid #d6c8bc;border-radius:11px;background:#f7f2ed;color:#594a41;font-size:18px;font-weight:800}.manualMethodTabs button.active{border-color:#8a3045;background:#8a3045;color:#fff}.manualMainField{display:grid;gap:8px;margin:15px 0;font-size:18px;font-weight:800}.manualMainField select,.manualMainField input{width:100%;box-sizing:border-box;min-height:48px;padding:10px 12px;border:1px solid #cbbcaf;border-radius:10px;background:#fff;font-size:17px;font-weight:400}.manualMainField small{color:#766b64;font-size:14px;font-weight:400}.manualItems{display:grid;gap:9px;margin-top:22px}.manualItems h3{margin:0 0 3px;font-size:20px}.manualItems article{display:grid;grid-template-columns:minmax(0,1fr) minmax(210px,.7fr) 92px;align-items:center;gap:10px;padding:11px 13px;border:1px solid #dfd3c8;border-radius:11px;background:#fff}.manualItems article.selected{border-color:#b98491;background:#fffafb}.manualItems article>label:first-child{display:flex;align-items:center;gap:9px;min-width:0;font-size:17px}.manualItems article>label:first-child input{width:18px;height:18px;margin:0}.manualItems article>label:first-child b{min-width:0}.manualItems article>label:first-child span{margin-left:auto;color:#8a3045;white-space:nowrap}.manualItems select,.manualQuantity input{width:100%;box-sizing:border-box;min-height:40px;padding:7px 9px;border:1px solid #cdbfb4;border-radius:8px;background:#fff;font-size:15px;font-weight:400}.manualQuantity{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:5px;font-size:14px;font-weight:700}.manualPaymentChoice{display:grid;gap:9px;margin:22px 0;padding:15px;border:1px solid #d9ccc1;border-radius:12px;background:#f9f5f1}.manualPaymentChoice legend{padding:0 7px;font-size:18px;font-weight:800}.manualPaymentChoice>label{display:flex;align-items:flex-start;gap:10px;padding:11px;border:1px solid #e1d7cf;border-radius:10px;background:#fff;cursor:pointer}.manualPaymentChoice input{width:18px;height:18px;margin:3px 0 0}.manualPaymentChoice span{display:grid;gap:3px}.manualPaymentChoice b{font-size:17px}.manualPaymentChoice small{color:#6f6660;font-size:14px}.manualCreateButton{width:100%;min-height:50px;border:0;border-radius:11px;background:#8a3045;color:#fff;font-size:18px;font-weight:800}.manualCreateButton:disabled{opacity:.55}.manualBookingModal>.staffModalClose{position:absolute!important}@media(max-width:700px){.staffPageHeading{align-items:stretch;flex-direction:column}.manualBookingModal{padding:24px 16px!important}.manualItems article{grid-template-columns:1fr}.manualItems article>label:first-child span{font-size:14px}.manualMethodTabs{grid-template-columns:1fr}}
-.staffPageHeading>.manualBookingEntry{background:#20423d;color:#fff;box-shadow:0 4px 12px rgba(32,66,61,.2)}
-
-/* 視訊區：白底維持白色，僅將文字區原本的咖啡色系替換為綠色系。 */
-body .videoBookingSection .staffPrimaryFilters{padding:15px 16px!important;border:1px solid #a6bbb8!important;border-radius:13px!important;background:#ebfbf9!important}
-body .videoBookingSection .staffSecondaryFilters{padding:22px 14px 12px!important;border:0!important;background:#fff!important}
-body .videoBookingSection .staffDateRange,body .videoBookingSection .staffDisplayOptions{background:#ebfbf9!important;border:1px solid #a6bbb8!important;color:#20423d!important}
-body .videoBookingSection .staffDateRange input,body .videoBookingSection .staffDisplayOptions label,body .videoBookingSection .staffSearchField input,body .videoBookingSection .staffPrimaryFilters select{background:#fff!important;border-color:#a6bbb8!important}
-body .videoBookingSection .staffPrimaryFilters>label,body .videoBookingSection .staffDateRange>b,body .videoBookingSection .staffDisplayOptions>b{color:#20423d!important}
-
-/* 手動建立預約：桌機加寬，完整顯示項目、子項目與數量。 */
-.manualBookingModal{width:min(1080px,calc(100vw - 40px))!important}
-.manualItems article{grid-template-columns:minmax(280px,1.15fr) minmax(300px,1fr) 110px!important}
-.returnedActionMenu button:disabled{opacity:.48;cursor:not-allowed}
-.returnedActionMenu .refillDataButton{min-height:56px!important;border:2px solid #a92222!important;background:#c94040!important;color:#fff!important;font-size:17px!important;font-weight:900!important;box-shadow:0 6px 16px rgba(201,64,64,.28)!important}
-@media(max-width:760px){.manualBookingModal{width:calc(100vw - 24px)!important}.manualItems article{grid-template-columns:1fr!important}}
-
-/* 手動建立預約：用戶搜尋與穩定的項目欄位版面 */
-.manualUserPicker{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:8px 12px;align-items:end;margin:15px 0}.manualUserPicker>label{grid-column:1/-1;font-size:18px;font-weight:800}.manualUserPicker select,.manualUserSearchBox input{width:100%;min-width:0;box-sizing:border-box;min-height:48px;border:1px solid #cbbcaf;border-radius:10px;background:#fff;font-size:16px;font-weight:400}.manualUserPicker select{padding:10px 12px}.manualUserSearchBox{position:relative;min-width:0}.manualUserSearchBox span{position:absolute;left:13px;top:50%;transform:translateY(-52%);color:#78594a;font-size:23px;line-height:1;pointer-events:none}.manualUserSearchBox input{padding:10px 12px 10px 42px}.manualUserPicker small{grid-column:1/-1;color:#766b64;font-size:14px}.manualItems,.manualItems article,.manualItems article>*{min-width:0}.manualItems article{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(86px,100px)!important}.manualItems article>label:first-child{flex-wrap:wrap;align-items:center}.manualItems article>label:first-child b{flex:1 1 150px;overflow-wrap:anywhere}.manualItems article>label:first-child span{flex:0 0 auto}.manualItems select{display:block;max-width:100%;min-width:0;text-overflow:ellipsis}.manualQuantity{min-width:0}.manualQuantity input{min-width:0}
-@media(max-width:920px){.manualItems article{grid-template-columns:1fr!important}.manualItems article>label:first-child b{flex:1 1 auto}.manualUserPicker{grid-template-columns:1fr}}
-.staffEmptyReturnedAnswers{margin:12px 0;padding:16px;border:1px dashed #a6bbb8;border-radius:10px;background:#f7fbfa;color:#20423d;font-size:16px}
-
-/* 八欄視訊表格：付款時間置於最左側。 */
-.videoBookingSection .staffTableHead,.videoBookingSection .staffTableRow{grid-template-columns:minmax(145px,.85fr) minmax(145px,.85fr) minmax(190px,1.1fr) minmax(125px,.72fr) minmax(125px,.72fr) minmax(220px,1.25fr) 78px minmax(145px,.82fr)!important}
-
-/* 手動建立預約：加寬、顯示 LINE 頭像，項目名稱與價格同列。 */
-.manualBookingModal{width:min(1240px,calc(100vw - 40px))!important}.manualSelectedCustomer{display:flex!important;align-items:center;gap:13px;width:100%;min-height:72px;margin:10px 0 18px!important;padding:10px 14px!important;border:1px solid #cbbcaf!important;border-radius:12px!important;background:#fff!important;color:#2d2622!important;text-align:left!important}.manualSelectedCustomer img,.manualSelectedCustomer .avatarFallback{flex:0 0 50px;width:50px;height:50px;border-radius:50%;object-fit:cover}.manualSelectedCustomer>span:last-child{display:grid;gap:3px}.manualSelectedCustomer b{font-size:18px}.manualSelectedCustomer small{font-size:15px;color:#746a63}.manualItems article>label:first-child{flex-wrap:nowrap!important}.manualItems article>label:first-child b{font-size:18px;line-height:1.35}.manualItems article>label:first-child span{font-size:17px;font-weight:500}.manualItems select{font-size:16px}.manualQuantity{font-size:16px}
-
-/* 修改問事資料：複選框靠左、單列、無外框，選項採一般字重。 */
-.staffAnswerEditor .staffHealthChecks{display:grid!important;grid-template-columns:1fr!important;gap:7px!important}.staffAnswerEditor .staffHealthChecks label{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;gap:9px!important;min-height:30px!important;margin:0!important;padding:3px 0!important;border:0!important;border-radius:0!important;background:transparent!important;font-weight:400!important}.staffAnswerEditor .staffHealthChecks input{order:-1!important;flex:0 0 auto!important;width:17px!important;height:17px!important;margin:0!important}
-
-/* 手動建立預約：搜尋結果直接列出，最多顯示約八位，點整列即可選取。 */
-.manualUserPicker{grid-template-columns:1fr!important;margin-bottom:8px!important}
-.manualUserResults{display:grid;gap:9px;max-height:576px;margin:0 0 20px;padding:3px 7px 3px 3px;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
-.manualUserResult{display:grid;grid-template-columns:minmax(0,1fr) 104px;align-items:stretch;min-width:0;min-height:70px;border:1px solid #d9ccc1;border-radius:12px;background:#fff!important;overflow:hidden;transition:border-color .15s,box-shadow .15s}
-.manualUserResult:hover{border-color:#b99d8e;box-shadow:0 2px 8px rgba(80,57,44,.08)}
-.manualUserResult.selected{border-color:#8a3045;background:#fff8fa!important;box-shadow:0 0 0 2px rgba(138,48,69,.14)}
-button.manualUserSelect{display:flex!important;align-items:center!important;gap:12px!important;min-width:0!important;min-height:68px!important;margin:0!important;padding:9px 13px!important;border:0!important;border-radius:0!important;background:#fff!important;color:#26201d!important;text-align:left!important;cursor:pointer!important}
-.manualUserResult.selected button.manualUserSelect{background:#fff8fa!important}
-button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:block!important;flex:0 0 48px!important;width:48px!important;min-width:48px!important;max-width:48px!important;height:48px!important;min-height:48px!important;max-height:48px!important;margin:0!important;padding:0!important;border-radius:50%!important;object-fit:cover!important;object-position:center!important}
-.manualUserSelect>span:last-child{display:grid;gap:2px;min-width:0}
-.manualUserSelect b{overflow:hidden;color:#211c19!important;font-size:17px;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}
-.manualUserSelect small{color:#756b65!important;font-size:14px!important;font-weight:400!important}
-.manualUserResult.selected .manualUserSelect small{color:#8a3045!important;font-weight:800!important}
-.manualUserProfileButton{width:104px!important;min-width:104px!important;margin:0!important;padding:8px 10px!important;border:0!important;border-left:1px solid #e2d8cf!important;border-radius:0!important;background:#f3ece7!important;color:#68463a!important;font-size:15px!important;font-weight:800!important;cursor:pointer}
-.manualUserProfileButton:hover{background:#efe7e1!important}
-.manualUserEmpty{margin:0;padding:20px;border:1px dashed #d8cbc1;border-radius:11px;background:#faf8f6;color:#756b65;text-align:center;font-size:16px}
-
-/* 用戶資料視窗永遠位於手動預約視窗上方。 */
-.priorityModal{z-index:10050!important}
-.priorityModal .userInfoModal{z-index:10051!important}
-
-/* LINE 聯絡：新增常用訊息有清楚、獨立的操作區。 */
-.lineComposeSection{margin-top:16px;padding:16px;border:1px solid #d9cec5;border-radius:13px;background:#fbf8f5}
-.lineComposeHeading{display:flex;align-items:flex-start;gap:11px}
-.lineComposeHeading>span{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;border-radius:50%;background:#8a3045;color:#fff;font-size:24px;font-weight:500;line-height:1}
-.lineComposeHeading h3{margin:0 0 3px;font-size:19px}
-.lineComposeHeading p{margin:0;color:#746a63;font-size:14px;line-height:1.45}
-.lineComposeSection .lineMessageEditor{margin-top:13px!important}
-.lineComposeSave{width:100%;min-height:44px;margin:12px 0 0!important;border:0!important;border-radius:9px!important;background:#9b5c49!important;color:#fff!important;font-size:16px!important;font-weight:800!important}
-.lineContactActions.single{grid-template-columns:1fr!important}
-.lineContactActions.single .sendLineMessageButton{width:100%}
-@media(max-width:700px){.manualUserResults{max-height:504px}.manualUserProfileButton{min-width:88px;padding-inline:9px!important}.manualUserSelect{padding-inline:10px!important}.manualUserSelect b{font-size:15px}}
-
-/* 視訊時間欄位需一眼可辨識。 */
-.staffTableRow .staffVideoTime{display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800}
-.staffPagination{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:18px;margin-top:16px;padding:13px 16px;border:1px solid #decfc3;border-radius:12px;background:#faf7f3;color:#3f3028;font-size:16px}.staffPagination>label{display:flex;align-items:center;gap:9px;font-weight:700}.staffPagination select{min-width:88px;padding:8px 10px;border:1px solid #cdb9aa;border-radius:9px;background:#fff;font:inherit}.staffPagination>span{text-align:center;color:#75675e}.staffPagination>div{display:flex;gap:8px}.staffPagination button{min-width:96px;padding:9px 13px;border:1px solid #9b7968;border-radius:9px;background:#fff;color:#704b3c;font-size:15px;font-weight:700}.staffPagination button:not(:disabled):hover{background:#8a3045;color:#fff;border-color:#8a3045}.staffPagination button:disabled{opacity:.42;cursor:not-allowed}@media(max-width:720px){.staffPagination{grid-template-columns:1fr;text-align:center}.staffPagination>label,.staffPagination>div{justify-content:center}}
+export async function POST(request: NextRequest) {
+  if (!isAdminSession((await cookies()).get("admin_session")?.value))
+    return NextResponse.json({ error: "未登入" }, { status: 401 });
+  const body = await request.json(), { bookingNo, action } = body;
+  if (action === "create_manual_booking") {
+    const db = adminSupabase(), methodCode = body.methodCode === "video" ? "video" : "text",
+      lines = Array.isArray(body.lines) ? body.lines : [];
+    if (!body.customerId) return NextResponse.json({ error: "請選擇用戶" }, { status: 400 });
+    if (!lines.length) return NextResponse.json({ error: "請至少選擇一個諮詢項目" }, { status: 400 });
+    const [{ data: customer }, { data: method }] = await Promise.all([
+      db.from("customers").select("id,line_user_id,line_display_name,full_name,profile_completed_at").eq("id", body.customerId).single(),
+      db.from("consultation_methods").select("id,code,title,base_price,duration_minutes").eq("code", methodCode).eq("is_active", true).single(),
+    ]);
+    if (!customer?.line_user_id || !customer.full_name)
+      return NextResponse.json({ error: "這位用戶尚未完成 LINE 登入與本人資料" }, { status: 400 });
+    if (!method) return NextResponse.json({ error: "諮詢方式目前未開放" }, { status: 400 });
+    let slotStart: string | null = null, slotEnd: string | null = null;
+    if (methodCode === "video") {
+      const start = new Date(String(body.slotStart || ""));
+      if (Number.isNaN(start.getTime())) return NextResponse.json({ error: "請選擇視訊時間" }, { status: 400 });
+      slotStart = start.toISOString();
+      slotEnd = new Date(start.getTime() + Math.max(1, Number(method.duration_minutes) || 25) * 60000).toISOString();
+      const { data: occupied } = await db.from("bookings").select("id").eq("consultation_method_id", method.id).eq("slot_start", slotStart).neq("status", "cancelled").maybeSingle();
+      if (occupied) return NextResponse.json({ error: "這個視訊時段已經有人預約" }, { status: 409 });
+    }
+    const itemIds = [...new Set(lines.map((line: any) => String(line.itemId || "")).filter(Boolean))],
+      subIds = [...new Set(lines.map((line: any) => String(line.subId || "")).filter(Boolean))];
+    const [{ data: catalogItems }, { data: catalogSubs }] = await Promise.all([
+      db.from("booking_items").select("id,title,price,option_mode").in("id", itemIds).eq("is_active", true),
+      subIds.length ? db.from("sub_items").select("id,item_id,title,price").in("id", subIds).eq("is_active", true) : Promise.resolve({ data: [] as any[] }),
+    ]);
+    if ((catalogItems || []).length !== itemIds.length) return NextResponse.json({ error: "部分諮詢項目不存在或已停用" }, { status: 400 });
+    let subtotal = 0;
+    const normalized = lines.map((line: any) => {
+      const item = (catalogItems || []).find((candidate: any) => candidate.id === line.itemId),
+        sub = (catalogSubs || []).find((candidate: any) => candidate.id === line.subId && candidate.item_id === line.itemId),
+        qty = Math.max(1, Math.floor(Number(line.qty) || 1));
+      if (!item || (item.option_mode === "single_required" && !sub)) throw new Error(`請完成「${item?.title || "諮詢項目"}」的子項目選擇`);
+      const unit = Number(sub?.price ?? item.price ?? 0); subtotal += unit * qty;
+      return { item, sub, qty, unit };
+    });
+    const now = new Date(), taipeiDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" }).format(now).replace(/-/g, ""),
+      manualNo = `LAS-${taipeiDate}-${crypto.randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase()}`,
+      total = subtotal + Number(method.base_price || 0), expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+    const { data: booking, error: bookingError } = await db.from("bookings").insert({ booking_no: manualNo, customer_id: customer.id, consultation_method_id: method.id, slot_start: slotStart, slot_end: slotEnd, subtotal, total_price: total, payment_method: "credit_card", payment_status: "pending", status: "pending_payment", expires_at: expiresAt }).select("id,booking_no").single();
+    if (bookingError || !booking) return NextResponse.json({ error: bookingError?.message || "建立預約失敗" }, { status: 400 });
+    try {
+      for (const line of normalized) {
+        const { data: detail, error: detailError } = await db.from("booking_details").insert({ booking_id: booking.id, item_id: line.item.id, item_title: line.item.title, unit_price: line.unit, quantity: line.qty, line_total: line.unit * line.qty }).select("id").single();
+        if (detailError || !detail) throw new Error(detailError?.message || "無法儲存諮詢項目");
+        if (line.sub) {
+          const { error: subError } = await db.from("booking_detail_sub_items").insert({ booking_detail_id: detail.id, sub_item_id: line.sub.id, sub_item_title: line.sub.title, unit_price: line.sub.price, quantity: line.qty, line_total: Number(line.sub.price) * line.qty });
+          if (subError) throw new Error(subError.message);
+        }
+      }
+      if (body.notifyPayment) {
+        const site=process.env.NEXT_PUBLIC_SITE_URL||request.nextUrl.origin;
+        await pushLineFlex(customer.line_user_id,"待付款",bookingStatusFlex({status:"pending",bookingNo:manualNo,method:methodCode,total,slotStart:slotStart||undefined,items:normalized.map((line:any)=>[line.item.title,line.sub?.title].filter(Boolean).join("｜")),expiresAt,site}));
+      }
+      return NextResponse.json({ ok: true, bookingNo: manualNo, paymentNotified: Boolean(body.notifyPayment) });
+    } catch (error) {
+      await db.from("bookings").delete().eq("id", booking.id);
+      return NextResponse.json({ error: error instanceof Error ? error.message : "建立預約失敗" }, { status: 400 });
+    }
+  }
+  if (action === "check_document_edited") {
+    const db=adminSupabase(),{data:booking}=await db.from("bookings").select("id,booking_details(google_document_id)").eq("booking_no",bookingNo).single();
+    if(!booking)return NextResponse.json({error:"找不到訂單"},{status:404});
+    const documentId=(booking.booking_details||[]).find((detail:any)=>detail.google_document_id)?.google_document_id;
+    if(!documentId)return NextResponse.json({ok:true,teacherEdited:false});
+    try{return NextResponse.json({ok:true,teacherEdited:await wasDocumentEditedBy(documentId,"jingxuan570820@gmail.com")})}
+    catch(error){console.error("無法檢查諮詢單編輯紀錄",error);return NextResponse.json({ok:true,teacherEdited:false,checkUnavailable:true})}
+  }
+  if (action === "generate_document") {
+    const db=adminSupabase(),{data:booking,error}=await db.from("bookings").select("id,booking_no,data_submitted_at").eq("booking_no",bookingNo).single();
+    if(error||!booking)return NextResponse.json({error:"找不到訂單"},{status:404});
+    if(!booking.data_submitted_at)return NextResponse.json({error:"用戶尚未回傳問事資料，不能建立諮詢單"},{status:400});
+    try{
+      await createConsultationDocuments(db,booking.id,booking.booking_no,Boolean(body.force),body.createMode==="new"?"new":"replace",body.submissionId||undefined);
+      const {data:details}=await db.from("booking_details").select("id,item_title,google_document_url").eq("booking_id",booking.id).not("google_document_url","is",null);
+      if(!details?.length)return NextResponse.json({error:"這筆訂單沒有可建立的問事資料"},{status:400});
+      return NextResponse.json({ok:true,documents:details});
+    }catch(error){
+      console.error("後台建立諮詢文件失敗",error);
+      return NextResponse.json({error:error instanceof Error?error.message:"建立文件失敗"},{status:500});
+    }
+  }
+  if (action === "change_document_link") {
+    const url=String(body.documentUrl||"").trim(),match=url.match(/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/);
+    if(!match)return NextResponse.json({error:"請貼上正確的 Google 文件連結"},{status:400});
+    const db=adminSupabase(),{data:booking,error}=await db.from("bookings").select("id").eq("booking_no",bookingNo).single();
+    if(error||!booking)return NextResponse.json({error:"找不到訂單"},{status:404});
+    const {data:details,error:detailError}=await db.from("booking_details").select("id,item_title,google_document_created_at,booking_items(code)").eq("booking_id",booking.id);
+    if(detailError)return NextResponse.json({error:detailError.message},{status:400});
+    const target=(details||[]).find((detail:any)=>{const item=Array.isArray(detail.booking_items)?detail.booking_items[0]:detail.booking_items;return item?.code==="past-life-personal"||String(detail.item_title||"").includes("前世因果（個人）")});
+    if(!target)return NextResponse.json({error:"這筆訂單沒有可連結的前世因果（個人）項目"},{status:400});
+    const normalized=`https://docs.google.com/document/d/${match[1]}/edit`,{error:updateError}=await db.from("booking_details").update({google_document_id:match[1],google_document_url:normalized,google_document_created_at:target.google_document_created_at||new Date().toISOString()}).eq("id",target.id);
+    return updateError?NextResponse.json({error:updateError.message},{status:400}):NextResponse.json({ok:true,url:normalized});
+  }
+  if (action === "get_answer") {
+    if (!body.answerId) return NextResponse.json({ error: "缺少問事資料" }, { status: 400 });
+    const db = adminSupabase(), { data: answer, error } = await db.from("booking_consultation_answers")
+      .select("id,profile_id,questions,extra_data,updated_at,booking_answer_participants(position,profile_id)")
+      .eq("id", body.answerId).single();
+    if (error || !answer) return NextResponse.json({ error: error?.message || "找不到問事資料" }, { status: 404 });
+    return NextResponse.json({ answer });
+  }
+  if (action === "update_answer") {
+    if(!body.answerId||!body.profileId)return NextResponse.json({error:"缺少問事資料"},{status:400});
+    const db=adminSupabase(),{error}=await db.from("booking_consultation_answers").update({profile_id:body.profileId,questions:(body.questions||[]).slice(0,3),extra_data:body.extraData||{},updated_at:new Date().toISOString()}).eq("id",body.answerId);
+    if(!error&&Array.isArray(body.profileIds)){await db.from("booking_answer_participants").delete().eq("answer_id",body.answerId);const rows=body.profileIds.filter(Boolean).filter((id:string,i:number,a:string[])=>a.indexOf(id)===i).map((profile_id:string,position:number)=>({answer_id:body.answerId,profile_id,position}));if(rows.length)await db.from("booking_answer_participants").insert(rows)}
+    return error?NextResponse.json({error:error.message},{status:400}):NextResponse.json({ok:true});
+  }
+  if (action === "update_submission_answer") {
+    if(!body.submissionId||!body.answerId)return NextResponse.json({error:"缺少填寫版本資料"},{status:400});
+    const db=adminSupabase(),{data:submission,error:readError}=await db.from("booking_data_submissions").select("payload").eq("id",body.submissionId).single();
+    if(readError||!submission)return NextResponse.json({error:"找不到填寫版本"},{status:404});
+    const payload={...(submission.payload||{})},answers=Array.isArray(payload.answers)?[...payload.answers]:[],index=answers.findIndex((answer:any)=>answer.id===body.answerId);
+    if(index<0)return NextResponse.json({error:"版本中找不到這筆問事資料"},{status:404});
+    answers[index]={...answers[index],profile_id:body.profileId,questions:(body.questions||[]).slice(0,3),extra_data:body.extraData||{},booking_answer_participants:(body.profileIds||[]).filter(Boolean).map((profile_id:string,position:number)=>({profile_id,position}))};
+    const {error}=await db.from("booking_data_submissions").update({payload:{...payload,answers}}).eq("id",body.submissionId);
+    return error?NextResponse.json({error:error.message},{status:400}):NextResponse.json({ok:true});
+  }
+  if (action === "update_submission_profile") {
+    if(!body.submissionId||!body.profileId)return NextResponse.json({error:"缺少填寫版本資料"},{status:400});
+    const db=adminSupabase(),{data:submission,error:readError}=await db.from("booking_data_submissions").select("payload").eq("id",body.submissionId).single();
+    if(readError||!submission)return NextResponse.json({error:"找不到填寫版本"},{status:404});
+    const payload={...(submission.payload||{})},profiles=Array.isArray(payload.profiles)?[...payload.profiles]:[],index=profiles.findIndex((profile:any)=>profile.id===body.profileId);
+    if(index<0)return NextResponse.json({error:"版本中找不到這位諮詢者"},{status:404});
+    const allowed=["name","relationship_detail","gender","birth_date","lunar_birth_text","zodiac","birth_shichen","address","death_date","lunar_death_text","death_shichen","notes","owner_profile_id","photo_data"];
+    profiles[index]={...profiles[index],...Object.fromEntries(allowed.filter(key=>key in body.profile).map(key=>[key,body.profile[key]||null]))};
+    const {error}=await db.from("booking_data_submissions").update({payload:{...payload,profiles}}).eq("id",body.submissionId);
+    return error?NextResponse.json({error:error.message},{status:400}):NextResponse.json({ok:true});
+  }
+  if (action === "update_consultation_profile") {
+    const db=adminSupabase(),allowed=["name","relationship_detail","gender","birth_date","lunar_birth_text","zodiac","birth_shichen","address","death_date","lunar_death_text","death_shichen","notes","owner_profile_id","photo_data"];
+    if (!body?.profileId) return NextResponse.json({error:"缺少資料"},{status:400});
+    const profileUpdate=Object.fromEntries(allowed.filter(k=>k in body.profile).map(k=>[k,body.profile[k]||null]));
+    const {error}=await db.from("consultation_profiles").update({...profileUpdate,updated_at:new Date().toISOString()}).eq("id",body.profileId);
+    if(body.answerId)await db.from("booking_consultation_answers").update({questions:(body.questions||[]).slice(0,3),updated_at:new Date().toISOString()}).eq("id",body.answerId);
+    return error?NextResponse.json({error:error.message},{status:400}):NextResponse.json({ok:true});
+  }
+  if (action === "update_price") {
+    const amount=Number(body.totalPrice);
+    if(!Number.isInteger(amount)||amount<0||amount>10000000)return NextResponse.json({error:"請輸入正確的整數金額"},{status:400});
+    const db=adminSupabase(),{data:booking,error:findError}=await db.from("bookings").select("id,booking_no,total_price,slot_start,expires_at,payment_status,status,customers(line_user_id),consultation_methods(code),booking_details(item_title,quantity,booking_detail_sub_items(sub_item_title))").eq("booking_no",bookingNo).single();
+    if(findError||!booking)return NextResponse.json({error:findError?.message||"找不到訂單"},{status:404});
+    if(booking.payment_status==="paid")return NextResponse.json({error:"已付款訂單不能修改金額"},{status:400});
+    if(booking.status==="cancelled"||booking.status==="expired")return NextResponse.json({error:"已取消或已失效訂單不能修改金額"},{status:400});
+    const {data,error}=await db.from("bookings").update({total_price:amount,updated_at:new Date().toISOString()}).eq("id",booking.id).neq("payment_status","paid").select("booking_no,total_price").single();
+    if(error||!data)return NextResponse.json({error:error?.message||"訂單狀態已變更，請重新載入"},{status:400});
+    const customer=Array.isArray(booking.customers)?booking.customers[0]:booking.customers,
+      method=Array.isArray(booking.consultation_methods)?booking.consultation_methods[0]:booking.consultation_methods,
+      details=Array.isArray(booking.booking_details)?booking.booking_details:[],
+      itemTitles=details.flatMap((detail:any)=>{
+        const subs=Array.isArray(detail.booking_detail_sub_items)?detail.booking_detail_sub_items:[];
+        const title=[detail.item_title,subs.map((sub:any)=>sub.sub_item_title).filter(Boolean).join("、")].filter(Boolean).join("｜");
+        return Array.from({length:Math.max(1,Number(detail.quantity)||1)},()=>title);
+      }).filter(Boolean),
+      site=process.env.NEXT_PUBLIC_SITE_URL||request.nextUrl.origin;
+    if(customer?.line_user_id)try{await pushLineFlex(customer.line_user_id,"訂單已更新",bookingStatusFlex({status:"pending",headerLabel:"訂單已更新",bookingNo:booking.booking_no,method:method?.code||"text",total:amount,slotStart:booking.slot_start||undefined,items:itemTitles,expiresAt:booking.expires_at||undefined,site}))}catch(lineError){console.error("訂單改價 LINE 通知失敗",lineError)}
+    return NextResponse.json({ok:true,totalPrice:data.total_price});
+  }
+  if (action !== "mark_paid") return NextResponse.json({ error: "不支援的操作" }, { status: 400 });
+  const db = adminSupabase();
+  const { data: current, error: currentError } = await db.from("bookings").select(
+    "id,booking_no,total_price,slot_start,payment_status,customers(line_user_id),consultation_methods(code),booking_details(item_title,quantity,booking_detail_sub_items(sub_item_title))",
+  ).eq("booking_no", bookingNo).single();
+  if (currentError || !current)
+    return NextResponse.json({ error: currentError?.message || "找不到訂單" }, { status: 404 });
+  if (current.payment_status === "paid")
+    return NextResponse.json({ error: "這筆訂單已是已付款狀態" }, { status: 400 });
+  const { data, error } = await db.from("bookings").update({
+    payment_status: "paid",
+    status: "confirmed",
+    collection_source: "manual",
+    paid_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).eq("booking_no", bookingNo).neq("payment_status", "paid").select("booking_no").single();
+  if (error || !data) return NextResponse.json({ error: error?.message || "找不到訂單" }, { status: 400 });
+  const customer = Array.isArray(current.customers) ? current.customers[0] : current.customers;
+  const method = Array.isArray(current.consultation_methods) ? current.consultation_methods[0] : current.consultation_methods;
+  const details = Array.isArray(current.booking_details) ? current.booking_details : [];
+  const items = details.flatMap((detail: any) => {
+    const subs = Array.isArray(detail.booking_detail_sub_items) ? detail.booking_detail_sub_items : [];
+    const title = [detail.item_title, subs.map((sub: any) => sub.sub_item_title).filter(Boolean).join("、")].filter(Boolean).join("｜");
+    return Array.from({ length: Math.max(1, Number(detail.quantity) || 1) }, () => title);
+  }).filter(Boolean);
+  let lineNotified = false;
+  let lineError = "";
+  if (customer?.line_user_id) {
+    try {
+      const site = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin;
+      await pushLineFlex(customer.line_user_id, "已付款｜請填寫問事資料", bookingStatusFlex({
+        status: "paid",
+        bookingNo: current.booking_no,
+        method: method?.code || "text",
+        total: Number(current.total_price || 0),
+        slotStart: current.slot_start || undefined,
+        items,
+        site,
+      }));
+      lineNotified = true;
+    } catch (notifyError) {
+      lineError = notifyError instanceof Error ? notifyError.message : "LINE 通知失敗";
+      console.error("手動收款 LINE 通知失敗", notifyError);
+    }
+  } else lineError = "此用戶沒有 LINE UID，無法傳送通知";
+  return NextResponse.json({ ok: true, lineNotified, lineError });
+}
+export async function PATCH(request: NextRequest) {
+  if (!isAdminSession((await cookies()).get("admin_session")?.value))
+    return NextResponse.json({ error: "未登入" }, { status: 401 });
+  const body = await request.json(),
+    db = adminSupabase(),
+    { data: b } = await db
+      .from("bookings")
+      .select(
+        "id,booking_no,slot_start,consultation_method_id,customers(line_user_id),consultation_methods(code,base_price),booking_details(item_id,quantity,booking_detail_sub_items(sub_item_id))",
+      )
+      .eq("booking_no", body.bookingNo)
+      .single();
+  if (!b) return NextResponse.json({ error: "找不到訂單" }, { status: 404 });
+  const oldSlotStart = b.slot_start,
+    normalizeLines = (lines: any[]) =>
+      lines
+        .map((line: any) =>
+          `${line.itemId || line.item_id}|${line.subId || line.booking_detail_sub_items?.[0]?.sub_item_id || ""}|${Math.max(1, Number(line.qty ?? line.quantity) || 1)}`,
+        )
+        .sort(),
+    timeChanged = Boolean(
+      body.slotStart &&
+        (!oldSlotStart ||
+          new Date(body.slotStart).getTime() !== new Date(oldSlotStart).getTime()),
+    ),
+    itemsChanged =
+      Array.isArray(body.lines) &&
+      JSON.stringify(normalizeLines(body.lines)) !==
+        JSON.stringify(normalizeLines(b.booking_details || []));
+  if (body.slotStart) {
+    const start = new Date(body.slotStart),
+      end = new Date(start.getTime() + 1800000);
+    await db
+      .from("bookings")
+      .update({
+        slot_start: start.toISOString(),
+        slot_end: end.toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", b.id);
+  }
+  let titles: string[] = [];
+  if (Array.isArray(body.lines) && body.lines.length) {
+    const itemIds = body.lines.map((x: { itemId: string }) => x.itemId),
+      subIds = body.lines
+        .map((x: { subId?: string }) => x.subId)
+        .filter(Boolean);
+    const { data: items } = await db
+      .from("booking_items")
+      .select("id,title,price")
+      .in("id", itemIds)
+      .eq("is_active", true);
+    const { subItems } = await (async () => {
+      const { data } = subIds.length
+        ? await db
+            .from("sub_items")
+            .select("id,item_id,title,price")
+            .in("id", subIds)
+        : { data: [] };
+      return { subItems: data || [] };
+    })();
+    await db.from("booking_details").delete().eq("booking_id", b.id);
+    if (items?.length) {
+      let subtotal = 0;
+      for (const line of body.lines as {
+        itemId: string;
+        subId?: string;
+        qty: number;
+      }[]) {
+        const item = items.find((i) => i.id === line.itemId);
+        if (!item) continue;
+        const sub = subItems.find(
+            (s) => s.id === line.subId && s.item_id === item.id,
+          ),
+          qty = Math.max(1, Number(line.qty) || 1),
+          unit = sub?.price ?? item.price;
+        const { data: detail } = await db
+          .from("booking_details")
+          .insert({
+            booking_id: b.id,
+            item_id: item.id,
+            item_title: item.title,
+            unit_price: unit,
+            quantity: qty,
+            line_total: unit * qty,
+          })
+          .select("id")
+          .single();
+        if (sub && detail)
+          await db.from("booking_detail_sub_items").insert({
+            booking_detail_id: detail.id,
+            sub_item_id: sub.id,
+            sub_item_title: sub.title,
+            unit_price: sub.price,
+            quantity: qty,
+            line_total: sub.price * qty,
+          });
+        subtotal += unit * qty;
+        titles.push(`${sub?.title || item.title} x${qty}`);
+      }
+      const method = b.consultation_methods as unknown as {
+        base_price: number;
+      };
+      await db
+        .from("bookings")
+        .update({
+          subtotal,
+          total_price: subtotal + (method.base_price || 0),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", b.id);
+    }
+  }
+  const { data: currentDetails } = await db
+    .from("booking_details")
+    .select("item_title,quantity,booking_detail_sub_items(sub_item_title)")
+    .eq("booking_id", b.id);
+  titles = (currentDetails || []).map((detail: any) => {
+    const subTitle = detail.booking_detail_sub_items?.[0]?.sub_item_title || "";
+    return [detail.item_title, subTitle].filter(Boolean).join("｜");
+  });
+  titles = titles.map((title) =>
+    title
+      .replace(/(兩位嬰靈[（(]含[）)]以上).*/u, "$1")
+      .replace(/[（(]?無論幾位[^）)]*[）)]?/g, "")
+      .replace(/^＋加購[：:]\s*/u, "")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+  const c = b.customers as unknown as { line_user_id: string },
+    site = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin,
+    effectiveSlot = body.slotStart || oldSlotStart,
+    isVideo = (b.consultation_methods as unknown as { code: string })?.code === "video",
+    slotDate = effectiveSlot ? new Date(effectiveSlot) : null,
+    dateParts = slotDate ? new Intl.DateTimeFormat("zh-TW", {
+      timeZone: "Asia/Taipei", month: "numeric", day: "numeric", weekday: "short",
+    }).formatToParts(slotDate) : [],
+    datePart = (type: string) => dateParts.find((part) => part.type === type)?.value || "",
+    videoDate = slotDate ? `${datePart("month")}月${datePart("day")}日（${datePart("weekday").replace("週", "")}）` : "",
+    timeParts = slotDate ? new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Taipei", hour: "2-digit", minute: "2-digit", hour12: false,
+    }).formatToParts(slotDate) : [],
+    hour24 = Number(timeParts.find((part) => part.type === "hour")?.value || 0),
+    minute = timeParts.find((part) => part.type === "minute")?.value || "00",
+    videoTime = `${hour24 < 12 ? "上午" : hour24 < 13 ? "中午" : "下午"} ${String(hour24 % 12 || 12).padStart(2, "0")}:${minute}`;
+  await pushLineFlex(c.line_user_id,"預約已變更",bookingStatusFlex({status:"changed",bookingNo:b.booking_no,method:isVideo?"video":"text",slotStart:effectiveSlot||undefined,items:titles,site}));
+  /* legacy layout
+  await pushLineFlex(c.line_user_id, "預約已變更", {
+    type: "bubble",
+    header: {
+      type: "box",
+      layout: "vertical",
+      backgroundColor: "#F1F1F1",
+      contents: [
+        {
+          type: "text",
+          text: "預約已變更",
+          color: "#333333",
+          weight: "bold",
+          size: "xl",
+          align: "center",
+        },
+        {
+          type: "text",
+          text: `訂單編號：${b.booking_no}`,
+          color: "#8B8B8B",
+          size: "xs",
+          align: "center",
+          margin: "sm",
+        },
+      ],
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      spacing: "md",
+      contents: [
+        ...(isVideo
+          ? [
+              {
+                type: "text",
+                text: "視訊諮詢",
+                align: "center",
+                weight: "bold",
+                size: "lg",
+              },
+              { type: "separator", margin: "md" },
+              {
+                type: "text",
+                text: "預約時間",
+                color: "#333333",
+                size: "sm",
+                margin: "lg",
+              },
+              {
+                type: "text",
+                text: videoDate,
+                wrap: true,
+                color: "#218548",
+                weight: "bold",
+                size: "xxl",
+              },
+              {
+                type: "text",
+                text: videoTime,
+                wrap: true,
+                color: "#218548",
+                weight: "bold",
+                size: "xxl",
+              },
+            ]
+          : []),
+        {
+          type: "text",
+          text: `${isVideo ? "諮詢項目\n" : "諮詢項目\n"}${titles.map((title, index) => `${["❶","❷","❸","❹","❺","❻","❼","❽","❾"][index] || `${index + 1}.`}${title}`).join("\n")}`,
+          wrap: true,
+          margin: "lg",
+          color: "#333333",
+          size: "md",
+        },
+      ],
+    },
+    footer: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "button",
+          style: "primary",
+          color: "#4A78C2",
+          height: "md",
+          action: {
+            type: "uri",
+            label: "查看預約",
+            uri: `${site}/my-bookings?order=${encodeURIComponent(b.booking_no)}`,
+          },
+        },
+      ],
+    },
+  }); */
+  return NextResponse.json({ ok: true });
+}
