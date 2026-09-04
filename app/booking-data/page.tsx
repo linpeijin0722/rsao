@@ -274,7 +274,8 @@ export default function BookingData() {
   async function load(o = order, retry = true) {
     if (!data) setLoading(true);
     try {
-      const r = await fetch(`/api/booking-data?order=${encodeURIComponent(o)}`, {
+      const refill = new URLSearchParams(location.search).get("refill") === "1";
+      const r = await fetch(`/api/booking-data?order=${encodeURIComponent(o)}${refill ? "&refill=1" : ""}`, {
           cache: "no-store",
         }),
         j = await r.json();
@@ -284,6 +285,11 @@ export default function BookingData() {
         } catch {}
       }
       if (r.ok) {
+        if (refill) {
+          const cleanUrl = new URL(location.href);
+          cleanUrl.searchParams.delete("refill");
+          history.replaceState(null, "", cleanUrl);
+        }
         setData(j);
         setMsg("");
       } else setMsg(j.error);
@@ -294,7 +300,8 @@ export default function BookingData() {
     }
   }
   useEffect(() => {
-    const o = new URLSearchParams(location.search).get("order") || "";
+    const params = new URLSearchParams(location.search);
+    const o = params.get("order") || "";
     setOrder(o);
     void prepareLiff().catch((error) =>
       console.error("LIFF 預先初始化失敗", error),
