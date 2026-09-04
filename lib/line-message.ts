@@ -247,10 +247,10 @@ export function videoReminderFlex(args: {
         },
         {
           type: "text",
-          text: `⏰ ${appointmentTime}`,
+          text: appointmentTime,
           color: "#168A54",
           weight: "bold",
-          size: "xxl",
+          size: "xl",
           align: "center",
           wrap: true,
         },
