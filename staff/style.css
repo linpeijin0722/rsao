@@ -402,3 +402,111 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 .staffAnswerEditor .returnedEditActions{position:sticky!important;bottom:0!important;display:grid!important;grid-template-columns:minmax(0,1.5fr) minmax(0,.8fr)!important;gap:10px!important;margin-top:10px!important;padding:16px 30px 22px!important;border-top:1px solid #eadfd7!important;background:rgba(255,255,255,.97)!important;backdrop-filter:blur(8px)!important}
 .staffAnswerEditor .returnedEditActions button{min-height:48px!important;margin:0!important;border-radius:10px!important}.staffAnswerEditor .returnedEditActions button:first-child{background:#995548!important;color:#fff!important}.staffAnswerEditor .returnedEditActions .cancel{background:#f1eeeb!important;color:#655c56!important}
 @media(max-width:640px){.staffAnswerEditor{width:calc(100vw - 18px)!important;max-height:92vh!important}.staffAnswerEditorHeader{padding:22px 18px 17px}.staffAnswerCurrentItem{margin:16px 18px 0}.staffAnswerEditor .staffFrontFields{padding:16px 18px 6px!important}.staffAnswerEditor .returnedEditActions{padding:14px 18px 18px!important}.staffAnswerEditor .returnedEditActions{grid-template-columns:1fr!important}}
+
+/* 2026-09-07 v12：統一「已回傳資料 → 填寫版本 → 修改問事資料」視窗寬度，並優化問事編輯 UX。 */
+.returnedDataModal,
+.returnedDataModal.mode-menu,
+.returnedDataModal.mode-answers,
+.returnedDataModal.mode-user,
+.returnedDataModal.mode-view,
+.staffAnswerEditor{
+  width:min(760px,calc(100vw - 32px))!important;
+  max-width:760px!important;
+  box-sizing:border-box!important;
+}
+.returnedDataModal{
+  max-height:min(88vh,860px)!important;
+  padding:52px 24px 24px!important;
+  border-radius:18px!important;
+}
+.returnedDataModal>h2{margin:0 42px 14px 0!important;font-size:25px!important;line-height:1.25!important}
+.returnedDataModal .returnedMenuBack{margin:6px 0 16px!important;color:#7b655c!important;font-weight:750!important}
+.returnedDataModal .staffAnswerCards{gap:16px!important}
+.returnedDataModal .staffAnswerCards>article{
+  padding:18px!important;border:1px solid #e2d5cc!important;border-radius:14px!important;
+  background:#fffdfa!important;box-shadow:0 2px 8px rgba(64,45,35,.045)!important;
+}
+.returnedDataModal .staffAnswerCards h3{margin:12px 0 10px!important;color:#302825!important;font-size:19px!important}
+.returnedDataModal .staffAnswerCards p{margin:7px 0!important;color:#3f3935!important;line-height:1.55!important}
+.returnedDataModal .editAnswerButton{min-height:48px!important;border-radius:10px!important;background:#995548!important;color:#fff!important;font-weight:850!important}
+
+.staffAnswerEditor{
+  overflow:hidden!important;
+  display:flex!important;
+  flex-direction:column!important;
+  background:#fff!important;
+}
+.staffAnswerEditorHeader{flex:0 0 auto!important;padding:24px 28px 18px!important;background:#fff!important}
+.staffAnswerEditorHeader p{max-width:580px!important}
+.staffAnswerCurrentItem{
+  flex:0 0 auto!important;margin:16px 28px 0!important;padding:14px 16px!important;
+  border:1px solid #eaded5!important;background:#f9f5f1!important;
+}
+.staffAnswerEditor .staffFrontFields{
+  flex:1 1 auto!important;overflow-y:auto!important;overscroll-behavior:contain!important;
+  padding:18px 28px 20px!important;gap:14px!important;
+}
+.staffAnswerEditor .staffAnswerSection,
+.staffAnswerEditor .staffAnswerTargetGroup{
+  display:grid!important;gap:13px!important;padding:18px!important;
+  border:1px solid #e4d8cf!important;border-radius:14px!important;background:#fffdfa!important;
+  box-shadow:0 1px 4px rgba(59,43,34,.035)!important;
+}
+.staffAnswerEditor .staffAnswerIdentitySection{background:#fbf7f3!important}
+.staffAnswerSectionHeading{
+  display:flex!important;align-items:center!important;gap:11px!important;margin-bottom:2px!important;
+}
+.staffAnswerSectionHeading>span{
+  display:grid!important;place-items:center!important;flex:0 0 30px!important;width:30px!important;height:30px!important;
+  border-radius:50%!important;background:#8a3045!important;color:#fff!important;font-size:14px!important;font-weight:900!important;
+}
+.staffAnswerSectionHeading>div{display:grid!important;gap:2px!important}
+.staffAnswerSectionHeading b{color:#302825!important;font-size:17px!important;line-height:1.25!important}
+.staffAnswerSectionHeading small{color:#88776e!important;font-size:13px!important;font-weight:500!important;line-height:1.4!important}
+.staffAnswerEditor .staffFrontFields>label,
+.staffAnswerEditor .staffAnswerSection>label,
+.staffAnswerEditor .staffAnswerTargetGroup>label{gap:7px!important;color:#3c3430!important;font-size:15px!important}
+.staffAnswerEditor .staffFrontFields input,
+.staffAnswerEditor .staffFrontFields select,
+.staffAnswerEditor .staffFrontFields textarea{
+  min-height:46px!important;padding:11px 12px!important;border:1px solid #d8cec7!important;border-radius:10px!important;
+  background:#fff!important;font-size:16px!important;line-height:1.45!important;
+}
+.staffAnswerEditor .staffFrontFields textarea{min-height:96px!important}
+.staffQuestionField{display:grid!important;gap:7px!important}
+.staffQuestionField>span{color:#594b44!important;font-size:14px!important;font-weight:850!important}
+.staffAnswerEditor .returnedEditActions{
+  position:static!important;flex:0 0 auto!important;display:grid!important;
+  grid-template-columns:minmax(0,.8fr) minmax(0,1.45fr)!important;gap:10px!important;
+  margin:0!important;padding:14px 28px 20px!important;border-top:1px solid #eadfd7!important;
+  background:#fff!important;box-shadow:0 -6px 18px rgba(66,45,34,.04)!important;
+}
+.staffAnswerEditor .returnedEditActions button{min-height:50px!important;border-radius:10px!important;font-size:16px!important;font-weight:900!important}
+.staffAnswerEditor .returnedEditActions .cancel{order:0!important;border:1px solid #ddd4cd!important;background:#fff!important;color:#6f625b!important}
+.staffAnswerEditor .returnedEditActions button:not(.cancel){order:1!important;background:#995548!important;color:#fff!important}
+.staffAnswerEditor .returnedEditActions button:disabled{opacity:.48!important;cursor:not-allowed!important}
+
+@media(max-width:640px){
+  .returnedDataModal,
+  .returnedDataModal.mode-menu,
+  .returnedDataModal.mode-answers,
+  .returnedDataModal.mode-user,
+  .returnedDataModal.mode-view,
+  .staffAnswerEditor{width:calc(100vw - 18px)!important;max-width:none!important}
+  .returnedDataModal{padding:48px 14px 16px!important}
+  .staffAnswerEditorHeader{padding:20px 18px 16px!important}
+  .staffAnswerCurrentItem{margin:14px 18px 0!important}
+  .staffAnswerEditor .staffFrontFields{padding:16px 18px 18px!important}
+  .staffAnswerEditor .staffAnswerSection,.staffAnswerEditor .staffAnswerTargetGroup{padding:15px!important}
+  .staffAnswerEditor .returnedEditActions{grid-template-columns:1fr!important;padding:12px 18px 16px!important}
+  .staffAnswerEditor .returnedEditActions .cancel{order:1!important}
+  .staffAnswerEditor .returnedEditActions button:not(.cancel){order:0!important}
+}
+
+/* v14：用戶資料頭像捷徑 + 修改預約 UI/UX */
+.userInfoModal{width:min(560px,calc(100vw - 32px))!important;padding:28px!important;text-align:center!important}
+.userProfileAvatarAction{position:relative!important;display:inline-grid!important;place-items:center!important;width:108px!important;height:108px!important;margin:0 auto 10px!important;padding:0!important;border:3px solid #fff!important;border-radius:50%!important;background:#eee!important;box-shadow:0 0 0 2px #d8c7bb,0 7px 20px rgba(56,41,32,.16)!important;overflow:visible!important;cursor:pointer!important;transition:transform .15s ease,box-shadow .15s ease!important}
+.userProfileAvatarAction:hover{transform:translateY(-2px);box-shadow:0 0 0 3px #9b5c49,0 9px 24px rgba(56,41,32,.2)!important}.userProfileAvatarAction img,.userProfileAvatarAction .avatarFallback{width:100%!important;height:100%!important;border-radius:50%!important;object-fit:cover!important}.userProfileAvatarHint{position:absolute;left:50%;bottom:-8px;transform:translate(-50%,100%);min-width:max-content;padding:6px 9px;border-radius:8px;background:#2f2926;color:#fff;font-size:12px;font-weight:800;opacity:0;pointer-events:none;transition:opacity .15s ease}.userProfileAvatarAction:hover .userProfileAvatarHint{opacity:1}.userInfoModal>h2{margin:17px 0 5px!important;font-size:25px!important}.userProfileQuickTip{max-width:430px;margin:0 auto 18px!important;color:#766b64;font-size:13px;line-height:1.5}.profileCopyToast{position:fixed;left:50%;top:24px;z-index:10100;transform:translateX(-50%);padding:11px 16px;border-radius:10px;background:#20423d;color:#fff;font-size:14px;font-weight:800;box-shadow:0 8px 25px rgba(0,0,0,.2)}.userInfoModal .staffCustomerProfile{text-align:left}.userInfoActions{margin-top:18px}
+
+.staffEditModal{display:flex!important;flex-direction:column!important;width:min(920px,calc(100vw - 36px))!important;max-height:92vh!important;padding:0!important;overflow:hidden!important;border-radius:18px!important;background:#fff!important}.staffEditModal .staffModalClose{top:16px!important;right:16px!important;z-index:5}.staffEditHeader{flex:0 0 auto!important;align-items:center!important;margin:0!important;padding:24px 64px 18px 24px!important;border-bottom:1px solid #eadfd7!important;background:linear-gradient(180deg,#fff 0%,#fbf7f3 100%)!important}.staffEditHeader img,.staffEditHeader .avatarFallback{width:64px!important;height:64px!important;box-shadow:0 0 0 2px #eadfd7}.staffEditHeader h2{font-size:24px!important}.staffEditHeader p{margin-top:4px!important;color:#7a6d65!important;font-size:14px!important}.staffEditModal>.bookingStatus,.staffEditModal>.manualPaidButton,.staffEditModal>.editTime,.staffEditModal>.staffEditSectionHeading,.staffEditModal>.staffEditColumns,.staffEditModal>.staffTotalPrice{margin-left:24px!important;margin-right:24px!important}.staffEditModal>.bookingStatus{margin-top:16px!important}.staffEditModal>.editTime{padding:14px 16px;border:1px solid #e2d4ca;border-radius:12px;background:#fbf8f5}.staffEditModal>.editTime input{box-sizing:border-box;width:100%;margin-top:5px;border:1px solid #d3c4ba;border-radius:9px;background:#fff}.staffEditSectionHeading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-top:18px!important;margin-bottom:10px!important}.staffEditSectionHeading span{display:block;margin-bottom:3px;color:#9b5c49;font-size:13px;font-weight:900;letter-spacing:.05em}.staffEditSectionHeading h3{margin:0!important;font-size:21px!important}.staffEditSectionHeading small{max-width:360px;color:#7a6e66;font-size:13px;line-height:1.45;text-align:right}.staffEditColumns{flex:1 1 auto!important;min-height:280px!important;overflow:auto!important;display:grid!important;grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr)!important;gap:14px!important;margin-bottom:14px!important}.staffEditColumns>section{align-self:start;padding:16px!important;border:1px solid #dfd0c5!important;border-radius:14px!important;background:#fcf9f6!important}.staffEditColumns>section>h3{margin:0 0 12px!important;padding-bottom:10px;border-bottom:1px solid #eadfd7;font-size:18px!important}.staffCurrentItems article,.staffCatalogItems article{border-color:#e5d9d0!important;background:#fff!important;box-shadow:0 1px 0 rgba(75,52,40,.03)}.staffCurrentItems article+article,.staffCatalogItems article+article{margin-top:8px}.staffCatalogItems article{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px!important;border:1px solid #e5d9d0;border-radius:10px}.staffAddButton{flex:0 0 36px!important;width:36px!important;height:36px!important;margin:0!important;padding:0!important;border-radius:50%!important;background:#8a3045!important;color:#fff!important;font-size:23px!important}.staffTotalPrice{flex:0 0 auto!important;display:flex!important;align-items:center!important;gap:12px!important;margin-top:0!important;margin-bottom:0!important;padding:14px 16px!important;border:1px solid #dccabc!important;border-radius:12px 12px 0 0!important;background:#fbf6f1!important}.staffTotalPrice b{color:#4a3c34}.staffTotalPrice strong{margin-left:auto;color:#b52232;font-size:20px!important}.staffEditFooterActions{flex:0 0 auto;display:grid;grid-template-columns:1fr auto;gap:10px;padding:12px 24px 20px;background:#fff}.staffEditFooterActions button{min-height:48px!important;margin:0!important;border-radius:10px!important;font-size:16px!important;font-weight:900!important}.staffEditSave{background:#8a3045!important;color:#fff!important;border:0!important}.staffEditCancel{min-width:130px!important;border:1px solid #d8cdc5!important;background:#f4f1ee!important;color:#655b55!important}
+@media(max-width:760px){.staffEditModal{width:min(96vw,680px)!important}.staffEditColumns{grid-template-columns:1fr!important}.staffEditSectionHeading{align-items:flex-start;flex-direction:column}.staffEditSectionHeading small{text-align:left}.staffEditFooterActions{grid-template-columns:1fr}.staffEditCancel{min-width:0!important}.userProfileAvatarHint{display:none}}
