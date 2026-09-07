@@ -23,7 +23,7 @@ export default function StaffAnswerEditorV2({ value, profiles, change, close, sa
   const relation = title.includes("與他人前世關係");
   const personalLove = title.includes("個人感情運") || sub.includes("個人感情運");
   const love = (title.includes("感情運勢") || title.includes("關係合盤") || title.includes("合八字") || title.includes("合婚")) && !personalLove;
-  const newborn = title.includes("新生兒命名");
+  const newborn = title.includes("新生兒命名") || sub.includes("新生兒命名");
   const personalRename = title.includes("個人改名") || sub.includes("個人改名");
   const naming = title.includes("命名") || title.includes("改名") || sub.includes("命名") || sub.includes("改名");
   const company = title.includes("公司命名") || title.includes("公司改名") || sub.includes("公司命名") || sub.includes("公司改名");
@@ -106,8 +106,17 @@ export default function StaffAnswerEditorV2({ value, profiles, change, close, sa
 
   return <div className="modalBackdrop returnedEditBackdrop"><div className="modal staffFrontEditor staffAnswerEditor">
     <button className="staffModalClose" onClick={close}>×</button>
-    <h2>修改問事資料</h2>
-    <h3 className="staffAnswerItem">{title}{sub ? `－${sub}` : ""}</h3>
+    <header className="staffAnswerEditorHeader">
+      <div>
+        <span className="staffAnswerEditorEyebrow">問事資料編輯</span>
+        <h2>修改問事資料</h2>
+        <p>依照用戶原本填寫的內容進行修改，儲存後會更新這一筆問事資料。</p>
+      </div>
+    </header>
+    <section className="staffAnswerCurrentItem">
+      <span>目前編輯項目</span>
+      <h3 className="staffAnswerItem">{title}{sub ? `－${sub}` : ""}</h3>
+    </section>
     <div className="staffFrontFields staffExactAnswerFields">
       {newborn ? <>
         {personSelect(extra.mother_id || ids[0], 0, "請選擇寶寶的媽媽", (p) => p.profile_type === "person" && p.gender === "女", "mother_id")}

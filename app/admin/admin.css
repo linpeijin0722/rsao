@@ -290,3 +290,30 @@
 .adminLogin{font-size:17px}
 .adminLogin h1,.adminLogin h2{font-size:25px}
 .adminLogin input,.adminLogin button{font-size:17px}
+
+
+/* 2026-09-07 v11：前台視訊預約總開關狀態卡與清除按鈕視覺。 */
+.videoBookingMasterControl{
+  margin:0 0 14px;padding:18px 20px;border-radius:14px;
+  border:1px solid #d8ded9;box-shadow:0 2px 8px rgba(46,58,51,.05);
+  transition:background .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+.videoBookingMasterControl.isEnabled{background:#eef9f2;border-color:#b9ddc7;box-shadow:0 3px 12px rgba(47,148,98,.10)}
+.videoBookingMasterControl.isDisabled{background:#f3f4f4;border-color:#d5d9d7;box-shadow:0 3px 12px rgba(70,76,73,.06)}
+.videoBookingMasterControl>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.videoBookingMasterControl>div>b{font-size:19px;color:#202823}
+.videoBookingMasterControl span{padding:6px 11px;border-radius:999px;font-size:14px;font-weight:900;letter-spacing:.01em}
+.videoBookingMasterControl span.enabled{background:#d8f3e2;color:#17633d;border:1px solid #b7dfc7}
+.videoBookingMasterControl span.disabled{background:#e2e5e3;color:#4e5852;border:1px solid #cfd4d1}
+.videoBookingMasterControl p{margin:9px 0 15px;color:#56615b;font-size:14px;line-height:1.65;font-weight:500}
+.videoBookingMasterActions{display:flex;gap:9px}
+.videoBookingMasterActions button{min-width:68px;padding:11px 18px;border:1px solid #cfd5d1;border-radius:9px;background:#fff;color:#303833;font-weight:850;box-shadow:0 1px 3px rgba(39,47,42,.04);cursor:pointer}
+.videoBookingMasterActions .activeClose{border-color:#aeb5b1;background:#dfe3e1;color:#313a35}
+.videoBookingMasterActions .activeOpen{border-color:#2f9462;background:#2f9462;color:#fff}
+.closeAllDayButton{
+  width:100%;margin:0 0 9px;padding:13px 16px;border:1px solid #c9cecb;border-radius:11px;
+  background:#f1f2f2;color:#4c5550;font-size:16px;font-weight:850;box-shadow:none;
+}
+.closeAllDayButton:hover{background:#e3e6e4;color:#2d3531;border-color:#b9bfbc}
+.closeAllDayButton:disabled{opacity:.5;cursor:not-allowed}
+.closeEverySlotButton{margin-bottom:9px}
