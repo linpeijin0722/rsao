@@ -89,7 +89,7 @@ export async function POST(r: NextRequest) {
     }
     after(async () => {
       try {
-        await createConsultationDocuments(x.db,x.b.id,x.b.booking_no);
+        await createConsultationDocuments(x.db,x.b.id,x.b.booking_no,false,"replace",undefined,r.nextUrl.origin);
       } catch (error) {
         console.error("建立諮詢 Google 文件失敗", error);
       }

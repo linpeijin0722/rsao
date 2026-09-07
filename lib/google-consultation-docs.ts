@@ -186,26 +186,49 @@ async function formatDocumentAfterCreation(documentId: string, bookingNo: string
   });
 }
 
-async function insertReturnResultButton(documentId: string, bookingNo: string, token: string) {
-  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
-  const currentBody = documentPlainText(document);
+async function insertReturnResultButton(documentId: string, bookingNo: string, token: string, requestOrigin = "") {
+  let document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
   const label = "回傳諮詢結果";
-  const base = siteBaseUrl();
-  if (!base) throw new Error("尚未設定 NEXT_PUBLIC_SITE_URL，無法建立『回傳諮詢結果』連結");
+  const base = (requestOrigin || siteBaseUrl()).trim().replace(/\/$/, "");
+  if (!base) throw new Error("無法取得網站網址，『回傳諮詢結果』連結無法建立");
   const returnUrl = `${base}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}`;
 
-  // normalize 可能因重試而再次執行；已存在就只確認它仍有連結，不重複插入。
-  if (currentBody.startsWith(label)) return;
+  const findButton = (source: any) => {
+    for (const block of source.body?.content || []) {
+      for (const element of block.paragraph?.elements || []) {
+        const value = String(element.textRun?.content || "");
+        if (value.includes(label)) return { element, link: element.textRun?.textStyle?.link?.url || "" };
+      }
+    }
+    return null;
+  };
+  const existing = findButton(document);
+  if (existing?.link) return;
 
+  // 不再假設正文一定從 index=1 開始。每次都從最新 documents.get 找第一個真正 paragraph。
+  const firstParagraph = (document.body?.content || []).find((block: any) => block.paragraph && Number.isFinite(block.startIndex));
+  const insertIndex = Number(firstParagraph?.startIndex ?? 1);
   const buttonText = `${label}\n\n`;
-  const labelEnd = 1 + label.length;
+  const labelEnd = insertIndex + label.length;
+  console.info("[consultation-doc] insert return button", { documentId, bookingNo, insertIndex, returnUrl });
+
+  // 插入與格式分開。第一批完成後重新讀文件，避免 index 因插入而失效。
+  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+    method: "POST",
+    body: JSON.stringify({ requests: [{ insertText: { location: { index: insertIndex }, text: buttonText } }] }),
+  });
+  document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const inserted = findButton(document);
+  if (!inserted) throw new Error("『回傳諮詢結果』文字插入後驗證失敗");
+
+  const actualStart = Number(inserted.element.startIndex);
+  const actualEnd = actualStart + label.length;
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
     method: "POST",
     body: JSON.stringify({ requests: [
-      { insertText: { location: { index: 1 }, text: buttonText } },
       {
         updateTextStyle: {
-          range: { startIndex: 1, endIndex: labelEnd },
+          range: { startIndex: actualStart, endIndex: actualEnd },
           textStyle: {
             bold: true,
             fontSize: { magnitude: 14, unit: "PT" },
@@ -218,21 +241,20 @@ async function insertReturnResultButton(documentId: string, bookingNo: string, t
       },
       {
         updateParagraphStyle: {
-          range: { startIndex: 1, endIndex: labelEnd + 1 },
-          paragraphStyle: {
-            spaceAbove: { magnitude: 4, unit: "PT" },
-            spaceBelow: { magnitude: 8, unit: "PT" },
-            lineSpacing: 100,
-          },
+          range: { startIndex: actualStart, endIndex: Math.min(actualEnd + 1, Number(inserted.element.endIndex || actualEnd + 1)) },
+          paragraphStyle: { spaceAbove: { magnitude: 4, unit: "PT" }, spaceBelow: { magnitude: 8, unit: "PT" }, lineSpacing: 100 },
           fields: "spaceAbove,spaceBelow,lineSpacing",
         },
       },
     ] }),
   });
 
-  // 寫入後重新讀取，確定第一行真的存在，避免再出現 API 成功但文件沒有按鈕的假象。
+  // 最終驗證不只看文字，連 hyperlink 也必須存在。
   const verified = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
-  if (!documentPlainText(verified).startsWith(label)) throw new Error("『回傳諮詢結果』按鈕插入後驗證失敗");
+  const verifiedButton = findButton(verified);
+  if (!verifiedButton) throw new Error("『回傳諮詢結果』按鈕最終驗證失敗：找不到文字");
+  if (verifiedButton.link !== returnUrl) throw new Error("『回傳諮詢結果』按鈕最終驗證失敗：連結沒有成功寫入");
+  console.info("[consultation-doc] return button verified", { documentId, startIndex: verifiedButton.element.startIndex });
 }
 
 function lastVisibleBodyIndex(document: any) {
@@ -273,6 +295,16 @@ async function cleanupFinalBlankPage(documentId: string, token: string) {
     const body = document.body?.content || [];
     const documentEnd = body.reduce((max: number, block: any) => Math.max(max, Number(block.endIndex || 0)), 1);
     const lastVisibleEnd = lastVisibleBodyIndex(document);
+    const tail = body.slice(-8).map((block: any) => ({
+      startIndex: block.startIndex,
+      endIndex: block.endIndex,
+      type: block.paragraph ? "paragraph" : block.table ? "table" : block.sectionBreak ? "sectionBreak" : "other",
+      text: block.paragraph ? (block.paragraph.elements || []).map((element: any) => String(element.textRun?.content || "").replace(/\u00a0/g, "[NBSP]").replace(/\n/g, "[NL]")).join("").slice(0, 120) : "",
+      pageBreakBefore: Boolean(block.paragraph?.paragraphStyle?.pageBreakBefore),
+      keepWithNext: Boolean(block.paragraph?.paragraphStyle?.keepWithNext),
+      keepLinesTogether: Boolean(block.paragraph?.paragraphStyle?.keepLinesTogether),
+    }));
+    console.info("[consultation-doc] blank-page cleanup pass", { documentId, pass, documentEnd, lastVisibleEnd, tail });
     const requests: any[] = [];
 
     // 先取消尾端空白段落造成的強制換頁。
@@ -336,13 +368,13 @@ async function cleanupFinalBlankPage(documentId: string, token: string) {
   if (!plain.replace(/[\s\u00a0]/g, "")) throw new Error("空白頁清理後文件內容異常，已停止後續流程");
 }
 
-async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: string) {
+async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: string, requestOrigin = "") {
   const token = await accessToken();
 
   // 順序固定：①完整文件已由 Apps Script 建立 → ②格式／頁首頁尾 → ③正文第一行回傳按鈕
   // → ④最後才重新讀取並清除尾端空白頁。空白頁清理之後不再對正文做任何插入或格式更新。
   await formatDocumentAfterCreation(documentId, bookingNo, token);
-  await insertReturnResultButton(documentId, bookingNo, token);
+  await insertReturnResultButton(documentId, bookingNo, token, requestOrigin);
   await cleanupFinalBlankPage(documentId, token);
 }
 
@@ -685,7 +717,7 @@ function consultationNumber(position: number) {
   return `${String.fromCharCode(65 + letterIndex)}${String(((safe - 1) % 99) + 1).padStart(2, "0")}`;
 }
 
-export async function createConsultationDocuments(db: any, bookingId: string, bookingNo: string, force = false, createMode: "replace" | "new" = "replace", submissionId?: string) {
+export async function createConsultationDocuments(db: any, bookingId: string, bookingNo: string, force = false, createMode: "replace" | "new" = "replace", submissionId?: string, requestOrigin = "") {
   const { data: booking } = await db.from("bookings").select("created_at,paid_at,slot_start,total_price,consultation_methods(code),customers(line_display_name,full_name)").eq("id", bookingId).single();
   const customer = one(booking?.customers) || {};
   const lineName = text(customer.line_display_name) || "LINE用戶";
@@ -814,12 +846,14 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const result = await response.json();
   if (!response.ok || !result.ok) throw new Error(result.error || "Apps Script 建立文件失敗");
   if (result.version !== requiredAppsScriptVersion) throw new Error(`目前連到舊版 Google Apps Script（目前：${result.version || "無版本資訊"}；需要：${requiredAppsScriptVersion}），請更新 Vercel 的 GOOGLE_APPS_SCRIPT_WEB_APP_URL 後重新部署`);
-  // Apps Script 已負責頁首頁尾；Docs API 的二次格式整理失敗時，不應阻止
-  // 已成功建立的文件連結寫回後台。
+  // 二次整理失敗時仍先把已建立的文件連結寫回後台，但不能再「靜默成功」。
+  // 寫回完成後會把錯誤拋回 API，讓後台與 Vercel log 都能明確看到真正失敗原因。
+  let normalizationError: unknown = null;
   try {
-    await normalizeDocumentHeaderAndFooter(result.documentId, bookingNo);
+    await normalizeDocumentHeaderAndFooter(result.documentId, bookingNo, requestOrigin);
   } catch (error) {
-    console.error("Google 文件二次格式整理失敗，保留已建立文件並繼續寫回連結", error);
+    normalizationError = error;
+    console.error("[consultation-doc] Google 文件最終整理失敗", { documentId: result.documentId, bookingNo, error });
   }
   const createdAt = existingDetails.map((detail: any) => detail.google_document_created_at).filter(Boolean).sort()[0] || new Date().toISOString();
   const { error: updateError } = await db.from("booking_details").update({
@@ -832,4 +866,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     google_document_id: null, google_document_url: null, google_document_created_at: null,
   }).eq("booking_id", bookingId).neq("id", anchor.id);
   if (clearError) throw clearError;
+  if (normalizationError) {
+    throw normalizationError instanceof Error ? normalizationError : new Error("Google 文件最終整理失敗");
+  }
 }

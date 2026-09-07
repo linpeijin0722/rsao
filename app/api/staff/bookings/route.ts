@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
     if(error||!booking)return NextResponse.json({error:"找不到訂單"},{status:404});
     if(!booking.data_submitted_at)return NextResponse.json({error:"用戶尚未回傳問事資料，不能建立諮詢單"},{status:400});
     try{
-      await createConsultationDocuments(db,booking.id,booking.booking_no,Boolean(body.force),body.createMode==="new"?"new":"replace",body.submissionId||undefined);
+      await createConsultationDocuments(db,booking.id,booking.booking_no,Boolean(body.force),body.createMode==="new"?"new":"replace",body.submissionId||undefined,request.nextUrl.origin);
       const {data:details}=await db.from("booking_details").select("id,item_title,google_document_url").eq("booking_id",booking.id).not("google_document_url","is",null);
       if(!details?.length)return NextResponse.json({error:"這筆訂單沒有可建立的問事資料"},{status:400});
       return NextResponse.json({ok:true,documents:details});
