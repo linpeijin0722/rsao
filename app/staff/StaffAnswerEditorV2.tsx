@@ -118,14 +118,20 @@ export default function StaffAnswerEditorV2({ value, profiles, change, close, sa
       <h3 className="staffAnswerItem">{title}{sub ? `－${sub}` : ""}</h3>
     </section>
     <div className="staffFrontFields staffExactAnswerFields">
-      {newborn ? <>
-        {personSelect(extra.mother_id || ids[0], 0, "請選擇寶寶的媽媽", (p) => p.profile_type === "person" && p.gender === "女", "mother_id")}
-        {personSelect(extra.father_id || ids[1], 1, "請選擇寶寶的爸爸", (p) => p.profile_type === "person" && p.gender === "男", "father_id")}
-        {personSelect(extra.baby_id || ids[2], 2, "請選擇寶寶", undefined, "baby_id")}
-      </> : <>
-        {personSelect(ids[0], 0, deceased ? "請選擇過世親友" : deceasedPet ? "請選擇往生寵物" : infant ? "請選擇孩子的媽媽" : "這個項目是為誰諮詢？", infant ? (p) => p.profile_type === "person" && p.gender === "女" : deceasedPet ? (p) => p.profile_type === "pet" : undefined)}
-        {(relation || love) && <div className="staffAnswerTargetGroup"><b>請選擇要觀看的對象（共 {targetIds.length} 位）</b>{targetIds.map((id, n) => personSelect(id, n + 1, `第 ${n + 1} 位`))}</div>}
-      </>}
+      <section className="staffAnswerSection staffAnswerIdentitySection">
+        <div className="staffAnswerSectionHeading">
+          <span>1</span>
+          <div><b>諮詢對象</b><small>確認這筆問事資料是為誰填寫</small></div>
+        </div>
+        {newborn ? <>
+          {personSelect(extra.mother_id || ids[0], 0, "請選擇寶寶的媽媽", (p) => p.profile_type === "person" && p.gender === "女", "mother_id")}
+          {personSelect(extra.father_id || ids[1], 1, "請選擇寶寶的爸爸", (p) => p.profile_type === "person" && p.gender === "男", "father_id")}
+          {personSelect(extra.baby_id || ids[2], 2, "請選擇寶寶", undefined, "baby_id")}
+        </> : <>
+          {personSelect(ids[0], 0, deceased ? "請選擇過世親友" : deceasedPet ? "請選擇往生寵物" : infant ? "請選擇孩子的媽媽" : "這個項目是為誰諮詢？", infant ? (p) => p.profile_type === "person" && p.gender === "女" : deceasedPet ? (p) => p.profile_type === "pet" : undefined)}
+          {(relation || love) && <div className="staffAnswerTargetGroup"><b>請選擇要觀看的對象（共 {targetIds.length} 位）</b>{targetIds.map((id, n) => personSelect(id, n + 1, `第 ${n + 1} 位`))}</div>}
+        </>}
+      </section>
 
       {love && targetIds.map((id) => {
         const person = profiles.find((p: any) => p.id === id);
@@ -154,9 +160,15 @@ export default function StaffAnswerEditorV2({ value, profiles, change, close, sa
       {home && <section className="staffAnswerSection">{area("欲觀看陽宅的所在地址", "home_address")}{area("本次諮詢的主要目的", "home_purpose", "例如：購屋前評估、裝修格局調整、搬入後想改善運勢")}{area("目前住起來最困擾的問題", "home_problem", "例如：睡眠不好、頻繁吵架、財運受阻、身體欠安")}</section>}
       {infant && <section className="staffAnswerSection">{(extra.pregnancy_losses || []).map((loss: any, i: number) => <div className="staffNestedFields" key={i}><label>國曆流產日期<input type="date" value={text(loss.date).slice(0,10)} onChange={(e) => { const next=[...(extra.pregnancy_losses||[])],date=e.target.value; next[i]={...loss,date,lunar:date?lunarProfile(date).lunar_birth_text:""};setExtra("pregnancy_losses",next)}}/></label><label>農曆流產日期<input disabled value={text(loss.lunar)}/></label><label>流產時辰<select value={text(loss.shichen)} onChange={(e) => { const next=[...(extra.pregnancy_losses||[])]; next[i]={...loss,shichen:e.target.value};setExtra("pregnancy_losses",next)}}><option value="">請選擇</option>{times.map(x=><option key={x}>{x}</option>)}</select></label><label>備註<textarea value={text(loss.notes)} onChange={(e) => { const next=[...(extra.pregnancy_losses||[])]; next[i]={...loss,notes:e.target.value};setExtra("pregnancy_losses",next)}}/></label></div>)}{area("目前的心理或生活狀況", "current_condition")}{area("過去是否曾處理過", "previous_handling")}</section>}
       {lawsuit && <section className="staffAnswerSection">{select("官司／糾紛類型", "lawsuit_type", ["詐騙","債務","離婚","合約","侵權","傷害","交通事故","其他"])}{extra.lawsuit_type === "其他" && input("其他官司／糾紛類型", "other_lawsuit_type")}{select("目前訴訟進度", "lawsuit_progress", ["偵查中","收到傳票","準備開庭","其他"])}{extra.lawsuit_progress === "其他" && input("其他訴訟進度", "other_lawsuit_progress")}<label>下次開庭或調解日期<input type="date" value={text(extra.next_court_date)} onChange={(e) => setExtra("next_court_date", e.target.value)}/></label>{area("事件簡述與爭議點", "dispute_summary", "請用 2-3 句話簡單說明事情經過，以及雙方目前卡住的地方")}{area("目前是否有專業人士或他人協助", "professional_help")}{area("本次最想解答的核心問題", "core_question")}</section>}
-      {!noGenericQuestions && <section className="staffAnswerSection"><h4>想詢問的問題</h4>{Array.from({length:3},(_,index)=>value.questions?.[index]||"").map((q: string, i: number) => <textarea aria-label={`問題 ${i+1}`} key={i} value={q} onChange={(e) => setQuestion(i, e.target.value)}/>)}</section>}
+      {!noGenericQuestions && <section className="staffAnswerSection staffAnswerQuestionsSection">
+        <div className="staffAnswerSectionHeading">
+          <span>2</span>
+          <div><b>想詢問的問題</b><small>可直接修改原本內容，空白問題也會保留</small></div>
+        </div>
+        {Array.from({length:3},(_,index)=>value.questions?.[index]||"").map((q: string, i: number) => <label className="staffQuestionField" key={i}><span>問題 {i+1}</span><textarea aria-label={`問題 ${i+1}`} value={q} onChange={(e) => setQuestion(i, e.target.value)}/></label>)}
+      </section>}
     </div>
-    <div className="returnedEditActions"><button onClick={() => void save()} disabled={!ids.length || ids.some(id => !id) || new Set(ids).size !== ids.length}>儲存問事資料</button><button className="cancel" onClick={close}>取消</button></div>
+    <div className="returnedEditActions"><button className="cancel" onClick={close}>取消</button><button onClick={() => void save()} disabled={!ids.length || ids.some(id => !id) || new Set(ids).size !== ids.length}>儲存問事資料</button></div>
   </div></div>;
 }
 

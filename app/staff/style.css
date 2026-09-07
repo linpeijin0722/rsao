@@ -379,3 +379,126 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 .staffPage .staffPageHeading .staffHeadingActions>button.manualBookingEntry:hover{transform:translateY(-1px)!important;filter:brightness(.98)!important}
 .staffPage .staffPageHeading .staffHeadingActions>a.videoCalendarButton:hover{box-shadow:0 6px 16px rgba(26,115,232,.30)!important}
 @media(max-width:860px){.staffPage .staffPageHeading .staffHeadingActions{flex-wrap:wrap!important}.staffPage .staffPageHeading .staffHeadingActions>a.videoCalendarButton{flex:1 1 180px!important;min-width:0!important;padding:10px 12px!important;font-size:16px!important}}
+
+
+/* 2026-09-07 v11：修改問事資料固定寬度與資訊層級，避免不同項目忽寬忽窄。 */
+.staffAnswerEditor{
+  width:min(760px,calc(100vw - 32px))!important;max-width:760px!important;
+  max-height:min(88vh,860px)!important;padding:0!important;overflow:auto!important;
+  box-sizing:border-box!important;border-radius:16px!important;
+}
+.staffAnswerEditorHeader{position:relative;padding:26px 30px 20px;border-bottom:1px solid #eadfd7;background:#fff}
+.staffAnswerEditorHeader>div{padding-right:38px}.staffAnswerEditorEyebrow{display:inline-block;margin-bottom:5px;color:#8a3045;font-size:13px;font-weight:900;letter-spacing:.08em}
+.staffAnswerEditorHeader h2{margin:0!important;color:#2e2723;font-size:26px!important;line-height:1.25}.staffAnswerEditorHeader p{margin:8px 0 0;color:#766b64;font-size:14px;line-height:1.6}
+.staffAnswerEditor>.staffModalClose{top:18px!important;right:18px!important;z-index:3}
+.staffAnswerCurrentItem{margin:20px 30px 0;padding:14px 16px;border:1px solid #e5d8ce;border-radius:12px;background:#faf6f2}
+.staffAnswerCurrentItem>span{display:block;margin-bottom:4px;color:#8b786b;font-size:13px;font-weight:800}.staffAnswerCurrentItem .staffAnswerItem{margin:0!important;padding:0!important;color:#332b27;font-size:18px!important;line-height:1.45}
+.staffAnswerEditor .staffFrontFields{display:grid!important;grid-template-columns:1fr!important;gap:16px!important;padding:20px 30px 8px!important;box-sizing:border-box!important}
+.staffAnswerEditor .staffFrontFields>label,.staffAnswerEditor .staffAnswerSection>label,.staffAnswerEditor .staffAnswerTargetGroup>label{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;width:100%!important;box-sizing:border-box!important;color:#403833;font-size:15px!important;font-weight:850!important}
+.staffAnswerEditor .staffFrontFields input,.staffAnswerEditor .staffFrontFields select,.staffAnswerEditor .staffFrontFields textarea{width:100%!important;max-width:none!important;box-sizing:border-box!important;border:1px solid #d8cec7!important;border-radius:10px!important;background:#fff!important;padding:11px 12px!important;color:#2d2926!important;outline:none!important}
+.staffAnswerEditor .staffFrontFields input:focus,.staffAnswerEditor .staffFrontFields select:focus,.staffAnswerEditor .staffFrontFields textarea:focus{border-color:#9f6558!important;box-shadow:0 0 0 3px rgba(159,101,88,.10)!important}
+.staffAnswerEditor .staffFrontFields textarea{min-height:92px!important;resize:vertical!important}
+.staffAnswerEditor .staffAnswerSection,.staffAnswerEditor .staffAnswerTargetGroup{width:100%!important;box-sizing:border-box!important;padding:16px!important;background:#fbf8f4!important;border-color:#e4d9d0!important}
+.staffAnswerEditor .returnedEditActions{position:sticky!important;bottom:0!important;display:grid!important;grid-template-columns:minmax(0,1.5fr) minmax(0,.8fr)!important;gap:10px!important;margin-top:10px!important;padding:16px 30px 22px!important;border-top:1px solid #eadfd7!important;background:rgba(255,255,255,.97)!important;backdrop-filter:blur(8px)!important}
+.staffAnswerEditor .returnedEditActions button{min-height:48px!important;margin:0!important;border-radius:10px!important}.staffAnswerEditor .returnedEditActions button:first-child{background:#995548!important;color:#fff!important}.staffAnswerEditor .returnedEditActions .cancel{background:#f1eeeb!important;color:#655c56!important}
+@media(max-width:640px){.staffAnswerEditor{width:calc(100vw - 18px)!important;max-height:92vh!important}.staffAnswerEditorHeader{padding:22px 18px 17px}.staffAnswerCurrentItem{margin:16px 18px 0}.staffAnswerEditor .staffFrontFields{padding:16px 18px 6px!important}.staffAnswerEditor .returnedEditActions{padding:14px 18px 18px!important}.staffAnswerEditor .returnedEditActions{grid-template-columns:1fr!important}}
+
+/* 2026-09-07 v12：統一「已回傳資料 → 填寫版本 → 修改問事資料」視窗寬度，並優化問事編輯 UX。 */
+.returnedDataModal,
+.returnedDataModal.mode-menu,
+.returnedDataModal.mode-answers,
+.returnedDataModal.mode-user,
+.returnedDataModal.mode-view,
+.staffAnswerEditor{
+  width:min(760px,calc(100vw - 32px))!important;
+  max-width:760px!important;
+  box-sizing:border-box!important;
+}
+.returnedDataModal{
+  max-height:min(88vh,860px)!important;
+  padding:52px 24px 24px!important;
+  border-radius:18px!important;
+}
+.returnedDataModal>h2{margin:0 42px 14px 0!important;font-size:25px!important;line-height:1.25!important}
+.returnedDataModal .returnedMenuBack{margin:6px 0 16px!important;color:#7b655c!important;font-weight:750!important}
+.returnedDataModal .staffAnswerCards{gap:16px!important}
+.returnedDataModal .staffAnswerCards>article{
+  padding:18px!important;border:1px solid #e2d5cc!important;border-radius:14px!important;
+  background:#fffdfa!important;box-shadow:0 2px 8px rgba(64,45,35,.045)!important;
+}
+.returnedDataModal .staffAnswerCards h3{margin:12px 0 10px!important;color:#302825!important;font-size:19px!important}
+.returnedDataModal .staffAnswerCards p{margin:7px 0!important;color:#3f3935!important;line-height:1.55!important}
+.returnedDataModal .editAnswerButton{min-height:48px!important;border-radius:10px!important;background:#995548!important;color:#fff!important;font-weight:850!important}
+
+.staffAnswerEditor{
+  overflow:hidden!important;
+  display:flex!important;
+  flex-direction:column!important;
+  background:#fff!important;
+}
+.staffAnswerEditorHeader{flex:0 0 auto!important;padding:24px 28px 18px!important;background:#fff!important}
+.staffAnswerEditorHeader p{max-width:580px!important}
+.staffAnswerCurrentItem{
+  flex:0 0 auto!important;margin:16px 28px 0!important;padding:14px 16px!important;
+  border:1px solid #eaded5!important;background:#f9f5f1!important;
+}
+.staffAnswerEditor .staffFrontFields{
+  flex:1 1 auto!important;overflow-y:auto!important;overscroll-behavior:contain!important;
+  padding:18px 28px 20px!important;gap:14px!important;
+}
+.staffAnswerEditor .staffAnswerSection,
+.staffAnswerEditor .staffAnswerTargetGroup{
+  display:grid!important;gap:13px!important;padding:18px!important;
+  border:1px solid #e4d8cf!important;border-radius:14px!important;background:#fffdfa!important;
+  box-shadow:0 1px 4px rgba(59,43,34,.035)!important;
+}
+.staffAnswerEditor .staffAnswerIdentitySection{background:#fbf7f3!important}
+.staffAnswerSectionHeading{
+  display:flex!important;align-items:center!important;gap:11px!important;margin-bottom:2px!important;
+}
+.staffAnswerSectionHeading>span{
+  display:grid!important;place-items:center!important;flex:0 0 30px!important;width:30px!important;height:30px!important;
+  border-radius:50%!important;background:#8a3045!important;color:#fff!important;font-size:14px!important;font-weight:900!important;
+}
+.staffAnswerSectionHeading>div{display:grid!important;gap:2px!important}
+.staffAnswerSectionHeading b{color:#302825!important;font-size:17px!important;line-height:1.25!important}
+.staffAnswerSectionHeading small{color:#88776e!important;font-size:13px!important;font-weight:500!important;line-height:1.4!important}
+.staffAnswerEditor .staffFrontFields>label,
+.staffAnswerEditor .staffAnswerSection>label,
+.staffAnswerEditor .staffAnswerTargetGroup>label{gap:7px!important;color:#3c3430!important;font-size:15px!important}
+.staffAnswerEditor .staffFrontFields input,
+.staffAnswerEditor .staffFrontFields select,
+.staffAnswerEditor .staffFrontFields textarea{
+  min-height:46px!important;padding:11px 12px!important;border:1px solid #d8cec7!important;border-radius:10px!important;
+  background:#fff!important;font-size:16px!important;line-height:1.45!important;
+}
+.staffAnswerEditor .staffFrontFields textarea{min-height:96px!important}
+.staffQuestionField{display:grid!important;gap:7px!important}
+.staffQuestionField>span{color:#594b44!important;font-size:14px!important;font-weight:850!important}
+.staffAnswerEditor .returnedEditActions{
+  position:static!important;flex:0 0 auto!important;display:grid!important;
+  grid-template-columns:minmax(0,.8fr) minmax(0,1.45fr)!important;gap:10px!important;
+  margin:0!important;padding:14px 28px 20px!important;border-top:1px solid #eadfd7!important;
+  background:#fff!important;box-shadow:0 -6px 18px rgba(66,45,34,.04)!important;
+}
+.staffAnswerEditor .returnedEditActions button{min-height:50px!important;border-radius:10px!important;font-size:16px!important;font-weight:900!important}
+.staffAnswerEditor .returnedEditActions .cancel{order:0!important;border:1px solid #ddd4cd!important;background:#fff!important;color:#6f625b!important}
+.staffAnswerEditor .returnedEditActions button:not(.cancel){order:1!important;background:#995548!important;color:#fff!important}
+.staffAnswerEditor .returnedEditActions button:disabled{opacity:.48!important;cursor:not-allowed!important}
+
+@media(max-width:640px){
+  .returnedDataModal,
+  .returnedDataModal.mode-menu,
+  .returnedDataModal.mode-answers,
+  .returnedDataModal.mode-user,
+  .returnedDataModal.mode-view,
+  .staffAnswerEditor{width:calc(100vw - 18px)!important;max-width:none!important}
+  .returnedDataModal{padding:48px 14px 16px!important}
+  .staffAnswerEditorHeader{padding:20px 18px 16px!important}
+  .staffAnswerCurrentItem{margin:14px 18px 0!important}
+  .staffAnswerEditor .staffFrontFields{padding:16px 18px 18px!important}
+  .staffAnswerEditor .staffAnswerSection,.staffAnswerEditor .staffAnswerTargetGroup{padding:15px!important}
+  .staffAnswerEditor .returnedEditActions{grid-template-columns:1fr!important;padding:12px 18px 16px!important}
+  .staffAnswerEditor .returnedEditActions .cancel{order:1!important}
+  .staffAnswerEditor .returnedEditActions button:not(.cancel){order:0!important}
+}
