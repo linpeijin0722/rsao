@@ -615,7 +615,7 @@ export default function Staff() {
     );
   return (
     <main className={`staffPage returned-edit-${returnedEditMode}`}>
-      <div className="staffPageHeading"><h1>預約工作後台</h1><div className="staffHeadingActions"><a className="lineAdminButton" href="https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/" target="_blank" rel="noreferrer">官方LINE後台</a><button className="manualBookingEntry" onClick={()=>setManualOpen(true)}>＋ 手動建立預約</button></div></div>
+      <div className="staffPageHeading"><h1>預約工作後台</h1><div className="staffHeadingActions"><a className="lineAdminButton" href="https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/" target="_blank" rel="noreferrer">官方LINE後台</a><a className="videoCalendarButton" href={(()=>{const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(new Date());const year=parts.find((part)=>part.type==="year")?.value||String(new Date().getFullYear());const month=parts.find((part)=>part.type==="month")?.value||String(new Date().getMonth()+1);return `https://calendar.google.com/calendar/u/4/r/month/${year}/${Number(month)}/1`;})()} target="_blank" rel="noreferrer" aria-label="開啟本月視訊諮詢 Google 行事曆">視訊諮詢行事曆</a><button className="manualBookingEntry" onClick={()=>setManualOpen(true)}>＋ 手動建立預約</button></div></div>
       {error && <div className="error">{error}</div>}
       <section className="staffBookingSection videoBookingSection">
         <h2 className="staffSectionTitle">視訊預約</h2>

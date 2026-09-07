@@ -379,26 +379,3 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 .staffPage .staffPageHeading .staffHeadingActions>button.manualBookingEntry:hover{transform:translateY(-1px)!important;filter:brightness(.98)!important}
 .staffPage .staffPageHeading .staffHeadingActions>a.videoCalendarButton:hover{box-shadow:0 6px 16px rgba(26,115,232,.30)!important}
 @media(max-width:860px){.staffPage .staffPageHeading .staffHeadingActions{flex-wrap:wrap!important}.staffPage .staffPageHeading .staffHeadingActions>a.videoCalendarButton{flex:1 1 180px!important;min-width:0!important;padding:10px 12px!important;font-size:16px!important}}
-
-
-/* 2026-09-07 v11：修改問事資料固定寬度與資訊層級，避免不同項目忽寬忽窄。 */
-.staffAnswerEditor{
-  width:min(760px,calc(100vw - 32px))!important;max-width:760px!important;
-  max-height:min(88vh,860px)!important;padding:0!important;overflow:auto!important;
-  box-sizing:border-box!important;border-radius:16px!important;
-}
-.staffAnswerEditorHeader{position:relative;padding:26px 30px 20px;border-bottom:1px solid #eadfd7;background:#fff}
-.staffAnswerEditorHeader>div{padding-right:38px}.staffAnswerEditorEyebrow{display:inline-block;margin-bottom:5px;color:#8a3045;font-size:13px;font-weight:900;letter-spacing:.08em}
-.staffAnswerEditorHeader h2{margin:0!important;color:#2e2723;font-size:26px!important;line-height:1.25}.staffAnswerEditorHeader p{margin:8px 0 0;color:#766b64;font-size:14px;line-height:1.6}
-.staffAnswerEditor>.staffModalClose{top:18px!important;right:18px!important;z-index:3}
-.staffAnswerCurrentItem{margin:20px 30px 0;padding:14px 16px;border:1px solid #e5d8ce;border-radius:12px;background:#faf6f2}
-.staffAnswerCurrentItem>span{display:block;margin-bottom:4px;color:#8b786b;font-size:13px;font-weight:800}.staffAnswerCurrentItem .staffAnswerItem{margin:0!important;padding:0!important;color:#332b27;font-size:18px!important;line-height:1.45}
-.staffAnswerEditor .staffFrontFields{display:grid!important;grid-template-columns:1fr!important;gap:16px!important;padding:20px 30px 8px!important;box-sizing:border-box!important}
-.staffAnswerEditor .staffFrontFields>label,.staffAnswerEditor .staffAnswerSection>label,.staffAnswerEditor .staffAnswerTargetGroup>label{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;width:100%!important;box-sizing:border-box!important;color:#403833;font-size:15px!important;font-weight:850!important}
-.staffAnswerEditor .staffFrontFields input,.staffAnswerEditor .staffFrontFields select,.staffAnswerEditor .staffFrontFields textarea{width:100%!important;max-width:none!important;box-sizing:border-box!important;border:1px solid #d8cec7!important;border-radius:10px!important;background:#fff!important;padding:11px 12px!important;color:#2d2926!important;outline:none!important}
-.staffAnswerEditor .staffFrontFields input:focus,.staffAnswerEditor .staffFrontFields select:focus,.staffAnswerEditor .staffFrontFields textarea:focus{border-color:#9f6558!important;box-shadow:0 0 0 3px rgba(159,101,88,.10)!important}
-.staffAnswerEditor .staffFrontFields textarea{min-height:92px!important;resize:vertical!important}
-.staffAnswerEditor .staffAnswerSection,.staffAnswerEditor .staffAnswerTargetGroup{width:100%!important;box-sizing:border-box!important;padding:16px!important;background:#fbf8f4!important;border-color:#e4d9d0!important}
-.staffAnswerEditor .returnedEditActions{position:sticky!important;bottom:0!important;display:grid!important;grid-template-columns:minmax(0,1.5fr) minmax(0,.8fr)!important;gap:10px!important;margin-top:10px!important;padding:16px 30px 22px!important;border-top:1px solid #eadfd7!important;background:rgba(255,255,255,.97)!important;backdrop-filter:blur(8px)!important}
-.staffAnswerEditor .returnedEditActions button{min-height:48px!important;margin:0!important;border-radius:10px!important}.staffAnswerEditor .returnedEditActions button:first-child{background:#995548!important;color:#fff!important}.staffAnswerEditor .returnedEditActions .cancel{background:#f1eeeb!important;color:#655c56!important}
-@media(max-width:640px){.staffAnswerEditor{width:calc(100vw - 18px)!important;max-height:92vh!important}.staffAnswerEditorHeader{padding:22px 18px 17px}.staffAnswerCurrentItem{margin:16px 18px 0}.staffAnswerEditor .staffFrontFields{padding:16px 18px 6px!important}.staffAnswerEditor .returnedEditActions{padding:14px 18px 18px!important}.staffAnswerEditor .returnedEditActions{grid-template-columns:1fr!important}}
