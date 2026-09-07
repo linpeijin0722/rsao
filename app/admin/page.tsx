@@ -129,14 +129,15 @@ export default function Admin() {
   }
   async function dayLoad(id = methodId, d = date) {
     if (!id) return;
-    const r = await fetch(`/api/admin/day?methodId=${id}&date=${d}`),
+    const r = await fetch(`/api/admin/day?methodId=${id}&date=${d}&_=${Date.now()}`, { cache: "no-store" }),
       j = await r.json();
     if (r.ok) setOpenTimes(j.open);
   }
   async function monthLoad(id = methodId, value = month) {
     if (!id) return;
     const response = await fetch(
-        `/api/admin/month?methodId=${id}&month=${value}`,
+        `/api/admin/month?methodId=${id}&month=${value}&_=${Date.now()}`,
+        { cache: "no-store" },
       ),
       result = await response.json();
     if (response.ok) setOpenDates(result.dates || []);

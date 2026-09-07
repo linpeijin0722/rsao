@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
 import { adminSupabase } from "@/lib/supabase";
+export const dynamic = "force-dynamic";
 
 const dateKey = (value: string) =>
   new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Taipei" }).format(
@@ -35,5 +36,5 @@ export async function GET(request: NextRequest) {
         .filter((date: string) => date.startsWith(month)),
     ),
   ];
-  return NextResponse.json({ dates });
+  return NextResponse.json({ dates }, { headers: { "Cache-Control": "no-store, max-age=0" } });
 }

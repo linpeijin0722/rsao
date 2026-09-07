@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
 import { adminSupabase } from "@/lib/supabase";
+export const dynamic = "force-dynamic";
 export async function GET(r: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
@@ -30,5 +31,5 @@ export async function GET(r: NextRequest) {
         }).format(new Date(x.slot_start)),
       ),
   );
-  return NextResponse.json({ open: [...open] });
+  return NextResponse.json({ open: [...open] }, { headers: { "Cache-Control": "no-store, max-age=0" } });
 }
