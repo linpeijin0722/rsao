@@ -47,10 +47,15 @@ export async function POST(r: NextRequest) {
     return error ? NextResponse.json({ error: error.message }, { status: 500 }) : NextResponse.json({ ok: true, closed: rows.length });
   }
   if (b.action === "close_all") {
-    const { error } = await db.from("availability_rules").insert(
-      Array.from({ length: 7 }, (_, index) => ({ weekday: index + 1, start_time: "07:00", end_time: "23:00", valid_from: null, valid_until: null, is_active: true, is_open: false })),
-    );
-    return error ? NextResponse.json({ error: error.message }, { status: 500 }) : NextResponse.json({ ok: true });
+    // 「清除所有時段」只清除時段設定，絕對不碰 booking_system_settings.video_booking_enabled。
+    // 先移除一般規則，再清除週／單日時段覆寫；前台總開關維持使用者原本設定。
+    const { error: ruleError } = await db.from("availability_rules").delete().not("id", "is", null);
+    if (ruleError) return NextResponse.json({ error: ruleError.message }, { status: 500 });
+    const { error: weeklyError } = await db.from("weekly_slot_overrides").delete().not("weekday", "is", null);
+    if (weeklyError) return NextResponse.json({ error: weeklyError.message }, { status: 500 });
+    const methodId = await resolveVideoMethodId();
+    const { error: slotError } = await db.from("slot_overrides").delete().eq("consultation_method_id", methodId);
+    return slotError ? NextResponse.json({ error: slotError.message }, { status: 500 }) : NextResponse.json({ ok: true, cleared: true });
   }
   if (!b.slotStart) return NextResponse.json({ error: "缺少時段資料，請重新整理後再試" }, { status: 400 });
   const methodId = await resolveVideoMethodId();
