@@ -60,42 +60,35 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
   // 這也是先前「看似有清理程式、實際空白頁仍存在」的主要風險。
   const cleanupRequests: any[] = [];
   const documentEndIndex = bodyContent.reduce((max:number, block:any) => Math.max(max, Number(block?.endIndex || 0)), 0);
+  // Google Docs 的「看起來是空白頁」常不是 pageBreak，而是結果區預留的 NBSP 空段落
+  // 被擠到下一頁。舊版刻意保護 NBSP，因此永遠無法清掉這種尾端空白頁。
+  // 新規則：只從文件最尾端往前清除純空白/NBSP/pageBreak 段落；一碰到真正可見內容就停止。
+  // 這樣內文中的老師輸入空間仍保留，但最後一頁若只有空白佔位就會被收掉。
   for (let i = bodyContent.length - 1; i >= 0; i -= 1) {
     const block = bodyContent[i];
+    if (block.sectionBreak) continue;
+    if (block.table || block.tableOfContents) break;
     const elements = block.paragraph?.elements || [];
     const rawText = elements.map((element:any) => element.textRun?.content || "").join("");
-    // NBSP 是老師輸入區刻意保留的空間，不能當成一般空白刪掉。
-    const hasProtectedNbsp = rawText.includes("\u00a0");
-    const visibleText = rawText.replace(/[ \t\r\n]/g, "");
+    const visibleText = rawText.replace(/[\s\u00a0]/g, "");
     const hasInlineContent = elements.some((element:any) => element.inlineObjectElement || element.horizontalRule);
-    const pageBreaks = elements.filter((element:any) => element.pageBreak);
-    if (visibleText || hasProtectedNbsp || hasInlineContent || block.table) break;
+    if (visibleText || hasInlineContent) break;
 
-    // 清除尾端手動分頁。
-    for (const pageBreak of pageBreaks) {
-      if (pageBreak?.startIndex != null && pageBreak?.endIndex != null && pageBreak.endIndex > pageBreak.startIndex) {
-        cleanupRequests.push({ deleteContentRange: { range: { startIndex: pageBreak.startIndex, endIndex: pageBreak.endIndex } } });
-      }
-    }
-
-    // 只改尾端空段落的 pageBreakBefore；不能動有內容的老師輸入區。
     if (block.paragraph?.paragraphStyle?.pageBreakBefore && block.startIndex != null && block.endIndex != null) {
       cleanupRequests.push({
         updateParagraphStyle: {
-          range: { startIndex: block.startIndex, endIndex: Math.max(block.startIndex + 1, block.endIndex - 1) },
+          range: { startIndex: Number(block.startIndex), endIndex: Math.max(Number(block.startIndex) + 1, Number(block.endIndex) - 1) },
           paragraphStyle: { pageBreakBefore: false },
           fields: "pageBreakBefore",
         },
       });
     }
 
-    // 上一版只刪 page break，若模板尾端是「很多個空段落」仍會被擠成一整張空白頁。
-    // 這裡把最後一個文件終止換行以前的純空白段落一起收掉；保留 Google Docs 必要的 terminal newline。
-    if (!pageBreaks.length && block.paragraph && block.startIndex != null && block.endIndex != null) {
-      const safeEnd = Math.min(Number(block.endIndex), Math.max(Number(block.startIndex), documentEndIndex - 1));
-      if (safeEnd > Number(block.startIndex)) {
-        cleanupRequests.push({ deleteContentRange: { range: { startIndex: Number(block.startIndex), endIndex: safeEnd } } });
-      }
+    // 純空白段落（含 NBSP）直接收掉，但保留文件最後必須存在的 terminal newline。
+    if (block.paragraph && block.startIndex != null && block.endIndex != null) {
+      const safeStart = Number(block.startIndex);
+      const safeEnd = Math.min(Number(block.endIndex), Math.max(safeStart, documentEndIndex - 1));
+      if (safeEnd > safeStart) cleanupRequests.push({ deleteContentRange: { range: { startIndex: safeStart, endIndex: safeEnd } } });
     }
   }
   if (cleanupRequests.length) {
@@ -222,23 +215,37 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
     }
   }
   if (!createdHeaderId) throw new Error("Google 文件頁首建立失敗");
-  const headerText = `訂單編號：${bookingNo}`;
+  const returnBase = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
+  const returnLabel = "【 回傳諮詢結果 】";
+  const headerText = `訂單編號：${bookingNo}\n${returnLabel}`;
+  const returnStart = headerText.indexOf(returnLabel);
+  const returnUrl = returnBase ? `${returnBase}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}` : "";
+  const headerRequests: any[] = [
+    { insertText: { location: { segmentId: createdHeaderId, index: 0 }, text: headerText } },
+    {
+      updateParagraphStyle: {
+        range: { segmentId: createdHeaderId, startIndex: 0, endIndex: headerText.length },
+        paragraphStyle: { spaceAbove: { magnitude: 0, unit: "PT" }, spaceBelow: { magnitude: 0, unit: "PT" }, lineSpacing: 100 },
+        fields: "spaceAbove,spaceBelow,lineSpacing",
+      },
+    },
+  ];
+  if (returnUrl) headerRequests.push({
+    updateTextStyle: {
+      range: { segmentId: createdHeaderId, startIndex: returnStart, endIndex: returnStart + returnLabel.length },
+      textStyle: {
+        bold: true,
+        foregroundColor: { color: { rgbColor: { red: 1, green: 1, blue: 1 } } },
+        backgroundColor: { color: { rgbColor: { red: 0.086, green: 0.541, blue: 0.329 } } },
+        link: { url: returnUrl },
+      },
+      fields: "bold,foregroundColor,backgroundColor,link",
+    },
+  });
   await google(
     `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,
     token,
-    {
-      method: "POST",
-      body: JSON.stringify({ requests: [
-        { insertText: { location: { segmentId: createdHeaderId, index: 0 }, text: headerText } },
-        {
-          updateParagraphStyle: {
-            range: { segmentId: createdHeaderId, startIndex: 0, endIndex: headerText.length },
-            paragraphStyle: { spaceAbove: { magnitude: 0, unit: "PT" }, spaceBelow: { magnitude: 0, unit: "PT" }, lineSpacing: 100 },
-            fields: "spaceAbove,spaceBelow,lineSpacing",
-          },
-        },
-      ] }),
-    },
+    { method: "POST", body: JSON.stringify({ requests: headerRequests }) },
   );
 }
 
@@ -247,6 +254,51 @@ export async function wasDocumentEditedBy(documentId: string, editorEmail: strin
   const token = await accessToken();
   const result = await google(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(documentId)}/revisions?fields=revisions(lastModifyingUser(emailAddress))`, token);
   return (result.revisions || []).some((revision: any) => String(revision?.lastModifyingUser?.emailAddress || "").toLowerCase() === editorEmail.toLowerCase());
+}
+
+export type ConsultationReturnItem = { index: number; itemTitle: string; content: string };
+
+function documentPlainText(document: any) {
+  let output = "";
+  for (const block of document.body?.content || []) {
+    if (block.paragraph) {
+      for (const element of block.paragraph.elements || []) {
+        if (element.textRun?.content) output += String(element.textRun.content);
+        else if (element.pageBreak) output += "\n";
+      }
+    }
+  }
+  return output.replace(/\u00a0/g, " ").replace(/\r/g, "");
+}
+
+export async function getConsultationReturnPreview(documentId: string): Promise<ConsultationReturnItem[]> {
+  if (!documentId) throw new Error("缺少 Google 文件 ID");
+  const token = await accessToken();
+  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const body = documentPlainText(document);
+  const marker = /項目\s*(\d+)\s*[（(]共\s*\d+\s*個項目[）)]/g;
+  const matches = Array.from(body.matchAll(marker));
+  if (!matches.length) throw new Error("這份諮詢單找不到『項目 N』區段，請重新建立諮詢單後再試");
+  return matches.map((match, idx) => {
+    const segmentStart = match.index || 0;
+    const segmentEnd = idx + 1 < matches.length ? (matches[idx + 1].index || body.length) : body.length;
+    const segment = body.slice(segmentStart, segmentEnd).replace(/\n{4,}/g, "\n\n\n");
+    const afterMarker = segment.slice(match[0].length).replace(/^\s+/, "");
+    const firstLine = afterMarker.split("\n").map((line) => line.trim()).find(Boolean) || `項目 ${idx + 1}`;
+    let startOffset = -1;
+    if (idx === 0) startOffset = segment.indexOf("您好，以下是您的諮詢結果");
+    if (startOffset < 0) {
+      const q1 = /(?:^|\n)Q1\s*[:：]/m.exec(segment);
+      if (q1) startOffset = (q1.index || 0) + (q1[0].startsWith("\n") ? 1 : 0);
+    }
+    if (startOffset < 0) {
+      const tag = /【[^】\n]+】/.exec(segment);
+      if (tag) startOffset = tag.index || 0;
+    }
+    if (startOffset < 0) throw new Error(`項目 ${idx + 1} 找不到 Q1 或結果標籤，請確認文件格式`);
+    const content = segment.slice(startOffset).replace(/[ \t]+$/gm, "").replace(/\n{3,}$/g, "\n").trim();
+    return { index: idx + 1, itemTitle: firstLine, content };
+  });
 }
 
 const fieldLabels: Record<string, string> = {
@@ -454,6 +506,10 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
       if (!rows || typeof rows !== "object") return;
       Object.entries(rows as Record<string, unknown>).forEach(([label, value]) => addField(`${focus}－${label}`, value));
     });
+  }
+  if (itemIndex === 1) {
+    add("您好，以下是您的諮詢結果");
+    add("");
   }
   questions.map(text).filter(Boolean).forEach((question: string, index: number) => {
     add(`Q${index + 1}:${question}`, "question");

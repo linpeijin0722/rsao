@@ -96,10 +96,13 @@ const shortText = (value: unknown, limit = 20) => {
   const chars = Array.from(String(value || ""));
   return chars.length > limit ? `${chars.slice(0, limit).join("")}…` : chars.join("");
 };
-const bookingItemLines = (booking: any) => asArray(booking.booking_details).map((detail: any) => {
+const bookingItemRows = (booking: any) => asArray(booking.booking_details).map((detail: any) => {
   const subs = asArray(detail.booking_detail_sub_items).map((sub: any) => sub.sub_item_title).filter(Boolean);
-  return shortText([detail.item_title, ...subs].filter(Boolean).join(" "));
+  const quantity = Math.max(1, Number(detail.quantity) || 1);
+  const amount = Number(detail.line_total ?? ((Number(detail.unit_price || 0) * quantity) || 0));
+  return { label: shortText([detail.item_title, ...subs].filter(Boolean).join(" "), 60), amount };
 });
+const bookingItemLines = (booking: any) => bookingItemRows(booking).map((row) => row.label);
 const videoDateTimeText = (value: string) => {
   const parts = new Intl.DateTimeFormat("zh-TW", {
     timeZone: "Asia/Taipei",
@@ -280,6 +283,25 @@ export default function Staff() {
   useEffect(() => {
     setTextPage(1);
   }, [statusFilter, dataFilter, sortBy, customerSearch, bookingSearch, documentSearch, textDateFrom, textDateTo, textPageSize]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || paymentActionBusy) return;
+      if (paymentActions) return setPaymentActions(null);
+      if (teacherOverwrite) return setTeacherOverwrite(null);
+      if (documentVersionPicker) return setDocumentVersionPicker(null);
+      if (documentRebuild) return setDocumentRebuild(null);
+      if (documentLinkEdit) return setDocumentLinkEdit(null);
+      if (lineContact) return setLineContact(null);
+      if (priceEdit) return setPriceEdit(null);
+      if (addPicker) return setAddPicker(null);
+      if (editing) return setEditing(null);
+      if (manualOpen) return setManualOpen(false);
+      if (dataBooking) { setDataBooking(null); setDataView([]); return; }
+      if (userView) return setUserView(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [paymentActions,paymentActionBusy,teacherOverwrite,documentVersionPicker,documentRebuild,documentLinkEdit,lineContact,priceEdit,addPicker,editing,manualOpen,dataBooking,userView]);
   function toggleManualItem(item:any,checked:boolean){
     setManualLines(value=>checked?[...value,{itemId:item.id,subId:item.sub_items?.length===1?item.sub_items[0].id:"",qty:1}]:value.filter(line=>line.itemId!==item.id));
   }
@@ -926,7 +948,7 @@ export default function Staff() {
           </div>
         </div>
       )}
-      {paymentActions&&<div className="modalBackdrop priorityModal" onClick={()=>!paymentActionBusy&&setPaymentActions(null)}><div className="modal paymentActionModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose paymentActionClose" aria-label="關閉" disabled={paymentActionBusy} onClick={()=>setPaymentActions(null)}>×</button><div className="paymentActionHeader"><h2>付款狀態操作</h2><p>請確認訂單內容後再執行操作</p></div><div className="paymentActionOrder"><span>訂單編號</span><strong>{paymentActions.booking_no}</strong></div><div className="paymentActionItems"><h3>預約項目</h3>{bookingItemLines(paymentActions).length?<div>{bookingItemLines(paymentActions).map((line:string,index:number)=><p key={`${paymentActions.id}-payment-item-${index}`}><span>{index+1}</span><b>{line}</b></p>)}</div>:<p className="paymentActionEmpty">沒有項目資料</p>}</div>{paymentActions.payment_status==="paid"?<button className="dangerAction" disabled={paymentActionBusy} onClick={()=>{if(confirm(`是否確定要手動退款並取消訂單 ${paymentActions.booking_no}？`))void changePaymentState("manual_refund")}}>手動退款</button>:<div className="paymentActionChoices"><button className="dangerAction" disabled={paymentActionBusy} onClick={()=>{if(confirm(`是否確定要取消訂單 ${paymentActions.booking_no}？`))void changePaymentState("cancel_booking")}}>取消訂單</button><button className="manualPaidButton" disabled={paymentActionBusy} onClick={()=>{if(confirm(`是否確定已收到款項，將訂單 ${paymentActions.booking_no} 設為手動付款？`))void changePaymentState("mark_paid")}}>手動付款</button></div>}</div></div>}
+      {paymentActions&&<div className="modalBackdrop priorityModal" onClick={()=>!paymentActionBusy&&setPaymentActions(null)}><div className="modal paymentActionModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose paymentActionClose" aria-label="關閉" disabled={paymentActionBusy} onClick={()=>setPaymentActions(null)}>×</button><div className="paymentActionHeader"><h2>付款狀態操作</h2><p>請確認訂單內容與金額後再執行操作</p></div><div className="paymentActionOrder"><span>訂單編號</span><strong>{paymentActions.booking_no}</strong></div><div className="paymentActionItems"><h3>預約項目</h3>{bookingItemRows(paymentActions).length?<div>{bookingItemRows(paymentActions).map((row:{label:string;amount:number},index:number)=><p key={`${paymentActions.id}-payment-item-${index}`}><span>{index+1}</span><b>{row.label}</b><strong>NT$ {row.amount.toLocaleString("zh-TW")}</strong></p>)}</div>:<p className="paymentActionEmpty">沒有項目資料</p>}</div><div className="paymentActionTotal"><span>訂單總金額</span><strong>NT$ {Number(paymentActions.total_price||0).toLocaleString("zh-TW")}</strong></div>{paymentActions.payment_status==="paid"?<button className="dangerAction" disabled={paymentActionBusy} onClick={()=>{if(confirm(`是否確定要手動退款並取消訂單 ${paymentActions.booking_no}？`))void changePaymentState("manual_refund")}}>手動退款</button>:<div className="paymentActionChoices"><button className="dangerAction" disabled={paymentActionBusy} onClick={()=>{if(confirm(`是否確定要取消訂單 ${paymentActions.booking_no}？`))void changePaymentState("cancel_booking")}}>取消訂單</button><button className="manualPaidButton" disabled={paymentActionBusy} onClick={()=>{if(confirm(`是否確定已收到款項，將訂單 ${paymentActions.booking_no} 設為手動付款？`))void changePaymentState("mark_paid")}}>手動付款</button></div>}</div></div>}
       {editing && (
         <div className="modalBackdrop" onClick={() => setEditing(null)}>
           <div
