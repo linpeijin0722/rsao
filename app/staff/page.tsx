@@ -190,7 +190,8 @@ export default function Staff() {
     [priceEdit,setPriceEdit]=useState<any>(null),
     [priceValue,setPriceValue]=useState(""),
     [paymentActions,setPaymentActions]=useState<any>(null),
-    [paymentActionBusy,setPaymentActionBusy]=useState(false);
+    [paymentActionBusy,setPaymentActionBusy]=useState(false),
+    [profileCopyToast,setProfileCopyToast]=useState("");
   async function staffPost(body:any,retry=true){
     let response=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
     if(response.status===401&&retry){
@@ -201,6 +202,24 @@ export default function Staff() {
       }
     }
     return response;
+  }
+  async function openLineAdminFromProfile(customer:any) {
+    const name=String(customer?.line_display_name||"").trim();
+    if(!name)return alert("此用戶沒有 LINE 名稱可複製");
+
+    // 先同步開分頁，避免 await clipboard 後被瀏覽器當成非使用者操作而擋掉 popup。
+    const lineTab=window.open("https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/","_blank");
+    if(lineTab) lineTab.opener=null;
+
+    let copied=false;
+    try { await navigator.clipboard.writeText(name); copied=true; } catch {
+      try {
+        const input=document.createElement("textarea");input.value=name;input.style.position="fixed";input.style.opacity="0";document.body.appendChild(input);input.select();copied=document.execCommand("copy");input.remove();
+      } catch {}
+    }
+    setProfileCopyToast(copied?`已複製 LINE 名稱：${name}`:`請手動複製 LINE 名稱：${name}`);
+    window.setTimeout(()=>setProfileCopyToast(""),2600);
+    if(!lineTab) window.alert("瀏覽器阻擋了新分頁，請允許此網站開啟彈出式視窗後再試一次。");
   }
   async function generateDocument(x:any,createMode:"replace"|"new"="replace",confirmedTeacherEdit=false){
     const exists=sheetLinks(x).length>0;
@@ -748,10 +767,13 @@ export default function Staff() {
             className="modal userInfoModal"
             onClick={(e) => e.stopPropagation()}
           >
-            {userView.line_picture_url && (
-              <img src={userView.line_picture_url} alt="" />
-            )}
+            <button className="userProfileAvatarAction" type="button" title="複製 LINE 名稱並開啟官方 LINE 後台" aria-label="複製 LINE 名稱並開啟官方 LINE 後台" onClick={() => void openLineAdminFromProfile(userView)}>
+              {userView.line_picture_url ? <img src={userView.line_picture_url} alt="LINE 頭像" /> : <span className="avatarFallback">LINE</span>}
+              <span className="userProfileAvatarHint">開啟 LINE 後台</span>
+            </button>
             <h2>{userView.line_display_name}</h2>
+            <p className="userProfileQuickTip"><b>點擊頭像</b>即可複製 LINE 名稱並另開官方 LINE 後台，進入後直接貼上搜尋。</p>
+            {profileCopyToast&&<div className="profileCopyToast" role="status">✓ {profileCopyToast}</div>}
             <div className="staffCustomerProfile">
               <div><span>姓名</span><b>{userView.full_name || "尚未填寫"}</b></div>
               <div><span>性別</span><b>{userView.gender || "尚未填寫"}</b></div>
@@ -962,7 +984,7 @@ export default function Staff() {
             >
               ×
             </button>
-            <header>
+            <header className="staffEditHeader">
               {editing.customers?.line_picture_url ? (
                 <img src={editing.customers.line_picture_url} alt="LINE頭像" />
               ) : (
@@ -994,7 +1016,7 @@ export default function Staff() {
                 />
               </label>
             )}
-            <h3>修改諮詢項目與數量</h3>
+            <div className="staffEditSectionHeading"><div><span>預約內容</span><h3>修改諮詢項目與數量</h3></div><small>左側調整目前項目，右側可快速新增其他諮詢。</small></div>
             <div className="staffEditColumns">
               <section className="staffCurrentItems">
                 <h3>目前已有項目</h3>
@@ -1069,10 +1091,7 @@ export default function Staff() {
               </section>
             </div>
             <div className="staffTotalPrice"><b>總金額</b><strong>NT$ {Number(editing.total_price||0).toLocaleString("en-US")}</strong>{editing.payment_status!=="paid"&&editing.status!=="cancelled"&&editing.status!=="expired"&&<button onClick={()=>{setPriceEdit(editing);setPriceValue(String(editing.total_price||0))}}>修改</button>}</div>
-            <button onClick={saveEdit}>儲存並發送 LINE 通知</button>
-            <button className="cancel" onClick={() => setEditing(null)}>
-              取消
-            </button>
+            <div className="staffEditFooterActions"><button className="staffEditSave" onClick={saveEdit}>儲存並發送 LINE 通知</button><button className="cancel staffEditCancel" onClick={() => setEditing(null)}>取消</button></div>
           </div>
         </div>
       )}

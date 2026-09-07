@@ -53,6 +53,10 @@ export default function Admin() {
     [videoControlSaving, setVideoControlSaving] = useState(false),
     [holidayDate, setHolidayDate] = useState(today()),
     [note, setNote] = useState(""),
+    [holidayEdit, setHolidayEdit] = useState<H | null>(null),
+    [holidayEditDate, setHolidayEditDate] = useState(""),
+    [holidayEditNote, setHolidayEditNote] = useState(""),
+    [holidayEditSaving, setHolidayEditSaving] = useState(false),
     [textSaveMessage, setTextSaveMessage] = useState("");
   const [textCap, setTextCap] = useState<any>({
       enabled: true,
@@ -225,6 +229,16 @@ export default function Admin() {
   async function slotToggle(t: string) {
     if (!methodId) return window.alert("找不到視訊諮詢設定，請重新整理後再試");
     const value = !openTimes.includes(t);
+
+    // 週五開啟個別時段時僅提示，不影響後續操作或前台總開關。
+    if (value) {
+      const [year, monthValue, dayValue] = date.split("-").map(Number);
+      const selectedDay = new Date(year, monthValue - 1, dayValue);
+      if (selectedDay.getDay() === 5) {
+        window.alert(`${monthValue}/${dayValue}是週五，請確認是否會撞到子龍廟時間。`);
+      }
+    }
+
     const r = await fetch("/api/admin/slots", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -305,6 +319,38 @@ export default function Admin() {
   async function holidayDel(d: string) {
     await fetch(`/api/admin/holidays?date=${d}`, { method: "DELETE" });
     load();
+  }
+  function openHolidayEdit(h: H) {
+    setHolidayEdit(h);
+    setHolidayEditDate(h.holiday_date);
+    setHolidayEditNote(h.note || "");
+  }
+  async function saveHolidayEdit() {
+    if (!holidayEdit || holidayEditSaving) return;
+    if (!holidayEditDate) return setError("請選擇休假日期");
+    if (holidayEditDate < today()) return setError("休假日不能早於今天");
+    setHolidayEditSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/admin/holidays", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ date: holidayEditDate, note: holidayEditNote }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "修改休假日失敗");
+      if (holidayEditDate !== holidayEdit.holiday_date) {
+        const remove = await fetch(`/api/admin/holidays?date=${holidayEdit.holiday_date}`, { method: "DELETE" });
+        if (!remove.ok) throw new Error("新日期已儲存，但舊休假日刪除失敗，請重新整理後確認");
+      }
+      setHolidayEdit(null);
+      setDate(holidayEditDate);
+      await load();
+    } catch (err: any) {
+      setError(err?.message || "修改休假日失敗");
+    } finally {
+      setHolidayEditSaving(false);
+    }
   }
   async function ruleDel(id: string) {
     await fetch(`/api/admin/schedule?id=${id}`, { method: "DELETE" });
@@ -479,12 +525,26 @@ export default function Admin() {
                 {h.holiday_date}
                 <small>{h.note}</small>
               </span>
-              <button onClick={() => holidayDel(h.holiday_date)}>
-                取消休假
-              </button>
+              <div className="holidayRowActions">
+                <button className="holidayEditButton" aria-label={`編輯 ${h.holiday_date} 休假日`} title="編輯休假日" onClick={() => openHolidayEdit(h)}>
+                  <span aria-hidden="true">✎</span><span>編輯</span>
+                </button>
+                <button className="holidayCancelButton" onClick={() => holidayDel(h.holiday_date)}>取消休假</button>
+              </div>
             </div>
           ))}
       </section>
+      {holidayEdit && (
+        <div className="adminModalBackdrop" onClick={() => !holidayEditSaving && setHolidayEdit(null)}>
+          <div className="adminModal holidayEditModal" onClick={(e) => e.stopPropagation()}>
+            <button className="adminModalClose" aria-label="關閉" disabled={holidayEditSaving} onClick={() => setHolidayEdit(null)}>×</button>
+            <div className="holidayEditHeading"><span aria-hidden="true">✎</span><div><h2>編輯特定休假日</h2><p>修改日期或備註後儲存即可。</p></div></div>
+            <label>休假日期<input type="date" min={today()} value={holidayEditDate} onChange={(e) => setHolidayEditDate(e.target.value)} /></label>
+            <label>備註<input value={holidayEditNote} onChange={(e) => setHolidayEditNote(e.target.value)} placeholder="備註（選填）" /></label>
+            <div className="holidayEditActions"><button className="secondary" disabled={holidayEditSaving} onClick={() => setHolidayEdit(null)}>取消</button><button className="primary" disabled={holidayEditSaving} onClick={() => void saveHolidayEdit()}>{holidayEditSaving ? "儲存中…" : "儲存修改"}</button></div>
+          </div>
+        </div>
+      )}
       <section className="adminCard">
         <h2>個別日期時段</h2>
         <div className="monthNav">
