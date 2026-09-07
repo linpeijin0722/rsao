@@ -49,24 +49,69 @@ async function google(url: string, token: string, init: RequestInit = {}) {
 
 async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: string) {
   const token = await accessToken();
-  const document = await google(
+  let document = await google(
     `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,
     token,
   );
-  const bodyContent = document.body?.content || [];
-  const requests: any[] = [];
-  // 若文件尾端只剩 Google Docs 的手動分頁符號與空白段落，刪除分頁符號，
-  // 避免諮詢單最後多出完全空白的一頁。
+  let bodyContent = document.body?.content || [];
+
+  // 空白頁清理必須獨立送出。若把刪除分頁與後續格式更新放在同一個 batch，
+  // 前面的 deleteContentRange 會改變 index，導致後面的格式 request 使用舊 index 而整批失敗。
+  // 這也是先前「看似有清理程式、實際空白頁仍存在」的主要風險。
+  const cleanupRequests: any[] = [];
+  const documentEndIndex = bodyContent.reduce((max:number, block:any) => Math.max(max, Number(block?.endIndex || 0)), 0);
   for (let i = bodyContent.length - 1; i >= 0; i -= 1) {
     const block = bodyContent[i];
     const elements = block.paragraph?.elements || [];
-    const visibleText = elements.map((element:any) => element.textRun?.content || "").join("").replace(/[\s\u00a0]/g, "");
-    const pageBreak = elements.find((element:any) => element.pageBreak);
-    if (visibleText) break;
-    if (pageBreak?.startIndex != null && pageBreak?.endIndex != null && pageBreak.endIndex > pageBreak.startIndex) {
-      requests.push({ deleteContentRange: { range: { startIndex: pageBreak.startIndex, endIndex: pageBreak.endIndex } } });
+    const rawText = elements.map((element:any) => element.textRun?.content || "").join("");
+    // NBSP 是老師輸入區刻意保留的空間，不能當成一般空白刪掉。
+    const hasProtectedNbsp = rawText.includes("\u00a0");
+    const visibleText = rawText.replace(/[ \t\r\n]/g, "");
+    const hasInlineContent = elements.some((element:any) => element.inlineObjectElement || element.horizontalRule);
+    const pageBreaks = elements.filter((element:any) => element.pageBreak);
+    if (visibleText || hasProtectedNbsp || hasInlineContent || block.table) break;
+
+    // 清除尾端手動分頁。
+    for (const pageBreak of pageBreaks) {
+      if (pageBreak?.startIndex != null && pageBreak?.endIndex != null && pageBreak.endIndex > pageBreak.startIndex) {
+        cleanupRequests.push({ deleteContentRange: { range: { startIndex: pageBreak.startIndex, endIndex: pageBreak.endIndex } } });
+      }
+    }
+
+    // 只改尾端空段落的 pageBreakBefore；不能動有內容的老師輸入區。
+    if (block.paragraph?.paragraphStyle?.pageBreakBefore && block.startIndex != null && block.endIndex != null) {
+      cleanupRequests.push({
+        updateParagraphStyle: {
+          range: { startIndex: block.startIndex, endIndex: Math.max(block.startIndex + 1, block.endIndex - 1) },
+          paragraphStyle: { pageBreakBefore: false },
+          fields: "pageBreakBefore",
+        },
+      });
+    }
+
+    // 上一版只刪 page break，若模板尾端是「很多個空段落」仍會被擠成一整張空白頁。
+    // 這裡把最後一個文件終止換行以前的純空白段落一起收掉；保留 Google Docs 必要的 terminal newline。
+    if (!pageBreaks.length && block.paragraph && block.startIndex != null && block.endIndex != null) {
+      const safeEnd = Math.min(Number(block.endIndex), Math.max(Number(block.startIndex), documentEndIndex - 1));
+      if (safeEnd > Number(block.startIndex)) {
+        cleanupRequests.push({ deleteContentRange: { range: { startIndex: Number(block.startIndex), endIndex: safeEnd } } });
+      }
     }
   }
+  if (cleanupRequests.length) {
+    // 先處理 paragraph style，再從文件尾端往前刪 page break，避免 index 位移互相影響。
+    const styles = cleanupRequests.filter((request) => request.updateParagraphStyle);
+    const deletes = cleanupRequests.filter((request) => request.deleteContentRange)
+      .sort((a, b) => b.deleteContentRange.range.startIndex - a.deleteContentRange.range.startIndex);
+    await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+      method: "POST",
+      body: JSON.stringify({ requests: [...styles, ...deletes] }),
+    });
+    document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+    bodyContent = document.body?.content || [];
+  }
+
+  const requests: any[] = [];
   requests.push({
     updateDocumentStyle: {
       documentStyle: {
@@ -262,6 +307,18 @@ const profileLines = (profile: any, ownerName: string) => {
   ].filter(Boolean);
 };
 
+const companyPartnerSummary = (profile: any) => {
+  if (!profile) return "";
+  const name = text(profile.name || profile.full_name);
+  const lunar = text(profile.lunar_birth_text);
+  const shichen = text(profile.birth_shichen) ? `（${shichenName(profile.birth_shichen)}）` : "";
+  const zodiac = text(profile.zodiac) ? `生肖：${text(profile.zodiac)}` : "";
+  const birth = `${lunar}${shichen}${zodiac}`;
+  const address = text(profile.address || profile.full_address);
+  // 公司合夥人固定顯示：姓名／農曆生日（時辰）生肖／地址。
+  return [name, birth, address].filter(Boolean).join("／");
+};
+
 type Mark = { start: number; end: number; kind: "meta" | "title" | "section" | "question" | "answer" | "teacher" | "fieldLabel" | "fieldAnswer" };
 type DocumentImage = { marker: string; dataUrl: string; width: number };
 type PageSpec = { detail: any; target?: any; targetIndex?: number; targetCount?: number };
@@ -376,7 +433,9 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     const isCompany = subTitle.includes("公司命名") || subTitle.includes("公司改名") || title.includes("公司命名") || title.includes("公司改名");
     if (isCompany) {
       const allPeople = [one(answer?.consultation_profiles), ...(answer?.booking_answer_participants || []).map((entry:any) => one(entry.consultation_profiles))].filter(Boolean);
-      const partnerName = allPeople.find((profile:any) => text(profile.id) === text(extra.partner))?.name || extra.partner;
+      const partnerProfile = allPeople.find((profile:any) => text(profile.id) === text(extra.partner)) || answer?.__profileLookup?.[text(extra.partner)];
+      // 依諮詢單格式顯示「姓名／農曆生日（時辰）生肖／地址」，不可把 profile UUID 印出來。
+      const partnerName = companyPartnerSummary(partnerProfile) || text(extra.partner);
       addField(fieldLabels.old_name, extra.old_name);
       addField(fieldLabels.business, extra.business);
       addField(fieldLabels.mode, extra.mode === "sole" ? "獨資（自己一人開）" : extra.mode === "partners" ? "合夥（有其他股東）" : extra.mode);
@@ -503,6 +562,9 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const profileIds = Array.from(new Set(allAnswers.flatMap((answer: any) => [
     answer.profile_id,
     ...(answer.booking_answer_participants || []).map((participant: any) => participant.profile_id),
+    // 公司命名／改名的「其他合夥人」可能只存在 extra_data.partner，
+    // 沒有被加入 booking_answer_participants；若不一起查會直接把 UUID 印到諮詢單。
+    answer?.extra_data?.partner,
   ]).filter(Boolean))) as string[];
   if (profileIds.length) {
     const { data: profiles, error: profileError } = await db.from("consultation_profiles").select("*").in("id", profileIds);
@@ -513,6 +575,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
       (answer.booking_answer_participants || []).forEach((participant: any) => {
         if (!one(participant.consultation_profiles) && profilesById.has(participant.profile_id)) participant.consultation_profiles = profilesById.get(participant.profile_id);
       });
+      answer.__profileLookup = Object.fromEntries(profilesById);
     });
   }
   if (!folderId) throw new Error("尚未設定 GOOGLE_DRIVE_OUTPUT_FOLDER_ID");
