@@ -317,3 +317,32 @@
 .closeAllDayButton:hover{background:#e3e6e4;color:#2d3531;border-color:#b9bfbc}
 .closeAllDayButton:disabled{opacity:.5;cursor:not-allowed}
 .closeEverySlotButton{margin-bottom:9px}
+
+
+/* 2026-09-07 v13：清除時段為中性咖啡色操作，不與「關閉前台預約」的紅色警示語意混淆。 */
+.closeAllDayButton{
+  border:1px solid #c7a997!important;
+  background:#f6eee8!important;
+  color:#704b3b!important;
+  box-shadow:0 3px 10px rgba(112,75,59,.08)!important;
+}
+.closeAllDayButton:hover{
+  border-color:#8f604b!important;
+  background:#8f604b!important;
+  color:#fff!important;
+}
+.closeAllDayButton:focus-visible{outline:3px solid rgba(143,96,75,.18)!important;outline-offset:2px!important}
+
+/* v14：特定休假日編輯操作 */
+.holidayRowActions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.rule .holidayEditButton,.rule .holidayCancelButton{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:38px;margin:0;padding:8px 12px;border-radius:9px;font-weight:800;cursor:pointer;transition:.15s ease}
+.rule .holidayEditButton{border:1px solid #c9ad9e;background:#f8f1ec;color:#8b513f}
+.rule .holidayEditButton:hover{background:#9b5c49;border-color:#9b5c49;color:#fff;box-shadow:0 3px 9px rgba(92,57,43,.16)}
+.rule .holidayEditButton>span:first-child{font-size:19px;line-height:1}
+.rule .holidayCancelButton{border:1px solid #d8d0ca;background:#fff;color:#443d39}
+.rule .holidayCancelButton:hover{background:#f1ece8;border-color:#c8bbb2}
+.adminModalBackdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;background:rgba(24,22,20,.52);backdrop-filter:blur(2px)}
+.adminModal{position:relative;width:min(520px,calc(100vw - 32px));box-sizing:border-box;padding:26px;border:1px solid #d8c7bb;border-radius:18px;background:#fff;box-shadow:0 20px 55px rgba(31,24,20,.24)}
+.adminModalClose{position:absolute;right:14px;top:14px;width:38px;height:38px;border:0!important;border-radius:9px!important;background:#8a3045!important;color:#fff!important;font-size:27px!important;line-height:1!important;cursor:pointer}
+.holidayEditHeading{display:flex;align-items:flex-start;gap:12px;padding-right:44px;margin-bottom:20px}.holidayEditHeading>span{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:12px;background:#f2e6df;color:#945541;font-size:24px;font-weight:900}.holidayEditHeading h2{margin:0 0 4px}.holidayEditHeading p{margin:0;color:#756a63;font-size:15px}.holidayEditModal label{display:grid;gap:7px;margin-top:14px;color:#302923;font-weight:800}.holidayEditModal label input{width:100%;box-sizing:border-box;margin:0!important;padding:12px 13px!important;font-size:16px}.holidayEditActions{display:grid;grid-template-columns:1fr 1.5fr;gap:10px;margin-top:24px}.holidayEditActions button{min-height:46px;border-radius:10px;font-size:16px;font-weight:800;cursor:pointer}.holidayEditActions .secondary{border:1px solid #d6cbc3;background:#fff;color:#655b55}.holidayEditActions .primary{border:1px solid #9b5c49;background:#9b5c49;color:#fff}.holidayEditActions button:disabled{opacity:.55;cursor:wait}
+@media(max-width:600px){.rule{align-items:flex-start}.holidayRowActions{flex-direction:column;align-items:stretch}.rule .holidayEditButton,.rule .holidayCancelButton{width:100%}.holidayEditActions{grid-template-columns:1fr}}
