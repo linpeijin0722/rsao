@@ -654,7 +654,7 @@ export default function Page() {
                   </div>
                   {availableDates.size === 0 && (
                     <div className="videoSlotsEmpty" role="status">
-                      目前所有可預約時段皆已額滿，請稍後再查看。
+                      目前所有可預約時段皆已額滿。
                     </div>
                   )}
                   {date && (

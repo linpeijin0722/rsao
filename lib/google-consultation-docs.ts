@@ -47,65 +47,31 @@ async function google(url: string, token: string, init: RequestInit = {}) {
   return result;
 }
 
-async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: string) {
-  const token = await accessToken();
-  let document = await google(
-    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,
-    token,
-  );
-  let bodyContent = document.body?.content || [];
+function siteBaseUrl() {
+  const explicit = (process.env.NEXT_PUBLIC_SITE_URL || "").trim().replace(/\/$/, "");
+  if (explicit) return explicit;
+  const vercelHost = (process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL || "").trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
+  return vercelHost ? `https://${vercelHost}` : "";
+}
 
-  // 空白頁清理必須獨立送出。若把刪除分頁與後續格式更新放在同一個 batch，
-  // 前面的 deleteContentRange 會改變 index，導致後面的格式 request 使用舊 index 而整批失敗。
-  // 這也是先前「看似有清理程式、實際空白頁仍存在」的主要風險。
-  const cleanupRequests: any[] = [];
-  const documentEndIndex = bodyContent.reduce((max:number, block:any) => Math.max(max, Number(block?.endIndex || 0)), 0);
-  // Google Docs 的「看起來是空白頁」常不是 pageBreak，而是結果區預留的 NBSP 空段落
-  // 被擠到下一頁。舊版刻意保護 NBSP，因此永遠無法清掉這種尾端空白頁。
-  // 新規則：只從文件最尾端往前清除純空白/NBSP/pageBreak 段落；一碰到真正可見內容就停止。
-  // 這樣內文中的老師輸入空間仍保留，但最後一頁若只有空白佔位就會被收掉。
-  for (let i = bodyContent.length - 1; i >= 0; i -= 1) {
-    const block = bodyContent[i];
-    if (block.sectionBreak) continue;
-    if (block.table || block.tableOfContents) break;
-    const elements = block.paragraph?.elements || [];
-    const rawText = elements.map((element:any) => element.textRun?.content || "").join("");
-    const visibleText = rawText.replace(/[\s\u00a0]/g, "");
-    const hasInlineContent = elements.some((element:any) => element.inlineObjectElement || element.horizontalRule);
-    if (visibleText || hasInlineContent) break;
+function collectSegmentIds(sourceDocument: any, kind: "Header" | "Footer") {
+  const sectionStyles = (sourceDocument.body?.content || [])
+    .map((block: any) => block.sectionBreak?.sectionStyle)
+    .filter(Boolean);
+  const ids = Array.from(new Set(
+    sectionStyles.flatMap((style: any) => [
+      style[`default${kind}Id`],
+      style[`firstPage${kind}Id`],
+      style[`evenPage${kind}Id`],
+    ]).filter(Boolean),
+  )) as string[];
+  const segments = kind === "Header" ? sourceDocument.headers : sourceDocument.footers;
+  return Array.from(new Set([...ids, ...Object.keys(segments || {})]));
+}
 
-    if (block.paragraph?.paragraphStyle?.pageBreakBefore && block.startIndex != null && block.endIndex != null) {
-      cleanupRequests.push({
-        updateParagraphStyle: {
-          range: { startIndex: Number(block.startIndex), endIndex: Math.max(Number(block.startIndex) + 1, Number(block.endIndex) - 1) },
-          paragraphStyle: { pageBreakBefore: false },
-          fields: "pageBreakBefore",
-        },
-      });
-    }
-
-    // 純空白段落（含 NBSP）直接收掉，但保留文件最後必須存在的 terminal newline。
-    if (block.paragraph && block.startIndex != null && block.endIndex != null) {
-      const safeStart = Number(block.startIndex);
-      const safeEnd = Math.min(Number(block.endIndex), Math.max(safeStart, documentEndIndex - 1));
-      if (safeEnd > safeStart) cleanupRequests.push({ deleteContentRange: { range: { startIndex: safeStart, endIndex: safeEnd } } });
-    }
-  }
-  if (cleanupRequests.length) {
-    // 先處理 paragraph style，再從文件尾端往前刪 page break，避免 index 位移互相影響。
-    const styles = cleanupRequests.filter((request) => request.updateParagraphStyle);
-    const deletes = cleanupRequests.filter((request) => request.deleteContentRange)
-      .sort((a, b) => b.deleteContentRange.range.startIndex - a.deleteContentRange.range.startIndex);
-    await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
-      method: "POST",
-      body: JSON.stringify({ requests: [...styles, ...deletes] }),
-    });
-    document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
-    bodyContent = document.body?.content || [];
-  }
-
-  const requests: any[] = [];
-  requests.push({
+async function formatDocumentAfterCreation(documentId: string, bookingNo: string, token: string) {
+  let document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const requests: any[] = [{
     updateDocumentStyle: {
       documentStyle: {
         marginHeader: { magnitude: 14.1732, unit: "PT" },
@@ -113,37 +79,22 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
       },
       fields: "marginHeader,marginFooter",
     },
-  });
-  // Google Docs 的頁首頁尾 ID 位於各 sectionBreak.sectionStyle，並不在 documentStyle。
-  // 舊版讀錯位置，導致一直找不到模板既有的頁首／頁尾，格式更新也因此沒有生效。
-  const collectSegmentIds = (sourceDocument: any, kind: "Header" | "Footer") => {
-    const sectionStyles = (sourceDocument.body?.content || [])
-      .map((block: any) => block.sectionBreak?.sectionStyle)
-      .filter(Boolean);
-    const ids = Array.from(new Set(
-      sectionStyles.flatMap((style: any) => [
-        style[`default${kind}Id`],
-        style[`firstPage${kind}Id`],
-        style[`evenPage${kind}Id`],
-      ]).filter(Boolean),
-    )) as string[];
-    const segments = kind === "Header" ? sourceDocument.headers : sourceDocument.footers;
-    return Array.from(new Set([...ids, ...Object.keys(segments || {})]));
-  };
+  }];
+
   const headerIds = collectSegmentIds(document, "Header");
   const footerIds = collectSegmentIds(document, "Footer");
-  // 保留模板原本的頁首區段，清空內容後直接寫入訂單編號，避免刪除後重新建立時
-  // Google API 偶爾未回傳 headerId。頁尾則整段刪除，不保留任何內容。
   for (const footerId of footerIds) requests.push({ deleteFooter: { footerId } });
+
   const existingHeaderId = headerIds[0];
   if (existingHeaderId) {
     const headerContent = document.headers?.[existingHeaderId]?.content || [];
     const headerEnd = Math.max(1, ...headerContent.map((block: any) => Number(block.endIndex || 1)));
-    if (headerEnd > 1) requests.push({ deleteContentRange: { range: { segmentId: existingHeaderId, startIndex: 0, endIndex: headerEnd - 1 } } });
+    if (headerEnd > 1) requests.push({
+      deleteContentRange: { range: { segmentId: existingHeaderId, startIndex: 0, endIndex: headerEnd - 1 } },
+    });
   }
 
-  // 「整體運勢」最下方的備註是固定說明，不是老師輸入區。
-  // Apps Script 會先套用共用樣式，這裡再精準覆蓋成黑色 10pt。
+  // Apps Script 建立完整內文後，才做最後的固定格式覆蓋。
   const bodyRuns: Array<{ text: string; start: number; end: number }> = [];
   for (const block of document.body?.content || []) {
     for (const element of block.paragraph?.elements || []) {
@@ -163,8 +114,7 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
     }
     return bodyRuns.at(-1)?.end || 1;
   };
-  // 視訊諮詢單最上方兩行是老師辨識預約的重點資訊，固定套用指定紅色。
-  // 這裡直接透過 Docs API 覆蓋，避免 Apps Script 的一般標題樣式把它改成咖啡色。
+
   const videoHeader = flatBody.match(/\d{4}\/\d{1,2}\/\d{1,2}\([一二三四五六日]\)(?:上午|中午|下午)\d{2}:\d{2}\nLINE名稱：[^\n]+｜視訊時間：\d+分鐘/);
   if (videoHeader) {
     const videoHeaderOffset = flatBody.indexOf(videoHeader[0]);
@@ -180,6 +130,7 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
       },
     });
   }
+
   const noteText = "備註：\n1.以上均為虛歲\n2.如果沒有特別提到的年紀，代表身體狀況大致平順，不需要特別擔心，只要維持日常保養即可。\n3.運勢中的歲數，僅代表在那個年齡段需要特別留意的事項（非今生會活到幾歲喔） 若遇到劫難的時候就要比較小心，通過自己的努力衝過難關，多做福德佈施，化解災劫也能夠延續生命。";
   let noteOffset = flatBody.indexOf(noteText);
   while (noteOffset >= 0) {
@@ -196,57 +147,203 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
     });
     noteOffset = flatBody.indexOf(noteText, noteOffset + noteText.length);
   }
-  await google(
-    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,
-    token,
-    { method: "POST", body: JSON.stringify({ requests }) },
-  );
-  let createdHeaderId = existingHeaderId;
-  if (!createdHeaderId) {
-    const createHeaderResult = await google(
-      `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,
-      token,
-      { method: "POST", body: JSON.stringify({ requests: [{ createHeader: { type: "DEFAULT" } }] }) },
-    );
-    createdHeaderId = createHeaderResult.replies?.[0]?.createHeader?.headerId;
-    if (!createdHeaderId) {
-      const refreshedDocument = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
-      createdHeaderId = collectSegmentIds(refreshedDocument, "Header")[0];
+
+  if (requests.length) {
+    await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+      method: "POST",
+      body: JSON.stringify({ requests }),
+    });
+  }
+
+  // 頁首只保留訂單編號。『回傳諮詢結果』改放正文第一行，確保開啟文件一定看得到。
+  document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  let headerId = collectSegmentIds(document, "Header")[0];
+  if (!headerId) {
+    const createHeaderResult = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+      method: "POST",
+      body: JSON.stringify({ requests: [{ createHeader: { type: "DEFAULT" } }] }),
+    });
+    headerId = createHeaderResult.replies?.[0]?.createHeader?.headerId;
+    if (!headerId) {
+      document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+      headerId = collectSegmentIds(document, "Header")[0];
     }
   }
-  if (!createdHeaderId) throw new Error("Google 文件頁首建立失敗");
-  const returnBase = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
-  const returnLabel = "【 回傳諮詢結果 】";
-  const headerText = `訂單編號：${bookingNo}\n${returnLabel}`;
-  const returnStart = headerText.indexOf(returnLabel);
-  const returnUrl = returnBase ? `${returnBase}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}` : "";
-  const headerRequests: any[] = [
-    { insertText: { location: { segmentId: createdHeaderId, index: 0 }, text: headerText } },
-    {
-      updateParagraphStyle: {
-        range: { segmentId: createdHeaderId, startIndex: 0, endIndex: headerText.length },
-        paragraphStyle: { spaceAbove: { magnitude: 0, unit: "PT" }, spaceBelow: { magnitude: 0, unit: "PT" }, lineSpacing: 100 },
-        fields: "spaceAbove,spaceBelow,lineSpacing",
+  if (!headerId) throw new Error("Google 文件頁首建立失敗");
+  const headerText = `訂單編號：${bookingNo}`;
+  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+    method: "POST",
+    body: JSON.stringify({ requests: [
+      { insertText: { location: { segmentId: headerId, index: 0 }, text: headerText } },
+      {
+        updateParagraphStyle: {
+          range: { segmentId: headerId, startIndex: 0, endIndex: headerText.length },
+          paragraphStyle: { spaceAbove: { magnitude: 0, unit: "PT" }, spaceBelow: { magnitude: 0, unit: "PT" }, lineSpacing: 100 },
+          fields: "spaceAbove,spaceBelow,lineSpacing",
+        },
       },
-    },
-  ];
-  if (returnUrl) headerRequests.push({
-    updateTextStyle: {
-      range: { segmentId: createdHeaderId, startIndex: returnStart, endIndex: returnStart + returnLabel.length },
-      textStyle: {
-        bold: true,
-        foregroundColor: { color: { rgbColor: { red: 1, green: 1, blue: 1 } } },
-        backgroundColor: { color: { rgbColor: { red: 0.086, green: 0.541, blue: 0.329 } } },
-        link: { url: returnUrl },
-      },
-      fields: "bold,foregroundColor,backgroundColor,link",
-    },
+    ] }),
   });
-  await google(
-    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,
-    token,
-    { method: "POST", body: JSON.stringify({ requests: headerRequests }) },
-  );
+}
+
+async function insertReturnResultButton(documentId: string, bookingNo: string, token: string) {
+  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const currentBody = documentPlainText(document);
+  const label = "回傳諮詢結果";
+  const base = siteBaseUrl();
+  if (!base) throw new Error("尚未設定 NEXT_PUBLIC_SITE_URL，無法建立『回傳諮詢結果』連結");
+  const returnUrl = `${base}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}`;
+
+  // normalize 可能因重試而再次執行；已存在就只確認它仍有連結，不重複插入。
+  if (currentBody.startsWith(label)) return;
+
+  const buttonText = `${label}\n\n`;
+  const labelEnd = 1 + label.length;
+  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+    method: "POST",
+    body: JSON.stringify({ requests: [
+      { insertText: { location: { index: 1 }, text: buttonText } },
+      {
+        updateTextStyle: {
+          range: { startIndex: 1, endIndex: labelEnd },
+          textStyle: {
+            bold: true,
+            fontSize: { magnitude: 14, unit: "PT" },
+            foregroundColor: { color: { rgbColor: { red: 1, green: 1, blue: 1 } } },
+            backgroundColor: { color: { rgbColor: { red: 0.024, green: 0.596, blue: 0.302 } } },
+            link: { url: returnUrl },
+          },
+          fields: "bold,fontSize,foregroundColor,backgroundColor,link",
+        },
+      },
+      {
+        updateParagraphStyle: {
+          range: { startIndex: 1, endIndex: labelEnd + 1 },
+          paragraphStyle: {
+            spaceAbove: { magnitude: 4, unit: "PT" },
+            spaceBelow: { magnitude: 8, unit: "PT" },
+            lineSpacing: 100,
+          },
+          fields: "spaceAbove,spaceBelow,lineSpacing",
+        },
+      },
+    ] }),
+  });
+
+  // 寫入後重新讀取，確定第一行真的存在，避免再出現 API 成功但文件沒有按鈕的假象。
+  const verified = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  if (!documentPlainText(verified).startsWith(label)) throw new Error("『回傳諮詢結果』按鈕插入後驗證失敗");
+}
+
+function lastVisibleBodyIndex(document: any) {
+  let lastVisibleEnd = 1;
+  for (const block of document.body?.content || []) {
+    // 表格、圖片等即使沒有 textRun 也視為真正內容。
+    if (block.table || block.tableOfContents) {
+      lastVisibleEnd = Math.max(lastVisibleEnd, Number(block.endIndex || lastVisibleEnd));
+      continue;
+    }
+    const paragraph = block.paragraph;
+    if (!paragraph) continue;
+    for (const element of paragraph.elements || []) {
+      if (element.inlineObjectElement || element.horizontalRule) {
+        lastVisibleEnd = Math.max(lastVisibleEnd, Number(element.endIndex || block.endIndex || lastVisibleEnd));
+        continue;
+      }
+      const run = element.textRun;
+      if (!run?.content || !Number.isFinite(element.startIndex)) continue;
+      const content = String(run.content);
+      for (let offset = content.length - 1; offset >= 0; offset -= 1) {
+        // NBSP 也視為空白。只保留最後一個真正可見字元。
+        if (!/[\s\u00a0]/u.test(content[offset])) {
+          lastVisibleEnd = Math.max(lastVisibleEnd, Number(element.startIndex) + offset + 1);
+          break;
+        }
+      }
+    }
+  }
+  return lastVisibleEnd;
+}
+
+async function cleanupFinalBlankPage(documentId: string, token: string) {
+  // 這是整份文件的「最後一個階段」。前面所有內容、格式、回傳連結都完成後才允許執行。
+  // 反覆重新讀文件，避免任何 request 使用舊 index。
+  for (let pass = 0; pass < 3; pass += 1) {
+    const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+    const body = document.body?.content || [];
+    const documentEnd = body.reduce((max: number, block: any) => Math.max(max, Number(block.endIndex || 0)), 1);
+    const lastVisibleEnd = lastVisibleBodyIndex(document);
+    const requests: any[] = [];
+
+    // 先取消尾端空白段落造成的強制換頁。
+    for (const block of body) {
+      if (!block.paragraph || block.startIndex == null || block.endIndex == null) continue;
+      if (Number(block.endIndex) <= lastVisibleEnd) continue;
+      if (block.paragraph?.paragraphStyle?.pageBreakBefore) {
+        requests.push({
+          updateParagraphStyle: {
+            range: { startIndex: Number(block.startIndex), endIndex: Math.max(Number(block.startIndex) + 1, Number(block.endIndex) - 1) },
+            paragraphStyle: { pageBreakBefore: false },
+            fields: "pageBreakBefore",
+          },
+        });
+      }
+    }
+
+    if (requests.length) {
+      await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+        method: "POST",
+        body: JSON.stringify({ requests }),
+      });
+      continue;
+    }
+
+    // Google 文件必須保留最後 terminal newline，因此最多刪到 documentEnd - 1。
+    // 一次把最後可見字元之後的 NBSP / 多餘換行 / pageBreak / 空 section 清乾淨。
+    const deleteEnd = Math.max(lastVisibleEnd, documentEnd - 1);
+    if (deleteEnd > lastVisibleEnd) {
+      try {
+        await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+          method: "POST",
+          body: JSON.stringify({ requests: [{ deleteContentRange: { range: { startIndex: lastVisibleEnd, endIndex: deleteEnd } } }] }),
+        });
+        continue;
+      } catch (error) {
+        // 若 Google 因 section/table 邊界拒絕廣域刪除，改成從尾端逐段安全刪除。
+        const fallback: any[] = [];
+        for (let i = body.length - 1; i >= 0; i -= 1) {
+          const block = body[i];
+          if (!block.paragraph || block.startIndex == null || block.endIndex == null) continue;
+          if (Number(block.endIndex) <= lastVisibleEnd) break;
+          const start = Math.max(lastVisibleEnd, Number(block.startIndex));
+          const end = Math.min(Number(block.endIndex), documentEnd - 1);
+          if (end > start) fallback.push({ deleteContentRange: { range: { startIndex: start, endIndex: end } } });
+        }
+        if (!fallback.length) throw error;
+        await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+          method: "POST",
+          body: JSON.stringify({ requests: fallback }),
+        });
+        continue;
+      }
+    }
+    break;
+  }
+
+  // 最終驗證：清理後重新抓一次，確保最後仍有真正內容，且尾端沒有大量空白佔位。
+  const verified = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const plain = documentPlainText(verified);
+  if (!plain.replace(/[\s\u00a0]/g, "")) throw new Error("空白頁清理後文件內容異常，已停止後續流程");
+}
+
+async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: string) {
+  const token = await accessToken();
+
+  // 順序固定：①完整文件已由 Apps Script 建立 → ②格式／頁首頁尾 → ③正文第一行回傳按鈕
+  // → ④最後才重新讀取並清除尾端空白頁。空白頁清理之後不再對正文做任何插入或格式更新。
+  await formatDocumentAfterCreation(documentId, bookingNo, token);
+  await insertReturnResultButton(documentId, bookingNo, token);
+  await cleanupFinalBlankPage(documentId, token);
 }
 
 export async function wasDocumentEditedBy(documentId: string, editorEmail: string) {
