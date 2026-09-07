@@ -635,6 +635,7 @@ export default function Staff() {
   return (
     <main className={`staffPage returned-edit-${returnedEditMode}`}>
       <div className="staffPageHeading"><h1>預約工作後台</h1><div className="staffHeadingActions"><a className="lineAdminButton" href="https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/" target="_blank" rel="noreferrer">官方LINE後台</a><a className="videoCalendarButton" href={(()=>{const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(new Date());const year=parts.find((part)=>part.type==="year")?.value||String(new Date().getFullYear());const month=parts.find((part)=>part.type==="month")?.value||String(new Date().getMonth()+1);return `https://calendar.google.com/calendar/u/4/r/month/${year}/${Number(month)}/1`;})()} target="_blank" rel="noreferrer" aria-label="開啟本月視訊諮詢 Google 行事曆">視訊諮詢行事曆</a><button className="manualBookingEntry" onClick={()=>setManualOpen(true)}>＋ 手動建立預約</button></div></div>
+      {profileCopyToast&&<div className="profileCopyToast" role="status">✓ {profileCopyToast}</div>}
       {error && <div className="error">{error}</div>}
       <section className="staffBookingSection videoBookingSection">
         <h2 className="staffSectionTitle">視訊預約</h2>
@@ -773,7 +774,6 @@ export default function Staff() {
             </button>
             <h2>{userView.line_display_name}</h2>
             <p className="userProfileQuickTip"><b>點擊頭像</b>即可複製 LINE 名稱並另開官方 LINE 後台，進入後直接貼上搜尋。</p>
-            {profileCopyToast&&<div className="profileCopyToast" role="status">✓ {profileCopyToast}</div>}
             <div className="staffCustomerProfile">
               <div><span>姓名</span><b>{userView.full_name || "尚未填寫"}</b></div>
               <div><span>性別</span><b>{userView.gender || "尚未填寫"}</b></div>
@@ -801,7 +801,7 @@ export default function Staff() {
             {dataViewMode==="menu"&&<div className="returnedActionMenu"><button className="refillDataButton" disabled={resendingData} onClick={()=>void remind(dataBooking.booking_no,dataBooking.customers,true)}>{resendingData?"通知傳送中…":"📨 傳送重新填寫通知給用戶"}</button><button disabled={!dataView.length} onClick={()=>setDataViewMode("user")}>修改用戶資料</button><button disabled={!dataView.some((p:any)=>Boolean(p.answerId))} onClick={()=>setDataViewMode("answers")}>修改問事資料</button>{!dataView.length&&<p className="staffEmptyReturnedAnswers">此訂單標示為已回傳，但資料庫內找不到可編輯的諮詢者資料。請重新整理；若仍出現此訊息，代表該筆舊資料未正確寫入。</p>}</div>}
             {dataViewMode!=="menu"&&<button className="returnedMenuBack" onClick={()=>setDataViewMode("menu")}>‹ 返回功能選單</button>}
             {dataViewMode==="user"&&<div className="staffProfileTags">{uniquePeople(dataView).map((p:any)=>{const category=p.relationship==="本人"&&!p.relationship_detail?"本人":p.profile_type==="person"?"親友":p.profile_type==="pet"?"往生寵物":"過世親友";return <button key={p.id} className="staffProfileTag" onClick={()=>setProfileEditor({...p})}>{p.profile_type==="pet"&&p.photo_data&&<img src={p.photo_data} alt=""/>}<span><b>{p.name}</b><small>{category}{p.relationship_detail?`・${p.relationship_detail}`:""}</small></span></button>})}</div>}
-            {dataViewMode==="answers"&&!selectedSubmission&&<div className="submissionVersionList">{asArray(dataBooking.data_submissions).map((submission:any,index:number)=><button key={submission.id} onClick={()=>setSelectedSubmission(submission)}><b>第 {asArray(dataBooking.data_submissions).length-index} 次填寫</b><small>{submissionTime(submission.submitted_at)}</small></button>)}</div>}
+            {dataViewMode==="answers"&&!selectedSubmission&&<><p className="submissionVersionHint">請選擇要查看或修改的填寫版本</p><div className="submissionVersionList">{asArray(dataBooking.data_submissions).map((submission:any,index:number)=><button key={submission.id} onClick={()=>setSelectedSubmission(submission)}><span className="submissionVersionBadge">{asArray(dataBooking.data_submissions).length-index}</span><span><b>第 {asArray(dataBooking.data_submissions).length-index} 次填寫</b><small>{submissionTime(submission.submitted_at)}</small></span><span className="submissionVersionArrow">›</span></button>)}</div></>}
             {dataViewMode==="answers"&&selectedSubmission&&<><button className="returnedMenuBack" onClick={()=>setSelectedSubmission(null)}>‹ 返回填寫版本</button><div className="staffAnswerCards">{asArray(selectedSubmission.payload?.answers).map((answer:any)=>{const detail=asArray(dataBooking.booking_details).find((entry:any)=>entry.id===answer.booking_detail_id)||{};const profiles=asArray(selectedSubmission.payload?.profiles);const profileIds=[answer.profile_id,...asArray(answer.booking_answer_participants).sort((a:any,b:any)=>(a.position||0)-(b.position||0)).map((entry:any)=>entry.profile_id)].filter((id:string,index:number,all:string[])=>id&&all.indexOf(id)===index);const people=profileIds.map((id:string)=>profiles.find((profile:any)=>profile.id===id)).filter(Boolean);return <article key={answer.id}><div className="answerProfileTags">{people.map((person:any)=><div className="answerProfileTag" key={person.id}><span><b>{person.name}</b><small>{person.relationship_detail||person.relationship}</small></span></div>)}</div><h3>{detail.item_title||"諮詢項目"}</h3>{asArray(answer.questions).map((question:string,index:number)=><p key={index}>問題 {index+1}：{question||"（未填寫）"}</p>)}<button className="editAnswerButton" onClick={()=>setAnswerEditor({...answer,answerId:answer.id,targetProfileId:answer.profile_id||profileIds[0],targetProfileIds:profileIds,submissionId:selectedSubmission.id,item_title:detail.item_title||"諮詢項目",item_code:detail.booking_items?.code||"",sub_items:asArray(detail.booking_detail_sub_items).map((sub:any)=>sub.sub_item_title),availableProfiles:profiles})}>修改這個版本的問事資料</button></article>})}</div></>}
             {dataViewMode==="view"&&<div className="staffAnswerCards">{dataView.filter((p:any,i:number,all:any[])=>all.findIndex(x=>x.answerId===p.answerId)===i).map((p:any)=><article key={p.answerId}><h3>{p.item_title}{p.sub_items?.length?`－${p.sub_items.join("、")}`:""}</h3>{p.questions?.filter(Boolean).map((q:string,n:number)=><p key={n}>問題 {n+1}：{q}</p>)}</article>)}</div>}
             <button onClick={() => {setDataView([]);setDataBooking(null)}}>關閉</button>
@@ -985,36 +985,33 @@ export default function Staff() {
               ×
             </button>
             <header className="staffEditHeader">
-              {editing.customers?.line_picture_url ? (
-                <img src={editing.customers.line_picture_url} alt="LINE頭像" />
-              ) : (
-                <div className="avatarFallback">LINE</div>
-              )}
-              <div>
-                <h2>{editing.customers?.line_display_name || "LINE 用戶"}</h2>
-                <p>{editing.booking_no}</p>
+              <div className="staffEditIdentity">
+                <button className="staffEditAvatarAction" type="button" title="複製 LINE 名稱並開啟官方 LINE 後台" aria-label="複製 LINE 名稱並開啟官方 LINE 後台" onClick={() => void openLineAdminFromProfile(editing.customers)}>
+                  {editing.customers?.line_picture_url ? (
+                    <img src={editing.customers.line_picture_url} alt="LINE頭像" />
+                  ) : (
+                    <span className="avatarFallback">LINE</span>
+                  )}
+                </button>
+                <div>
+                  <h2>{editing.customers?.line_display_name || "LINE 用戶"}</h2>
+                  <p>{editing.booking_no}</p>
+                </div>
+              </div>
+              <div className="bookingStatus staffEditHeaderStatus">
+                <b>{editing.payment_status === "paid" ? (editing.collection_source === "manual" ? "手動收款" : "已付款") : "未付款"}</b>
+                {editing.payment_status === "paid" && (
+                  <b>{isComplete(editing) ? "諮詢者資料已填" : "諮詢者資料未填"}</b>
+                )}
               </div>
             </header>
-            <div className="bookingStatus">
-              <b>{editing.payment_status === "paid" ? (editing.collection_source === "manual" ? "手動收款" : "已付款") : "未付款"}</b>
-              {editing.payment_status === "paid" && (
-                <b>
-                  {isComplete(editing)
-                    ? "諮詢者資料已填"
-                    : "諮詢者資料未填"}
-                </b>
-              )}
-            </div>
             {editing.payment_status !== "paid" && <button className="manualPaidButton" onClick={() => markPaid(editing.booking_no)}>設為已付款（手動收款）</button>}
             {editing.consultation_methods?.code === "video" && (
-              <label className="editTime">
-                預約時間
-                <input
-                  type="datetime-local"
-                  value={editTime}
-                  onChange={(e) => setEditTime(e.target.value)}
-                />
-              </label>
+              <div className="editTime staffEditTimeRow">
+                <strong>預約時間</strong>
+                <label><span>日期</span><input type="date" value={editTime.slice(0,10)} onChange={(e) => setEditTime(`${e.target.value}T${editTime.slice(11,16) || "12:00"}`)} /></label>
+                <label><span>時間</span><input type="time" step="1800" value={editTime.slice(11,16)} onChange={(e) => setEditTime(`${editTime.slice(0,10)}T${e.target.value}`)} /></label>
+              </div>
             )}
             <div className="staffEditSectionHeading"><div><span>預約內容</span><h3>修改諮詢項目與數量</h3></div><small>左側調整目前項目，右側可快速新增其他諮詢。</small></div>
             <div className="staffEditColumns">
