@@ -1,0 +1,404 @@
+/* 視訊預約沿用文字預約的白底邏輯，只把咖啡色系替換為綠色系。 */
+body .videoBookingSection .staffSectionTitle,body .videoBookingSection .staffTableHead{background:#20423d!important;color:#fff!important}
+body .videoBookingSection .textBookingTools,body .videoBookingSection .staffPrimaryFilters,body .videoBookingSection .staffSecondaryFilters,body .videoBookingSection .videoBookingTools,body .videoBookingSection .dailyBookings,body .videoBookingSection .staffDateRange,body .videoBookingSection .staffDisplayOptions{background:#fff!important;border-color:#a6bbb8!important}
+body .videoBookingSection .staffPrimaryFilters input,body .videoBookingSection .staffPrimaryFilters select,body .videoBookingSection .staffSecondaryFilters input,body .videoBookingSection .staffSecondaryFilters select{background:#fff!important;border-color:#a6bbb8!important;color:inherit!important}
+body .videoBookingSection .staffPrimaryFilters>label,body .videoBookingSection .staffSecondaryFilters>label,body .videoBookingSection .staffDateRange,body .videoBookingSection .staffDisplayOptions{color:inherit!important}
+body .videoBookingSection .staffSearchIcon,body .videoBookingSection .staffMonthNav,body .videoBookingSection .staffMonthNav button{color:#20423d!important}
+body .videoBookingSection .videoViewToolbar button{background:#fff!important;border-color:#a6bbb8!important;color:#20423d!important}
+body .videoBookingSection .videoViewToolbar button.active{background:#20423d!important;color:#fff!important}
+body .videoBookingSection .staffDays button.booked{background:#ebfbf9!important;border-color:#a6bbb8!important;color:#20423d!important}
+body .videoBookingSection .staffDays button.selected{background:#20423d!important;color:#fff!important;outline-color:#a6bbb8!important}
+body .videoBookingSection .staffDays button.booked.pastBooked,body .videoBookingSection .staffDays button.booked.pastBooked.selected{background:#66615e!important;border-color:#66615e!important;color:#fff!important;outline-color:#3f3b39!important}
+body .videoBookingSection .staffTableRow{background:#fff!important;border-color:#a6bbb8!important}
+body .videoBookingSection .staffState.paid{color:#168a54!important}
+body .videoBookingSection .staffState.pending,body .videoBookingSection .staffState.cancelled,body .videoBookingSection .staffState.expired{color:#b5233d!important}
+body .videoBookingSection .returned{color:#168a54!important}
+body .videoBookingSection .missing{color:#b5233d!important}
+
+.staffLogin,
+.staffPage {
+  max-width: 1560px;
+  width: min(98vw, 1560px);
+  margin: auto;
+  padding: 28px;
+}
+.staffLogin {
+  display: grid;
+  gap: 12px;
+  max-width: 380px;
+}
+.staffLogin input,
+.staffLogin button {
+  padding: 13px;
+}
+.staffPage section {
+  background: #fff;
+  border-radius: 15px;
+  padding: 22px;
+  margin: 16px 0;
+}
+.staffMonthNav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 25px;
+  margin: 15px;
+}
+.staffMonthNav button {
+  border: 0;
+  background: #fff;
+  font-size: 27px;
+}
+.staffMonthNav b{font-size:21px;line-height:1.3}.staffCalendar{max-width:690px}.staffWeek b{font-size:18px;line-height:1.5}.staffDays button{font-size:16px}
+.staffCalendar {
+  max-width: 650px;
+  margin: auto;
+}
+.staffWeek,
+.staffDays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 7px;
+}
+.staffWeek b {
+  text-align: center;
+}
+.staffDays button,
+.staffDays span {
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 10px;
+}
+.staffDays .booked {
+  background: #43a36d;
+  color: #fff;
+  font-weight: 700;
+}
+.staffDays .empty {
+  background: #e3e1df;
+  color: #aaa;
+}
+.staffDays .selected {
+  outline: 3px solid #82384b;
+}
+.staffDays .pastBooked{background:#66615e;color:#fff}
+.videoViewToolbar{width:min(650px,calc(100% - 40px));box-sizing:border-box;margin:15px auto 5px;display:flex;justify-content:center}.videoViewToolbar button{min-width:230px;padding:11px 20px;border:1px solid #315e57;border-radius:999px;background:#f3f8f7;color:#315e57;font-size:16px;font-weight:800;white-space:nowrap;cursor:pointer;box-shadow:0 2px 7px rgba(49,94,87,.12)}.videoViewToolbar button:hover,.videoViewToolbar button.active{background:#315e57;color:#fff}.dailyBookings>h3{font-size:20px!important;font-weight:900!important;color:#263e39;margin-top:12px!important}
+.dailyBookings .pastVideoRow{background:#e4e1de!important;border-color:#c8c2bd!important}
+.dailyBookings {
+  max-width: 650px;
+  margin: 20px auto;
+}
+.dailyBookings > button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr;
+  gap: 10px;
+  text-align: left;
+  padding: 14px;
+  margin: 7px 0;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  background: #fff;
+}
+.staffTable {
+  display: grid;
+  gap: 9px;
+}
+.staffTable article {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr 1fr auto;
+  gap: 9px;
+  align-items: center;
+  padding: 13px;
+  border: 1px solid #ddd;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.staffTable button,
+.remindButton {
+  background: #8a3045;
+  color: #fff;
+  border: 0;
+  padding: 9px;
+  border-radius: 7px;
+}
+.staffEditModal {
+  max-height: 92vh;
+  overflow: auto;
+  width: min(94vw, 680px);
+}
+.staffEditModal header {
+  display: flex;
+  height: auto;
+  gap: 13px;
+  padding: 0 0 15px;
+  background: #fff;
+}
+.staffEditModal header img,
+.avatarFallback {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.avatarFallback {
+  display: grid;
+  place-items: center;
+  background: #ddd;
+}
+.staffEditModal header h2,
+.staffEditModal header p {
+  margin: 0;
+}
+.bookingStatus {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+.bookingStatus b {
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #eee;
+}
+.editTime {
+  display: grid;
+  gap: 5px;
+  margin: 14px 0;
+}
+.editTime input {
+  padding: 11px;
+}
+.staffEditItems {
+  display: grid;
+  gap: 8px;
+}
+.staffEditItems article {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+}
+.staffEditItems article > div:first-child {
+  display: grid;
+  gap: 5px;
+  flex: 1;
+}
+.staffEditItems small {
+  color: #777;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.staffEditItems select {
+  padding: 9px;
+}
+.staffQty {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.staffQty button {
+  width: 35px;
+  height: 35px;
+  border: 1px solid #ddd;
+  border-radius: 50%;
+  background: #fff;
+  color: #8a3045;
+}
+.staffEditModal > button {
+  margin-top: 10px;
+}
+@media (max-width: 700px) {
+  .staffTable article {
+    grid-template-columns: 1fr;
+  }
+  .dailyBookings > button {
+    grid-template-columns: 60px 1fr;
+  }
+  .staffPage {
+    padding: 15px;
+  }
+}
+.rememberStaff{display:flex!important;align-items:center;gap:7px;margin-top:12px;font-size:14px}.rememberStaff input{width:auto!important;margin:0!important}.staffTableHead b{font-size:19px!important}.staffTableRow>*:not(:first-child){font-size:16px!important}
+.staffExactAnswerFields{gap:16px!important}.staffAnswerTargetGroup,.staffAnswerSection{display:grid;gap:11px;width:100%;padding:14px;border:1px solid #e2d8cf;border-radius:12px;background:#fbf8f4}.staffAnswerTargetGroup>b,.staffAnswerSection h4{margin:0;font-size:17px}.staffNestedFields{display:grid;gap:10px;padding:12px;border-radius:10px;background:#f5efe8}.staffAnswerEditor{width:min(720px,96vw)!important}.staffAnswerEditor .staffAnswerItem{padding-right:42px}.staffAnswerEditor .returnedEditActions{position:sticky;bottom:-24px;padding-top:14px;background:#fff}
+.staffEditModal,.staffEditModal input,.staffEditModal select,.staffEditModal button{font-size:17px!important}.staffEditModal h2{font-size:25px!important}.staffEditItems b{font-size:18px!important}.staffEditItems small{font-size:15px!important}.staffQty span{font-size:18px!important;font-weight:700}.staffFrontFields input,.staffFrontFields select,.staffFrontFields textarea,.staffAnswerSection textarea{font-weight:400!important}.staffFrontFields label,.staffAnswerSection h4,.staffAnswerTargetGroup>b{font-weight:800!important}.returnedEditActions button{font-size:17px!important;font-weight:800!important;padding:12px 18px!important}
+.staffAnswerSection textarea,.staffNestedFields input,.staffNestedFields select,.staffNestedFields textarea{font-size:16px!important;font-weight:400!important;line-height:1.55}.staffAnswerSection h4,.staffAnswerTargetGroup>b{font-size:17px!important}.staffFrontFields input,.staffFrontFields select,.staffFrontFields textarea{font-size:16px!important;font-weight:400!important}
+.textBookingSection .staffState,.textBookingSection .returned,.textBookingSection .missing{white-space:nowrap;min-width:104px}.textBookingSection .staffTableHead,.textBookingSection .staffTableRow{width:100%}
+.staffCatalogItems h3,.staffSubPicker h2{font-size:24px!important}.staffCatalogItems article>b{font-size:19px!important}.staffSubPicker>p{font-size:17px!important}.staffSubOptions button b{font-size:18px!important}.staffSubOptions button span{font-size:16px!important}.consultationSheetLinks{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:nowrap}.consultationSheetLink{display:grid;place-items:center;width:34px;height:34px;min-width:34px;padding:0;border:1px solid #dccdc3;border-radius:8px;background:#f4ece5;text-decoration:none;font-size:18px;line-height:1;cursor:pointer}.documentGenerateButton{color:#8a3045}.documentGenerateButton:disabled{cursor:wait;opacity:.55}.sheetPending{text-align:center;color:#999}
+.textBookingSection .staffBookingTable{overflow-x:visible}.textBookingSection .staffTableHead,.textBookingSection .staffTableRow{grid-template-columns:minmax(145px,.85fr) minmax(205px,1.15fr) minmax(150px,.85fr) minmax(112px,.7fr) minmax(235px,1.35fr) 76px minmax(150px,.8fr);min-width:0;width:100%;box-sizing:border-box}.textBookingSection .staffTableRow>*{min-width:0}.textBookingSection .staffTableRow small{overflow-wrap:anywhere}
+@media(max-width:1050px){.textBookingSection .staffBookingTable{overflow-x:auto}.textBookingSection .staffTableHead,.textBookingSection .staffTableRow{min-width:980px}}
+.documentLinkModal{width:min(520px,calc(100vw - 32px));padding:28px}.documentLinkModal h2{margin:0 44px 10px 0}.documentLinkModal p{line-height:1.6;color:#645b55}.documentLinkModal label{display:grid;gap:8px;margin-top:18px;font-weight:700}.documentLinkModal input{width:100%;box-sizing:border-box;padding:12px;border:1px solid #bdb3aa;border-radius:8px;font-size:16px;font-weight:400}.openGoogleDrive{display:inline-flex;padding:10px 14px;border-radius:8px;background:#f2eee8;color:#704a38;font-weight:700;text-decoration:none}.documentLinkActions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}.documentLinkActions button{min-height:44px;border:0;border-radius:8px;background:#8a3045;color:#fff;font-size:16px;font-weight:700}.documentLinkActions .cancel{background:#dedad6;color:#4c4540}.documentRelinkButton{filter:none}
+.openGoogleDrive strong{margin:0 2px;font-weight:900}.staffFilters label{font-size:17px!important;font-weight:800!important;gap:7px}.staffFilters select{min-height:42px;padding:8px 34px 8px 11px;font-size:17px!important}.staffTableHead>*{text-align:center!important;justify-self:stretch}.staffTableHead b{display:flex;align-items:center;justify-content:center;text-align:center}.staffTableRow>span:first-child{font-size:17px!important;line-height:1.45}
+.textBookingTools{margin:0 20px 18px;display:flex;align-items:flex-end;gap:10px;border:0;background:transparent;overflow:visible}.staffPrimaryFilters,.staffSecondaryFilters{display:contents!important}.staffPrimaryFilters>label{display:grid;gap:5px;white-space:nowrap;font-size:15px}.staffPrimaryFilters select{background:#fff;min-width:108px}.staffSearchGroup{display:grid;grid-template-columns:28px 132px 126px 94px;align-items:end;gap:6px;min-width:0}.staffSearchIcon{display:grid;place-items:center;height:40px;font-size:24px;line-height:1;color:#744d3d}.staffSearchField{display:grid!important;gap:4px;min-width:0}.staffSearchField input{width:100%;min-width:0;height:40px;box-sizing:border-box;padding:7px 9px!important;border:1px solid #bba995!important;border-radius:10px!important;background:#fff!important;font-size:14px;font-weight:400}.staffDateRange,.staffDisplayOptions{display:flex;align-items:center;gap:6px;padding:7px 8px;border:1px solid #dfd2c6;border-radius:10px;background:#fff}.staffDateRange>b,.staffDisplayOptions>b{color:#5c4538;font-size:15px;white-space:nowrap}.staffDateRange label{display:flex;align-items:center;gap:4px}.staffDateRange input{box-sizing:border-box;width:112px;height:36px;padding:5px 7px;border:1px solid #c9b9ad;border-radius:8px;background:#fff;font-size:14px;font-weight:400}.staffDateRange button{padding:6px 5px;border:0;background:transparent;color:#8a3045;font-weight:700;cursor:pointer}.staffDisplayOptions label{display:flex!important;align-items:center;gap:5px!important;padding:6px 7px;border:1px solid #ddd0c6;border-radius:8px;background:#faf7f3;white-space:nowrap;cursor:pointer;font-size:14px}.staffDisplayOptions input{min-height:0;width:16px;height:16px;margin:0;padding:0}.staffState{display:flex!important;align-items:center;justify-content:center;gap:5px}.staffState>span{font:inherit;color:inherit}.staffOrderAmount{color:#191919!important;font-size:15px!important;font-weight:400!important;white-space:nowrap}.staffOrderCell{display:grid;align-content:center;gap:7px;min-width:0}.staffOrderCell>small{font-size:15px;line-height:1.35;white-space:nowrap;overflow-wrap:normal}.staffOrderItems{display:grid!important;grid-auto-flow:row;gap:4px;width:100%;padding-top:6px;border-top:1px dashed #d8cdc4;color:#554d48;font-size:14px;line-height:1.35}.staffOrderItems>div{display:block!important;width:100%;white-space:normal;overflow-wrap:anywhere}.consultationSheetLinks,.consultationDocumentLink,.consultationDocumentLink small{white-space:nowrap!important}.teacherOverwriteModal{max-width:520px}.teacherOverwriteModal>input{width:100%;box-sizing:border-box;margin:12px 0;padding:12px;border:1px solid #bba995;border-radius:9px;font-size:16px}.teacherOverwriteModal>button:disabled{opacity:.45;cursor:not-allowed}.lineContactButton{margin-top:8px}.lineContactModal textarea{width:100%;min-height:110px;box-sizing:border-box}.lineContactActions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.savedLineMessages{display:grid;gap:7px;margin:10px 0}.savedLineMessages button{background:#f2ece6;color:#46382f;text-align:left}
+@media(max-width:1450px){.textBookingTools{flex-wrap:wrap}.staffSearchGroup{flex:1;grid-template-columns:28px repeat(3,minmax(100px,1fr))}.staffDateRange,.staffDisplayOptions{flex-wrap:wrap}}@media(max-width:900px){.textBookingTools{display:grid}.staffPrimaryFilters,.staffSecondaryFilters{display:flex!important;flex-wrap:wrap;padding:0!important;background:transparent!important;border:0!important}.staffSearchGroup{width:100%;grid-template-columns:28px repeat(3,minmax(0,1fr))}.videoViewToolbar{align-items:stretch;flex-direction:column}.videoViewToolbar button{width:100%}}
+.rebuildDocumentModal{width:min(500px,calc(100vw - 32px));display:grid;gap:12px;padding:28px}.rebuildDocumentModal h2,.rebuildDocumentModal p{margin:0}.rebuildDocumentModal>button:not(.staffModalClose){display:grid!important;gap:5px;width:100%;padding:15px;border:1px solid #d8c8bd!important;border-radius:11px;background:#fff!important;color:#352d29!important;text-align:left;font-size:17px;opacity:1!important}.rebuildDocumentModal>button b{font-size:18px;color:#8a3045!important}.rebuildDocumentModal>button small{font-size:14px;color:#756b65!important}.rebuildDocumentModal>button.cancel{display:block!important;background:#e4dfda!important;color:#4c4540!important;text-align:center;font-weight:800}
+.staffSecondaryFilters{align-items:stretch!important;gap:16px!important;padding:16px!important}.staffDateRange,.staffDisplayOptions{padding:11px 13px!important;border:1px solid #ddd0c6!important;border-radius:12px!important;background:#faf7f3!important}.staffDateRange>b,.staffDisplayOptions>b{font-size:17px!important}.staffDateRange label,.staffDisplayOptions label{font-size:16px!important}.staffDateRange input{height:40px!important;border-radius:9px!important;font-size:16px!important}.staffDateRange button{padding:8px 10px!important;border:1px solid #dacbc0!important;border-radius:8px!important;background:#fff!important;font-size:15px!important;font-weight:800!important}.staffDisplayOptions label{padding:8px 11px!important;border-radius:9px!important;background:#fff!important}
+.staffTotalPrice{display:flex;align-items:center;gap:10px;margin:18px 0;padding:14px 16px;border:1px solid #dccbbb;border-radius:12px;background:#fffaf5}.staffTotalPrice strong{color:#b51f39;font-size:20px}.staffTotalPrice button{width:auto!important;margin:0!important;padding:7px 12px!important;background:#fff!important;color:#8a3045!important;border:1px solid #cdaeb6!important}.staffPriceModal{max-width:430px}.staffPriceModal label{display:block;font-weight:700;margin:18px 0}.staffPriceModal .priceInput{display:flex;align-items:center;margin-top:8px;border:1px solid #cdbfb3;border-radius:10px;overflow:hidden;background:#fff}.staffPriceModal .priceInput span{padding:0 12px;color:#6c625c}.staffPriceModal .priceInput input{border:0!important;margin:0!important;border-radius:0!important;font-size:20px!important}.consultationDocumentLink{display:inline-flex!important;align-items:center!important;gap:2px!important;width:auto!important;min-width:34px!important;padding:0 6px!important}.consultationDocumentLink small{font-size:13px;font-weight:700;color:#5b382b}.staffDisplayOptions{flex-wrap:wrap}.staffDisplayOptions label{white-space:nowrap}
+.staffHealthChecks{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:6px 0 14px}.staffHealthChecks label{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid #ddcfbf;border-radius:10px;background:#fff}.staffHealthChecks input{width:auto!important;margin:0}
+.submissionHistory{display:grid;gap:10px;margin:12px 0 20px}.submissionHistory h3{margin:0}.submissionHistory details{border:1px solid #ddcfbf;border-radius:10px;background:#faf7f3;overflow:hidden}.submissionHistory summary{padding:12px 14px;color:#8a3045;font-weight:800;cursor:pointer}.submissionHistory details>div{padding:2px 14px 12px}.submissionHistory article{padding:8px 0;border-top:1px solid #eadfd6}.submissionHistory p{margin:5px 0}
+.submissionVersionList{display:grid;gap:16px;margin:18px 0}.submissionVersionList>button{display:grid!important;gap:2px!important;width:100%!important;min-height:96px!important;margin:0!important;padding:10px 18px!important;border:0!important;border-radius:13px!important;background:#9b5c49!important;color:#fff!important;box-shadow:0 5px 13px rgba(91,51,39,.17)!important}.submissionVersionList>button b{font-size:35px!important;line-height:1.12}.submissionVersionList>button small{color:#eee!important;font-size:16px!important;font-weight:500!important}
+.textBookingTools{display:grid!important;grid-template-columns:minmax(0,1fr)!important;align-items:stretch!important}.staffPrimaryFilters{display:flex!important;align-items:flex-end;gap:10px;flex-wrap:wrap;width:100%}.staffSecondaryFilters{display:flex!important;align-items:center!important;justify-content:space-between;gap:12px!important;flex-wrap:wrap;width:100%;padding-top:10px!important}@media(max-width:900px){.staffPrimaryFilters,.staffSecondaryFilters{width:100%}.staffDateRange,.staffDisplayOptions{width:auto}}
+.staffPrimaryFilters .staffSearchGroup{margin-left:auto;grid-template-columns:28px 145px 168px 105px}
+.userInfoActions{display:grid;grid-template-columns:1fr;gap:10px;margin-top:18px}.userInfoActions button{position:static!important;width:100%!important;min-height:46px!important;margin:0!important;border-radius:10px!important;font-size:17px!important;font-weight:800!important}.userInfoActions .lineContactButton{border:1px solid #06a84f!important;background:#06c755!important;color:#fff!important}.userInfoActions .userInfoClose{border:1px solid #d7cec7!important;background:#f1eeeb!important;color:#403833!important}
+.lineContactModal{width:min(620px,calc(100vw - 32px));padding:30px!important}.lineContactModal h2{margin:0 44px 5px 0;font-size:25px!important}.lineContactCustomer{margin:0 0 16px;color:#675d57;font-size:17px!important}.lineContactModal .videoReminderPreset{display:grid!important;grid-template-columns:46px 1fr!important;grid-template-rows:auto auto!important;align-items:center!important;width:100%;min-height:70px;padding:12px 16px!important;border:2px solid #d6a23d!important;border-radius:12px!important;background:#fff7df!important;color:#5c3b12!important;text-align:left!important;box-shadow:0 5px 15px rgba(128,86,20,.14)!important}.videoReminderPreset>span{grid-row:1/3;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:#e39c23;color:#fff;font-size:23px}.videoReminderPreset>b{font-size:18px}.videoReminderPreset>small{color:#786544;font-size:13px;font-weight:500}.lineMessageEditor{display:grid!important;gap:8px;margin-top:16px;font-size:17px!important;font-weight:800!important}.lineContactModal textarea{width:100%;min-height:126px;box-sizing:border-box;padding:12px 14px;border:1px solid #cbbdb2;border-radius:10px;font-size:17px!important;line-height:1.55;font-weight:400}.savedMessagesSection{margin-top:18px}.savedMessagesSection h3{margin:0 0 9px;font-size:18px}.savedLineMessages{display:grid;gap:9px;margin:0}.savedLineMessage{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;align-items:stretch}.savedLineMessage button{min-height:42px!important;margin:0!important;border-radius:9px!important;font-size:15px!important}.savedLineMessage .savedMessageText{padding:9px 12px!important;border:1px solid #ded4cc!important;background:#f7f3ef!important;color:#46382f!important;text-align:left!important;line-height:1.4}.savedLineMessage .savedMessageEdit{padding:7px 11px!important;border:1px solid #b99986!important;background:#fff!important;color:#704a38!important}.savedLineMessage .savedMessageDelete{padding:7px 11px!important;border:1px solid #d9d0ca!important;background:#ece8e5!important;color:#655b55!important}.lineContactActions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.lineContactActions button{min-height:48px!important;margin:0!important;border-radius:10px!important;font-size:17px!important;font-weight:800!important}.lineContactActions .saveLineMessageButton{background:#9b5c49!important;color:#fff!important}.lineContactActions .sendLineMessageButton{background:#06c755!important;color:#fff!important}
+.priorityModal{z-index:10000!important}.videoReminderConfirmModal{width:min(460px,calc(100vw - 32px));padding:28px!important}.videoReminderConfirmModal h2{margin:0 0 12px;font-size:23px}.videoReminderConfirmModal p{font-size:17px;line-height:1.65}.videoReminderConfirmModal>div{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px}.videoReminderConfirmModal>div button{min-height:46px;margin:0!important;border-radius:10px!important;font-size:17px!important;font-weight:800!important}.videoReminderConfirmModal>div .cancel{background:#e8e3df!important;color:#4d4540!important}
+@media(max-width:900px){.staffPrimaryFilters .staffSearchGroup{margin-left:0;grid-template-columns:28px minmax(0,1fr) minmax(0,1.33fr) minmax(0,.85fr)}.lineContactModal{padding:24px 18px!important}.savedLineMessage{grid-template-columns:minmax(0,1fr) auto}.savedLineMessage .savedMessageDelete{grid-column:2}.lineContactActions{grid-template-columns:1fr}}
+.videoBookingTools{margin-top:16px!important;margin-bottom:20px!important;padding-bottom:16px;border-bottom:1px solid #e7ddd4}.videoBookingSection .dailyBookings{max-width:none;width:100%;margin:20px 0 0}.videoBookingSection .staffBookingTable{overflow-x:visible}.videoBookingSection .staffTableHead,.videoBookingSection .staffTableRow{grid-template-columns:minmax(145px,.85fr) minmax(205px,1.15fr) minmax(150px,.85fr) minmax(112px,.7fr) minmax(235px,1.35fr) 76px minmax(150px,.8fr);min-width:0;width:100%;box-sizing:border-box}.videoBookingSection .staffTableRow>*{min-width:0}.staffEmptyState{grid-column:1/-1;padding:26px;text-align:center;color:#756b65;font-size:17px;font-weight:700;background:#faf8f6;border:1px dashed #d8cbc1;border-radius:10px}@media(max-width:1050px){.videoBookingSection .staffBookingTable{overflow-x:auto}.videoBookingSection .staffTableHead,.videoBookingSection .staffTableRow{min-width:980px}}
+.staffPageHeading{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:20px}.staffPageHeading h1{margin:0}.staffPageHeading>button{min-height:46px;padding:10px 18px;border:0;border-radius:11px;background:#8a3045;color:#fff;font-size:17px;font-weight:800;cursor:pointer}.manualBookingModal{width:min(780px,calc(100vw - 32px));max-height:90vh;overflow:auto;padding:30px!important}.manualBookingModal h2{margin:0 44px 5px 0;font-size:27px}.manualBookingModal>p{margin:0 0 18px;color:#716760;font-size:16px}.manualMethodTabs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 18px}.manualMethodTabs button{min-height:48px;border:1px solid #d6c8bc;border-radius:11px;background:#f7f2ed;color:#594a41;font-size:18px;font-weight:800}.manualMethodTabs button.active{border-color:#8a3045;background:#8a3045;color:#fff}.manualMainField{display:grid;gap:8px;margin:15px 0;font-size:18px;font-weight:800}.manualMainField select,.manualMainField input{width:100%;box-sizing:border-box;min-height:48px;padding:10px 12px;border:1px solid #cbbcaf;border-radius:10px;background:#fff;font-size:17px;font-weight:400}.manualMainField small{color:#766b64;font-size:14px;font-weight:400}.manualItems{display:grid;gap:9px;margin-top:22px}.manualItems h3{margin:0 0 3px;font-size:20px}.manualItems article{display:grid;grid-template-columns:minmax(0,1fr) minmax(210px,.7fr) 92px;align-items:center;gap:10px;padding:11px 13px;border:1px solid #dfd3c8;border-radius:11px;background:#fff}.manualItems article.selected{border-color:#b98491;background:#fffafb}.manualItems article>label:first-child{display:flex;align-items:center;gap:9px;min-width:0;font-size:17px}.manualItems article>label:first-child input{width:18px;height:18px;margin:0}.manualItems article>label:first-child b{min-width:0}.manualItems article>label:first-child span{margin-left:auto;color:#8a3045;white-space:nowrap}.manualItems select,.manualQuantity input{width:100%;box-sizing:border-box;min-height:40px;padding:7px 9px;border:1px solid #cdbfb4;border-radius:8px;background:#fff;font-size:15px;font-weight:400}.manualQuantity{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:5px;font-size:14px;font-weight:700}.manualPaymentChoice{display:grid;gap:9px;margin:22px 0;padding:15px;border:1px solid #d9ccc1;border-radius:12px;background:#f9f5f1}.manualPaymentChoice legend{padding:0 7px;font-size:18px;font-weight:800}.manualPaymentChoice>label{display:flex;align-items:flex-start;gap:10px;padding:11px;border:1px solid #e1d7cf;border-radius:10px;background:#fff;cursor:pointer}.manualPaymentChoice input{width:18px;height:18px;margin:3px 0 0}.manualPaymentChoice span{display:grid;gap:3px}.manualPaymentChoice b{font-size:17px}.manualPaymentChoice small{color:#6f6660;font-size:14px}.manualCreateButton{width:100%;min-height:50px;border:0;border-radius:11px;background:#8a3045;color:#fff;font-size:18px;font-weight:800}.manualCreateButton:disabled{opacity:.55}.manualBookingModal>.staffModalClose{position:absolute!important}@media(max-width:700px){.staffPageHeading{align-items:stretch;flex-direction:column}.manualBookingModal{padding:24px 16px!important}.manualItems article{grid-template-columns:1fr}.manualItems article>label:first-child span{font-size:14px}.manualMethodTabs{grid-template-columns:1fr}}
+.staffPageHeading>.manualBookingEntry{background:#20423d;color:#fff;box-shadow:0 4px 12px rgba(32,66,61,.2)}
+
+/* 視訊區：白底維持白色，僅將文字區原本的咖啡色系替換為綠色系。 */
+body .videoBookingSection .staffPrimaryFilters{padding:15px 16px!important;border:1px solid #a6bbb8!important;border-radius:13px!important;background:#ebfbf9!important}
+body .videoBookingSection .staffSecondaryFilters{padding:22px 14px 12px!important;border:0!important;background:#fff!important}
+body .videoBookingSection .staffDateRange,body .videoBookingSection .staffDisplayOptions{background:#ebfbf9!important;border:1px solid #a6bbb8!important;color:#20423d!important}
+body .videoBookingSection .staffDateRange input,body .videoBookingSection .staffDisplayOptions label,body .videoBookingSection .staffSearchField input,body .videoBookingSection .staffPrimaryFilters select{background:#fff!important;border-color:#a6bbb8!important}
+body .videoBookingSection .staffPrimaryFilters>label,body .videoBookingSection .staffDateRange>b,body .videoBookingSection .staffDisplayOptions>b{color:#20423d!important}
+
+/* 手動建立預約：桌機加寬，完整顯示項目、子項目與數量。 */
+.manualBookingModal{width:min(1080px,calc(100vw - 40px))!important}
+.manualItems article{grid-template-columns:minmax(280px,1.15fr) minmax(300px,1fr) 110px!important}
+.returnedActionMenu button:disabled{opacity:.48;cursor:not-allowed}
+.returnedActionMenu .refillDataButton{min-height:56px!important;border:2px solid #a92222!important;background:#c94040!important;color:#fff!important;font-size:17px!important;font-weight:900!important;box-shadow:0 6px 16px rgba(201,64,64,.28)!important}
+@media(max-width:760px){.manualBookingModal{width:calc(100vw - 24px)!important}.manualItems article{grid-template-columns:1fr!important}}
+
+/* 手動建立預約：用戶搜尋與穩定的項目欄位版面 */
+.manualUserPicker{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:8px 12px;align-items:end;margin:15px 0}.manualUserPicker>label{grid-column:1/-1;font-size:18px;font-weight:800}.manualUserPicker select,.manualUserSearchBox input{width:100%;min-width:0;box-sizing:border-box;min-height:48px;border:1px solid #cbbcaf;border-radius:10px;background:#fff;font-size:16px;font-weight:400}.manualUserPicker select{padding:10px 12px}.manualUserSearchBox{position:relative;min-width:0}.manualUserSearchBox span{position:absolute;left:13px;top:50%;transform:translateY(-52%);color:#78594a;font-size:23px;line-height:1;pointer-events:none}.manualUserSearchBox input{padding:10px 12px 10px 42px}.manualUserPicker small{grid-column:1/-1;color:#766b64;font-size:14px}.manualItems,.manualItems article,.manualItems article>*{min-width:0}.manualItems article{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(86px,100px)!important}.manualItems article>label:first-child{flex-wrap:wrap;align-items:center}.manualItems article>label:first-child b{flex:1 1 150px;overflow-wrap:anywhere}.manualItems article>label:first-child span{flex:0 0 auto}.manualItems select{display:block;max-width:100%;min-width:0;text-overflow:ellipsis}.manualQuantity{min-width:0}.manualQuantity input{min-width:0}
+@media(max-width:920px){.manualItems article{grid-template-columns:1fr!important}.manualItems article>label:first-child b{flex:1 1 auto}.manualUserPicker{grid-template-columns:1fr}}
+.staffEmptyReturnedAnswers{margin:12px 0;padding:16px;border:1px dashed #a6bbb8;border-radius:10px;background:#f7fbfa;color:#20423d;font-size:16px}
+
+/* 八欄視訊表格：付款時間置於最左側。 */
+.videoBookingSection .staffTableHead,.videoBookingSection .staffTableRow{grid-template-columns:minmax(145px,.85fr) minmax(145px,.85fr) minmax(190px,1.1fr) minmax(125px,.72fr) minmax(125px,.72fr) minmax(220px,1.25fr) 78px minmax(145px,.82fr)!important}
+
+/* 手動建立預約：加寬、顯示 LINE 頭像，項目名稱與價格同列。 */
+.manualBookingModal{width:min(1240px,calc(100vw - 40px))!important}.manualSelectedCustomer{display:flex!important;align-items:center;gap:13px;width:100%;min-height:72px;margin:10px 0 18px!important;padding:10px 14px!important;border:1px solid #cbbcaf!important;border-radius:12px!important;background:#fff!important;color:#2d2622!important;text-align:left!important}.manualSelectedCustomer img,.manualSelectedCustomer .avatarFallback{flex:0 0 50px;width:50px;height:50px;border-radius:50%;object-fit:cover}.manualSelectedCustomer>span:last-child{display:grid;gap:3px}.manualSelectedCustomer b{font-size:18px}.manualSelectedCustomer small{font-size:15px;color:#746a63}.manualItems article>label:first-child{flex-wrap:nowrap!important}.manualItems article>label:first-child b{font-size:18px;line-height:1.35}.manualItems article>label:first-child span{font-size:17px;font-weight:500}.manualItems select{font-size:16px}.manualQuantity{font-size:16px}
+
+/* 修改問事資料：複選框靠左、單列、無外框，選項採一般字重。 */
+.staffAnswerEditor .staffHealthChecks{display:grid!important;grid-template-columns:1fr!important;gap:7px!important}.staffAnswerEditor .staffHealthChecks label{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;gap:9px!important;min-height:30px!important;margin:0!important;padding:3px 0!important;border:0!important;border-radius:0!important;background:transparent!important;font-weight:400!important}.staffAnswerEditor .staffHealthChecks input{order:-1!important;flex:0 0 auto!important;width:17px!important;height:17px!important;margin:0!important}
+
+/* 手動建立預約：搜尋結果直接列出，最多顯示約八位，點整列即可選取。 */
+.manualUserPicker{grid-template-columns:1fr!important;margin-bottom:8px!important}
+.manualUserResults{display:grid;gap:9px;max-height:576px;margin:0 0 20px;padding:3px 7px 3px 3px;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.manualUserResult{display:grid;grid-template-columns:minmax(0,1fr) 104px;align-items:stretch;min-width:0;min-height:70px;border:1px solid #d9ccc1;border-radius:12px;background:#fff!important;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.manualUserResult:hover{border-color:#b99d8e;box-shadow:0 2px 8px rgba(80,57,44,.08)}
+.manualUserResult.selected{border-color:#8a3045;background:#fff8fa!important;box-shadow:0 0 0 2px rgba(138,48,69,.14)}
+button.manualUserSelect{display:flex!important;align-items:center!important;gap:12px!important;min-width:0!important;min-height:68px!important;margin:0!important;padding:9px 13px!important;border:0!important;border-radius:0!important;background:#fff!important;color:#26201d!important;text-align:left!important;cursor:pointer!important}
+.manualUserResult.selected button.manualUserSelect{background:#fff8fa!important}
+button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:block!important;flex:0 0 48px!important;width:48px!important;min-width:48px!important;max-width:48px!important;height:48px!important;min-height:48px!important;max-height:48px!important;margin:0!important;padding:0!important;border-radius:50%!important;object-fit:cover!important;object-position:center!important}
+.manualUserSelect>span:last-child{display:grid;gap:2px;min-width:0}
+.manualUserSelect b{overflow:hidden;color:#211c19!important;font-size:17px;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}
+.manualUserSelect small{color:#756b65!important;font-size:14px!important;font-weight:400!important}
+.manualUserResult.selected .manualUserSelect small{color:#8a3045!important;font-weight:800!important}
+.manualUserProfileButton{width:104px!important;min-width:104px!important;margin:0!important;padding:8px 10px!important;border:0!important;border-left:1px solid #e2d8cf!important;border-radius:0!important;background:#f3ece7!important;color:#68463a!important;font-size:15px!important;font-weight:800!important;cursor:pointer}
+.manualUserProfileButton:hover{background:#efe7e1!important}
+.manualUserEmpty{margin:0;padding:20px;border:1px dashed #d8cbc1;border-radius:11px;background:#faf8f6;color:#756b65;text-align:center;font-size:16px}
+
+/* 用戶資料視窗永遠位於手動預約視窗上方。 */
+.priorityModal{z-index:10050!important}
+.priorityModal .userInfoModal{z-index:10051!important}
+
+/* LINE 聯絡：新增常用訊息有清楚、獨立的操作區。 */
+.lineComposeSection{margin-top:16px;padding:16px;border:1px solid #d9cec5;border-radius:13px;background:#fbf8f5}
+.lineComposeHeading{display:flex;align-items:flex-start;gap:11px}
+.lineComposeHeading>span{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;border-radius:50%;background:#8a3045;color:#fff;font-size:24px;font-weight:500;line-height:1}
+.lineComposeHeading h3{margin:0 0 3px;font-size:19px}
+.lineComposeHeading p{margin:0;color:#746a63;font-size:14px;line-height:1.45}
+.lineComposeSection .lineMessageEditor{margin-top:13px!important}
+.lineComposeSave{width:100%;min-height:44px;margin:12px 0 0!important;border:0!important;border-radius:9px!important;background:#9b5c49!important;color:#fff!important;font-size:16px!important;font-weight:800!important}
+.lineContactActions.single{grid-template-columns:1fr!important}
+.lineContactActions.single .sendLineMessageButton{width:100%}
+@media(max-width:700px){.manualUserResults{max-height:504px}.manualUserProfileButton{min-width:88px;padding-inline:9px!important}.manualUserSelect{padding-inline:10px!important}.manualUserSelect b{font-size:15px}}
+
+/* 視訊時間欄位需一眼可辨識。 */
+.staffTableRow .staffVideoTime{display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800}
+.staffPagination{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:18px;margin-top:16px;padding:13px 16px;border:1px solid #decfc3;border-radius:12px;background:#faf7f3;color:#3f3028;font-size:16px}.staffPagination>label{display:flex;align-items:center;gap:9px;font-weight:700}.staffPagination select{min-width:88px;padding:8px 10px;border:1px solid #cdb9aa;border-radius:9px;background:#fff;font:inherit}.staffPagination>span{text-align:center;color:#75675e}.staffPagination>div{display:flex;gap:8px}.staffPagination button{min-width:96px;padding:9px 13px;border:1px solid #9b7968;border-radius:9px;background:#fff;color:#704b3c;font-size:15px;font-weight:700}.staffPagination button:not(:disabled):hover{background:#8a3045;color:#fff;border-color:#8a3045}.staffPagination button:disabled{opacity:.42;cursor:not-allowed}@media(max-width:720px){.staffPagination{grid-template-columns:1fr;text-align:center}.staffPagination>label,.staffPagination>div{justify-content:center}}
+.staffHeadingActions{display:flex;align-items:center;gap:12px;flex-wrap:nowrap}.staffHeadingActions .lineAdminButton,.staffHeadingActions .manualBookingEntry{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:46px;padding:10px 18px;border:0;border-radius:11px;font-size:18px;line-height:1.25;font-weight:800;white-space:nowrap;cursor:pointer;text-decoration:none;box-shadow:0 4px 12px rgba(32,66,61,.20);transition:filter .15s ease,box-shadow .15s ease}.staffHeadingActions .lineAdminButton{background:#06c755;color:#fff!important}.staffHeadingActions .manualBookingEntry{background:#20423d;color:#fff}.staffHeadingActions .lineAdminButton:hover,.staffHeadingActions .manualBookingEntry:hover{filter:brightness(.96);box-shadow:0 5px 14px rgba(32,66,61,.24)}@media(max-width:700px){.staffHeadingActions{width:100%;gap:9px}.staffHeadingActions .lineAdminButton,.staffHeadingActions .manualBookingEntry{flex:1;min-width:0;padding:10px 12px;font-size:16px}}
+.staffStateButton{border:0;background:transparent;cursor:pointer;font:inherit;padding:4px 6px;border-radius:7px}.staffStateButton:hover{background:rgba(0,0,0,.05)}
+.paymentActionModal{width:min(430px,calc(100vw - 32px));padding:28px!important}.paymentActionModal h2{margin:0 40px 10px 0}.paymentActionModal p{margin:0 0 18px}.paymentActionChoices{display:grid;grid-template-columns:1fr 1fr;gap:10px}.paymentActionModal button{min-height:44px;border:0;border-radius:9px;font-weight:800;cursor:pointer}.paymentActionModal .dangerAction{width:100%;background:#c94040;color:#fff}.paymentActionModal .manualPaidButton{width:100%;margin:0;background:#168a54;color:#fff}.paymentActionModal .cancelAction{width:100%;margin-top:10px;background:#e7e2dd;color:#4c4540}.paymentActionModal button:disabled{opacity:.55;cursor:wait}
+
+/* 2026-09-07：後台標題操作按鈕與付款狀態操作 UI 微調 */
+.staffPage .staffPageHeading .staffHeadingActions{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:12px!important;flex-wrap:nowrap!important}
+.staffPage .staffPageHeading .staffHeadingActions>a.lineAdminButton,
+.staffPage .staffPageHeading .staffHeadingActions>button.manualBookingEntry{
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  box-sizing:border-box!important;width:auto!important;min-width:max-content!important;min-height:48px!important;
+  margin:0!important;padding:11px 20px!important;border:0!important;border-radius:11px!important;
+  color:#fff!important;font-family:inherit!important;font-size:18px!important;line-height:1.35!important;font-weight:800!important;
+  white-space:nowrap!important;text-decoration:none!important;cursor:pointer!important;
+  box-shadow:0 4px 12px rgba(32,66,61,.20)!important;
+}
+.staffPage .staffPageHeading .staffHeadingActions>a.lineAdminButton{background:#06c755!important}
+.staffPage .staffPageHeading .staffHeadingActions>button.manualBookingEntry{background:#20423d!important}
+.staffPage .staffPageHeading .staffHeadingActions>a.lineAdminButton:hover,
+.staffPage .staffPageHeading .staffHeadingActions>button.manualBookingEntry:hover{filter:brightness(.96)!important;box-shadow:0 5px 14px rgba(32,66,61,.24)!important}
+
+/* 文字預約：縮短訂單編號欄、加寬諮詢單欄，諮詢單編號不可被裁切。 */
+.textBookingSection .staffTableHead,.textBookingSection .staffTableRow{
+  grid-template-columns:minmax(145px,.85fr) minmax(205px,1.15fr) minmax(150px,.85fr) minmax(112px,.7fr) minmax(175px,.95fr) 76px minmax(245px,1.45fr)!important;
+}
+.textBookingSection .consultationSheetLinks{width:100%!important;min-width:0!important;overflow:visible!important;justify-content:center!important}
+.textBookingSection .consultationDocumentLink{max-width:none!important;overflow:visible!important;padding-inline:8px!important}
+.textBookingSection .consultationDocumentLink small{display:inline-block!important;max-width:none!important;overflow:visible!important;text-overflow:clip!important;font-size:14px!important}
+@media(max-width:1120px){.textBookingSection .staffBookingTable{overflow-x:auto!important}.textBookingSection .staffTableHead,.textBookingSection .staffTableRow{min-width:1120px!important}}
+
+/* 付款狀態操作：資訊層級清楚、返回改成右上角 X。 */
+.paymentActionModal{position:relative!important;width:min(560px,calc(100vw - 32px))!important;padding:30px!important;border-radius:18px!important;background:#fff!important;box-shadow:0 20px 55px rgba(43,31,24,.25)!important}
+.paymentActionModal .paymentActionClose{position:absolute!important;top:16px!important;right:16px!important;width:42px!important;height:42px!important;min-height:42px!important;margin:0!important;padding:0!important;border:1px solid #dfd5ce!important;border-radius:50%!important;background:#f7f3ef!important;color:#493f39!important;font-size:29px!important;line-height:1!important;font-weight:500!important}
+.paymentActionModal .paymentActionClose:hover{background:#eee7e1!important}
+.paymentActionHeader{padding-right:46px;margin-bottom:20px}.paymentActionHeader h2{margin:0 0 5px!important;color:#2f2723;font-size:27px!important;line-height:1.25}.paymentActionHeader p{margin:0!important;color:#756a63;font-size:16px!important;line-height:1.5}
+.paymentActionOrder{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:12px;margin-bottom:18px;padding:13px 15px;border:1px solid #e2d8d0;border-radius:11px;background:#faf7f4}.paymentActionOrder span{color:#75675f;font-size:15px;font-weight:700}.paymentActionOrder strong{min-width:0;color:#322824;font-size:17px;overflow-wrap:anywhere}
+.paymentActionItems{margin:0 0 22px}.paymentActionItems h3{margin:0 0 10px;color:#4d3a31;font-size:18px!important}.paymentActionItems>div{display:grid;gap:8px}.paymentActionItems p{display:grid;grid-template-columns:28px 1fr;align-items:start;gap:9px;margin:0!important;padding:10px 12px;border:1px solid #eadfd7;border-radius:10px;background:#fffaf7}.paymentActionItems p>span{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#efe5de;color:#704b3d;font-size:14px;font-weight:900}.paymentActionItems p>b{padding-top:2px;color:#342b27;font-size:17px!important;line-height:1.45;font-weight:700}.paymentActionEmpty{display:block!important;color:#8a817b!important;font-weight:500!important}
+.paymentActionChoices{display:grid!important;grid-template-columns:1fr 1fr!important;gap:12px!important}.paymentActionModal .dangerAction,.paymentActionModal .manualPaidButton{min-height:52px!important;margin:0!important;border:0!important;border-radius:11px!important;color:#fff!important;font-size:18px!important;line-height:1.2!important;font-weight:900!important;box-shadow:0 4px 10px rgba(55,36,30,.12)!important}.paymentActionModal .dangerAction{width:100%!important;background:#bd3449!important}.paymentActionModal .manualPaidButton{width:100%!important;background:#168a54!important}.paymentActionModal .dangerAction:hover,.paymentActionModal .manualPaidButton:hover{filter:brightness(.96)}.paymentActionModal button:disabled{opacity:.55!important;cursor:wait!important}
+@media(max-width:700px){.staffPage .staffPageHeading .staffHeadingActions{width:100%!important;gap:9px!important}.staffPage .staffPageHeading .staffHeadingActions>a.lineAdminButton,.staffPage .staffPageHeading .staffHeadingActions>button.manualBookingEntry{flex:1 1 0!important;min-width:0!important;padding:10px 11px!important;font-size:16px!important}.paymentActionModal{padding:24px 18px!important}.paymentActionChoices{grid-template-columns:1fr!important}}
+
+/* 2026-09-07 v4：付款狀態金額資訊 */
+.paymentActionItems p{grid-template-columns:28px minmax(0,1fr) auto!important;align-items:center!important}
+.paymentActionItems p>strong{align-self:center;color:#8a3045;font-size:16px;font-weight:900;white-space:nowrap}
+.paymentActionTotal{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:-4px 0 20px;padding:16px 18px;border:1px solid #e5c6cc;border-radius:12px;background:#fff4f6;box-shadow:inset 4px 0 0 #bd3449}
+.paymentActionTotal span{color:#5d4147;font-size:17px;font-weight:800}.paymentActionTotal strong{color:#b5213d;font-size:24px;font-weight:950;white-space:nowrap}
+@media(max-width:560px){.paymentActionItems p{grid-template-columns:28px 1fr!important}.paymentActionItems p>strong{grid-column:2;text-align:left}.paymentActionTotal strong{font-size:21px}}
+
+/* 2026-09-07 v4：Google 諮詢結果 LINE 回傳頁 */
+.returnResultPage{min-height:100vh;padding:34px 18px 120px;background:#eee9e3;color:#332924;font-family:inherit}.returnResultCard{width:min(920px,100%);margin:0 auto;border:1px solid #d8c8bc;border-radius:20px;background:#fff;box-shadow:0 18px 48px rgba(52,39,31,.14);overflow:hidden}.returnResultStatus{box-sizing:border-box;padding:42px;text-align:center}.returnResultStatus h1{font-size:26px}.returnResultHeader{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:26px 30px;border-bottom:1px solid #eadfd6;background:#fffaf6}.returnResultHeader>div>span{display:inline-block;margin-bottom:4px;color:#168a54;font-size:15px;font-weight:900}.returnResultHeader h1{margin:0;color:#3d2b23;font-size:29px}.returnResultHeader p{margin:5px 0 0;color:#7a6e67;font-size:15px}.returnResultEditLink{padding:10px 14px;border:1px solid #cdbbad;border-radius:10px;background:#fff;color:#6b4b3e!important;font-weight:800;text-decoration:none;white-space:nowrap}.returnResultSelect{padding:22px 30px 12px}.returnResultSelect>b{display:block;margin-bottom:10px;font-size:17px}.returnResultSelect>div{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px}.returnResultSelect label{display:flex;align-items:center;gap:7px;min-width:max-content;padding:8px 11px;border:1px solid #dfd3ca;border-radius:10px;background:#faf7f4;cursor:pointer}.returnResultSelect label.selected{border-color:#87b9a4;background:#eff9f4}.returnResultSelect input{width:17px;height:17px;margin:0}.returnResultSelect label>span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#eee3dc;color:#765445;font-size:13px;font-weight:900}.returnResultSelect label>strong{font-size:15px}.returnResultPager{display:grid;grid-template-columns:46px 1fr 46px;align-items:center;gap:12px;padding:12px 30px}.returnResultPager button{height:44px;border:1px solid #d8cabe;border-radius:50%;background:#fff;color:#694b3e;font-size:29px;cursor:pointer}.returnResultPager button:disabled{opacity:.3;cursor:not-allowed}.returnResultPager>div{text-align:center}.returnResultPager small{color:#83766e;font-size:14px}.returnResultPager h2{margin:4px 0 0;font-size:20px}.returnResultPreview{margin:0 30px 104px;border:1px solid #e0d5cd;border-radius:14px;background:#fff}.returnResultPreviewTitle{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 15px;border-bottom:1px solid #e8ded7;background:#faf7f4;border-radius:14px 14px 0 0}.returnResultPreviewTitle span{font-weight:900}.returnResultPreviewTitle em{font-style:normal;color:#168a54;font-size:14px;font-weight:800}.returnResultPreview pre{min-height:300px;margin:0;padding:20px;white-space:pre-wrap;overflow-wrap:anywhere;color:#2e2926;font:16px/1.75 inherit}.returnResultFooter{position:fixed;left:50%;bottom:18px;z-index:20;display:grid;grid-template-columns:1fr 1.5fr;gap:12px;width:min(860px,calc(100vw - 36px));box-sizing:border-box;padding:12px;border:1px solid #d9cabf;border-radius:15px;background:rgba(255,255,255,.96);box-shadow:0 12px 36px rgba(52,39,31,.2);backdrop-filter:blur(10px)}.returnResultFooter a,.returnResultFooter button{display:flex;align-items:center;justify-content:center;min-height:52px;border-radius:11px;font-size:17px;font-weight:900;text-decoration:none}.returnResultFooter a{border:1px solid #bda99a;background:#fff;color:#6b4b3e!important}.returnResultFooter button{border:0;background:#168a54;color:#fff;cursor:pointer}.returnResultFooter button:disabled{opacity:.45;cursor:not-allowed}.returnConfirmBackdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;background:rgba(30,27,24,.62)}.returnConfirmModal{position:relative;width:min(520px,100%);box-sizing:border-box;padding:28px;border-radius:18px;background:#fff;box-shadow:0 22px 60px rgba(0,0,0,.28)}.returnConfirmModal>span{color:#bd3449;font-size:14px;font-weight:900}.returnConfirmModal h2{margin:6px 42px 8px 0;font-size:24px}.returnConfirmModal p{color:#675d57;line-height:1.6}.returnConfirmClose{position:absolute;top:14px;right:14px;width:40px;height:40px;border:1px solid #ddd1c8;border-radius:50%;background:#faf7f4;font-size:27px;cursor:pointer}.returnConfirmItems{display:grid;gap:7px;margin:16px 0}.returnConfirmItems>div{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;background:#f7f3ef;font-weight:700}.returnConfirmItems span{display:grid;place-items:center;width:25px;height:25px;border-radius:50%;background:#eadfd7;color:#704c3d}.returnConfirmActions{display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin-top:20px}.returnConfirmActions button{min-height:48px;border:0;border-radius:10px;font-size:16px;font-weight:900;cursor:pointer}.returnConfirmActions button:first-child{background:#eee8e3;color:#544942}.returnConfirmActions button:last-child{background:#bd3449;color:#fff}.returnResultSuccess{padding:70px 30px;text-align:center}.returnResultSuccess>div{display:grid;place-items:center;width:62px;height:62px;margin:0 auto 14px;border-radius:50%;background:#eaf8f0;color:#168a54;font-size:34px;font-weight:900}.returnResultSuccess h2{font-size:26px}.returnResultSuccess p{color:#746a64}.returnResultSuccess a{display:inline-flex;margin-top:12px;padding:12px 18px;border-radius:10px;background:#20423d;color:#fff!important;font-weight:900;text-decoration:none}@media(max-width:650px){.returnResultHeader{align-items:flex-start;padding:22px 18px}.returnResultEditLink{display:none}.returnResultSelect,.returnResultPager{padding-left:18px;padding-right:18px}.returnResultPreview{margin-left:18px;margin-right:18px}.returnResultFooter{grid-template-columns:1fr 1.35fr}.returnConfirmModal{padding:24px 18px}}
+
+/* 2026-09-07 v10：後台頂部三個主要操作，LINE／Google Calendar／手動預約。 */
+.staffPage .staffPageHeading .staffHeadingActions>a.videoCalendarButton{
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  box-sizing:border-box!important;width:auto!important;min-width:max-content!important;min-height:48px!important;
+  margin:0!important;padding:11px 20px!important;border:0!important;border-radius:11px!important;
+  background:#1a73e8!important;color:#fff!important;font-family:inherit!important;font-size:18px!important;
+  line-height:1.35!important;font-weight:800!important;white-space:nowrap!important;text-decoration:none!important;
+  box-shadow:0 4px 12px rgba(26,115,232,.24)!important;transition:transform .15s ease,filter .15s ease,box-shadow .15s ease!important;
+}
+.staffPage .staffPageHeading .staffHeadingActions>a.lineAdminButton,
+.staffPage .staffPageHeading .staffHeadingActions>button.manualBookingEntry{transition:transform .15s ease,filter .15s ease,box-shadow .15s ease!important}
+.staffPage .staffPageHeading .staffHeadingActions>a.videoCalendarButton:hover,
+.staffPage .staffPageHeading .staffHeadingActions>a.lineAdminButton:hover,
+.staffPage .staffPageHeading .staffHeadingActions>button.manualBookingEntry:hover{transform:translateY(-1px)!important;filter:brightness(.98)!important}
+.staffPage .staffPageHeading .staffHeadingActions>a.videoCalendarButton:hover{box-shadow:0 6px 16px rgba(26,115,232,.30)!important}
+@media(max-width:860px){.staffPage .staffPageHeading .staffHeadingActions{flex-wrap:wrap!important}.staffPage .staffPageHeading .staffHeadingActions>a.videoCalendarButton{flex:1 1 180px!important;min-width:0!important;padding:10px 12px!important;font-size:16px!important}}
+
+
+/* 2026-09-07 v11：修改問事資料固定寬度與資訊層級，避免不同項目忽寬忽窄。 */
+.staffAnswerEditor{
+  width:min(760px,calc(100vw - 32px))!important;max-width:760px!important;
+  max-height:min(88vh,860px)!important;padding:0!important;overflow:auto!important;
+  box-sizing:border-box!important;border-radius:16px!important;
+}
+.staffAnswerEditorHeader{position:relative;padding:26px 30px 20px;border-bottom:1px solid #eadfd7;background:#fff}
+.staffAnswerEditorHeader>div{padding-right:38px}.staffAnswerEditorEyebrow{display:inline-block;margin-bottom:5px;color:#8a3045;font-size:13px;font-weight:900;letter-spacing:.08em}
+.staffAnswerEditorHeader h2{margin:0!important;color:#2e2723;font-size:26px!important;line-height:1.25}.staffAnswerEditorHeader p{margin:8px 0 0;color:#766b64;font-size:14px;line-height:1.6}
+.staffAnswerEditor>.staffModalClose{top:18px!important;right:18px!important;z-index:3}
+.staffAnswerCurrentItem{margin:20px 30px 0;padding:14px 16px;border:1px solid #e5d8ce;border-radius:12px;background:#faf6f2}
+.staffAnswerCurrentItem>span{display:block;margin-bottom:4px;color:#8b786b;font-size:13px;font-weight:800}.staffAnswerCurrentItem .staffAnswerItem{margin:0!important;padding:0!important;color:#332b27;font-size:18px!important;line-height:1.45}
+.staffAnswerEditor .staffFrontFields{display:grid!important;grid-template-columns:1fr!important;gap:16px!important;padding:20px 30px 8px!important;box-sizing:border-box!important}
+.staffAnswerEditor .staffFrontFields>label,.staffAnswerEditor .staffAnswerSection>label,.staffAnswerEditor .staffAnswerTargetGroup>label{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;width:100%!important;box-sizing:border-box!important;color:#403833;font-size:15px!important;font-weight:850!important}
+.staffAnswerEditor .staffFrontFields input,.staffAnswerEditor .staffFrontFields select,.staffAnswerEditor .staffFrontFields textarea{width:100%!important;max-width:none!important;box-sizing:border-box!important;border:1px solid #d8cec7!important;border-radius:10px!important;background:#fff!important;padding:11px 12px!important;color:#2d2926!important;outline:none!important}
+.staffAnswerEditor .staffFrontFields input:focus,.staffAnswerEditor .staffFrontFields select:focus,.staffAnswerEditor .staffFrontFields textarea:focus{border-color:#9f6558!important;box-shadow:0 0 0 3px rgba(159,101,88,.10)!important}
+.staffAnswerEditor .staffFrontFields textarea{min-height:92px!important;resize:vertical!important}
+.staffAnswerEditor .staffAnswerSection,.staffAnswerEditor .staffAnswerTargetGroup{width:100%!important;box-sizing:border-box!important;padding:16px!important;background:#fbf8f4!important;border-color:#e4d9d0!important}
+.staffAnswerEditor .returnedEditActions{position:sticky!important;bottom:0!important;display:grid!important;grid-template-columns:minmax(0,1.5fr) minmax(0,.8fr)!important;gap:10px!important;margin-top:10px!important;padding:16px 30px 22px!important;border-top:1px solid #eadfd7!important;background:rgba(255,255,255,.97)!important;backdrop-filter:blur(8px)!important}
+.staffAnswerEditor .returnedEditActions button{min-height:48px!important;margin:0!important;border-radius:10px!important}.staffAnswerEditor .returnedEditActions button:first-child{background:#995548!important;color:#fff!important}.staffAnswerEditor .returnedEditActions .cancel{background:#f1eeeb!important;color:#655c56!important}
+@media(max-width:640px){.staffAnswerEditor{width:calc(100vw - 18px)!important;max-height:92vh!important}.staffAnswerEditorHeader{padding:22px 18px 17px}.staffAnswerCurrentItem{margin:16px 18px 0}.staffAnswerEditor .staffFrontFields{padding:16px 18px 6px!important}.staffAnswerEditor .returnedEditActions{padding:14px 18px 18px!important}.staffAnswerEditor .returnedEditActions{grid-template-columns:1fr!important}}
