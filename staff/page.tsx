@@ -206,6 +206,11 @@ export default function Staff() {
   async function openLineAdminFromProfile(customer:any) {
     const name=String(customer?.line_display_name||"").trim();
     if(!name)return alert("此用戶沒有 LINE 名稱可複製");
+
+    // 先同步開分頁，避免 await clipboard 後被瀏覽器當成非使用者操作而擋掉 popup。
+    const lineTab=window.open("https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/","_blank");
+    if(lineTab) lineTab.opener=null;
+
     let copied=false;
     try { await navigator.clipboard.writeText(name); copied=true; } catch {
       try {
@@ -214,7 +219,7 @@ export default function Staff() {
     }
     setProfileCopyToast(copied?`已複製 LINE 名稱：${name}`:`請手動複製 LINE 名稱：${name}`);
     window.setTimeout(()=>setProfileCopyToast(""),2600);
-    window.open("https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/","_blank","noopener,noreferrer");
+    if(!lineTab) window.alert("瀏覽器阻擋了新分頁，請允許此網站開啟彈出式視窗後再試一次。");
   }
   async function generateDocument(x:any,createMode:"replace"|"new"="replace",confirmedTeacherEdit=false){
     const exists=sheetLinks(x).length>0;
@@ -629,7 +634,7 @@ export default function Staff() {
     );
   return (
     <main className={`staffPage returned-edit-${returnedEditMode}`}>
-      <div className="staffPageHeading"><h1>預約工作後台</h1><div className="staffHeadingActions"><a className="lineAdminButton" href="https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/" target="_blank" rel="noreferrer">官方LINE後台</a><button className="manualBookingEntry" onClick={()=>setManualOpen(true)}>＋ 手動建立預約</button></div></div>
+      <div className="staffPageHeading"><h1>預約工作後台</h1><div className="staffHeadingActions"><a className="lineAdminButton" href="https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/" target="_blank" rel="noreferrer">官方LINE後台</a><a className="videoCalendarButton" href={(()=>{const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(new Date());const year=parts.find((part)=>part.type==="year")?.value||String(new Date().getFullYear());const month=parts.find((part)=>part.type==="month")?.value||String(new Date().getMonth()+1);return `https://calendar.google.com/calendar/u/4/r/month/${year}/${Number(month)}/1`;})()} target="_blank" rel="noreferrer" aria-label="開啟本月視訊諮詢 Google 行事曆">視訊諮詢行事曆</a><button className="manualBookingEntry" onClick={()=>setManualOpen(true)}>＋ 手動建立預約</button></div></div>
       {error && <div className="error">{error}</div>}
       <section className="staffBookingSection videoBookingSection">
         <h2 className="staffSectionTitle">視訊預約</h2>
@@ -767,7 +772,7 @@ export default function Staff() {
               <span className="userProfileAvatarHint">開啟 LINE 後台</span>
             </button>
             <h2>{userView.line_display_name}</h2>
-            <p className="userProfileQuickTip">點擊頭像會複製 LINE 名稱，並另開官方 LINE 後台供你直接貼上搜尋。</p>
+            <p className="userProfileQuickTip"><b>點擊頭像</b>即可複製 LINE 名稱並另開官方 LINE 後台，進入後直接貼上搜尋。</p>
             {profileCopyToast&&<div className="profileCopyToast" role="status">✓ {profileCopyToast}</div>}
             <div className="staffCustomerProfile">
               <div><span>姓名</span><b>{userView.full_name || "尚未填寫"}</b></div>
