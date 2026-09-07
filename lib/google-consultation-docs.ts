@@ -608,7 +608,6 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     add("而離婚或離異的高風險年齡則要特別注意：　歲。", "teacher");
     add("");
     add("如果要姻緣比較順利，", "teacher");
-    add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher");
   }
   const sections = isPastLifeRelation ? ["【前前世】", "【前世】", "【綜觀今生】"] : !isPastLifePersonal ? [] : /前三世|三世/.test(subTitle)
     ? ["【前前前世】", "【前前世】", "【前世】", "【綜觀今生】"]

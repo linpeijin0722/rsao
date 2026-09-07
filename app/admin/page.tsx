@@ -222,17 +222,25 @@ export default function Admin() {
     ]);
   }
   async function slotToggle(t: string) {
-    const value = !openTimes.includes(t),
-      r = await fetch("/api/admin/slots", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          methodId,
-          slotStart: `${date}T${t}:00+08:00`,
-          isOpen: value,
-        }),
-      });
-    if (r.ok) dayLoad();
+    if (!methodId) return window.alert("找不到視訊諮詢設定，請重新整理後再試");
+    const value = !openTimes.includes(t);
+    const r = await fetch("/api/admin/slots", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        methodId,
+        slotStart: `${date}T${t}:00+08:00`,
+        isOpen: value,
+      }),
+    });
+    const result = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      window.alert(`${value ? "開啟" : "關閉"}時段失敗：${result.error || "請稍後再試"}`);
+      return;
+    }
+    // 單日時段是最明確的人工設定，成功後立即反映，再從伺服器重新校正。
+    setOpenTimes((current) => value ? [...new Set([...current, t])].sort() : current.filter((item) => item !== t));
+    await Promise.all([dayLoad(), monthLoad()]);
   }
   async function closeAllDaySlots() {
     setClosingDate(true);

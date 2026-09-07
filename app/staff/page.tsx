@@ -984,14 +984,6 @@ export default function Staff() {
               )}
             </div>
             {editing.payment_status !== "paid" && <button className="manualPaidButton" onClick={() => markPaid(editing.booking_no)}>設為已付款（手動收款）</button>}
-            {editing.payment_status === "paid" && (
-                <button
-                  className="remindButton"
-                  onClick={() => remind(editing.booking_no, editing.customers)}
-                >
-                  請用戶填資料
-                </button>
-              )}
             {editing.consultation_methods?.code === "video" && (
               <label className="editTime">
                 預約時間
