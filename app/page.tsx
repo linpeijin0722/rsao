@@ -84,6 +84,7 @@ export default function Page() {
     [auth, setAuth] = useState("loading"),
     [profile, setProfile] = useState<{
       pictureUrl?: string;
+      full_name?: string;
     } | null>(null),
     [menu, setMenu] = useState(false),
     [screen, setScreen] = useState<Screen>("method"),
@@ -161,6 +162,7 @@ export default function Page() {
             location.replace("/my-profile?setup=1");
             return false;
           }
+          setProfile((current:any) => ({ ...(current || {}), ...(result.profile || {}) }));
           return true;
         };
         const hasOfficialAccountFriendship = async (fallback:boolean) => {
@@ -454,7 +456,7 @@ export default function Page() {
       setBookingNo(j.booking.booking_no);
       try {
         const liffId=bookingLiffId;
-        if(liffId){await liff.init({liffId});if(liff.isInClient())await liff.sendMessages([{type:"text",text:"我已送出預約，訂單待付款。"}])}
+        if(liffId){await liff.init({liffId});if(liff.isInClient())await liff.sendMessages([{type:"text",text:`我已送出預約，訂單待付款。姓名：${profile?.full_name || ""}`}])}
       } catch (error) {
         console.error("LIFF 用戶訊息發送失敗",error);
       }

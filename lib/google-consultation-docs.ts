@@ -53,7 +53,21 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
     `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,
     token,
   );
-  const requests: any[] = [{
+  const bodyContent = document.body?.content || [];
+  const requests: any[] = [];
+  // 若文件尾端只剩 Google Docs 的手動分頁符號與空白段落，刪除分頁符號，
+  // 避免諮詢單最後多出完全空白的一頁。
+  for (let i = bodyContent.length - 1; i >= 0; i -= 1) {
+    const block = bodyContent[i];
+    const elements = block.paragraph?.elements || [];
+    const visibleText = elements.map((element:any) => element.textRun?.content || "").join("").replace(/[\s\u00a0]/g, "");
+    const pageBreak = elements.find((element:any) => element.pageBreak);
+    if (visibleText) break;
+    if (pageBreak?.startIndex != null && pageBreak?.endIndex != null && pageBreak.endIndex > pageBreak.startIndex) {
+      requests.push({ deleteContentRange: { range: { startIndex: pageBreak.startIndex, endIndex: pageBreak.endIndex } } });
+    }
+  }
+  requests.push({
     updateDocumentStyle: {
       documentStyle: {
         marginHeader: { magnitude: 14.1732, unit: "PT" },
@@ -61,7 +75,7 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
       },
       fields: "marginHeader,marginFooter",
     },
-  }];
+  });
   // Google Docs 的頁首頁尾 ID 位於各 sectionBreak.sectionStyle，並不在 documentStyle。
   // 舊版讀錯位置，導致一直找不到模板既有的頁首／頁尾，格式更新也因此沒有生效。
   const collectSegmentIds = (sourceDocument: any, kind: "Header" | "Footer") => {
@@ -209,6 +223,8 @@ const fieldLabels: Record<string, string> = {
   health_concerns: "當前關注的健康問題", major_treatment_planned: "近期是否有手術或重大治療規劃？",
   treatment_question: "想瞭解的問題", treatment_question_other: "其他想瞭解的問題",
   health_notes: "備註", current_regret: "目前的困擾或遺憾", consultation_goal: "這次諮詢最希望獲得什麼",
+  old_name: "公司目前名字（或舊名）", business: "主要業務與產品", mode: "公司經營模式",
+  partner: "其他合夥人", preferences: "命名喜好與禁忌", favorite_words: "特別喜歡或想放進去的字",
 };
 
 const shichenName = (value: unknown) => text(value).split(/[（(]/)[0];
@@ -357,8 +373,20 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     addField(fieldLabels.date_range, extra.date_range);
     addField(fieldLabels.notes, extra.notes);
   } else {
+    const isCompany = subTitle.includes("公司命名") || subTitle.includes("公司改名") || title.includes("公司命名") || title.includes("公司改名");
+    if (isCompany) {
+      const allPeople = [one(answer?.consultation_profiles), ...(answer?.booking_answer_participants || []).map((entry:any) => one(entry.consultation_profiles))].filter(Boolean);
+      const partnerName = allPeople.find((profile:any) => text(profile.id) === text(extra.partner))?.name || extra.partner;
+      addField(fieldLabels.old_name, extra.old_name);
+      addField(fieldLabels.business, extra.business);
+      addField(fieldLabels.mode, extra.mode === "sole" ? "獨資（自己一人開）" : extra.mode === "partners" ? "合夥（有其他股東）" : extra.mode);
+      if (extra.mode === "partners") addField(fieldLabels.partner, partnerName);
+      addField(fieldLabels.preferences, extra.preferences);
+      addField(fieldLabels.favorite_words, extra.favorite_words);
+      addField("其他備註", extra.notes);
+    }
     Object.keys(fieldLabels).forEach((key) => {
-      if (["relationship_status", "relationship_duration", "main_event", "relationship_goal", "purpose", "situation", "date_range", "location", "notes"].includes(key)) return;
+      if (["relationship_status", "relationship_duration", "main_event", "relationship_goal", "purpose", "situation", "date_range", "location", "notes", "old_name", "business", "mode", "partner", "preferences", "favorite_words"].includes(key)) return;
       addField(fieldLabels[key], extra[key]);
     });
     if (Array.isArray(extra.overall_focuses)) addField("目前最關心的事件", extra.overall_focuses);

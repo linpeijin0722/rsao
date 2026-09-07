@@ -82,19 +82,16 @@ const submissionTime = (value:string) => {
 };
 const statusKey = (x: any) =>
   x.status === "cancelled"
-    ? x.cancellation_reason === "自行取消"
-      ? "cancelled"
-      : "expired"
-    : x.payment_status === "paid"
-      ? "paid"
-      : "pending";
+    ? "cancelled"
+    : x.status === "expired"
+      ? "expired"
+      : x.payment_status === "paid"
+        ? "paid"
+        : "pending";
 const statusText = (x: any) =>
-  ({
-    paid: "已付款",
-    pending: "待付款",
-    cancelled: "已取消",
-    expired: "已失效",
-  })[statusKey(x)];
+  x.status === "cancelled"
+    ? (x.cancellation_reason === "手動退款" ? "手動退款" : "取消訂單")
+    : ({ paid: "已付款", pending: "待付款", expired: "已失效" } as Record<string,string>)[statusKey(x)];
 const shortText = (value: unknown, limit = 20) => {
   const chars = Array.from(String(value || ""));
   return chars.length > limit ? `${chars.slice(0, limit).join("")}…` : chars.join("");
@@ -188,7 +185,9 @@ export default function Staff() {
     [editingSavedMessage,setEditingSavedMessage]=useState<number|null>(null),
     [videoReminderConfirm,setVideoReminderConfirm]=useState(false),
     [priceEdit,setPriceEdit]=useState<any>(null),
-    [priceValue,setPriceValue]=useState("");
+    [priceValue,setPriceValue]=useState(""),
+    [paymentActions,setPaymentActions]=useState<any>(null),
+    [paymentActionBusy,setPaymentActionBusy]=useState(false);
   async function staffPost(body:any,retry=true){
     let response=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
     if(response.status===401&&retry){
@@ -356,6 +355,17 @@ export default function Staff() {
       return;
     }
     alert("已發送提醒");
+  }
+  async function changePaymentState(action:"cancel_booking"|"manual_refund"|"mark_paid"){
+    if(!paymentActions)return;
+    const label=action==="cancel_booking"?"取消訂單":action==="manual_refund"?"手動退款":"手動付款";
+    setPaymentActionBusy(true);
+    try{
+      const r=await staffPost({bookingNo:paymentActions.booking_no,action}),j=await r.json();
+      if(!r.ok)throw new Error(j.error||`${label}失敗`);
+      setPaymentActions(null);setEditing(null);await load();
+      alert(`${label}完成`);
+    }catch(error){alert(error instanceof Error?error.message:`${label}失敗`)}finally{setPaymentActionBusy(false)}
   }
   async function markPaid(no: string) {
     if (!confirm("確定已收到這筆款項，並將訂單標記為已付款嗎？")) return;
@@ -583,7 +593,7 @@ export default function Staff() {
     );
   return (
     <main className={`staffPage returned-edit-${returnedEditMode}`}>
-      <div className="staffPageHeading"><h1>預約工作後台</h1><button className="manualBookingEntry" onClick={()=>setManualOpen(true)}>＋ 手動建立預約</button></div>
+      <div className="staffPageHeading"><h1>預約工作後台</h1><div className="staffHeadingActions"><a className="lineAdminButton" href="https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/" target="_blank" rel="noreferrer">官方LINE後台</a><button className="manualBookingEntry" onClick={()=>setManualOpen(true)}>＋ 手動建立預約</button></div></div>
       {error && <div className="error">{error}</div>}
       <section className="staffBookingSection videoBookingSection">
         <h2 className="staffSectionTitle">視訊預約</h2>
@@ -679,7 +689,7 @@ export default function Staff() {
                       )}
                       <span>{[x.customers?.line_display_name,x.customers?.full_name].filter(Boolean).join("｜")}</span>
                     </button>
-                    <b className={`staffState ${statusKey(x)}`}><span>{paid && x.collection_source === "manual" ? "手動收款" : status}</span>{showVideoAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</b>
+                    <button className={`staffState staffStateButton ${statusKey(x)}`} onClick={()=>setPaymentActions(x)}><span>{paid && x.collection_source === "manual" ? "手動收款" : status}</span>{showVideoAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</button>
                     {paid ? (
                       complete ? (
                         <button
@@ -847,7 +857,7 @@ export default function Staff() {
                   )}
                   <span>{[x.customers?.line_display_name,x.customers?.full_name].filter(Boolean).join("｜")}</span>
                 </button>
-                <b className={`staffState ${statusKey(x)}`}><span>{paid && x.collection_source === "manual" ? "手動收款" : statusText(x)}</span>{showTextAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</b>
+                <button className={`staffState staffStateButton ${statusKey(x)}`} onClick={()=>setPaymentActions(x)}><span>{paid && x.collection_source === "manual" ? "手動收款" : statusText(x)}</span>{showTextAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</button>
                 {paid ? (
                   complete ? (
                     <button
@@ -916,6 +926,7 @@ export default function Staff() {
           </div>
         </div>
       )}
+      {paymentActions&&<div className="modalBackdrop priorityModal" onClick={()=>!paymentActionBusy&&setPaymentActions(null)}><div className="modal paymentActionModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setPaymentActions(null)}>×</button><h2>付款狀態操作</h2><p>訂單編號：<strong>{paymentActions.booking_no}</strong></p>{paymentActions.payment_status==="paid"?<button className="dangerAction" disabled={paymentActionBusy} onClick={()=>{if(confirm(`是否確定要手動退款並取消訂單 ${paymentActions.booking_no}？`))void changePaymentState("manual_refund")}}>手動退款</button>:<div className="paymentActionChoices"><button className="dangerAction" disabled={paymentActionBusy} onClick={()=>{if(confirm(`是否確定要取消訂單 ${paymentActions.booking_no}？`))void changePaymentState("cancel_booking")}}>取消訂單</button><button className="manualPaidButton" disabled={paymentActionBusy} onClick={()=>{if(confirm(`是否確定已收到款項，將訂單 ${paymentActions.booking_no} 設為手動付款？`))void changePaymentState("mark_paid")}}>手動付款</button></div>}<button className="cancelAction" disabled={paymentActionBusy} onClick={()=>setPaymentActions(null)}>返回</button></div></div>}
       {editing && (
         <div className="modalBackdrop" onClick={() => setEditing(null)}>
           <div

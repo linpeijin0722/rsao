@@ -1,5 +1,6 @@
 import { adminSupabase } from "@/lib/supabase";
 import { bookingFlex, pushLineFlex } from "@/lib/line-message";
+import { syncBookingCalendar } from "@/lib/google-calendar";
 
 export async function confirmPayment(fields: Record<string, string>, site: string) {
   if (fields.RtnCode !== "1") return "";
@@ -13,6 +14,7 @@ export async function confirmPayment(fields: Record<string, string>, site: strin
     status: "confirmed",
     paid_at: new Date().toISOString(),
   }).eq("booking_no", bookingNo).in("status", ["pending_payment", "confirmed"]);
+  try { await syncBookingCalendar(bookingNo); } catch (error) { console.error("付款 Calendar 同步失敗", error); }
   const { data: booking } = await db.from("bookings").select("booking_no,total_price,slot_start,slot_end,payment_status,payment_notified_at,customers(line_user_id),consultation_methods(code),booking_details(item_title,quantity,booking_detail_sub_items(sub_item_title))").eq("booking_no", bookingNo).single();
   if (booking?.payment_status === "paid" && !booking.payment_notified_at) {
     const customer = booking.customers as unknown as { line_user_id: string };

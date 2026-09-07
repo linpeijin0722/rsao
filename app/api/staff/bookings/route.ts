@@ -4,6 +4,7 @@ import { isAdminSession } from "@/lib/admin-session";
 import { adminSupabase } from "@/lib/supabase";
 import { bookingStatusFlex, pushLineFlex } from "@/lib/line-message";
 import { createConsultationDocuments, wasDocumentEditedBy } from "@/lib/google-consultation-docs";
+import { syncBookingCalendar } from "@/lib/google-calendar";
 export async function GET() {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
@@ -11,7 +12,7 @@ export async function GET() {
   const [{ data, error }, { data: customers, error: customerError }, { data: consultationProfiles, error: profileError }] = await Promise.all([db
     .from("bookings")
     .select(
-      "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,data_submitted_at,status,cancellation_reason,paid_at,created_at,customers(id,line_user_id,line_display_name,line_picture_url,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,quantity,google_document_id,google_document_url,google_document_created_at,google_sheet_url,booking_items(code),booking_detail_sub_items(sub_item_id,sub_item_title),booking_detail_profiles(profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)),booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data),booking_answer_participants(position,profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data))))",
+      "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,data_submitted_at,status,cancellation_reason,paid_at,created_at,google_calendar_event_id,customers(id,line_user_id,line_display_name,line_picture_url,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,quantity,google_document_id,google_document_url,google_document_created_at,google_sheet_url,booking_items(code),booking_detail_sub_items(sub_item_id,sub_item_title),booking_detail_profiles(profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)),booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data),booking_answer_participants(position,profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data))))",
     )
     .order("created_at", { ascending: false }), db
     .from("customers")
@@ -216,6 +217,19 @@ export async function POST(request: NextRequest) {
     if(customer?.line_user_id)try{await pushLineFlex(customer.line_user_id,"訂單已更新",bookingStatusFlex({status:"pending",headerLabel:"訂單已更新",bookingNo:booking.booking_no,method:method?.code||"text",total:amount,slotStart:booking.slot_start||undefined,items:itemTitles,expiresAt:booking.expires_at||undefined,site}))}catch(lineError){console.error("訂單改價 LINE 通知失敗",lineError)}
     return NextResponse.json({ok:true,totalPrice:data.total_price});
   }
+  if (action === "cancel_booking" || action === "manual_refund") {
+    const db=adminSupabase();
+    const {data:current,error:findError}=await db.from("bookings").select("id,booking_no,payment_status,status").eq("booking_no",bookingNo).single();
+    if(findError||!current)return NextResponse.json({error:findError?.message||"找不到訂單"},{status:404});
+    if(current.status==="cancelled")return NextResponse.json({error:"這筆訂單已取消"},{status:400});
+    if(action==="cancel_booking"&&current.payment_status==="paid")return NextResponse.json({error:"已付款訂單請使用手動退款"},{status:400});
+    if(action==="manual_refund"&&current.payment_status!=="paid")return NextResponse.json({error:"尚未付款訂單請使用取消訂單"},{status:400});
+    const reason=action==="manual_refund"?"手動退款":"取消訂單";
+    const {error}=await db.from("bookings").update({status:"cancelled",cancellation_reason:reason,updated_at:new Date().toISOString()}).eq("id",current.id);
+    if(error)return NextResponse.json({error:error.message},{status:400});
+    try{await syncBookingCalendar(bookingNo)}catch(calendarError){console.error("取消訂單 Calendar 同步失敗",calendarError)}
+    return NextResponse.json({ok:true,status:"cancelled",cancellationReason:reason});
+  }
   if (action !== "mark_paid") return NextResponse.json({ error: "不支援的操作" }, { status: 400 });
   const db = adminSupabase();
   const { data: current, error: currentError } = await db.from("bookings").select(
@@ -233,6 +247,7 @@ export async function POST(request: NextRequest) {
     updated_at: new Date().toISOString(),
   }).eq("booking_no", bookingNo).neq("payment_status", "paid").select("booking_no").single();
   if (error || !data) return NextResponse.json({ error: error?.message || "找不到訂單" }, { status: 400 });
+  try{await syncBookingCalendar(bookingNo)}catch(calendarError){console.error("手動收款 Calendar 同步失敗",calendarError)}
   const customer = Array.isArray(current.customers) ? current.customers[0] : current.customers;
   const method = Array.isArray(current.consultation_methods) ? current.consultation_methods[0] : current.consultation_methods;
   const details = Array.isArray(current.booking_details) ? current.booking_details : [];
@@ -392,6 +407,7 @@ export async function PATCH(request: NextRequest) {
       .replace(/\s+/g, " ")
       .trim(),
   );
+  if(timeChanged||itemsChanged){try{await syncBookingCalendar(b.booking_no)}catch(calendarError){console.error("修改預約 Calendar 同步失敗",calendarError)}}
   const c = b.customers as unknown as { line_user_id: string },
     site = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin,
     effectiveSlot = body.slotStart || oldSlotStart,
