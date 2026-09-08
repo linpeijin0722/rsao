@@ -428,7 +428,7 @@ export default function Admin() {
             開啟
           </button>
         </div>
-        <div className="adminGrid">
+        <div className="adminGrid textSettingsControls">
           <label>
             名額規則
             <select
@@ -451,7 +451,7 @@ export default function Admin() {
           </label>
         </div>
         {textCap.mode === "monthly" && (
-          <div className="adminGrid">
+          <div className="adminGrid textMonthlyRule">
             <label>
               該月總名額
               <input
@@ -506,7 +506,7 @@ export default function Admin() {
             ))}
           </div></div>
         )}
-        {textCap.mode === "weekly" && <div className="textRulePanel textOverridePanel">
+        <div className="textRulePanel textOverridePanel">
           <div className="textRuleHeading"><div><span>02</span><div><h3>個別日期名額</h3><p>個別日期設定優先於每週固定規則，設定 0 位也會有效關閉當日名額。</p></div></div><b>個別日期 ＞ 每週設定</b></div>
           <div className="textOverrideForm">
             <label>日期<input type="date" value={overrideDate} onChange={(e) => setOverrideDate(e.target.value)} /></label>
@@ -521,7 +521,7 @@ export default function Admin() {
             <button type="button" onClick={() => { setOverrideDate(entry.release_date); setOverrideCount(entry.release_count); setOverrideNote(entry.note || ""); }}>編輯</button>
             <button type="button" className="danger" onClick={() => setTextOverrides((current) => current.filter((item) => item.release_date !== entry.release_date))}>刪除</button>
           </div>)}</div> : <div className="textOverrideEmpty">尚未設定個別日期，系統會使用每週固定規則。</div>}
-        </div>}
+        </div>
         <button className="holidayButton" onClick={saveTextCapacity}>
           儲存文字名額設定
         </button>

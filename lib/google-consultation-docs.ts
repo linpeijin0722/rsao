@@ -310,20 +310,20 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
 async function insertConsultationReturnButton(documentId: string, bookingNo: string, requestOrigin: string, token: string) {
   const origin = requestOrigin.replace(/\/$/, "");
   if (!/^https:\/\//i.test(origin)) throw new Error("Google 文件圖片按鈕需要可公開讀取的 HTTPS 網址");
-  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
-  const endIndex = Math.max(1, (document.body?.content || []).reduce((max: number, block: any) => Math.max(max, Number(block.endIndex || 0)), 1) - 1);
+  const insertIndex = 1;
   const imageUrl = `${origin}/consultation-return-button.png`;
   const returnUrl = `${origin}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}`;
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
     method: "POST",
     body: JSON.stringify({ requests: [
-      { insertInlineImage: { uri: imageUrl, location: { index: endIndex }, objectSize: { width: { magnitude: 170, unit: "PT" } } } },
-      { updateTextStyle: { range: { startIndex: endIndex, endIndex: endIndex + 1 }, textStyle: { link: { url: returnUrl } }, fields: "link" } },
-      { updateParagraphStyle: { range: { startIndex: endIndex, endIndex: endIndex + 1 }, paragraphStyle: { alignment: "CENTER", spaceAbove: { magnitude: 12, unit: "PT" } }, fields: "alignment,spaceAbove" } },
+      { insertText: { location: { index: insertIndex }, text: "\n" } },
+      { insertInlineImage: { uri: imageUrl, location: { index: insertIndex }, objectSize: { width: { magnitude: 170, unit: "PT" } } } },
+      { updateTextStyle: { range: { startIndex: insertIndex, endIndex: insertIndex + 1 }, textStyle: { link: { url: returnUrl } }, fields: "link" } },
+      { updateParagraphStyle: { range: { startIndex: insertIndex, endIndex: insertIndex + 1 }, paragraphStyle: { alignment: "END", spaceBelow: { magnitude: 0, unit: "PT" } }, fields: "alignment,spaceBelow" } },
     ] }),
   });
   const verified = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
-  const inserted = (verified.body?.content || []).some((block: any) => (block.paragraph?.elements || []).some((element: any) => element.inlineObjectElement && Number(element.startIndex) === endIndex));
+  const inserted = (verified.body?.content || []).some((block: any) => (block.paragraph?.elements || []).some((element: any) => element.inlineObjectElement && Number(element.startIndex) === insertIndex));
   if (!inserted) throw new Error("Google 文件未回傳已插入的圖片物件");
 }
 
@@ -335,6 +335,14 @@ export async function wasDocumentEditedBy(documentId: string, editorEmail: strin
 }
 
 export type ConsultationReturnItem = { index: number; itemTitle: string; content: string };
+
+export function normalizeConsultationReturnText(value: string) {
+  return String(value || "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/[ \t]+$/gm, "")
+    .replace(/\n[ \t]*\n(?:[ \t]*\n)+/g, "\n\n")
+    .trim();
+}
 
 function documentPlainText(document: any) {
   let output = "";
@@ -360,7 +368,7 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
   return matches.map((match, idx) => {
     const segmentStart = match.index || 0;
     const segmentEnd = idx + 1 < matches.length ? (matches[idx + 1].index || body.length) : body.length;
-    const segment = body.slice(segmentStart, segmentEnd).replace(/\n{4,}/g, "\n\n\n");
+    const segment = normalizeConsultationReturnText(body.slice(segmentStart, segmentEnd));
     const afterMarker = segment.slice(match[0].length).replace(/^\s+/, "");
     const firstLine = afterMarker.split("\n").map((line) => line.trim()).find(Boolean) || `項目 ${idx + 1}`;
     let startOffset = -1;
@@ -374,7 +382,7 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
       if (tag) startOffset = tag.index || 0;
     }
     if (startOffset < 0) throw new Error(`項目 ${idx + 1} 找不到 Q1 或結果標籤，請確認文件格式`);
-    const content = segment.slice(startOffset).replace(/[ \t]+$/gm, "").replace(/\n{3,}$/g, "\n").trim();
+    const content = normalizeConsultationReturnText(segment.slice(startOffset));
     return { index: idx + 1, itemTitle: firstLine, content };
   });
 }

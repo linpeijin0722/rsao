@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
 import { adminSupabase } from "@/lib/supabase";
-import { getConsultationReturnPreview } from "@/lib/google-consultation-docs";
+import { getConsultationReturnPreview, normalizeConsultationReturnText } from "@/lib/google-consultation-docs";
 import { pushLineText } from "@/lib/line-message";
 
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -70,13 +70,21 @@ export async function POST(request: NextRequest) {
     const selected = Array.isArray(body.selectedIndexes)
       ? [...new Set(body.selectedIndexes.map((value: unknown) => Number(value)).filter((value: number) => Number.isInteger(value) && value > 0))]
       : [];
+    const editedItems = body.editedItems && typeof body.editedItems === "object" ? body.editedItems as Record<string, unknown> : {};
     if (!bookingNo || !selected.length) return NextResponse.json({ error: "請至少選擇一個要回傳的項目" }, { status: 400 });
     const { detail, customer } = await bookingForDocument(bookingNo, documentId);
     if (!customer?.line_user_id) return NextResponse.json({ error: "這位用戶沒有 LINE UID，無法回傳" }, { status: 400 });
 
     // 送出前重新讀一次 Google 文件，避免預覽後老師又修改內容而送出舊版本。
     const freshItems = await getConsultationReturnPreview(detail.google_document_id);
-    const selectedItems = freshItems.filter((item) => selected.includes(item.index));
+    const selectedItems = freshItems.filter((item) => selected.includes(item.index)).map((item) => ({
+      ...item,
+      content: normalizeConsultationReturnText(
+        Object.prototype.hasOwnProperty.call(editedItems, String(item.index))
+          ? String(editedItems[String(item.index)] || "")
+          : item.content,
+      ),
+    }));
     if (!selectedItems.length) return NextResponse.json({ error: "找不到選取的諮詢結果" }, { status: 400 });
 
     let messageCount = 0;

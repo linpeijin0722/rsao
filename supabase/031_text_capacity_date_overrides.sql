@@ -22,7 +22,6 @@ declare
   local_now timestamp;
   month_start date;
   days_in_month integer;
-  released_days integer;
 begin
   perform expire_unpaid_bookings();
   select * into s from text_capacity_settings where id = true;
@@ -40,14 +39,21 @@ begin
     and b.created_at < (month_start + interval '1 month') at time zone 'Asia/Taipei';
 
   if s.mode = 'monthly' then
-    if s.monthly_limit is null then return true; end if;
+    if s.monthly_limit is null and not exists (
+      select 1 from text_capacity_date_overrides
+      where release_date between month_start and local_now::date
+    ) then return true; end if;
     days_in_month := extract(day from (month_start + interval '1 month - 1 day'))::integer;
-    released_days := extract(day from local_now)::integer
-      - case when local_now::time < s.release_time then 1 else 0 end;
-    allowed_count := least(
-      s.monthly_limit,
-      ceil(s.monthly_limit * greatest(released_days, 0)::numeric / days_in_month)
-    );
+    select coalesce(sum(coalesce(
+      o.release_count,
+      case when s.monthly_limit is null then 0
+        else ceil(s.monthly_limit * extract(day from d)::numeric / days_in_month)
+          - ceil(s.monthly_limit * (extract(day from d)::integer - 1)::numeric / days_in_month)
+      end
+    )), 0)::integer into allowed_count
+    from generate_series(month_start, local_now::date, interval '1 day') d
+    left join text_capacity_date_overrides o on o.release_date = d::date
+    where d::date < local_now::date or local_now::time >= s.release_time;
   else
     select coalesce(sum(coalesce(o.release_count, r.release_count)), 0)::integer
     into allowed_count
