@@ -9,7 +9,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-09-03-v13";
+const requiredAppsScriptVersion = "2026-09-08-v14";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -311,21 +311,21 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
 async function insertConsultationReturnButton(documentId: string, bookingNo: string, requestOrigin: string, token: string) {
   const origin = requestOrigin.replace(/\/$/, "");
   if (!/^https:\/\//i.test(origin)) throw new Error("Google 文件圖片按鈕需要可公開讀取的 HTTPS 網址");
-  const insertIndex = 1;
   const imageUrl = `${origin}/consultation-return-button.png`;
   const returnUrl = `${origin}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}`;
-  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
-    method: "POST",
-    body: JSON.stringify({ requests: [
-      { insertText: { location: { index: insertIndex }, text: "\n" } },
-      { insertInlineImage: { uri: imageUrl, location: { index: insertIndex }, objectSize: { width: { magnitude: 170, unit: "PT" } } } },
-      { updateTextStyle: { range: { startIndex: insertIndex, endIndex: insertIndex + 1 }, textStyle: { link: { url: returnUrl } }, fields: "link" } },
-      { updateParagraphStyle: { range: { startIndex: insertIndex, endIndex: insertIndex + 1 }, paragraphStyle: { alignment: "END", spaceBelow: { magnitude: 0, unit: "PT" } }, fields: "alignment,spaceBelow" } },
-    ] }),
+  void token;
+  await updatePositionedReturnButton({ documentId, imageUrl, returnUrl });
+}
+
+async function updatePositionedReturnButton(args: { documentId: string; imageUrl: string; returnUrl: string; returnedAt?: string }) {
+  if (!appsScriptUrl || !appsScriptSecret) throw new Error("尚未設定 Google Apps Script");
+  const response = await fetch(appsScriptUrl, {
+    method: "POST", headers: { "content-type": "text/plain;charset=utf-8" }, redirect: "follow",
+    body: JSON.stringify({ secret: appsScriptSecret, expectedVersion: requiredAppsScriptVersion, action: "upsertReturnButton", ...args }),
   });
-  const verified = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
-  const inserted = (verified.body?.content || []).some((block: any) => (block.paragraph?.elements || []).some((element: any) => element.inlineObjectElement && Number(element.startIndex) === insertIndex));
-  if (!inserted) throw new Error("Google 文件未回傳已插入的圖片物件");
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.error || "Google 文件定位圖片更新失敗");
+  if (result.version !== requiredAppsScriptVersion) throw new Error(`Google Apps Script 版本不一致（目前：${result.version || "未知"}；需要：${requiredAppsScriptVersion}）`);
 }
 
 function returnedTimeLabel(value: string) {
@@ -336,39 +336,10 @@ function returnedTimeLabel(value: string) {
   return `上次回傳時間：${formatted}`;
 }
 
-export async function markConsultationResultReturned(documentId: string, requestOrigin: string, returnedAt: string) {
-  const token = await accessToken();
+export async function markConsultationResultReturned(documentId: string, requestOrigin: string, returnedAt: string, bookingNo: string) {
   const origin = requestOrigin.replace(/\/$/, "");
-  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
-  const buttonElement = (document.body?.content || []).flatMap((block: any) => block.paragraph?.elements || [])
-    .find((element: any) => element.inlineObjectElement);
-  const objectId = buttonElement?.inlineObjectElement?.inlineObjectId;
-  if (!objectId) throw new Error("找不到諮詢單上的回傳按鈕圖片");
-  const label = returnedTimeLabel(returnedAt);
-  const requests: any[] = [{ replaceImage: { imageObjectId: objectId, uri: `${origin}/consultation-returned-button.png`, imageReplaceMethod: "CENTER_CROP" } }];
-  const plain = documentPlainText(document);
-  if (plain.includes("上次回傳時間：")) {
-    requests.push({ replaceAllText: { containsText: { text: "上次回傳時間：[^\\n]*", matchCase: true, searchByRegex: true }, replaceText: label } });
-  } else {
-    requests.push({ insertText: { location: { index: Number(buttonElement.endIndex || 2) }, text: `\n${label}` } });
-  }
-  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, { method: "POST", body: JSON.stringify({ requests }) });
-  const refreshed = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
-  for (const block of refreshed.body?.content || []) {
-    for (const element of block.paragraph?.elements || []) {
-      const content = String(element.textRun?.content || "");
-      const offset = content.indexOf(label);
-      if (offset < 0) continue;
-      const startIndex = Number(element.startIndex) + offset, endIndex = startIndex + label.length;
-      await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
-        method: "POST", body: JSON.stringify({ requests: [
-          { updateTextStyle: { range: { startIndex, endIndex }, textStyle: { foregroundColor: { color: { rgbColor: { red: .48, green: .48, blue: .48 } } }, fontSize: { magnitude: 9, unit: "PT" } }, fields: "foregroundColor,fontSize" } },
-          { updateParagraphStyle: { range: { startIndex, endIndex }, paragraphStyle: { alignment: "END", spaceAbove: { magnitude: 2, unit: "PT" }, spaceBelow: { magnitude: 0, unit: "PT" } }, fields: "alignment,spaceAbove,spaceBelow" } },
-        ] }),
-      });
-      return;
-    }
-  }
+  const returnUrl = `${origin}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}`;
+  await updatePositionedReturnButton({ documentId, imageUrl: `${origin}/consultation-returned-button.png`, returnUrl, returnedAt: returnedTimeLabel(returnedAt).replace(/^上次回傳時間：/, "") });
 }
 
 export async function moveConsultationDocumentToReturnedFolder(documentId: string) {
@@ -381,21 +352,9 @@ export async function moveConsultationDocumentToReturnedFolder(documentId: strin
   await google(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(documentId)}?${params}`, token, { method: "PATCH" });
 }
 
-export async function refreshConsultationReturnButton(documentId: string, requestOrigin: string) {
-  const token = await accessToken();
-  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
-  const buttonElement = (document.body?.content || []).flatMap((block: any) => block.paragraph?.elements || [])
-    .find((element: any) => element.inlineObjectElement);
-  const objectId = buttonElement?.inlineObjectElement?.inlineObjectId;
-  if (!objectId) return;
-  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
-    method: "POST",
-    body: JSON.stringify({ requests: [{ replaceImage: {
-      imageObjectId: objectId,
-      uri: `${requestOrigin.replace(/\/$/, "")}/consultation-return-button.png?v=20260908-2`,
-      imageReplaceMethod: "CENTER_CROP",
-    } }] }),
-  });
+export async function refreshConsultationReturnButton(documentId: string, requestOrigin: string, bookingNo: string) {
+  const origin = requestOrigin.replace(/\/$/, "");
+  await updatePositionedReturnButton({ documentId, imageUrl: `${origin}/consultation-return-button.png?v=20260908-3`, returnUrl: `${origin}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}` });
 }
 
 export async function markConsultationOrderCancelled(documentId: string) {
@@ -404,17 +363,21 @@ export async function markConsultationOrderCancelled(documentId: string) {
   const warning = "此筆訂單已取消，請確認。";
   const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
   if (documentPlainText(document).includes(warning)) return;
+  const anchorBlock = (document.body?.content || []).find((block: any) =>
+    (block.paragraph?.elements || []).some((element: any) => String(element.textRun?.content || "").includes("\u200B")),
+  );
+  const warningIndex = anchorBlock ? Number(anchorBlock.endIndex || 1) : 1;
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
     method: "POST",
     body: JSON.stringify({ requests: [
-      { insertText: { location: { index: 1 }, text: `${warning}\n` } },
-      { updateTextStyle: { range: { startIndex: 1, endIndex: 1 + warning.length }, textStyle: {
+      { insertText: { location: { index: warningIndex }, text: `${warning}\n` } },
+      { updateTextStyle: { range: { startIndex: warningIndex, endIndex: warningIndex + warning.length }, textStyle: {
         bold: true,
         fontSize: { magnitude: 17.25, unit: "PT" },
         foregroundColor: { color: { rgbColor: { red: 1, green: 0.9804, blue: 0.4157 } } },
         backgroundColor: { color: { rgbColor: { red: 0.8, green: 0, blue: 0 } } },
       }, fields: "bold,fontSize,foregroundColor,backgroundColor" } },
-      { updateParagraphStyle: { range: { startIndex: 1, endIndex: 2 + warning.length }, paragraphStyle: {
+      { updateParagraphStyle: { range: { startIndex: warningIndex, endIndex: warningIndex + warning.length + 1 }, paragraphStyle: {
         spaceAbove: { magnitude: 0, unit: "PT" }, spaceBelow: { magnitude: 4, unit: "PT" },
       }, fields: "spaceAbove,spaceBelow" } },
     ] }),

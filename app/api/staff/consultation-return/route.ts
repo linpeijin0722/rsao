@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
     if (!bookingNo) return NextResponse.json({ error: "缺少訂單編號" }, { status: 400 });
     const { booking, detail, customer } = await bookingForDocument(bookingNo, documentId);
     try {
-      if (booking.consultation_result_returned_at) await markConsultationResultReturned(detail.google_document_id, request.nextUrl.origin, booking.consultation_result_returned_at);
-      else await refreshConsultationReturnButton(detail.google_document_id, request.nextUrl.origin);
+      if (booking.consultation_result_returned_at) await markConsultationResultReturned(detail.google_document_id, request.nextUrl.origin, booking.consultation_result_returned_at, bookingNo);
+      else await refreshConsultationReturnButton(detail.google_document_id, request.nextUrl.origin, bookingNo);
     } catch (syncError) {
       console.error("同步 Google 諮詢單回傳按鈕失敗", syncError);
     }
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
     const returnedAt = new Date().toISOString();
     const { error: returnedError } = await adminSupabase().from("bookings").update({ consultation_result_returned_at: returnedAt }).eq("booking_no", bookingNo);
     if (returnedError) throw returnedError;
-    try { await markConsultationResultReturned(detail.google_document_id, request.nextUrl.origin, returnedAt); }
+    try { await markConsultationResultReturned(detail.google_document_id, request.nextUrl.origin, returnedAt, bookingNo); }
     catch (error) { console.error("更新 Google 諮詢單回傳狀態失敗", error); }
     try { await moveConsultationDocumentToReturnedFolder(detail.google_document_id); }
     catch (error) { console.error("移動 Google 諮詢單到已回傳資料夾失敗", error); }
