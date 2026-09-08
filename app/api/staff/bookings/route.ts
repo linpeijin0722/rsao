@@ -224,8 +224,8 @@ export async function POST(request: NextRequest) {
     if(current.status==="cancelled")return NextResponse.json({error:"這筆訂單已取消"},{status:400});
     if(action==="cancel_booking"&&current.payment_status==="paid")return NextResponse.json({error:"已付款訂單請使用手動退款"},{status:400});
     if(action==="manual_refund"&&current.payment_status!=="paid")return NextResponse.json({error:"尚未付款訂單請使用取消訂單"},{status:400});
-    const reason=action==="manual_refund"?"手動取消":"取消訂單";
-    const {error}=await db.from("bookings").update({status:"cancelled",payment_status:action==="manual_refund"?"refunded":"failed",cancellation_reason:reason,updated_at:new Date().toISOString()}).eq("id",current.id);
+    const reason=action==="manual_refund"?"手動退款":"取消訂單";
+    const {error}=await db.from("bookings").update({status:"cancelled",payment_status:"failed",cancellation_reason:reason,updated_at:new Date().toISOString()}).eq("id",current.id);
     if(error)return NextResponse.json({error:error.message},{status:400});
     try{await syncBookingCalendar(bookingNo)}catch(calendarError){console.error("取消訂單 Calendar 同步失敗",calendarError)}
     const customer=Array.isArray(current.customers)?current.customers[0]:current.customers;

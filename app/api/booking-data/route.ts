@@ -70,6 +70,17 @@ export async function POST(r: NextRequest) {
     );
   if (x.b.payment_status !== "paid")
     return NextResponse.json({ error: "完成付款後才能填寫問事資料" }, { status: 400 });
+  if (body.action === "notify_submitted") {
+    if (!x.b.data_submitted_at) return NextResponse.json({ error: "尚未完成填單" }, { status: 400 });
+    try {
+      await pushDataReceivedCarousel(x.c.line_user_id, r.nextUrl.origin);
+      return NextResponse.json({ ok: true, officialLineSent: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "官方帳號訊息傳送失敗";
+      console.error("填單完成輪播通知傳送失敗", error);
+      return NextResponse.json({ error: message }, { status: 502 });
+    }
+  }
   if (body.action === "submit") {
     const detailIds=(x.b.booking_details||[]).map((d:any)=>d.id),{data:answers,error:answersError}=await x.db.from("booking_consultation_answers").select("*,booking_answer_participants(profile_id,position)").in("booking_detail_id",detailIds);
     if(answersError){
@@ -96,12 +107,14 @@ export async function POST(r: NextRequest) {
     });
     let officialLineSent = false;
     let officialLineError = "";
-    try {
-      await pushDataReceivedCarousel(x.c.line_user_id, r.nextUrl.origin);
-      officialLineSent = true;
-    } catch (error) {
-      officialLineError = error instanceof Error ? error.message : "官方帳號訊息傳送失敗";
-      console.error("填單完成輪播通知傳送失敗", error);
+    if (body.submitSource !== "liff") {
+      try {
+        await pushDataReceivedCarousel(x.c.line_user_id, r.nextUrl.origin);
+        officialLineSent = true;
+      } catch (error) {
+        officialLineError = error instanceof Error ? error.message : "官方帳號訊息傳送失敗";
+        console.error("填單完成輪播通知傳送失敗", error);
+      }
     }
     return NextResponse.json({
       ok:true,

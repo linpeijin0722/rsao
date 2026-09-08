@@ -90,7 +90,7 @@ const statusKey = (x: any) =>
         : "pending";
 const statusText = (x: any) =>
   x.status === "cancelled"
-    ? (x.cancellation_reason === "手動取消" || x.cancellation_reason === "手動退款" ? "手動取消" : "取消訂單")
+    ? (x.cancellation_reason === "手動取消" || x.cancellation_reason === "手動退款" ? "手動退款" : "取消訂單")
     : ({ paid: "已付款", pending: "待付款", expired: "已失效" } as Record<string,string>)[statusKey(x)];
 const shortText = (value: unknown, limit = 20) => {
   const chars = Array.from(String(value || ""));
@@ -405,7 +405,7 @@ export default function Staff() {
       const r=await staffPost({bookingNo:paymentActions.booking_no,action}),j=await r.json();
       if(!r.ok)throw new Error(j.error||`${label}失敗`);
       setPaymentActions(null);setEditing(null);await load();
-      alert(action==="manual_refund"?(j.lineNotified?"已更新為手動取消，並已傳送取消 LINE 訊息":`已更新為手動取消，但 LINE 訊息未送出：${j.lineError||"請檢查 LINE 設定"}`):`${label}完成`);
+      alert(action==="manual_refund"?(j.lineNotified?"已更新為手動退款，並已傳送取消 LINE 訊息":`已更新為手動退款，但 LINE 訊息未送出：${j.lineError||"請檢查 LINE 設定"}`):`${label}完成`);
     }catch(error){alert(error instanceof Error?error.message:`${label}失敗`)}finally{setPaymentActionBusy(false)}
   }
   async function markPaid(no: string) {
@@ -731,7 +731,7 @@ export default function Staff() {
                       )}
                       <span>{[x.customers?.line_display_name,x.customers?.full_name].filter(Boolean).join("｜")}</span>
                     </button>
-                    <button className={`staffState staffStateButton ${statusKey(x)}`} onClick={()=>setPaymentActions(x)}><span>{paid && x.collection_source === "manual" ? "手動收款" : status}</span>{showVideoAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</button>
+                    <button className={`staffState staffStateButton ${statusKey(x)}`} onClick={()=>setPaymentActions(x)}><span>{x.status!=="cancelled" && paid && x.collection_source === "manual" ? "手動收款" : status}</span>{showVideoAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</button>
                     {paid ? (
                       complete ? (
                         <button
@@ -901,7 +901,7 @@ export default function Staff() {
                   )}
                   <span>{[x.customers?.line_display_name,x.customers?.full_name].filter(Boolean).join("｜")}</span>
                 </button>
-                <button className={`staffState staffStateButton ${statusKey(x)}`} onClick={()=>setPaymentActions(x)}><span>{paid && x.collection_source === "manual" ? "手動收款" : statusText(x)}</span>{showTextAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</button>
+                <button className={`staffState staffStateButton ${statusKey(x)}`} onClick={()=>setPaymentActions(x)}><span>{x.status!=="cancelled" && paid && x.collection_source === "manual" ? "手動收款" : statusText(x)}</span>{showTextAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</button>
                 {paid ? (
                   complete ? (
                     <button

@@ -473,7 +473,14 @@ export default function BookingData() {
           await new Promise((resolve) => setTimeout(resolve, 700));
           await liff.sendMessages([message]);
         }
-        await new Promise((resolve) => setTimeout(resolve, 800));
+        const notifyResponse = await fetch("/api/booking-data", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ order, action: "notify_submitted" }),
+        });
+        const notifyResult = await notifyResponse.json().catch(() => ({}));
+        if (!notifyResponse.ok) throw new Error(`完成填單訊息已送出，但官方帳號輪播未能傳送：${notifyResult.error || "請稍後再試"}`);
+        await new Promise((resolve) => setTimeout(resolve, 500));
         if (liff.isInClient()) {
           window.setTimeout(returnToLine, 700);
           try {
