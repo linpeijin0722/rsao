@@ -530,3 +530,69 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 .staffEditModal .staffEditColumns{display:grid!important;grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr)!important;gap:14px!important;overflow:auto!important}
 .staffEditModal .staffEditFooterActions{position:sticky!important;bottom:0!important;z-index:2!important}
 @media(max-width:760px){.staffEditModal .staffEditColumns{grid-template-columns:1fr!important}.staffPage .staffPageHeading .staffHeadingActions>*{flex:1 1 180px!important}}
+
+/* v16：修正問事資料複選框尺寸與文字排列。必須放在通用 input 規則之後。 */
+.staffAnswerEditor .staffHealthChecks{
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  gap:8px!important;
+  width:100%!important;
+  margin:6px 0 14px!important;
+}
+.staffAnswerEditor .staffHealthChecks label{
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:9px!important;
+  width:100%!important;
+  min-width:0!important;
+  min-height:32px!important;
+  box-sizing:border-box!important;
+  margin:0!important;
+  padding:5px 8px!important;
+  border:1px solid #eadfd6!important;
+  border-radius:9px!important;
+  background:#fff!important;
+  color:#312b27!important;
+  font-size:15px!important;
+  font-weight:650!important;
+  line-height:1.35!important;
+  white-space:nowrap!important;
+  word-break:keep-all!important;
+  overflow-wrap:normal!important;
+  writing-mode:horizontal-tb!important;
+  text-orientation:mixed!important;
+  cursor:pointer!important;
+}
+.staffAnswerEditor .staffHealthChecks label:hover{
+  border-color:#cdb7aa!important;
+  background:#fffaf6!important;
+}
+.staffAnswerEditor .staffHealthChecks input[type="checkbox"]{
+  appearance:auto!important;
+  -webkit-appearance:checkbox!important;
+  order:0!important;
+  flex:0 0 16px!important;
+  width:16px!important;
+  min-width:16px!important;
+  max-width:16px!important;
+  height:16px!important;
+  min-height:16px!important;
+  max-height:16px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:2px!important;
+  box-shadow:none!important;
+  transform:none!important;
+  vertical-align:middle!important;
+  accent-color:#8a3045!important;
+}
+@media(max-width:640px){
+  .staffAnswerEditor .staffHealthChecks label{
+    font-size:14px!important;
+    gap:8px!important;
+    padding:5px 6px!important;
+  }
+}
