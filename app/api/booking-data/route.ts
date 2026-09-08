@@ -4,7 +4,7 @@ import { verifyLineSession } from "@/lib/line-session";
 import { adminSupabase } from "@/lib/supabase";
 import { lunarProfile } from "@/lib/lunar-profile";
 import { createConsultationDocuments } from "@/lib/google-consultation-docs";
-import { pushLineText } from "@/lib/line-message";
+import { pushDataReceivedCarousel } from "@/lib/line-message";
 async function context(order: string) {
   const uid = verifyLineSession((await cookies()).get("line_session")?.value);
   if (!uid) return null;
@@ -96,18 +96,12 @@ export async function POST(r: NextRequest) {
     });
     let officialLineSent = false;
     let officialLineError = "";
-    if (body.submitSource === "web") {
-      try {
-        await pushLineText(
-          x.c.line_user_id,
-          "已完成填單，請於此聊天室窗回傳您的姓名",
-        );
-        officialLineSent = true;
-      } catch (error) {
-        officialLineError =
-          error instanceof Error ? error.message : "官方帳號訊息傳送失敗";
-        console.error("一般瀏覽器填單完成通知傳送失敗", error);
-      }
+    try {
+      await pushDataReceivedCarousel(x.c.line_user_id, r.nextUrl.origin);
+      officialLineSent = true;
+    } catch (error) {
+      officialLineError = error instanceof Error ? error.message : "官方帳號訊息傳送失敗";
+      console.error("填單完成輪播通知傳送失敗", error);
     }
     return NextResponse.json({
       ok:true,

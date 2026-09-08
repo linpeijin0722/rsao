@@ -3,14 +3,14 @@ import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
 import { adminSupabase } from "@/lib/supabase";
 import { getConsultationReturnPreview, normalizeConsultationReturnText } from "@/lib/google-consultation-docs";
-import { pushLineText } from "@/lib/line-message";
+import { pushConsultationResultCarousel, pushLineText } from "@/lib/line-message";
 
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
 
 async function bookingForDocument(bookingNo: string, requestedDocumentId: string) {
   const db = adminSupabase();
   const { data: booking, error } = await db.from("bookings").select(
-    "id,booking_no,customers(line_user_id,line_display_name,line_picture_url,full_name),booking_details(id,item_title,google_document_id,google_document_url)",
+    "id,booking_no,customers(line_user_id,line_display_name,line_picture_url,full_name),consultation_methods(code),booking_details(id,item_title,google_document_id,google_document_url)",
   ).eq("booking_no", bookingNo).single();
   if (error || !booking) throw new Error(error?.message || "找不到訂單");
   const details = Array.isArray(booking.booking_details) ? booking.booking_details : [];
@@ -19,7 +19,7 @@ async function bookingForDocument(bookingNo: string, requestedDocumentId: string
     ? documents.find((entry: any) => entry.google_document_id === requestedDocumentId)
     : documents[0];
   if (!detail) throw new Error("找不到這筆訂單的 Google 諮詢單");
-  return { booking, detail, customer: one(booking.customers) };
+  return { booking, detail, customer: one(booking.customers), method: one(booking.consultation_methods) };
 }
 
 export async function GET(request: NextRequest) {
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       : [];
     const editedItems = body.editedItems && typeof body.editedItems === "object" ? body.editedItems as Record<string, unknown> : {};
     if (!bookingNo || !selected.length) return NextResponse.json({ error: "請至少選擇一個要回傳的項目" }, { status: 400 });
-    const { detail, customer } = await bookingForDocument(bookingNo, documentId);
+    const { detail, customer, method } = await bookingForDocument(bookingNo, documentId);
     if (!customer?.line_user_id) return NextResponse.json({ error: "這位用戶沒有 LINE UID，無法回傳" }, { status: 400 });
 
     // 送出前重新讀一次 Google 文件，避免預覽後老師又修改內容而送出舊版本。
@@ -97,6 +97,13 @@ export async function POST(request: NextRequest) {
         messageCount += 1;
       }
     }
+    // 必須等所有文字項目都成功傳送後，才送最後一則左右滑動輪播。
+    await pushConsultationResultCarousel({
+      userId: customer.line_user_id,
+      method: method?.code || "text",
+      bookingNo,
+      site: request.nextUrl.origin,
+    });
     return NextResponse.json({ ok: true, sentItems: selectedItems.length, messageCount });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "LINE 回傳失敗" }, { status: 400 });

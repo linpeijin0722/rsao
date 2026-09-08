@@ -37,6 +37,54 @@ export async function pushLineText(userId: string, text: string) {
   if (!response.ok)
     throw new Error(`LINE 訊息發送失敗：${await response.text()}`);
 }
+
+export function imageCarousel(args: {
+  site: string;
+  images: string[];
+  link?: { index: number; url: string };
+}) {
+  const site = args.site.replace(/\/$/, "");
+  return {
+    type: "carousel",
+    contents: args.images.map((image, index) => ({
+      type: "bubble",
+      size: "kilo",
+      hero: {
+        type: "image",
+        url: `${site}/${image.replace(/^\//, "")}`,
+        size: "full",
+        aspectRatio: "868:760",
+        aspectMode: "cover",
+        ...(args.link?.index === index ? { action: { type: "uri", label: "開啟連結", uri: args.link.url } } : {}),
+      },
+    })),
+  };
+}
+
+export async function pushConsultationResultCarousel(args: { userId: string; method: string; bookingNo: string; site: string }) {
+  const isVideo = args.method === "video";
+  const orderUrl = liffPageUrl("/my-bookings", new URLSearchParams({ order: args.bookingNo }));
+  const surveyUrl = "https://docs.google.com/forms/d/e/1FAIpQLSfK7YOhVxMmCWQ1laHMykb-fUCEP0zx_s9rEtLoa2KYQhmehQ/viewform?usp=publish-editor";
+  await pushLineFlex(
+    args.userId,
+    isVideo ? "【視訊諮詢準備】文字結果已送達！請先整理問題並確認預約時段 📅" : "您好～以上是您的文字諮詢結果",
+    imageCarousel({
+      site: args.site,
+      images: isVideo
+        ? ["video-result-01.png", "video-result-02.png", "video-result-03.png"]
+        : ["text-result-01.png", "text-result-02.png", "text-result-03.png"],
+      link: { index: 2, url: isVideo ? orderUrl : surveyUrl },
+    }),
+  );
+}
+
+export async function pushDataReceivedCarousel(userId: string, site: string) {
+  await pushLineFlex(
+    userId,
+    "收到，已幫您排單給老師，感謝您的耐心等候～",
+    imageCarousel({ site, images: ["data-received-01.png", "data-received-02.png"] }),
+  );
+}
 const statusColors={pending:{background:"#FDECEC",text:"#C94040",label:"待付款"},paid:{background:"#EBFBF9",text:"#168A54",label:"已付款"},data_required:{background:"#FDECEC",text:"#C94040",label:"請填寫諮詢者資料"},changed:{background:"#F1F1F1",text:"#444444",label:"預約已變更"}} as const;
 const bookingLiffId = process.env.NEXT_PUBLIC_LIFF_ID || "2010145548-jmc9lP5o";
 export const liffPageUrl = (path: string, params?: URLSearchParams) =>
