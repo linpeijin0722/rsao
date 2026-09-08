@@ -126,3 +126,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "LINE 回傳失敗" }, { status: 400 });
   }
 }
+
