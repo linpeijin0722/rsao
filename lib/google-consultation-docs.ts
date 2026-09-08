@@ -327,6 +327,66 @@ async function insertConsultationReturnButton(documentId: string, bookingNo: str
   if (!inserted) throw new Error("Google 文件未回傳已插入的圖片物件");
 }
 
+function returnedTimeLabel(value: string) {
+  const formatted = new Intl.DateTimeFormat("zh-TW", {
+    timeZone: "Asia/Taipei", year: "numeric", month: "numeric", day: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true,
+  }).format(new Date(value));
+  return `上次回傳時間：${formatted}`;
+}
+
+export async function markConsultationResultReturned(documentId: string, requestOrigin: string, returnedAt: string) {
+  const token = await accessToken();
+  const origin = requestOrigin.replace(/\/$/, "");
+  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const buttonElement = (document.body?.content || []).flatMap((block: any) => block.paragraph?.elements || [])
+    .find((element: any) => element.inlineObjectElement && Number(element.startIndex) <= 2);
+  const objectId = buttonElement?.inlineObjectElement?.inlineObjectId;
+  if (!objectId) throw new Error("找不到諮詢單上的回傳按鈕圖片");
+  const label = returnedTimeLabel(returnedAt);
+  const requests: any[] = [{ replaceImage: { imageObjectId: objectId, uri: `${origin}/consultation-returned-button.png`, imageReplaceMethod: "CENTER_CROP" } }];
+  const plain = documentPlainText(document);
+  if (plain.includes("上次回傳時間：")) {
+    requests.push({ replaceAllText: { containsText: { text: "上次回傳時間：[^\\n]*", matchCase: true, searchByRegex: true }, replaceText: label } });
+  } else {
+    requests.push({ insertText: { location: { index: Number(buttonElement.endIndex || 2) }, text: `\n${label}` } });
+  }
+  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, { method: "POST", body: JSON.stringify({ requests }) });
+  const refreshed = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  for (const block of refreshed.body?.content || []) {
+    for (const element of block.paragraph?.elements || []) {
+      const content = String(element.textRun?.content || "");
+      const offset = content.indexOf(label);
+      if (offset < 0) continue;
+      const startIndex = Number(element.startIndex) + offset, endIndex = startIndex + label.length;
+      await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+        method: "POST", body: JSON.stringify({ requests: [
+          { updateTextStyle: { range: { startIndex, endIndex }, textStyle: { foregroundColor: { color: { rgbColor: { red: .48, green: .48, blue: .48 } } }, fontSize: { magnitude: 9, unit: "PT" } }, fields: "foregroundColor,fontSize" } },
+          { updateParagraphStyle: { range: { startIndex, endIndex }, paragraphStyle: { alignment: "END", spaceAbove: { magnitude: 2, unit: "PT" }, spaceBelow: { magnitude: 0, unit: "PT" } }, fields: "alignment,spaceAbove,spaceBelow" } },
+        ] }),
+      });
+      return;
+    }
+  }
+}
+
+export async function refreshConsultationReturnButton(documentId: string, requestOrigin: string) {
+  const token = await accessToken();
+  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const buttonElement = (document.body?.content || []).flatMap((block: any) => block.paragraph?.elements || [])
+    .find((element: any) => element.inlineObjectElement && Number(element.startIndex) <= 2);
+  const objectId = buttonElement?.inlineObjectElement?.inlineObjectId;
+  if (!objectId) return;
+  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+    method: "POST",
+    body: JSON.stringify({ requests: [{ replaceImage: {
+      imageObjectId: objectId,
+      uri: `${requestOrigin.replace(/\/$/, "")}/consultation-return-button.png?v=20260908-2`,
+      imageReplaceMethod: "CENTER_CROP",
+    } }] }),
+  });
+}
+
 export async function wasDocumentEditedBy(documentId: string, editorEmail: string) {
   if (!documentId || !editorEmail) return false;
   const token = await accessToken();

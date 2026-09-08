@@ -111,7 +111,7 @@ export default function Admin() {
       }
     });
   }
-  async function saveTextCapacity() {
+  async function saveTextCapacity(overrides: TextDateOverride[] = textOverrides) {
     setTextSaveMessage("儲存中…");
     const r = await fetch("/api/admin/text-capacity", {
       method: "POST",
@@ -122,7 +122,7 @@ export default function Admin() {
         mode: textCap.mode,
         releaseTime: textCap.release_time,
         weekly: weeklyRelease,
-        overrides: textOverrides,
+        overrides,
       }),
     });
     if (r.ok) {
@@ -134,15 +134,23 @@ export default function Admin() {
       setError((await r.json()).error);
     }
   }
-  function addTextOverride() {
+  async function addTextOverride() {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(overrideDate)) return setError("請選擇個別設定日期");
     const releaseCount = Math.max(0, Number(overrideCount) || 0);
-    setTextOverrides((current) => [...current.filter((entry) => entry.release_date !== overrideDate), {
+    const next = [...textOverrides.filter((entry) => entry.release_date !== overrideDate), {
       release_date: overrideDate,
       release_count: releaseCount,
       note: overrideNote.trim() || null,
-    }].sort((a, b) => a.release_date.localeCompare(b.release_date)));
+    }].sort((a, b) => a.release_date.localeCompare(b.release_date));
+    setTextOverrides(next);
     setOverrideNote("");
+    await saveTextCapacity(next);
+  }
+  async function removeTextOverride(releaseDate: string) {
+    if (!window.confirm(`確定刪除 ${releaseDate} 的個別名額設定嗎？`)) return;
+    const next = textOverrides.filter((item) => item.release_date !== releaseDate);
+    setTextOverrides(next);
+    await saveTextCapacity(next);
   }
   function weekdayLabel(value: string) {
     return new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", weekday: "short" }).format(new Date(`${value}T12:00:00+08:00`));
@@ -519,10 +527,10 @@ export default function Admin() {
             <strong>{entry.release_count} 位</strong>
             <span className="textOverrideNote">{entry.note || "無備註"}</span>
             <button type="button" onClick={() => { setOverrideDate(entry.release_date); setOverrideCount(entry.release_count); setOverrideNote(entry.note || ""); }}>編輯</button>
-            <button type="button" className="danger" onClick={() => setTextOverrides((current) => current.filter((item) => item.release_date !== entry.release_date))}>刪除</button>
+            <button type="button" className="danger" onClick={() => void removeTextOverride(entry.release_date)}>刪除</button>
           </div>)}</div> : <div className="textOverrideEmpty">尚未設定個別日期，系統會使用每週固定規則。</div>}
         </div>
-        <button className="holidayButton" onClick={saveTextCapacity}>
+        <button className="holidayButton" onClick={() => void saveTextCapacity()}>
           儲存文字名額設定
         </button>
         {textSaveMessage && (

@@ -48,7 +48,7 @@ export function imageCarousel(args: {
     type: "carousel",
     contents: args.images.map((image, index) => ({
       type: "bubble",
-      size: "kilo",
+      size: "mega",
       hero: {
         type: "image",
         url: `${site}/${image.replace(/^\//, "")}`,
