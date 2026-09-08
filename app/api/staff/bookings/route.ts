@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
 import { adminSupabase } from "@/lib/supabase";
 import { bookingStatusFlex, pushLineFlex } from "@/lib/line-message";
-import { createConsultationDocuments, wasDocumentEditedBy } from "@/lib/google-consultation-docs";
+import { createConsultationDocuments, markConsultationOrderCancelled, wasDocumentEditedBy } from "@/lib/google-consultation-docs";
 import { syncBookingCalendar } from "@/lib/google-calendar";
 export async function GET() {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
@@ -219,7 +219,7 @@ export async function POST(request: NextRequest) {
   }
   if (action === "cancel_booking" || action === "manual_refund") {
     const db=adminSupabase();
-    const {data:current,error:findError}=await db.from("bookings").select("id,booking_no,total_price,slot_start,payment_status,status,customers(line_user_id),consultation_methods(code),booking_details(item_title,quantity,booking_detail_sub_items(sub_item_title))").eq("booking_no",bookingNo).single();
+    const {data:current,error:findError}=await db.from("bookings").select("id,booking_no,total_price,slot_start,payment_status,status,customers(line_user_id),consultation_methods(code),booking_details(item_title,quantity,google_document_id,booking_detail_sub_items(sub_item_title))").eq("booking_no",bookingNo).single();
     if(findError||!current)return NextResponse.json({error:findError?.message||"找不到訂單"},{status:404});
     if(current.status==="cancelled")return NextResponse.json({error:"這筆訂單已取消"},{status:400});
     if(action==="cancel_booking"&&current.payment_status==="paid")return NextResponse.json({error:"已付款訂單請使用手動退款"},{status:400});
@@ -231,6 +231,8 @@ export async function POST(request: NextRequest) {
     const customer=Array.isArray(current.customers)?current.customers[0]:current.customers;
     const method=Array.isArray(current.consultation_methods)?current.consultation_methods[0]:current.consultation_methods;
     const details=Array.isArray(current.booking_details)?current.booking_details:[];
+    const documentIds=Array.from(new Set(details.map((detail:any)=>detail.google_document_id).filter(Boolean))) as string[];
+    for(const documentId of documentIds)try{await markConsultationOrderCancelled(documentId)}catch(documentError){console.error("諮詢單取消警示更新失敗",documentError)}
     const items=details.flatMap((detail:any)=>Array.from({length:Math.max(1,Number(detail.quantity)||1)},()=>[detail.item_title,...(Array.isArray(detail.booking_detail_sub_items)?detail.booking_detail_sub_items:[]).map((sub:any)=>sub.sub_item_title)].filter(Boolean).join("｜"))).filter(Boolean);
     let lineNotified=false,lineError="";
     if(customer?.line_user_id)try{

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
 import { adminSupabase } from "@/lib/supabase";
-import { getConsultationReturnPreview, markConsultationResultReturned, normalizeConsultationReturnText, refreshConsultationReturnButton } from "@/lib/google-consultation-docs";
+import { getConsultationReturnPreview, markConsultationResultReturned, moveConsultationDocumentToReturnedFolder, normalizeConsultationReturnText, refreshConsultationReturnButton } from "@/lib/google-consultation-docs";
 import { pushConsultationResultCarousel, pushLineText } from "@/lib/line-message";
 
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -14,9 +14,14 @@ async function bookingForDocument(bookingNo: string, requestedDocumentId: string
   ).eq("booking_no", bookingNo).single();
   if (error || !booking) throw new Error(error?.message || "找不到訂單");
   const details = Array.isArray(booking.booking_details) ? booking.booking_details : [];
-  const documents = details.filter((detail: any) => detail.google_document_id);
+  const documents = details.map((detail: any) => {
+    const urlId = String(detail.google_document_url || "").match(/\/document\/d\/([a-zA-Z0-9_-]+)/)?.[1] || "";
+    return { ...detail, google_document_id: detail.google_document_id || urlId };
+  }).filter((detail: any) => detail.google_document_id);
+  // 舊按鈕可能仍帶著重建前的 documentId；只要 bookingNo 正確且該訂單仍有
+  // 有效諮詢單，就改用資料庫目前保存的文件，避免重建文件後舊連結失效。
   const detail = requestedDocumentId
-    ? documents.find((entry: any) => entry.google_document_id === requestedDocumentId)
+    ? documents.find((entry: any) => entry.google_document_id === requestedDocumentId) || documents[0]
     : documents[0];
   if (!detail) throw new Error("找不到這筆訂單的 Google 諮詢單");
   return { booking, detail, customer: one(booking.customers), method: one(booking.consultation_methods) };
@@ -114,6 +119,8 @@ export async function POST(request: NextRequest) {
     if (returnedError) throw returnedError;
     try { await markConsultationResultReturned(detail.google_document_id, request.nextUrl.origin, returnedAt); }
     catch (error) { console.error("更新 Google 諮詢單回傳狀態失敗", error); }
+    try { await moveConsultationDocumentToReturnedFolder(detail.google_document_id); }
+    catch (error) { console.error("移動 Google 諮詢單到已回傳資料夾失敗", error); }
     return NextResponse.json({ ok: true, sentItems: selectedItems.length, messageCount, skippedCarousel: skipCarousel, returnedAt });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "LINE 回傳失敗" }, { status: 400 });

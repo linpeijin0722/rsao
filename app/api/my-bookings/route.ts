@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyLineSession } from "@/lib/line-session";
 import { adminSupabase } from "@/lib/supabase";
+import { markConsultationOrderCancelled } from "@/lib/google-consultation-docs";
 export async function GET() {
   const uid = verifyLineSession((await cookies()).get("line_session")?.value);
   if (!uid)
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
       .select("id")
       .eq("line_user_id", uid)
       .single();
-  const { data: booking } = await db.from("bookings").select("id,payment_status,status").eq("booking_no", bookingNo).eq("customer_id", c?.id || "").single();
+  const { data: booking } = await db.from("bookings").select("id,payment_status,status,booking_details(google_document_id)").eq("booking_no", bookingNo).eq("customer_id", c?.id || "").single();
   if (booking?.payment_status === "paid") return NextResponse.json({ error: "已付款的預約無法自行取消，如需調整請聯絡 LINE 助理" }, { status: 400 });
   if (!booking || !["pending_payment", "confirmed"].includes(booking.status)) return NextResponse.json({ error: "此預約已取消、完成或不存在" }, { status: 400 });
   const update: Record<string,string> = { status: "cancelled", cancellation_reason: "自行取消" };
@@ -44,5 +45,8 @@ export async function POST(request: NextRequest) {
     .from("bookings")
     .update(update).eq("id", booking.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  const details=Array.isArray(booking.booking_details)?booking.booking_details:[];
+  const documentIds=Array.from(new Set(details.map((detail:any)=>detail.google_document_id).filter(Boolean))) as string[];
+  for(const documentId of documentIds)try{await markConsultationOrderCancelled(documentId)}catch(documentError){console.error("諮詢單取消警示更新失敗",documentError)}
   return NextResponse.json({ ok: true });
 }

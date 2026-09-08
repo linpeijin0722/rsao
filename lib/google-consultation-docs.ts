@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 const folderId = process.env.GOOGLE_DRIVE_OUTPUT_FOLDER_ID || process.env.GOOGLE_DRIVE_TEMPLATE_FOLDER_ID || "";
+const returnedFolderId = process.env.GOOGLE_DRIVE_RETURNED_FOLDER_ID || "18zRTeG1bAmWDCev0LJLslpo5LC7frYhX";
 const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || "";
 const privateKey = (process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || "").replace(/\\n/g, "\n");
 const appsScriptSetting = (process.env.GOOGLE_APPS_SCRIPT_WEB_APP_URL || "").trim();
@@ -340,7 +341,7 @@ export async function markConsultationResultReturned(documentId: string, request
   const origin = requestOrigin.replace(/\/$/, "");
   const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
   const buttonElement = (document.body?.content || []).flatMap((block: any) => block.paragraph?.elements || [])
-    .find((element: any) => element.inlineObjectElement && Number(element.startIndex) <= 2);
+    .find((element: any) => element.inlineObjectElement);
   const objectId = buttonElement?.inlineObjectElement?.inlineObjectId;
   if (!objectId) throw new Error("找不到諮詢單上的回傳按鈕圖片");
   const label = returnedTimeLabel(returnedAt);
@@ -370,11 +371,21 @@ export async function markConsultationResultReturned(documentId: string, request
   }
 }
 
+export async function moveConsultationDocumentToReturnedFolder(documentId: string) {
+  if (!documentId || !returnedFolderId) return;
+  const token = await accessToken();
+  const file = await google(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(documentId)}?fields=parents&supportsAllDrives=true`, token);
+  const previousParents = Array.isArray(file.parents) ? file.parents.filter((id: unknown) => String(id) !== returnedFolderId) : [];
+  const params = new URLSearchParams({ addParents: returnedFolderId, supportsAllDrives: "true", fields: "id,parents" });
+  if (previousParents.length) params.set("removeParents", previousParents.join(","));
+  await google(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(documentId)}?${params}`, token, { method: "PATCH" });
+}
+
 export async function refreshConsultationReturnButton(documentId: string, requestOrigin: string) {
   const token = await accessToken();
   const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
   const buttonElement = (document.body?.content || []).flatMap((block: any) => block.paragraph?.elements || [])
-    .find((element: any) => element.inlineObjectElement && Number(element.startIndex) <= 2);
+    .find((element: any) => element.inlineObjectElement);
   const objectId = buttonElement?.inlineObjectElement?.inlineObjectId;
   if (!objectId) return;
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
@@ -384,6 +395,29 @@ export async function refreshConsultationReturnButton(documentId: string, reques
       uri: `${requestOrigin.replace(/\/$/, "")}/consultation-return-button.png?v=20260908-2`,
       imageReplaceMethod: "CENTER_CROP",
     } }] }),
+  });
+}
+
+export async function markConsultationOrderCancelled(documentId: string) {
+  if (!documentId) return;
+  const token = await accessToken();
+  const warning = "此筆訂單已取消，請確認。";
+  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  if (documentPlainText(document).includes(warning)) return;
+  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+    method: "POST",
+    body: JSON.stringify({ requests: [
+      { insertText: { location: { index: 1 }, text: `${warning}\n` } },
+      { updateTextStyle: { range: { startIndex: 1, endIndex: 1 + warning.length }, textStyle: {
+        bold: true,
+        fontSize: { magnitude: 17.25, unit: "PT" },
+        foregroundColor: { color: { rgbColor: { red: 1, green: 0.9804, blue: 0.4157 } } },
+        backgroundColor: { color: { rgbColor: { red: 0.8, green: 0, blue: 0 } } },
+      }, fields: "bold,fontSize,foregroundColor,backgroundColor" } },
+      { updateParagraphStyle: { range: { startIndex: 1, endIndex: 2 + warning.length }, paragraphStyle: {
+        spaceAbove: { magnitude: 0, unit: "PT" }, spaceBelow: { magnitude: 4, unit: "PT" },
+      }, fields: "spaceAbove,spaceBelow" } },
+    ] }),
   });
 }
 
@@ -520,7 +554,9 @@ const companyPartnerSummary = (profile: any) => {
 type Mark = { start: number; end: number; kind: "meta" | "title" | "section" | "question" | "answer" | "teacher" | "fieldLabel" | "fieldAnswer" };
 type DocumentImage = { marker: string; dataUrl: string; width: number };
 type PageSpec = { detail: any; target?: any; targetIndex?: number; targetCount?: number };
-const cleanSubItemTitle = (value: unknown) => text(value).replace(/^\s*[＋+]\s*加購\s*[：:]?\s*(?:你)?/, "");
+const cleanSubItemTitle = (value: unknown) => text(value)
+  .replace(/^\s*[＋+]\s*加購\s*[：:]?\s*(?:你)?/, "")
+  .replace(/個人感情運\s*[（(]\s*僅看自己\s*[）)]/gu, "個人感情運");
 const taipeiClock = (value: Date) => {
   const parts = new Intl.DateTimeFormat("zh-TW", {
     timeZone: "Asia/Taipei", hour: "numeric", minute: "2-digit", hour12: true,
