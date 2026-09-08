@@ -219,16 +219,26 @@ export async function POST(request: NextRequest) {
   }
   if (action === "cancel_booking" || action === "manual_refund") {
     const db=adminSupabase();
-    const {data:current,error:findError}=await db.from("bookings").select("id,booking_no,payment_status,status").eq("booking_no",bookingNo).single();
+    const {data:current,error:findError}=await db.from("bookings").select("id,booking_no,total_price,slot_start,payment_status,status,customers(line_user_id),consultation_methods(code),booking_details(item_title,quantity,booking_detail_sub_items(sub_item_title))").eq("booking_no",bookingNo).single();
     if(findError||!current)return NextResponse.json({error:findError?.message||"找不到訂單"},{status:404});
     if(current.status==="cancelled")return NextResponse.json({error:"這筆訂單已取消"},{status:400});
     if(action==="cancel_booking"&&current.payment_status==="paid")return NextResponse.json({error:"已付款訂單請使用手動退款"},{status:400});
     if(action==="manual_refund"&&current.payment_status!=="paid")return NextResponse.json({error:"尚未付款訂單請使用取消訂單"},{status:400});
-    const reason=action==="manual_refund"?"手動退款":"取消訂單";
-    const {error}=await db.from("bookings").update({status:"cancelled",cancellation_reason:reason,updated_at:new Date().toISOString()}).eq("id",current.id);
+    const reason=action==="manual_refund"?"手動取消":"取消訂單";
+    const {error}=await db.from("bookings").update({status:"cancelled",payment_status:action==="manual_refund"?"refunded":"failed",cancellation_reason:reason,updated_at:new Date().toISOString()}).eq("id",current.id);
     if(error)return NextResponse.json({error:error.message},{status:400});
     try{await syncBookingCalendar(bookingNo)}catch(calendarError){console.error("取消訂單 Calendar 同步失敗",calendarError)}
-    return NextResponse.json({ok:true,status:"cancelled",cancellationReason:reason});
+    const customer=Array.isArray(current.customers)?current.customers[0]:current.customers;
+    const method=Array.isArray(current.consultation_methods)?current.consultation_methods[0]:current.consultation_methods;
+    const details=Array.isArray(current.booking_details)?current.booking_details:[];
+    const items=details.flatMap((detail:any)=>Array.from({length:Math.max(1,Number(detail.quantity)||1)},()=>[detail.item_title,...(Array.isArray(detail.booking_detail_sub_items)?detail.booking_detail_sub_items:[]).map((sub:any)=>sub.sub_item_title)].filter(Boolean).join("｜"))).filter(Boolean);
+    let lineNotified=false,lineError="";
+    if(customer?.line_user_id)try{
+      await pushLineFlex(customer.line_user_id,"預約已取消",bookingStatusFlex({status:"cancelled",headerLabel:"預約已取消",bookingNo:current.booking_no,method:method?.code||"text",total:Number(current.total_price||0),slotStart:current.slot_start||undefined,items,site:process.env.NEXT_PUBLIC_SITE_URL||request.nextUrl.origin}));
+      lineNotified=true;
+    }catch(notifyError){lineError=notifyError instanceof Error?notifyError.message:"LINE 通知失敗";console.error("取消訂單 LINE 通知失敗",notifyError)}
+    else lineError="此用戶沒有 LINE UID，無法傳送通知";
+    return NextResponse.json({ok:true,status:"cancelled",cancellationReason:reason,lineNotified,lineError});
   }
   if (action !== "mark_paid") return NextResponse.json({ error: "不支援的操作" }, { status: 400 });
   const db = adminSupabase();

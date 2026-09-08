@@ -9,7 +9,7 @@ export async function GET() {
   if (!(await ok()))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
   const db = adminSupabase(),
-    [{ data: settings }, { data: weekly }, { data: overrides }, { count }] = await Promise.all([
+    [{ data: settings, error: settingsError }, { data: weekly, error: weeklyError }, { data: overrides, error: overridesError }, { count, error: countError }] = await Promise.all([
       db.from("text_capacity_settings").select("*").eq("id", true).single(),
       db.from("text_weekly_release_rules").select("*").order("weekday"),
       db.from("text_capacity_date_overrides").select("*").order("release_date"),
@@ -30,6 +30,8 @@ export async function GET() {
           ).toISOString(),
         ),
     ]);
+  const loadError = settingsError || weeklyError || overridesError || countError;
+  if (loadError) return NextResponse.json({ error: loadError.message }, { status: 500 });
   return NextResponse.json({
     settings,
     weekly: weekly || [],
@@ -74,7 +76,8 @@ export async function POST(r: NextRequest) {
       note: String(x.note || "").trim() || null,
       updated_at: new Date().toISOString(),
     })).filter((x: { release_date: string }) => /^\d{4}-\d{2}-\d{2}$/.test(x.release_date));
-    const { data: current } = await db.from("text_capacity_date_overrides").select("release_date");
+    const { data: current, error: currentError } = await db.from("text_capacity_date_overrides").select("release_date");
+    if (currentError) return NextResponse.json({ error: currentError.message }, { status: 400 });
     const keep = new Set(normalized.map((x: { release_date: string }) => x.release_date));
     const remove = (current || []).map((x: { release_date: string }) => x.release_date).filter((date: string) => !keep.has(date));
     if (remove.length) {

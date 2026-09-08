@@ -108,7 +108,7 @@ export default function Admin() {
                 release_count: 0,
               })),
         );
-      }
+      } else setError((await x.json()).error || "文字諮詢名額載入失敗");
     });
   }
   async function saveTextCapacity(overrides: TextDateOverride[] = textOverrides) {
