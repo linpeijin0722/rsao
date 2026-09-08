@@ -292,13 +292,39 @@ async function cleanupFinalBlankPage(documentId: string, token: string) {
 
 async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: string, requestOrigin = "") {
   const token = await accessToken();
-  void bookingNo;
-  void requestOrigin;
 
-  // 回傳諮詢結果功能已取消。Apps Script 建立完整文件後，只做既有文字格式整理，
-  // 最後一步才處理尾端空白頁；不再建立／修改 Google 文件頁首。
+  // 文字格式、空白頁與回傳圖片按鈕分開執行，避免任一步驟互相拖累。
   await formatDocumentAfterCreation(documentId, token);
   await cleanupFinalBlankPage(documentId, token);
+  if (requestOrigin) {
+    try {
+      await insertConsultationReturnButton(documentId, bookingNo, requestOrigin, token);
+    } catch (error) {
+      console.error("[consultation-doc] 回傳諮詢結果圖片按鈕建立失敗", {
+        documentId, bookingNo, error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+}
+
+async function insertConsultationReturnButton(documentId: string, bookingNo: string, requestOrigin: string, token: string) {
+  const origin = requestOrigin.replace(/\/$/, "");
+  if (!/^https:\/\//i.test(origin)) throw new Error("Google 文件圖片按鈕需要可公開讀取的 HTTPS 網址");
+  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const endIndex = Math.max(1, (document.body?.content || []).reduce((max: number, block: any) => Math.max(max, Number(block.endIndex || 0)), 1) - 1);
+  const imageUrl = `${origin}/consultation-return-button.png`;
+  const returnUrl = `${origin}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}`;
+  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+    method: "POST",
+    body: JSON.stringify({ requests: [
+      { insertInlineImage: { uri: imageUrl, location: { index: endIndex }, objectSize: { width: { magnitude: 170, unit: "PT" } } } },
+      { updateTextStyle: { range: { startIndex: endIndex, endIndex: endIndex + 1 }, textStyle: { link: { url: returnUrl } }, fields: "link" } },
+      { updateParagraphStyle: { range: { startIndex: endIndex, endIndex: endIndex + 1 }, paragraphStyle: { alignment: "CENTER", spaceAbove: { magnitude: 12, unit: "PT" } }, fields: "alignment,spaceAbove" } },
+    ] }),
+  });
+  const verified = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const inserted = (verified.body?.content || []).some((block: any) => (block.paragraph?.elements || []).some((element: any) => element.inlineObjectElement && Number(element.startIndex) === endIndex));
+  if (!inserted) throw new Error("Google 文件未回傳已插入的圖片物件");
 }
 
 export async function wasDocumentEditedBy(documentId: string, editorEmail: string) {

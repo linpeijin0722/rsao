@@ -11,6 +11,7 @@ type R = {
 };
 type W = { weekday: number; start_time: string; is_open: boolean };
 type H = { holiday_date: string; note: string | null };
+type TextDateOverride = { release_date: string; release_count: number | string; note: string | null };
 const days = ["一", "二", "三", "四", "五", "六", "日"],
   times = Array.from(
     { length: 32 },
@@ -65,6 +66,10 @@ export default function Admin() {
       monthly_limit: "",
     }),
     [textUsed, setTextUsed] = useState(0),
+    [textOverrides, setTextOverrides] = useState<TextDateOverride[]>([]),
+    [overrideDate, setOverrideDate] = useState(today()),
+    [overrideCount, setOverrideCount] = useState<number | string>(0),
+    [overrideNote, setOverrideNote] = useState(""),
     [weeklyRelease, setWeeklyRelease] = useState<any[]>(
       days.map((_, i) => ({
         weekday: i + 1,
@@ -93,6 +98,7 @@ export default function Admin() {
         const y = await x.json();
         setTextCap(y.settings);
         setTextUsed(y.used);
+        setTextOverrides(y.overrides || []);
         setWeeklyRelease(
           y.weekly?.length
             ? y.weekly
@@ -116,6 +122,7 @@ export default function Admin() {
         mode: textCap.mode,
         releaseTime: textCap.release_time,
         weekly: weeklyRelease,
+        overrides: textOverrides,
       }),
     });
     if (r.ok) {
@@ -126,6 +133,19 @@ export default function Admin() {
       setTextSaveMessage("");
       setError((await r.json()).error);
     }
+  }
+  function addTextOverride() {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(overrideDate)) return setError("請選擇個別設定日期");
+    const releaseCount = Math.max(0, Number(overrideCount) || 0);
+    setTextOverrides((current) => [...current.filter((entry) => entry.release_date !== overrideDate), {
+      release_date: overrideDate,
+      release_count: releaseCount,
+      note: overrideNote.trim() || null,
+    }].sort((a, b) => a.release_date.localeCompare(b.release_date)));
+    setOverrideNote("");
+  }
+  function weekdayLabel(value: string) {
+    return new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", weekday: "short" }).format(new Date(`${value}T12:00:00+08:00`));
   }
   function confirmTextEnabled(value: boolean) {
     if (window.confirm(`確定要${value ? "開啟" : "關閉"}文字諮詢預約嗎？`))
@@ -448,7 +468,7 @@ export default function Admin() {
           </div>
         )}
         {textCap.mode === "weekly" && (
-          <div className="weeklyReleaseGrid">
+          <div className="textRulePanel"><div className="textRuleHeading"><div><span>01</span><div><h3>每週固定規則</h3><p>設定每週固定釋出的星期與名額。</p></div></div></div><div className="weeklyReleaseGrid">
             {weeklyRelease.map((rule, i) => (
               <label
                 className={rule.enabled ? "enabled" : ""}
@@ -484,8 +504,24 @@ export default function Admin() {
                 <small>位</small>
               </label>
             ))}
-          </div>
+          </div></div>
         )}
+        {textCap.mode === "weekly" && <div className="textRulePanel textOverridePanel">
+          <div className="textRuleHeading"><div><span>02</span><div><h3>個別日期名額</h3><p>個別日期設定優先於每週固定規則，設定 0 位也會有效關閉當日名額。</p></div></div><b>個別日期 ＞ 每週設定</b></div>
+          <div className="textOverrideForm">
+            <label>日期<input type="date" value={overrideDate} onChange={(e) => setOverrideDate(e.target.value)} /></label>
+            <label>開放名額<input type="number" min="0" value={overrideCount} onChange={(e) => setOverrideCount(e.target.value)} /></label>
+            <label>備註（選填）<input value={overrideNote} onChange={(e) => setOverrideNote(e.target.value)} placeholder="例如：臨時加開" /></label>
+            <button type="button" onClick={addTextOverride}>加入／更新</button>
+          </div>
+          {textOverrides.length ? <div className="textOverrideList">{textOverrides.map((entry) => <div key={entry.release_date}>
+            <span className="textOverrideDate"><b>{entry.release_date}</b><small>{weekdayLabel(entry.release_date)}</small></span>
+            <strong>{entry.release_count} 位</strong>
+            <span className="textOverrideNote">{entry.note || "無備註"}</span>
+            <button type="button" onClick={() => { setOverrideDate(entry.release_date); setOverrideCount(entry.release_count); setOverrideNote(entry.note || ""); }}>編輯</button>
+            <button type="button" className="danger" onClick={() => setTextOverrides((current) => current.filter((item) => item.release_date !== entry.release_date))}>刪除</button>
+          </div>)}</div> : <div className="textOverrideEmpty">尚未設定個別日期，系統會使用每週固定規則。</div>}
+        </div>}
         <button className="holidayButton" onClick={saveTextCapacity}>
           儲存文字名額設定
         </button>
