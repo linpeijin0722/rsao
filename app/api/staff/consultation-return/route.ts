@@ -10,7 +10,7 @@ const one = (value: any) => Array.isArray(value) ? value[0] : value;
 async function bookingForDocument(bookingNo: string, requestedDocumentId: string) {
   const db = adminSupabase();
   const { data: booking, error } = await db.from("bookings").select(
-    "id,booking_no,customers(line_user_id,line_display_name,full_name),booking_details(id,item_title,google_document_id,google_document_url)",
+    "id,booking_no,customers(line_user_id,line_display_name,line_picture_url,full_name),booking_details(id,item_title,google_document_id,google_document_url)",
   ).eq("booking_no", bookingNo).single();
   if (error || !booking) throw new Error(error?.message || "找不到訂單");
   const details = Array.isArray(booking.booking_details) ? booking.booking_details : [];
@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
       bookingNo: booking.booking_no,
       customerName: customer?.full_name || customer?.line_display_name || "LINE 用戶",
       lineDisplayName: customer?.line_display_name || "",
+      linePictureUrl: customer?.line_picture_url || "",
       documentId: detail.google_document_id,
       documentUrl: detail.google_document_url || `https://docs.google.com/document/d/${detail.google_document_id}/edit`,
       items,
