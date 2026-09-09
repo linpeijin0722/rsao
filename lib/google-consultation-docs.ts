@@ -9,7 +9,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-09-08-v14";
+const requiredAppsScriptVersion = "2026-09-09-v15";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -733,11 +733,14 @@ function consultationNumber(position: number) {
 }
 
 export async function createConsultationDocuments(db: any, bookingId: string, bookingNo: string, force = false, createMode: "replace" | "new" = "replace", submissionId?: string, requestOrigin = "") {
-  const { data: booking } = await db.from("bookings").select("created_at,paid_at,slot_start,total_price,consultation_methods(code),customers(line_display_name,full_name)").eq("id", bookingId).single();
+  const { data: booking } = await db.from("bookings").select("created_at,paid_at,slot_start,total_price,payment_status,status,cancellation_reason,consultation_methods(code),customers(line_display_name,full_name)").eq("id", bookingId).single();
   const customer = one(booking?.customers) || {};
   const lineName = text(customer.line_display_name) || "LINE用戶";
   const ownerName = text(customer.full_name) || lineName;
   const isVideo = one(booking?.consultation_methods)?.code === "video" && Boolean(booking?.slot_start);
+  const isCancelledOrRefunded = booking?.status === "cancelled" ||
+    booking?.payment_status === "failed" ||
+    ["手動退款", "自行退款", "用戶退款", "自行取消", "取消訂單"].includes(text(booking?.cancellation_reason));
   const { data: details, error } = await db.from("booking_details").select(`
     id,item_title,created_at,google_document_id,google_document_created_at,
     booking_items(code),booking_detail_sub_items(sub_item_title),
@@ -854,6 +857,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     body: JSON.stringify({
       secret: appsScriptSecret, expectedVersion: requiredAppsScriptVersion, folderId,
       title: fileTitle, bookingNo, content, marks, images, createMode,
+      cancelledWarning: isCancelledOrRefunded,
       previousDocumentIds: force ? existingDetails.map((detail: any) => detail.google_document_id).filter(Boolean) : [],
     }),
     redirect: "follow",
@@ -866,6 +870,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   let normalizationError: unknown = null;
   try {
     await normalizeDocumentHeaderAndFooter(result.documentId, bookingNo, requestOrigin);
+    if (isCancelledOrRefunded) await markConsultationOrderCancelled(result.documentId);
   } catch (error) {
     normalizationError = error;
     console.error("[consultation-doc] Google 文件最終整理失敗", { documentId: result.documentId, bookingNo, error });
