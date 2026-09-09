@@ -1,23 +1,16 @@
-本次需要更新兩個地方，兩個都必須完成：
+功能：每天台灣時間上午 9 點，更新一筆獨立的系統保活紀錄。
 
-一、網站專案
-將 lib/google-consultation-docs.ts 覆蓋到網站專案的相同路徑，然後提交上傳。
+不會修改訂單、付款、客戶或諮詢內容，也不會傳送任何 LINE 訊息。
 
-二、Google Apps Script
-開啟目前負責建立諮詢單的 Apps Script，將「Google Apps Script v15.gs」完整內容貼上覆蓋，儲存後建立新的網頁應用程式部署版本。
+安裝順序：
 
-完成後的規則：
+1. 將 app、supabase、vercel.json 依相同路徑覆蓋到林阿嫂網站專案。
+2. 到林阿嫂 Supabase 的 SQL Editor 執行：
+   supabase/037_system_heartbeat.sql
+3. 確認 Vercel 已設定 CRON_SECRET。
+4. 提交並部署網站。
+5. 部署後可在 Vercel → Settings → Cron Jobs 看到 /api/cron/keep-alive。
 
-1. 已是手動退款、用戶退款或取消狀態的訂單，新建諮詢單會顯示：
-   此筆訂單已取消，請確認。
+檢查是否成功：
 
-2. 已有諮詢單的訂單後來取消或退款，既有諮詢單也會加入相同警告。
-
-3. 無論選擇「覆蓋原諮詢單」或「建立新的諮詢單」，舊諮詢單都會顯示：
-   此筆訂單已建立新諮詢單，請確認。
-
-4. 覆蓋模式會先確認舊文件成功寫入警告，之後才移到垃圾桶。
-
-5. 同時符合取消與重建狀況時，兩行警告都會保留；同一句不會重複加入。
-
-警告樣式：粗體、約 23px、紅底 #cc0000、黃字 #fffa6a。
+在 Supabase Table Editor 打開 system_heartbeat，last_ping_at 每天會更新，ping_count 每天加 1。
