@@ -9,7 +9,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-09-14-v18";
+const requiredAppsScriptVersion = "2026-09-14-v19";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -411,7 +411,7 @@ function documentPlainText(document: any) {
       }
     }
   }
-  return output.replace(/\u00a0/g, " ").replace(/\r/g, "");
+  return output.replace(/[\u00a0\u200b]/g, " ").replace(/\r/g, "");
 }
 
 export async function getConsultationReturnPreview(documentId: string): Promise<ConsultationReturnItem[]> {
@@ -752,7 +752,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   if (!alreadyHasTeacherLayout) {
     const teacherKind = itemCode === "deceased-relative" ? "deceasedTeacher" : "teacher";
     add(infantSpirit ? "【嬰靈】" : `【${subTitle || title}】`, "section");
-    for (let index = 0; index < 4; index += 1) add("\u00a0", teacherKind);
+    for (let index = 0; index < 4; index += 1) add(itemCode === "deceased-relative" ? "\u200b" : "\u00a0", teacherKind);
   }
   return { content, marks, images };
 }
