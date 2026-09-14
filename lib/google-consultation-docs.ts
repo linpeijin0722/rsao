@@ -751,7 +751,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   const alreadyHasTeacherLayout = isPastLifePersonal || isPastLifeRelation || isOverallFortune || marriage || itemCode === "date-time-selection" || title.includes("擇日");
   if (!alreadyHasTeacherLayout) {
     const teacherKind = itemCode === "deceased-relative" ? "deceasedTeacher" : "teacher";
-    add(infantSpirit ? "【嬰靈】" : `【${subTitle || title}】`, itemCode === "deceased-relative" ? "deceasedTeacher" : "section");
+    add(infantSpirit ? "【嬰靈】" : `【${subTitle || title}】`, "section");
     for (let index = 0; index < 4; index += 1) add("\u00a0", teacherKind);
   }
   return { content, marks, images };
