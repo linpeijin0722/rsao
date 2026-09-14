@@ -9,7 +9,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-09-09-v15";
+const requiredAppsScriptVersion = "2026-09-14-v16";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -514,9 +514,21 @@ const companyPartnerSummary = (profile: any) => {
   return [name, birth, address].filter(Boolean).join("／");
 };
 
-type Mark = { start: number; end: number; kind: "meta" | "title" | "section" | "question" | "answer" | "teacher" | "fieldLabel" | "fieldAnswer" };
+type Mark = { start: number; end: number; kind: "meta" | "title" | "section" | "question" | "answer" | "teacher" | "fieldLabel" | "fieldAnswer" | "previousResultTitle" | "previousResult" };
 type DocumentImage = { marker: string; dataUrl: string; width: number };
-type PageSpec = { detail: any; target?: any; targetIndex?: number; targetCount?: number; previousResult?: string };
+type PageSpec = { detail: any; target?: any; targetIndex?: number; targetCount?: number; previousResult?: string; previousReturnedAt?: string; previousMethod?: string };
+const compactPreviousResult = (value: unknown) => text(value)
+  .replace(/^您好，以下是您的諮詢結果\s*/u, "")
+  .replace(/\n[ \t]*\n+/g, "\n")
+  .trim();
+const previousResultDate = (value: unknown) => {
+  const date = new Date(text(value));
+  if (!Number.isFinite(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", year: "numeric", month: "numeric", day: "numeric" }).formatToParts(date);
+  const get = (type: string) => parts.find((entry) => entry.type === type)?.value || "";
+  return `${get("year")}/${get("month")}/${get("day")}`;
+};
+const consultationMethodLabel = (value: unknown) => text(value) === "video" ? "視訊諮詢" : text(value) === "text" ? "文字諮詢" : text(value);
 const cleanSubItemTitle = (value: unknown) => text(value)
   .replace(/^\s*[＋+]\s*加購\s*[：:]?\s*(?:你)?/, "")
   .replace(/個人感情運\s*[（(]\s*僅看自己\s*[）)]/gu, "個人感情運");
@@ -652,11 +664,11 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
       Object.entries(rows as Record<string, unknown>).forEach(([label, value]) => addField(`${focus}－${label}`, value));
     });
   }
-  if (text(pageSpec.previousResult)) {
-    add("【最近一次諮詢結果（僅供老師參考）】", "section");
-    text(pageSpec.previousResult).split(/\r?\n/).forEach((line) => add(line, "teacher"));
-    add("");
-    add("【本次諮詢結果】", "section");
+  const previousResult = compactPreviousResult(pageSpec.previousResult);
+  if (previousResult) {
+    const previousMeta = [previousResultDate(pageSpec.previousReturnedAt), consultationMethodLabel(pageSpec.previousMethod)].filter(Boolean).join(" ");
+    add(`最近一次諮詢結果:${previousMeta}${previousMeta ? " " : ""}（僅供老師參考）`, "previousResultTitle");
+    previousResult.split(/\r?\n/).forEach((line) => add(line, "previousResult"));
     add("");
   }
   if (itemIndex === 1) {
@@ -816,7 +828,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     const currentItemIds = Array.from(new Set(pages.map((pageSpec) => text(pageSpec.detail.item_id)).filter(Boolean)));
     if (currentProfileIds.length && currentItemIds.length) {
       const { data: histories, error: historyError } = await db.from("consultation_result_history")
-        .select("booking_detail_id,item_id,profile_id,target_profile_id,result_content,returned_at")
+        .select("booking_detail_id,item_id,profile_id,target_profile_id,result_content,consultation_method,returned_at")
         .in("profile_id", currentProfileIds).in("item_id", currentItemIds)
         .order("returned_at", { ascending: false });
       if (historyError && !String(historyError.message || "").includes("consultation_result_history")) throw historyError;
@@ -829,14 +841,18 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
           text(row.profile_id) === text(answer?.profile_id) &&
           (text(row.target_profile_id) || null) === targetId,
         );
-        if (match?.result_content) pageSpec.previousResult = match.result_content;
+        if (match?.result_content) {
+          pageSpec.previousResult = match.result_content;
+          pageSpec.previousReturnedAt = match.returned_at;
+          pageSpec.previousMethod = match.consultation_method;
+        }
       }
     }
     // 舊訂單在此功能上線前沒有結果歷史資料；從既有 Google 文件回查一次，
     // 讓第一次部署後就能帶入舊客人的最近結果。
-    if (pages.some((pageSpec) => !pageSpec.previousResult) && booking?.customer_id) {
+    if (pages.some((pageSpec) => !pageSpec.previousResult || !pageSpec.previousReturnedAt || !pageSpec.previousMethod) && booking?.customer_id) {
       const { data: oldBookings, error: oldBookingError } = await db.from("bookings").select(`
-        id,consultation_result_returned_at,
+        id,consultation_result_returned_at,consultation_methods(code),
         booking_details(id,item_id,item_title,created_at,google_document_id,google_document_url,
           booking_items(code),booking_detail_sub_items(sub_item_title),
           booking_consultation_answers(profile_id,booking_answer_participants(profile_id,position)))
@@ -845,7 +861,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
         .order("consultation_result_returned_at", { ascending: false });
       if (oldBookingError) throw oldBookingError;
       const previewCache = new Map<string, ConsultationReturnItem[]>();
-      for (const pageSpec of pages.filter((entry) => !entry.previousResult)) {
+      for (const pageSpec of pages.filter((entry) => !entry.previousResult || !entry.previousReturnedAt || !entry.previousMethod)) {
         const answer = one(pageSpec.detail.booking_consultation_answers);
         const profileId = text(answer?.profile_id);
         const targetId = text(one(pageSpec.target?.consultation_profiles)?.id || pageSpec.target?.profile_id) || null;
@@ -864,7 +880,11 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
           try {
             if (!previewCache.has(documentId)) previewCache.set(documentId, await getConsultationReturnPreview(documentId));
             const previous = previewCache.get(documentId)?.[oldPageIndex];
-            if (previous?.content) pageSpec.previousResult = previous.content;
+            if (previous?.content) {
+              if (!pageSpec.previousResult) pageSpec.previousResult = previous.content;
+              pageSpec.previousReturnedAt = oldBooking.consultation_result_returned_at;
+              pageSpec.previousMethod = one(oldBooking.consultation_methods)?.code;
+            }
           } catch (legacyError) {
             console.error("讀取舊 Google 諮詢結果失敗", { documentId, legacyError });
           }

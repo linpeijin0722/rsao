@@ -149,6 +149,7 @@ export async function deliverPreparedConsultationReturn(payload: PreparedConsult
     page_index: item.index,
     item_title: item.itemTitle,
     result_content: item.content,
+    consultation_method: payload.method,
     returned_at: returnedAt,
   }));
   if (historyRows.length) {
