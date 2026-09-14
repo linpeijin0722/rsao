@@ -15,8 +15,43 @@ export type PreparedConsultationReturn = {
   lineUserId: string;
   method: string;
   skipCarousel: boolean;
-  items: Array<{ index: number; itemTitle: string; content: string }>;
+  items: Array<{
+    index: number; itemTitle: string; content: string;
+    bookingDetailId?: string; itemId?: string; profileId?: string; targetProfileId?: string | null;
+  }>;
 };
+
+const itemKind = (detail: any) => {
+  const code = one(detail.booking_items)?.code || "";
+  const title = String(detail.item_title || "");
+  const subs = (detail.booking_detail_sub_items || []).map((entry: any) => String(entry.sub_item_title || ""));
+  const personalLove = subs.some((value: string) => value.includes("個人感情運")) || title.includes("個人感情運");
+  return {
+    relation: code === "past-life-relationship" || title.includes("與他人前世關係"),
+    marriage: (code === "marriage-bazi" || title.includes("感情運勢") || title.includes("合婚") || title.includes("合八字") || title.includes("關係合盤")) && !personalLove,
+  };
+};
+
+async function returnItemBindings(bookingId: string) {
+  const { data, error } = await adminSupabase().from("booking_details").select(
+    "id,item_id,item_title,created_at,booking_items(code),booking_detail_sub_items(sub_item_title),booking_consultation_answers(profile_id,booking_answer_participants(profile_id,position))",
+  ).eq("booking_id", bookingId).order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data || []).flatMap((detail: any) => {
+    const answer = one(detail.booking_consultation_answers);
+    if (!answer) return [];
+    const kind = itemKind(detail);
+    const primaryId = String(answer.profile_id || "");
+    const targets = (answer.booking_answer_participants || []).slice()
+      .sort((a: any, b: any) => Number(a.position) - Number(b.position))
+      .filter((entry: any) => String(entry.profile_id || "") !== primaryId);
+    const pages = (kind.relation || kind.marriage) && targets.length ? targets : [null];
+    return pages.map((target: any) => ({
+      bookingDetailId: detail.id, itemId: detail.item_id, profileId: primaryId,
+      targetProfileId: target?.profile_id || null,
+    }));
+  });
+}
 
 function splitLineText(value: string, limit = 4500) {
   const chars = Array.from(value.trim());
@@ -63,9 +98,10 @@ export async function prepareConsultationReturn(args: {
     : [];
   if (!args.bookingNo || !selected.length) throw new Error("請至少選擇一個要回傳的項目");
   const editedItems = args.editedItems && typeof args.editedItems === "object" ? args.editedItems as Record<string, unknown> : {};
-  const { detail, customer, method } = await bookingForConsultationReturn(args.bookingNo, args.documentId);
+  const { booking, detail, customer, method } = await bookingForConsultationReturn(args.bookingNo, args.documentId);
   if (!customer?.line_user_id) throw new Error("這位用戶沒有 LINE UID，無法回傳");
   const freshItems = await getConsultationReturnPreview(detail.google_document_id);
+  const bindings = await returnItemBindings(booking.id);
   const items = freshItems.filter((item) => selected.includes(item.index)).map((item) => ({
     ...item,
     content: normalizeConsultationReturnText(
@@ -73,6 +109,7 @@ export async function prepareConsultationReturn(args: {
         ? String(editedItems[String(item.index)] || "")
         : item.content,
     ),
+    ...(bindings[item.index - 1] || {}),
   }));
   if (!items.length) throw new Error("找不到選取的諮詢結果");
   return {
@@ -104,6 +141,20 @@ export async function deliverPreparedConsultationReturn(payload: PreparedConsult
     });
   }
   const returnedAt = new Date().toISOString();
+  const historyRows = payload.items.filter((item) => item.bookingDetailId && item.itemId && item.profileId).map((item) => ({
+    booking_detail_id: item.bookingDetailId,
+    item_id: item.itemId,
+    profile_id: item.profileId,
+    target_profile_id: item.targetProfileId || null,
+    page_index: item.index,
+    item_title: item.itemTitle,
+    result_content: item.content,
+    returned_at: returnedAt,
+  }));
+  if (historyRows.length) {
+    const { error: historyError } = await adminSupabase().from("consultation_result_history").upsert(historyRows, { onConflict: "booking_detail_id,page_index" });
+    if (historyError) console.error("保存諮詢結果歷史失敗", historyError);
+  }
   const { error } = await adminSupabase().from("bookings")
     .update({ consultation_result_returned_at: returnedAt })
     .eq("booking_no", payload.bookingNo);
