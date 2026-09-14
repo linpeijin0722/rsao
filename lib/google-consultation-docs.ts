@@ -9,7 +9,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-09-09-v15";
+const requiredAppsScriptVersion = "2026-09-14-v19";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -411,7 +411,7 @@ function documentPlainText(document: any) {
       }
     }
   }
-  return output.replace(/\u00a0/g, " ").replace(/\r/g, "");
+  return output.replace(/[\u00a0\u200b]/g, " ").replace(/\r/g, "");
 }
 
 export async function getConsultationReturnPreview(documentId: string): Promise<ConsultationReturnItem[]> {
@@ -514,9 +514,31 @@ const companyPartnerSummary = (profile: any) => {
   return [name, birth, address].filter(Boolean).join("／");
 };
 
-type Mark = { start: number; end: number; kind: "meta" | "title" | "section" | "question" | "answer" | "teacher" | "fieldLabel" | "fieldAnswer" };
+type Mark = { start: number; end: number; kind: "meta" | "title" | "section" | "question" | "answer" | "teacher" | "deceasedTeacher" | "fieldLabel" | "fieldAnswer" | "previousResultTitle" | "previousResult" };
 type DocumentImage = { marker: string; dataUrl: string; width: number };
-type PageSpec = { detail: any; target?: any; targetIndex?: number; targetCount?: number };
+type PageSpec = { detail: any; target?: any; targetIndex?: number; targetCount?: number; previousResult?: string; previousCreatedAt?: string; previousMethod?: string; previousVideoSlotStart?: string };
+const compactPreviousResult = (value: unknown) => text(value)
+  .replace(/^您好，以下是您的諮詢結果\s*/u, "")
+  .replace(/^【(?:過世親人|個人感情運)】\s*$/gmu, "")
+  .replace(/\n[ \t]*\n+/g, "\n")
+  .trim();
+const previousResultDate = (value: unknown) => {
+  const date = new Date(text(value));
+  if (!Number.isFinite(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", year: "numeric", month: "numeric", day: "numeric" }).formatToParts(date);
+  const get = (type: string) => parts.find((entry) => entry.type === type)?.value || "";
+  return `${get("year")}/${get("month")}/${get("day")}`;
+};
+const consultationMethodLabel = (value: unknown) => text(value) === "video" ? "視訊諮詢" : text(value) === "text" ? "文字諮詢" : text(value);
+const previousVideoTime = (value: unknown) => {
+  const date = new Date(text(value));
+  if (!Number.isFinite(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", month: "numeric", day: "numeric", weekday: "short", hour: "numeric", minute: "2-digit", hour12: true }).formatToParts(date);
+  const get = (type: string) => parts.find((entry) => entry.type === type)?.value || "";
+  const week = get("weekday").replace("週", "").replace("星期", "");
+  const period = get("dayPeriod").replace("凌晨", "上午");
+  return `${get("month")}/${get("day")}(${week})${period}${get("hour")}:${get("minute")}`;
+};
 const cleanSubItemTitle = (value: unknown) => text(value)
   .replace(/^\s*[＋+]\s*加購\s*[：:]?\s*(?:你)?/, "")
   .replace(/個人感情運\s*[（(]\s*僅看自己\s*[）)]/gu, "個人感情運");
@@ -652,6 +674,15 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
       Object.entries(rows as Record<string, unknown>).forEach(([label, value]) => addField(`${focus}－${label}`, value));
     });
   }
+  const previousResult = compactPreviousResult(pageSpec.previousResult);
+  if (previousResult) {
+    const method = consultationMethodLabel(pageSpec.previousMethod);
+    const previousMeta = [`${previousResultDate(pageSpec.previousCreatedAt)}建立諮詢單`, method];
+    if (pageSpec.previousMethod === "video" && pageSpec.previousVideoSlotStart) previousMeta.push(`視訊時間：${previousVideoTime(pageSpec.previousVideoSlotStart)}`);
+    add(`最近一次諮詢結果：${previousMeta.filter(Boolean).join("｜")}`, "previousResultTitle");
+    previousResult.split(/\r?\n/).forEach((line) => add(line, "previousResult"));
+    add("");
+  }
   if (itemIndex === 1) {
     add("您好，以下是您的諮詢結果");
     add("");
@@ -719,8 +750,9 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   }
   const alreadyHasTeacherLayout = isPastLifePersonal || isPastLifeRelation || isOverallFortune || marriage || itemCode === "date-time-selection" || title.includes("擇日");
   if (!alreadyHasTeacherLayout) {
+    const teacherKind = itemCode === "deceased-relative" ? "deceasedTeacher" : "teacher";
     add(infantSpirit ? "【嬰靈】" : `【${subTitle || title}】`, "section");
-    for (let index = 0; index < 4; index += 1) add("\u00a0", "teacher");
+    for (let index = 0; index < 4; index += 1) add(itemCode === "deceased-relative" ? "\u200b" : "\u00a0", teacherKind);
   }
   return { content, marks, images };
 }
@@ -733,7 +765,7 @@ function consultationNumber(position: number) {
 }
 
 export async function createConsultationDocuments(db: any, bookingId: string, bookingNo: string, force = false, createMode: "replace" | "new" = "replace", submissionId?: string, requestOrigin = "") {
-  const { data: booking } = await db.from("bookings").select("created_at,paid_at,slot_start,total_price,payment_status,status,cancellation_reason,consultation_methods(code),customers(line_display_name,full_name)").eq("id", bookingId).single();
+  const { data: booking } = await db.from("bookings").select("customer_id,created_at,paid_at,slot_start,total_price,payment_status,status,cancellation_reason,consultation_methods(code),customers(line_display_name,full_name)").eq("id", bookingId).single();
   const customer = one(booking?.customers) || {};
   const lineName = text(customer.line_display_name) || "LINE用戶";
   const ownerName = text(customer.full_name) || lineName;
@@ -742,7 +774,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     booking?.payment_status === "failed" ||
     ["手動退款", "自行退款", "用戶退款", "自行取消", "取消訂單"].includes(text(booking?.cancellation_reason));
   const { data: details, error } = await db.from("booking_details").select(`
-    id,item_title,created_at,google_document_id,google_document_created_at,
+    id,item_id,item_title,created_at,google_document_id,google_document_created_at,
     booking_items(code),booking_detail_sub_items(sub_item_title),
     booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(*),booking_answer_participants(position,consultation_profiles(*)))
   `).eq("booking_id", bookingId).order("created_at", { ascending: true });
@@ -803,6 +835,79 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     const serializedExtra = JSON.stringify(answer?.extra_data || {}).replace(/[\s{}\[\]",:]/g, "");
     return hasProfile || hasQuestions || Boolean(serializedExtra);
   });
+  if (pages.length) {
+    const currentDetailIds = new Set(allDetails.map((detail: any) => text(detail.id)));
+    const currentProfileIds = Array.from(new Set(pages.map((pageSpec) => text(one(pageSpec.detail.booking_consultation_answers)?.profile_id)).filter(Boolean)));
+    const currentItemIds = Array.from(new Set(pages.map((pageSpec) => text(pageSpec.detail.item_id)).filter(Boolean)));
+    if (currentProfileIds.length && currentItemIds.length) {
+      const { data: histories, error: historyError } = await db.from("consultation_result_history")
+        .select("booking_detail_id,item_id,profile_id,target_profile_id,result_content,consultation_method,consultation_created_at,video_slot_start,returned_at")
+        .in("profile_id", currentProfileIds).in("item_id", currentItemIds)
+        .order("returned_at", { ascending: false });
+      if (historyError && !String(historyError.message || "").includes("consultation_result_history")) throw historyError;
+      for (const pageSpec of pages) {
+        const answer = one(pageSpec.detail.booking_consultation_answers);
+        const targetId = text(one(pageSpec.target?.consultation_profiles)?.id || pageSpec.target?.profile_id) || null;
+        const match = (histories || []).find((row: any) =>
+          !currentDetailIds.has(text(row.booking_detail_id)) &&
+          text(row.item_id) === text(pageSpec.detail.item_id) &&
+          text(row.profile_id) === text(answer?.profile_id) &&
+          (text(row.target_profile_id) || null) === targetId,
+        );
+        if (match?.result_content) {
+          pageSpec.previousResult = match.result_content;
+          pageSpec.previousCreatedAt = match.consultation_created_at || match.returned_at;
+          pageSpec.previousMethod = match.consultation_method;
+          pageSpec.previousVideoSlotStart = match.video_slot_start;
+        }
+      }
+    }
+    // 舊訂單在此功能上線前沒有結果歷史資料；從既有 Google 文件回查一次，
+    // 讓第一次部署後就能帶入舊客人的最近結果。
+    if (pages.some((pageSpec) => !pageSpec.previousResult || !pageSpec.previousCreatedAt || !pageSpec.previousMethod || (pageSpec.previousMethod === "video" && !pageSpec.previousVideoSlotStart)) && booking?.customer_id) {
+      const { data: oldBookings, error: oldBookingError } = await db.from("bookings").select(`
+        id,slot_start,consultation_result_returned_at,consultation_methods(code),
+        booking_details(id,item_id,item_title,created_at,google_document_id,google_document_url,google_document_created_at,
+          booking_items(code),booking_detail_sub_items(sub_item_title),
+          booking_consultation_answers(profile_id,booking_answer_participants(profile_id,position)))
+      `).eq("customer_id", booking.customer_id).neq("id", bookingId)
+        .not("consultation_result_returned_at", "is", null)
+        .order("consultation_result_returned_at", { ascending: false });
+      if (oldBookingError) throw oldBookingError;
+      const previewCache = new Map<string, ConsultationReturnItem[]>();
+      for (const pageSpec of pages.filter((entry) => !entry.previousResult || !entry.previousCreatedAt || !entry.previousMethod || (entry.previousMethod === "video" && !entry.previousVideoSlotStart))) {
+        const answer = one(pageSpec.detail.booking_consultation_answers);
+        const profileId = text(answer?.profile_id);
+        const targetId = text(one(pageSpec.target?.consultation_profiles)?.id || pageSpec.target?.profile_id) || null;
+        for (const oldBooking of oldBookings || []) {
+          const oldDetails = (oldBooking.booking_details || []).slice().sort((a: any, b: any) => text(a.created_at).localeCompare(text(b.created_at)));
+          const oldPages = expandPages(oldDetails);
+          const oldPageIndex = oldPages.findIndex((candidate) => {
+            const oldAnswer = one(candidate.detail.booking_consultation_answers);
+            const oldTargetId = text(one(candidate.target?.consultation_profiles)?.id || candidate.target?.profile_id) || null;
+            return text(candidate.detail.item_id) === text(pageSpec.detail.item_id) && text(oldAnswer?.profile_id) === profileId && oldTargetId === targetId;
+          });
+          if (oldPageIndex < 0) continue;
+          const documentDetail = oldDetails.find((detail: any) => detail.google_document_id || detail.google_document_url);
+          const documentId = text(documentDetail?.google_document_id) || text(documentDetail?.google_document_url).match(/\/document\/d\/([a-zA-Z0-9_-]+)/)?.[1] || "";
+          if (!documentId) continue;
+          try {
+            if (!previewCache.has(documentId)) previewCache.set(documentId, await getConsultationReturnPreview(documentId));
+            const previous = previewCache.get(documentId)?.[oldPageIndex];
+            if (previous?.content) {
+              if (!pageSpec.previousResult) pageSpec.previousResult = previous.content;
+              pageSpec.previousCreatedAt = documentDetail?.google_document_created_at || documentDetail?.created_at || oldBooking.consultation_result_returned_at;
+              pageSpec.previousMethod = one(oldBooking.consultation_methods)?.code;
+              pageSpec.previousVideoSlotStart = oldBooking.slot_start;
+            }
+          } catch (legacyError) {
+            console.error("讀取舊 Google 諮詢結果失敗", { documentId, legacyError });
+          }
+          if (pageSpec.previousResult) break;
+        }
+      }
+    }
+  }
   if (!pages.length && !isVideo) throw new Error("這筆訂單沒有可輸出的諮詢者資料或問事內容，未建立空白諮詢單");
   if (isVideo) {
     const videoDate = new Date(booking.slot_start);
