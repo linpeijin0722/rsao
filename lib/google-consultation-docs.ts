@@ -9,7 +9,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-09-14-v17";
+const requiredAppsScriptVersion = "2026-09-14-v18";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -519,7 +519,7 @@ type DocumentImage = { marker: string; dataUrl: string; width: number };
 type PageSpec = { detail: any; target?: any; targetIndex?: number; targetCount?: number; previousResult?: string; previousCreatedAt?: string; previousMethod?: string; previousVideoSlotStart?: string };
 const compactPreviousResult = (value: unknown) => text(value)
   .replace(/^您好，以下是您的諮詢結果\s*/u, "")
-  .replace(/^【過世親人】\s*$/gmu, "")
+  .replace(/^【(?:過世親人|個人感情運)】\s*$/gmu, "")
   .replace(/\n[ \t]*\n+/g, "\n")
   .trim();
 const previousResultDate = (value: unknown) => {
@@ -679,7 +679,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     const method = consultationMethodLabel(pageSpec.previousMethod);
     const previousMeta = [`${previousResultDate(pageSpec.previousCreatedAt)}建立諮詢單`, method];
     if (pageSpec.previousMethod === "video" && pageSpec.previousVideoSlotStart) previousMeta.push(`視訊時間：${previousVideoTime(pageSpec.previousVideoSlotStart)}`);
-    add(`（僅供老師參考）最近一次諮詢結果：${previousMeta.filter(Boolean).join("｜")}`, "previousResultTitle");
+    add(`最近一次諮詢結果：${previousMeta.filter(Boolean).join("｜")}`, "previousResultTitle");
     previousResult.split(/\r?\n/).forEach((line) => add(line, "previousResult"));
     add("");
   }
@@ -750,8 +750,8 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   }
   const alreadyHasTeacherLayout = isPastLifePersonal || isPastLifeRelation || isOverallFortune || marriage || itemCode === "date-time-selection" || title.includes("擇日");
   if (!alreadyHasTeacherLayout) {
-    add(infantSpirit ? "【嬰靈】" : `【${subTitle || title}】`, "section");
     const teacherKind = itemCode === "deceased-relative" ? "deceasedTeacher" : "teacher";
+    add(infantSpirit ? "【嬰靈】" : `【${subTitle || title}】`, itemCode === "deceased-relative" ? "deceasedTeacher" : "section");
     for (let index = 0; index < 4; index += 1) add("\u00a0", teacherKind);
   }
   return { content, marks, images };
