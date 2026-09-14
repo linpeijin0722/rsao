@@ -14,10 +14,11 @@ export type PreparedConsultationReturn = {
   documentId: string;
   lineUserId: string;
   method: string;
+  videoSlotStart?: string | null;
   skipCarousel: boolean;
   items: Array<{
     index: number; itemTitle: string; content: string;
-    bookingDetailId?: string; itemId?: string; profileId?: string; targetProfileId?: string | null;
+    bookingDetailId?: string; itemId?: string; profileId?: string; targetProfileId?: string | null; consultationCreatedAt?: string | null;
   }>;
 };
 
@@ -34,7 +35,7 @@ const itemKind = (detail: any) => {
 
 async function returnItemBindings(bookingId: string) {
   const { data, error } = await adminSupabase().from("booking_details").select(
-    "id,item_id,item_title,created_at,booking_items(code),booking_detail_sub_items(sub_item_title),booking_consultation_answers(profile_id,booking_answer_participants(profile_id,position))",
+    "id,item_id,item_title,created_at,google_document_created_at,booking_items(code),booking_detail_sub_items(sub_item_title),booking_consultation_answers(profile_id,booking_answer_participants(profile_id,position))",
   ).eq("booking_id", bookingId).order("created_at", { ascending: true });
   if (error) throw error;
   return (data || []).flatMap((detail: any) => {
@@ -48,7 +49,7 @@ async function returnItemBindings(bookingId: string) {
     const pages = (kind.relation || kind.marriage) && targets.length ? targets : [null];
     return pages.map((target: any) => ({
       bookingDetailId: detail.id, itemId: detail.item_id, profileId: primaryId,
-      targetProfileId: target?.profile_id || null,
+      targetProfileId: target?.profile_id || null, consultationCreatedAt: detail.google_document_created_at || detail.created_at,
     }));
   });
 }
@@ -71,7 +72,7 @@ function splitLineText(value: string, limit = 4500) {
 export async function bookingForConsultationReturn(bookingNo: string, requestedDocumentId: string) {
   const db = adminSupabase();
   const { data: booking, error } = await db.from("bookings").select(
-    "id,booking_no,consultation_result_returned_at,customers(line_user_id,line_display_name,line_picture_url,full_name),consultation_methods(code),booking_details(id,item_title,google_document_id,google_document_url)",
+    "id,booking_no,slot_start,consultation_result_returned_at,customers(line_user_id,line_display_name,line_picture_url,full_name),consultation_methods(code),booking_details(id,item_title,google_document_id,google_document_url)",
   ).eq("booking_no", bookingNo).single();
   if (error || !booking) throw new Error(error?.message || "找不到訂單");
   const details = Array.isArray(booking.booking_details) ? booking.booking_details : [];
@@ -117,6 +118,7 @@ export async function prepareConsultationReturn(args: {
     documentId: detail.google_document_id,
     lineUserId: customer.line_user_id,
     method: method?.code || "text",
+    videoSlotStart: booking.slot_start || null,
     skipCarousel: args.skipCarousel,
     items,
   } satisfies PreparedConsultationReturn;
@@ -150,6 +152,8 @@ export async function deliverPreparedConsultationReturn(payload: PreparedConsult
     item_title: item.itemTitle,
     result_content: item.content,
     consultation_method: payload.method,
+    consultation_created_at: item.consultationCreatedAt || returnedAt,
+    video_slot_start: payload.method === "video" ? payload.videoSlotStart || null : null,
     returned_at: returnedAt,
   }));
   if (historyRows.length) {
