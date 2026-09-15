@@ -122,14 +122,19 @@ export default function Staff() {
   const [password, setPassword] = useState(""),
     [rows, setRows] = useState<any[]>([]),
     [items, setItems] = useState<any[]>([]),
+    [methods, setMethods] = useState<any[]>([]),
     [manualCustomers, setManualCustomers] = useState<any[]>([]),
     [manualUserSearch, setManualUserSearch] = useState(""),
+    [manualUserPage, setManualUserPage] = useState(1),
     [customerProfiles, setCustomerProfiles] = useState<any[]>([]),
     [manualOpen, setManualOpen] = useState(false),
     [manualMethod, setManualMethod] = useState<"video"|"text">("text"),
     [manualCustomerId, setManualCustomerId] = useState(""),
     [manualSlotStart, setManualSlotStart] = useState(""),
     [manualLines, setManualLines] = useState<any[]>([]),
+    [manualCustomTotal, setManualCustomTotal] = useState<number|null>(null),
+    [manualTotalEditor, setManualTotalEditor] = useState(false),
+    [manualTotalValue, setManualTotalValue] = useState(""),
     [manualNotifyPayment, setManualNotifyPayment] = useState(true),
     [manualSaving, setManualSaving] = useState(false),
     [error, setError] = useState(""),
@@ -297,7 +302,7 @@ export default function Staff() {
     load();
     fetch("/api/catalog")
       .then((r) => r.json())
-      .then((j) => setItems(j.items || []));
+      .then((j) => {setItems(j.items || []);setMethods(j.methods || [])});
   }, []);
   useEffect(() => {
     setTextPage(1);
@@ -322,6 +327,7 @@ export default function Staff() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [paymentActions,paymentActionBusy,teacherOverwrite,documentVersionPicker,documentRebuild,documentLinkEdit,lineContact,priceEdit,addPicker,editing,manualOpen,dataBooking,userView]);
   function toggleManualItem(item:any,checked:boolean){
+    setManualCustomTotal(null);
     setManualLines(value=>checked?[...value,{itemId:item.id,subId:item.sub_items?.length===1?item.sub_items[0].id:"",qty:1}]:value.filter(line=>line.itemId!==item.id));
   }
   function openReturnedData(booking:any){
@@ -339,10 +345,10 @@ export default function Staff() {
     setManualSaving(true);
     try{
       const slotStart=manualSlotStart?`${manualSlotStart}:00+08:00`:null,
-        response=await staffPost({action:"create_manual_booking",customerId:manualCustomerId,methodCode:manualMethod,slotStart,lines:manualLines,notifyPayment:manualNotifyPayment}),result=await response.json();
+        response=await staffPost({action:"create_manual_booking",customerId:manualCustomerId,methodCode:manualMethod,slotStart,lines:manualLines,totalPrice:manualTotal,notifyPayment:manualNotifyPayment}),result=await response.json();
       if(!response.ok)throw new Error(result.error||"建立預約失敗");
       alert(`預約已建立\n訂單編號：${result.bookingNo}\n${result.paymentNotified?"已傳送付款資訊給用戶":"未傳送付款資訊；可在訂單設為已付款後，通知用戶填寫資料"}`);
-      setManualOpen(false);setManualCustomerId("");setManualSlotStart("");setManualLines([]);setManualNotifyPayment(true);await load();
+      setManualOpen(false);setManualCustomerId("");setManualSlotStart("");setManualLines([]);setManualCustomTotal(null);setManualNotifyPayment(true);await load();
     }catch(error){alert(error instanceof Error?error.message:"建立預約失敗")}finally{setManualSaving(false)}
   }
   async function sendLineContact(message:string,action:"text"|"video_reminder"="text"){
@@ -619,6 +625,16 @@ export default function Staff() {
         .includes(keyword),
     );
   }, [manualCustomers, manualUserSearch]);
+  const manualUserPageCount=Math.max(1,Math.min(5,Math.ceil(filteredManualCustomers.length/5)));
+  const visibleManualCustomers=filteredManualCustomers.slice((Math.min(manualUserPage,manualUserPageCount)-1)*5,Math.min(manualUserPage,manualUserPageCount)*5);
+  const manualCalculatedTotal=useMemo(()=>{
+    const base=Number(methods.find(method=>method.code===manualMethod)?.base_price||0);
+    return manualLines.reduce((sum,line)=>{
+      const item=items.find(candidate=>candidate.id===line.itemId),sub=item?.sub_items?.find((candidate:any)=>candidate.id===line.subId);
+      return sum+Number(sub?.price??item?.price??0)*Math.max(1,Number(line.qty)||1);
+    },base);
+  },[items,methods,manualLines,manualMethod]);
+  const manualTotal=manualCustomTotal??manualCalculatedTotal;
   if (error === "未登入")
     return (
       <main className="adminLogin staffLogin"><div>
@@ -941,16 +957,16 @@ export default function Staff() {
             <h2>手動建立預約</h2>
             <p>僅列出已經登入 LINE 並完成本人資料的用戶。</p>
             <div className="manualMethodTabs">
-              <button className={manualMethod==="text"?"active":""} onClick={()=>setManualMethod("text")}>文字諮詢</button>
-              <button className={manualMethod==="video"?"active":""} onClick={()=>setManualMethod("video")}>視訊諮詢</button>
+              <button className={manualMethod==="text"?"active":""} onClick={()=>{setManualMethod("text");setManualCustomTotal(null)}}>文字諮詢</button>
+              <button className={manualMethod==="video"?"active":""} onClick={()=>{setManualMethod("video");setManualCustomTotal(null)}}>視訊諮詢</button>
             </div>
             <div className="manualUserPicker">
-              <label htmlFor="manual-user-search">選擇用戶</label>
-              <div className="manualUserSearchBox"><span aria-hidden="true">⌕</span><input id="manual-user-search" type="search" value={manualUserSearch} onChange={event=>setManualUserSearch(event.target.value)} placeholder="搜尋 LINE 名稱或姓名" autoComplete="off" /></div>
+              <label htmlFor="manual-user-search">最近註冊的用戶</label>
+              <div className="manualUserSearchBox"><span aria-hidden="true">⌕</span><input id="manual-user-search" type="search" value={manualUserSearch} onChange={event=>{setManualUserSearch(event.target.value);setManualUserPage(1)}} placeholder="搜尋 LINE 名稱或姓名" autoComplete="off" /></div>
               <small>{manualUserSearch.trim() ? `找到 ${filteredManualCustomers.length} 位符合的用戶` : `共 ${manualCustomers.length} 位可選用戶`}</small>
             </div>
             <div className="manualUserResults" role="listbox" aria-label="符合條件的 LINE 用戶">
-              {filteredManualCustomers.map(customer=><div key={customer.id} className={`manualUserResult ${manualCustomerId===customer.id?"selected":""}`}>
+              {visibleManualCustomers.map(customer=><div key={customer.id} className={`manualUserResult ${manualCustomerId===customer.id?"selected":""}`}>
                 <button type="button" className="manualUserSelect" onClick={()=>setManualCustomerId(customer.id)}>
                   {customer.line_picture_url?<img src={customer.line_picture_url} alt="LINE 頭像"/>:<span className="avatarFallback">LINE</span>}
                   <span><b>{customer.line_display_name||"LINE 用戶"}｜{customer.full_name}</b><small>{manualCustomerId===customer.id?"已選取":"點此選取"}</small></span>
@@ -959,14 +975,17 @@ export default function Staff() {
               </div>)}
               {!filteredManualCustomers.length&&<p className="manualUserEmpty">找不到符合條件的用戶</p>}
             </div>
+            {filteredManualCustomers.length>5&&<nav className="manualUserPagination" aria-label="最近註冊用戶分頁"><button disabled={manualUserPage<=1} onClick={()=>setManualUserPage(page=>Math.max(1,page-1))}>‹ 上一頁</button><span>第 {Math.min(manualUserPage,manualUserPageCount)}／{manualUserPageCount} 頁</span><button disabled={manualUserPage>=manualUserPageCount} onClick={()=>setManualUserPage(page=>Math.min(manualUserPageCount,page+1))}>下一頁 ›</button></nav>}
             {manualMethod==="video"&&<label className="manualMainField">視訊日期與時間<input type="datetime-local" value={manualSlotStart} onChange={event=>setManualSlotStart(event.target.value)}/><small>後台可依實際需要建立 4 天內的視訊預約；時間為台灣時間。</small></label>}
             <section className="manualItems"><h3>選擇諮詢項目</h3>{items.map(item=>{const line=manualLines.find(candidate=>candidate.itemId===item.id);return <article key={item.id} className={line?"selected":""}>
               <label><input type="checkbox" checked={Boolean(line)} onChange={event=>toggleManualItem(item,event.target.checked)}/><b>{item.title}</b><span>NT$ {Number(item.price||0).toLocaleString("zh-TW")}</span></label>
-              {line&&item.sub_items?.length>0&&<select value={line.subId} onChange={event=>setManualLines(value=>value.map(candidate=>candidate.itemId===item.id?{...candidate,subId:event.target.value}:candidate))}><option value="">請選擇子項目</option>{item.sub_items.map((sub:any)=><option key={sub.id} value={sub.id}>{sub.title}　NT$ {Number(sub.price||0).toLocaleString("zh-TW")}</option>)}</select>}
-              {line&&<label className="manualQuantity">數量<input type="number" min="1" max="20" value={line.qty} onChange={event=>setManualLines(value=>value.map(candidate=>candidate.itemId===item.id?{...candidate,qty:Math.max(1,Number(event.target.value)||1)}:candidate))}/></label>}
+              {line&&item.sub_items?.length>0&&<select value={line.subId} onChange={event=>{setManualCustomTotal(null);setManualLines(value=>value.map(candidate=>candidate.itemId===item.id?{...candidate,subId:event.target.value}:candidate))}}><option value="">請選擇子項目</option>{item.sub_items.map((sub:any)=><option key={sub.id} value={sub.id}>{sub.title}　NT$ {Number(sub.price||0).toLocaleString("zh-TW")}</option>)}</select>}
+              {line&&<label className="manualQuantity">數量<input type="number" min="1" max="20" value={line.qty} onChange={event=>{setManualCustomTotal(null);setManualLines(value=>value.map(candidate=>candidate.itemId===item.id?{...candidate,qty:Math.max(1,Number(event.target.value)||1)}:candidate))}}/></label>}
             </article>})}</section>
+            <div className="manualBookingTotal"><span>總金額{manualCustomTotal!==null&&<small>已手動調整</small>}</span><strong>NT$ {manualTotal.toLocaleString("zh-TW")}</strong><button type="button" aria-label="編輯總金額" title="編輯總金額" onClick={()=>{setManualTotalValue(String(manualTotal));setManualTotalEditor(true)}}>✎</button></div>
             <fieldset className="manualPaymentChoice"><legend>建立後是否傳送付款資訊？</legend><label><input type="radio" checked={manualNotifyPayment} onChange={()=>setManualNotifyPayment(true)}/><span><b>傳送付款資訊</b><small>用戶會收到「待付款」訊息，可直接前往付款。</small></span></label><label><input type="radio" checked={!manualNotifyPayment} onChange={()=>setManualNotifyPayment(false)}/><span><b>暫不傳送付款資訊</b><small>適合另外轉帳；後台設為已付款後仍可通知用戶填寫資料。</small></span></label></fieldset>
             <button className="manualCreateButton" disabled={manualSaving} onClick={createManualBooking}>{manualSaving?"建立中，請稍候…":"確認建立預約"}</button>
+            {manualTotalEditor&&<div className="manualTotalBackdrop" onClick={()=>setManualTotalEditor(false)}><div className="manualTotalDialog" role="dialog" aria-modal="true" aria-labelledby="manual-total-title" onClick={event=>event.stopPropagation()}><h3 id="manual-total-title">確認修改總金額</h3><p>此金額會成為這筆訂單實際向用戶收取的金額。</p><label>新的總金額<div><span>NT$</span><input type="number" min="0" step="1" value={manualTotalValue} onChange={event=>setManualTotalValue(event.target.value)} autoFocus/></div></label><div className="manualTotalActions"><button type="button" onClick={()=>setManualTotalEditor(false)}>取消</button><button type="button" onClick={()=>{const amount=Number(manualTotalValue);if(!Number.isInteger(amount)||amount<0)return alert("請輸入正確的整數金額");setManualCustomTotal(amount);setManualTotalEditor(false)}}>確認修改</button></div></div></div>}
           </div>
         </div>
       )}
@@ -1138,3 +1157,4 @@ export default function Staff() {
 }
 function StaffProfileEditor({value,profiles,change,close,save}:any){const person=value.profile_type==="person",pet=value.profile_type==="pet",self=person&&value.relationship==="本人";return <div className="modalBackdrop returnedEditBackdrop"><div className="modal staffFrontEditor"><button className="staffModalClose" onClick={close}>×</button><h2>編輯諮詢者資料</h2><div className="staffProfileKinds"><b className="selected">{self?"本人":person?"親友":pet?"往生寵物":"過世親友"}</b></div><div className="staffFrontFields">{pet&&<label>寵物主人<select value={value.owner_profile_id||""} onChange={e=>change({...value,owner_profile_id:e.target.value})}><option value="">請選擇</option>{profiles.filter((p:any)=>p.profile_type==="person").map((p:any)=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}{pet&&value.photo_data&&<img className="staffPetPhoto" src={value.photo_data} alt="寵物照片"/>}<label>{pet?"寵物姓名":"姓名"}<input value={value.name||""} onChange={e=>change({...value,name:e.target.value})}/></label>{person&&!self&&<label>他是我的…<input value={value.relationship_detail||""} onChange={e=>change({...value,relationship_detail:e.target.value})}/></label>}{!pet&&<label>性別<select value={value.gender||""} onChange={e=>change({...value,gender:e.target.value})}><option value="">請選擇</option><option>男</option><option>女</option><option>其他</option></select></label>}<label>{pet?"出生日期":"國曆生日"}<input type="date" value={value.birth_date||""} onChange={e=>change({...value,birth_date:e.target.value})}/></label><label>農曆生日<input value={value.lunar_birth_text||""} onChange={e=>change({...value,lunar_birth_text:e.target.value})}/></label>{!pet&&<><label>生肖<input value={value.zodiac||""} onChange={e=>change({...value,zodiac:e.target.value})}/></label><label>出生時辰<input value={value.birth_shichen||""} onChange={e=>change({...value,birth_shichen:e.target.value})}/></label><label>地址<textarea value={value.address||""} onChange={e=>change({...value,address:e.target.value})}/></label></>}{!person&&<><label>國曆往生日期<input type="date" value={value.death_date||""} onChange={e=>change({...value,death_date:e.target.value})}/></label><label>農曆往生日期<input value={value.lunar_death_text||""} onChange={e=>change({...value,lunar_death_text:e.target.value})}/></label><label>往生時辰<input value={value.death_shichen||""} onChange={e=>change({...value,death_shichen:e.target.value})}/></label></>}<label>備註<textarea value={value.notes||""} onChange={e=>change({...value,notes:e.target.value})}/></label></div><div className="returnedEditActions"><button onClick={()=>void save()}>儲存</button><button className="cancel" onClick={close}>取消</button></div></div></div>}
 function StaffAnswerEditor({value,profiles,change,close,save}:any){return <div className="modalBackdrop returnedEditBackdrop"><div className="modal staffFrontEditor"><button className="staffModalClose" onClick={close}>×</button><h2>修改問事資料</h2><p className="staffAnswerItem">{value.item_title}{value.sub_items?.length?`－${value.sub_items.join("、")}`:""}</p><div className="staffFrontFields"><label>這個項目是為誰諮詢？<select value={value.targetProfileId||""} onChange={e=>change({...value,targetProfileId:e.target.value})}>{profiles.map((p:any)=><option key={p.id} value={p.id}>{p.name}（{p.relationship_detail||p.relationship}）</option>)}</select></label>{value.questions.map((q:string,i:number)=><label key={i}>問題 {i+1}<textarea value={q} onChange={e=>change({...value,questions:value.questions.map((v:string,n:number)=>n===i?e.target.value:v)})}/></label>)}</div><div className="returnedEditActions"><button onClick={()=>void save()}>儲存</button><button className="cancel" onClick={close}>取消</button></div></div></div>}
+
