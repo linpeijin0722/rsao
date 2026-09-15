@@ -16,11 +16,11 @@ export async function GET() {
     )
     .order("created_at", { ascending: false }), db
     .from("customers")
-    .select("id,line_user_id,line_display_name,line_picture_url,full_name,birth_date")
+    .select("id,line_user_id,line_display_name,line_picture_url,full_name,birth_date,created_at")
     .not("line_user_id", "is", null)
     .not("full_name", "is", null)
     .neq("full_name", "")
-    .order("line_display_name", { ascending: true }), db
+    .order("created_at", { ascending: false }), db
     .from("consultation_profiles")
     .select("id,customer_id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data")
     .order("name", { ascending: true })]);
@@ -97,7 +97,10 @@ export async function POST(request: NextRequest) {
     });
     const now = new Date(), taipeiDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" }).format(now).replace(/-/g, ""),
       manualNo = `LAS-${taipeiDate}-${crypto.randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase()}`,
-      total = subtotal + Number(method.base_price || 0), expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+      calculatedTotal = subtotal + Number(method.base_price || 0),
+      requestedTotal = body.totalPrice === undefined || body.totalPrice === null ? calculatedTotal : Number(body.totalPrice),
+      total = Number.isInteger(requestedTotal) && requestedTotal >= 0 ? requestedTotal : calculatedTotal,
+      expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
     const { data: booking, error: bookingError } = await db.from("bookings").insert({ booking_no: manualNo, customer_id: customer.id, consultation_method_id: method.id, slot_start: slotStart, slot_end: slotEnd, subtotal, total_price: total, payment_method: "credit_card", payment_status: "pending", status: "pending_payment", expires_at: expiresAt }).select("id,booking_no").single();
     if (bookingError || !booking) return NextResponse.json({ error: bookingError?.message || "建立預約失敗" }, { status: 400 });
     try {
@@ -533,3 +536,4 @@ export async function PATCH(request: NextRequest) {
   }); */
   return NextResponse.json({ ok: true });
 }
+
