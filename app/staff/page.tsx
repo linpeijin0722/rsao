@@ -311,9 +311,7 @@ export default function Staff() {
   useEffect(() => {
     const params=new URLSearchParams(window.location.search),bookingNo=params.get("quickReplyBookingNo")||"",documentId=params.get("quickReplyDocumentId")||"";
     if(!bookingNo||!documentId)return;
-    setQuickReplyTarget({bookingNo,documentId});
-    params.delete("quickReplyBookingNo");params.delete("quickReplyDocumentId");
-    const query=params.toString();window.history.replaceState({},"",`${window.location.pathname}${query?`?${query}`:""}${window.location.hash}`);
+    window.location.replace(`/staff/quick-reply?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}`);
   }, []);
   useEffect(() => {
     setTextPage(1);
