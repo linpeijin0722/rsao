@@ -553,10 +553,10 @@ export async function getQuickReplySectionSlots(documentId:string):Promise<Quick
   if(!documentId)throw new Error("缺少 Google 文件 ID");
   const token=await accessToken();
   const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
-  const {plain}=indexedDocumentText(document),headingPattern=/(?:^|\n)【([^】\n]+)】[^\n]*\n/g;
-  const matches=Array.from(plain.matchAll(headingPattern));
+  const {plain}=indexedDocumentText(document),headingPattern=/(?:^|\n)【([^】\n]+)】[^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset);
+  const matches=Array.from(scopedPlain.matchAll(headingPattern));
   return matches.map((match,slotIndex)=>{
-    const start=(match.index||0)+match[0].length;
+    const start=baseOffset+(match.index||0)+match[0].length;
     const rest=plain.slice(start),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/);
     const raw=boundary>=0?rest.slice(0,boundary):rest;
     return {slotIndex,label:normalizeConsultationReturnText(match[1]),answer:normalizeConsultationReturnText(raw.replace(/[\u00a0\u200b]/g," "))};
@@ -588,10 +588,10 @@ export async function upsertQuickConsultationSectionReplies(documentId:string,an
   if(!documentId)throw new Error("缺少 Google 文件 ID");
   const token=await accessToken();
   const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
-  const {plain,documentIndexAt}=indexedDocumentText(document),headingPattern=/(?:^|\n)【([^】\n]+)】[^\n]*\n/g;
-  const matches=Array.from(plain.matchAll(headingPattern));
+  const {plain,documentIndexAt}=indexedDocumentText(document),headingPattern=/(?:^|\n)【([^】\n]+)】[^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset);
+  const matches=Array.from(scopedPlain.matchAll(headingPattern));
   const slots=matches.map((match,slotIndex)=>{
-    const startOffset=(match.index||0)+match[0].length,rest=plain.slice(startOffset),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:Math.max(startOffset,plain.replace(/\n$/,"").length);
+    const startOffset=baseOffset+(match.index||0)+match[0].length,rest=plain.slice(startOffset),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:Math.max(startOffset,plain.replace(/\n$/,"").length);
     return {slotIndex,value:normalizeConsultationReturnText(String(answers[String(slotIndex)]||"")),startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset)};
   }).filter(slot=>slot.value).sort((a,b)=>b.startIndex-a.startIndex);
   if(!slots.length)return;
