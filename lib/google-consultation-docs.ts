@@ -539,6 +539,7 @@ export async function upsertQuickConsultationReply(documentId: string, answer: s
 }
 
 export type QuickReplyQuestionSlot = { slotIndex:number; questionNumber:number; question:string; answer:string };
+export type QuickReplySectionSlot = { slotIndex:number; label:string; answer:string };
 
 export async function getQuickReplyQuestionSlots(documentId:string):Promise<QuickReplyQuestionSlot[]> {
   if(!documentId)throw new Error("缺少 Google 文件 ID");
@@ -546,6 +547,20 @@ export async function getQuickReplyQuestionSlots(documentId:string):Promise<Quic
   const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
   const {plain}=indexedDocumentText(document),questionPattern=/(?:^|\n)Q(\d+)\s*[:：]\s*([^\n]*)\nA\1\s*[:：]\s*([^\n]*)/g;
   return Array.from(plain.matchAll(questionPattern)).map((match,slotIndex)=>({slotIndex,questionNumber:Number(match[1]),question:normalizeConsultationReturnText(match[2]),answer:normalizeConsultationReturnText(match[3])}));
+}
+
+export async function getQuickReplySectionSlots(documentId:string):Promise<QuickReplySectionSlot[]> {
+  if(!documentId)throw new Error("缺少 Google 文件 ID");
+  const token=await accessToken();
+  const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
+  const {plain}=indexedDocumentText(document),headingPattern=/(?:^|\n)【([^】\n]+)】[^\n]*\n/g;
+  const matches=Array.from(plain.matchAll(headingPattern));
+  return matches.map((match,slotIndex)=>{
+    const start=(match.index||0)+match[0].length;
+    const rest=plain.slice(start),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/);
+    const raw=boundary>=0?rest.slice(0,boundary):rest;
+    return {slotIndex,label:normalizeConsultationReturnText(match[1]),answer:normalizeConsultationReturnText(raw.replace(/[\u00a0\u200b]/g," "))};
+  });
 }
 
 export async function upsertQuickConsultationQuestionReplies(documentId:string,answers:Record<string,string>) {
@@ -564,6 +579,27 @@ export async function upsertQuickConsultationQuestionReplies(documentId:string,a
   for(const slot of slots){
     if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
     requests.push({insertText:{location:{index:slot.startIndex},text:slot.value}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+  }
+  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
+}
+
+export async function upsertQuickConsultationSectionReplies(documentId:string,answers:Record<string,string>) {
+  if(!documentId)throw new Error("缺少 Google 文件 ID");
+  const token=await accessToken();
+  const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
+  const {plain,documentIndexAt}=indexedDocumentText(document),headingPattern=/(?:^|\n)【([^】\n]+)】[^\n]*\n/g;
+  const matches=Array.from(plain.matchAll(headingPattern));
+  const slots=matches.map((match,slotIndex)=>{
+    const startOffset=(match.index||0)+match[0].length,rest=plain.slice(startOffset),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:startOffset+rest.length;
+    return {slotIndex,value:normalizeConsultationReturnText(String(answers[String(slotIndex)]||"")),startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset)};
+  }).filter(slot=>slot.value).sort((a,b)=>b.startIndex-a.startIndex);
+  if(!slots.length)return;
+  const requests:any[]=[];
+  for(const slot of slots){
+    if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
+    const inserted=`${slot.value}\n`;
+    requests.push({insertText:{location:{index:slot.startIndex},text:inserted}});
     requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
