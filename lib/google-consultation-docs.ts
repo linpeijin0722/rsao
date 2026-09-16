@@ -503,6 +503,37 @@ export async function upsertQuickConsultationReply(documentId: string, answer: s
   });
 }
 
+export type QuickReplyQuestionSlot = { slotIndex:number; questionNumber:number; question:string; answer:string };
+
+export async function getQuickReplyQuestionSlots(documentId:string):Promise<QuickReplyQuestionSlot[]> {
+  if(!documentId)throw new Error("缺少 Google 文件 ID");
+  const token=await accessToken();
+  const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
+  const {plain}=indexedDocumentText(document),questionPattern=/(?:^|\n)Q(\d+)\s*[:：]\s*([^\n]*)\nA\1\s*[:：]\s*([^\n]*)/g;
+  return Array.from(plain.matchAll(questionPattern)).map((match,slotIndex)=>({slotIndex,questionNumber:Number(match[1]),question:normalizeConsultationReturnText(match[2]),answer:normalizeConsultationReturnText(match[3])}));
+}
+
+export async function upsertQuickConsultationQuestionReplies(documentId:string,answers:Record<string,string>) {
+  if(!documentId)throw new Error("缺少 Google 文件 ID");
+  const token=await accessToken();
+  const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
+  const {plain,documentIndexAt}=indexedDocumentText(document);
+  const answerPattern=/(?:^|\n)A(\d+)\s*[:：]([^\n]*)/g;
+  const slots=Array.from(plain.matchAll(answerPattern)).map((match,slotIndex)=>{
+    const whole=match[0],leading=whole.startsWith("\n")?1:0,colonOffset=whole.search(/[:：]/),value=normalizeConsultationReturnText(String(answers[String(slotIndex)]||""));
+    const lineOffset=(match.index||0)+leading,startOffset=(match.index||0)+colonOffset+1,endOffset=(match.index||0)+whole.length;
+    return {slotIndex,value,startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset),lineStart:documentIndexAt(lineOffset)};
+  }).filter(slot=>slot.value).sort((a,b)=>b.startIndex-a.startIndex);
+  if(!slots.length)throw new Error("找不到可寫入的 A1、A2 回答位置");
+  const requests:any[]=[];
+  for(const slot of slots){
+    if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
+    requests.push({insertText:{location:{index:slot.startIndex},text:slot.value}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+  }
+  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
+}
+
 const fieldLabels: Record<string, string> = {
   relationship_status: "目前關係狀態", relationship_duration: "這段關係多久了？",
   main_event: "這次最想解決的事件？", relationship_goal: "你最希望達成的目標？",
