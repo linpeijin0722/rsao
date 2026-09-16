@@ -299,6 +299,13 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
   await cleanupFinalBlankPage(documentId, token);
   if (requestOrigin) {
     try {
+      await insertQuickReplyLink(documentId, bookingNo, requestOrigin, token);
+    } catch (error) {
+      console.error("[consultation-doc] 建立諮詢回覆連結失敗", {
+        documentId, bookingNo, error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    try {
       await insertConsultationReturnButton(documentId, bookingNo, requestOrigin, token);
     } catch (error) {
       console.error("[consultation-doc] 回傳諮詢結果圖片按鈕建立失敗", {
@@ -306,6 +313,34 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
       });
     }
   }
+}
+
+async function insertQuickReplyLink(documentId: string, bookingNo: string, requestOrigin: string, token: string) {
+  const origin = requestOrigin.replace(/\/$/, "");
+  if (!/^https:\/\//i.test(origin)) throw new Error("建立諮詢回覆連結需要 HTTPS 網址");
+  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const label = "✦ 點這裡建立諮詢回覆";
+  if (documentPlainText(document).includes(label)) return;
+  const linkUrl = `${origin}/staff?quickReplyBookingNo=${encodeURIComponent(bookingNo)}&quickReplyDocumentId=${encodeURIComponent(documentId)}`;
+  const inserted = `${label}\n`;
+  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+    method: "POST",
+    body: JSON.stringify({ requests: [
+      { insertText: { location: { index: 1 }, text: inserted } },
+      { updateTextStyle: { range: { startIndex: 1, endIndex: 1 + label.length }, textStyle: {
+        bold: true,
+        fontSize: { magnitude: 15, unit: "PT" },
+        foregroundColor: { color: { rgbColor: { red: 1, green: 1, blue: 1 } } },
+        backgroundColor: { color: { rgbColor: { red: 0.541, green: 0.188, blue: 0.271 } } },
+        link: { url: linkUrl },
+      }, fields: "bold,fontSize,foregroundColor,backgroundColor,link" } },
+      { updateParagraphStyle: { range: { startIndex: 1, endIndex: 1 + inserted.length }, paragraphStyle: {
+        alignment: "CENTER",
+        spaceAbove: { magnitude: 4, unit: "PT" },
+        spaceBelow: { magnitude: 8, unit: "PT" },
+      }, fields: "alignment,spaceAbove,spaceBelow" } },
+    ] }),
+  });
 }
 
 async function insertConsultationReturnButton(documentId: string, bookingNo: string, requestOrigin: string, token: string) {
