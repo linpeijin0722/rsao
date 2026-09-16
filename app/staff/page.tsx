@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import StaffAnswerEditorV2 from "./StaffAnswerEditorV2";
+import QuickConsultationReply from "./QuickConsultationReply";
 const key = (v: string) =>
   new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Taipei" }).format(
     new Date(v),
@@ -196,6 +197,8 @@ export default function Staff() {
     [priceValue,setPriceValue]=useState(""),
     [paymentActions,setPaymentActions]=useState<any>(null),
     [paymentActionBusy,setPaymentActionBusy]=useState(false),
+    [quickReplyTarget,setQuickReplyTarget]=useState<{bookingNo:string;documentId:string}|null>(null),
+    [excludeVideoBase,setExcludeVideoBase]=useState(false),
     [profileCopyToast,setProfileCopyToast]=useState("");
   async function staffPost(body:any,retry=true){
     let response=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
@@ -257,6 +260,7 @@ export default function Staff() {
     return <span className="consultationSheetLinks">
       <button className="consultationSheetLink documentGenerateButton" disabled={busy} onClick={()=>links.length&&asArray(x.data_submissions).length>1?setDocumentVersionPicker(x):links.length?setDocumentRebuild(x):generateDocument(x)} title={links.length?"重新建立諮詢單":"建立諮詢單"} aria-label={links.length?"重新建立諮詢單":"建立諮詢單"}>{busy?"…":"📄"}</button>
       <button className="consultationSheetLink documentRelinkButton" onClick={()=>{setDocumentLinkEdit(x);setDocumentLinkValue(links[0]?.consultation_url||"")}} title="更改為現有 Google 文件連結" aria-label="更改諮詢單連結">🔄</button>
+      {links[0]?.google_document_id&&<button className="quickReplyLaunch" onClick={()=>setQuickReplyTarget({bookingNo:x.booking_no,documentId:links[0].google_document_id})} title="使用固定句庫建立諮詢回覆">✦ 回覆</button>}
       {links.map((detail:any)=><a key={detail.id} className="consultationSheetLink consultationDocumentLink" href={detail.consultation_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗{showNumber&&<small>{consultationNumberFor(x)}</small>}</a>)}
     </span>
   }
@@ -525,6 +529,13 @@ export default function Staff() {
         ),
       ];
     }, [month]);
+  const isRevenueBooking=(booking:any)=>booking.payment_status==="paid"&&booking.status!=="cancelled";
+  const textRevenue=text.filter(isRevenueBooking).reduce((sum:number,booking:any)=>sum+Number(booking.total_price||0),0);
+  const videoRevenue=video.filter(isRevenueBooking).reduce((sum:number,booking:any)=>{
+    const amount=Number(booking.total_price||0),base=excludeVideoBase?Number(booking.consultation_methods?.base_price||0):0;
+    return sum+Math.max(0,amount-base);
+  },0);
+  const textRevenueCount=text.filter(isRevenueBooking).length,videoRevenueCount=video.filter(isRevenueBooking).length;
   function openEdit(x: any) {
     setEditing(x);
     setEditTime(
@@ -777,6 +788,7 @@ export default function Staff() {
             </div>
           </div>
         )}
+        <div className="staffRevenueCard videoRevenueCard"><div><span>視訊預約已付款總計</span><small>{videoDateFrom||videoDateTo?`付款日期：${videoDateFrom||"最早"} ～ ${videoDateTo||"今天"}`:"全部付款日期"}・共 {videoRevenueCount} 筆</small></div><strong>NT$ {videoRevenue.toLocaleString("zh-TW")}</strong><label><input type="checkbox" checked={excludeVideoBase} onChange={event=>setExcludeVideoBase(event.target.checked)}/><span>不計入視訊費用（每筆依系統設定扣除 NT$ {Number(methods.find(method=>method.code==="video")?.base_price||1200).toLocaleString("zh-TW")}）</span></label></div>
       </section>
       {userView && (
         <div className="modalBackdrop priorityModal" onClick={() => setUserView(null)}>
@@ -949,7 +961,9 @@ export default function Staff() {
           <span>第 {Math.min(textPage,textPageCount)}／{textPageCount} 頁・共 {text.length} 筆</span>
           <div><button disabled={textPage<=1} onClick={()=>setTextPage(page=>Math.max(1,page-1))}>‹ 上一頁</button><button disabled={textPage>=textPageCount} onClick={()=>setTextPage(page=>Math.min(textPageCount,page+1))}>下一頁 ›</button></div>
         </nav>
+        <div className="staffRevenueCard textRevenueCard"><div><span>文字預約已付款總計</span><small>{textDateFrom||textDateTo?`付款日期：${textDateFrom||"最早"} ～ ${textDateTo||"今天"}`:"全部付款日期"}・共 {textRevenueCount} 筆</small></div><strong>NT$ {textRevenue.toLocaleString("zh-TW")}</strong></div>
       </section>
+      {quickReplyTarget&&<QuickConsultationReply bookingNo={quickReplyTarget.bookingNo} documentId={quickReplyTarget.documentId} onClose={()=>setQuickReplyTarget(null)}/>} 
       {manualOpen && (
         <div className="modalBackdrop" onClick={()=>setManualOpen(false)}>
           <div className="modal manualBookingModal" onClick={event=>event.stopPropagation()}>
@@ -1158,3 +1172,4 @@ export default function Staff() {
 }
 function StaffProfileEditor({value,profiles,change,close,save}:any){const person=value.profile_type==="person",pet=value.profile_type==="pet",self=person&&value.relationship==="本人";return <div className="modalBackdrop returnedEditBackdrop"><div className="modal staffFrontEditor"><button className="staffModalClose" onClick={close}>×</button><h2>編輯諮詢者資料</h2><div className="staffProfileKinds"><b className="selected">{self?"本人":person?"親友":pet?"往生寵物":"過世親友"}</b></div><div className="staffFrontFields">{pet&&<label>寵物主人<select value={value.owner_profile_id||""} onChange={e=>change({...value,owner_profile_id:e.target.value})}><option value="">請選擇</option>{profiles.filter((p:any)=>p.profile_type==="person").map((p:any)=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}{pet&&value.photo_data&&<img className="staffPetPhoto" src={value.photo_data} alt="寵物照片"/>}<label>{pet?"寵物姓名":"姓名"}<input value={value.name||""} onChange={e=>change({...value,name:e.target.value})}/></label>{person&&!self&&<label>他是我的…<input value={value.relationship_detail||""} onChange={e=>change({...value,relationship_detail:e.target.value})}/></label>}{!pet&&<label>性別<select value={value.gender||""} onChange={e=>change({...value,gender:e.target.value})}><option value="">請選擇</option><option>男</option><option>女</option><option>其他</option></select></label>}<label>{pet?"出生日期":"國曆生日"}<input type="date" value={value.birth_date||""} onChange={e=>change({...value,birth_date:e.target.value})}/></label><label>農曆生日<input value={value.lunar_birth_text||""} onChange={e=>change({...value,lunar_birth_text:e.target.value})}/></label>{!pet&&<><label>生肖<input value={value.zodiac||""} onChange={e=>change({...value,zodiac:e.target.value})}/></label><label>出生時辰<input value={value.birth_shichen||""} onChange={e=>change({...value,birth_shichen:e.target.value})}/></label><label>地址<textarea value={value.address||""} onChange={e=>change({...value,address:e.target.value})}/></label></>}{!person&&<><label>國曆往生日期<input type="date" value={value.death_date||""} onChange={e=>change({...value,death_date:e.target.value})}/></label><label>農曆往生日期<input value={value.lunar_death_text||""} onChange={e=>change({...value,lunar_death_text:e.target.value})}/></label><label>往生時辰<input value={value.death_shichen||""} onChange={e=>change({...value,death_shichen:e.target.value})}/></label></>}<label>備註<textarea value={value.notes||""} onChange={e=>change({...value,notes:e.target.value})}/></label></div><div className="returnedEditActions"><button onClick={()=>void save()}>儲存</button><button className="cancel" onClick={close}>取消</button></div></div></div>}
 function StaffAnswerEditor({value,profiles,change,close,save}:any){return <div className="modalBackdrop returnedEditBackdrop"><div className="modal staffFrontEditor"><button className="staffModalClose" onClick={close}>×</button><h2>修改問事資料</h2><p className="staffAnswerItem">{value.item_title}{value.sub_items?.length?`－${value.sub_items.join("、")}`:""}</p><div className="staffFrontFields"><label>這個項目是為誰諮詢？<select value={value.targetProfileId||""} onChange={e=>change({...value,targetProfileId:e.target.value})}>{profiles.map((p:any)=><option key={p.id} value={p.id}>{p.name}（{p.relationship_detail||p.relationship}）</option>)}</select></label>{value.questions.map((q:string,i:number)=><label key={i}>問題 {i+1}<textarea value={q} onChange={e=>change({...value,questions:value.questions.map((v:string,n:number)=>n===i?e.target.value:v)})}/></label>)}</div><div className="returnedEditActions"><button onClick={()=>void save()}>儲存</button><button className="cancel" onClick={close}>取消</button></div></div></div>}
+
