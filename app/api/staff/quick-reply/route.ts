@@ -9,7 +9,7 @@ const asArray=(value:any):any[]=>Array.isArray(value)?value:value?[value]:[];
 const clean=(value:any)=>String(value||"").trim();
 const profilePresentation=(profile:any,ownerName:string)=>{
   if(!profile)return {profileLines:[],locationSubject:"祂",isPet:false};
-  const isPet=profile.profile_type==="pet"||/寵物|毛孩|狗|貓/.test(`${profile.relationship||""}${profile.relationship_detail||""}`),name=clean(profile.name),detail=clean(profile.relationship_detail),relationship=detail||(profile.relationship==="本人"?"本人":clean(profile.relationship)),relation=relationship==="本人"?"本人":`${ownerName||"用戶"}的${relationship||"親友"}`;
+  const isPet=profile.profile_type==="pet",name=clean(profile.name),detail=clean(profile.relationship_detail),relationship=detail||(profile.relationship==="本人"?"本人":clean(profile.relationship)),relation=relationship==="本人"?"本人":`${ownerName||"用戶"}的${relationship||"親友"}`;
   const lunar=clean(profile.lunar_birth_text),rocYear=Number(lunar.match(/民國\s*(\d+)/)?.[1]),birthYear=rocYear?rocYear+1911:Number(clean(profile.birth_date).match(/^(\d{4})/)?.[1]),age=birthYear?Math.max(1,new Date().getFullYear()-birthYear+1):0,shichen=clean(profile.birth_shichen).split(/[（(]/)[0],gender=clean(profile.gender),zodiac=clean(profile.zodiac),address=clean(profile.address||profile.full_address);
   const profileLines=[`姓名：${name}${gender?`／${gender}`:""}${relation?`（${relation}）`:""}${age?`　虛歲：${age}歲`:""}`,lunar?`農曆生日：${lunar}${shichen?`（${shichen}）`:""}${zodiac?`　生肖：${zodiac}`:""}`:"",address?`居住地址：${address}`:""].filter(Boolean);
   return {profileLines,locationSubject:isPet?(name||"毛孩"):(relationship&&relationship!=="本人"?relationship:name||"祂"),isPet};
@@ -64,9 +64,9 @@ export async function POST(request:NextRequest){
       const optionIds=valid.map(entry=>entry.optionId),previous=new Set(asArray(body.previousPhraseIds).map(String));
       const {data:phrases,error}=await data.db.from("quick_reply_phrases").select("id,option_id,content").eq("is_active",true).eq("phrase_type","judgment").in("option_id",optionIds);
       if(error)throw new Error(error.message);
-      const chosen=valid.filter(selection=>selection.optionCode!=="location").map(selection=>pick((phrases||[]).filter((entry:any)=>entry.option_id===selection.optionId),previous)).filter(Boolean) as any[],locationSelected=valid.some(selection=>selection.optionCode==="location"),customLocation=clean(body.customLocation),locationSubject=clean(body.locationSubject)||"祂",locationSentence=locationSelected&&customLocation?`${locationSubject}現在在${customLocation}。`:"";
+      const chosen=valid.filter(selection=>selection.optionCode!=="location").map(selection=>pick((phrases||[]).filter((entry:any)=>entry.option_id===selection.optionId),previous)).filter(Boolean) as any[],locationSelected=valid.some(selection=>selection.optionCode==="location"),customLocation=clean(body.customLocation),locationSubject=clean(body.locationSubject)||"祂",reincarnatedAs=clean(body.reincarnatedAs),locationMode=clean(body.locationMode),locationSentence=locationSelected?(locationMode==="reincarnated"&&reincarnatedAs?`目前已投胎成一個${reincarnatedAs}，`:customLocation?`${locationSubject}現在在${customLocation}。`:""):"";
       const answer=[locationSentence,...chosen.map(entry=>String(entry.content).trim())].filter(Boolean).join(" ");
-      if(locationSelected&&!customLocation)return NextResponse.json({error:"請先填寫現在的位置或地府第幾殿"},{status:400});
+      if(locationSelected&&!locationSentence)return NextResponse.json({error:locationMode==="reincarnated"?"請填寫現在投胎成什麼":"請先選擇現在的位置"},{status:400});
       if(!answer)return NextResponse.json({error:"這些選項目前沒有可用句子"},{status:400});
       return NextResponse.json({ok:true,answer,phraseIds:chosen.map(entry=>entry.id)});
     }
