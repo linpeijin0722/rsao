@@ -591,7 +591,7 @@ export async function upsertQuickConsultationSectionReplies(documentId:string,an
   const {plain,documentIndexAt}=indexedDocumentText(document),headingPattern=/(?:^|\n)【([^】\n]+)】[^\n]*\n/g;
   const matches=Array.from(plain.matchAll(headingPattern));
   const slots=matches.map((match,slotIndex)=>{
-    const startOffset=(match.index||0)+match[0].length,rest=plain.slice(startOffset),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:startOffset+rest.length;
+    const startOffset=(match.index||0)+match[0].length,rest=plain.slice(startOffset),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:Math.max(startOffset,plain.replace(/\n$/,"").length);
     return {slotIndex,value:normalizeConsultationReturnText(String(answers[String(slotIndex)]||"")),startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset)};
   }).filter(slot=>slot.value).sort((a,b)=>b.startIndex-a.startIndex);
   if(!slots.length)return;
