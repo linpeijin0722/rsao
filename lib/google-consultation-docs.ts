@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { makeQuickReplyToken } from "@/lib/quick-reply-token";
 
 const folderId = "1pihxwGH-FJtWPiCAwBcSvs65L603HVu-";
 const returnedFolderId = process.env.GOOGLE_DRIVE_RETURNED_FOLDER_ID || "18zRTeG1bAmWDCev0LJLslpo5LC7frYhX";
@@ -321,7 +322,8 @@ async function insertQuickReplyLink(documentId: string, bookingNo: string, reque
   const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
   const label = "✦ 點這裡建立諮詢回覆";
   if (documentPlainText(document).includes(label)) return;
-  const linkUrl = `${origin}/staff/quick-reply?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}`;
+  const replyToken=makeQuickReplyToken(bookingNo,documentId);
+  const linkUrl = `${origin}/staff/quick-reply?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}&token=${encodeURIComponent(replyToken)}`;
   const inserted = `${label}\n`;
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
     method: "POST",
