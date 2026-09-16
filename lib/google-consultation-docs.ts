@@ -321,7 +321,7 @@ async function insertQuickReplyLink(documentId: string, bookingNo: string, reque
   const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
   const label = "✦ 點這裡建立諮詢回覆";
   if (documentPlainText(document).includes(label)) return;
-  const linkUrl = `${origin}/staff?quickReplyBookingNo=${encodeURIComponent(bookingNo)}&quickReplyDocumentId=${encodeURIComponent(documentId)}`;
+  const linkUrl = `${origin}/staff/quick-reply?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}`;
   const inserted = `${label}\n`;
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
     method: "POST",
