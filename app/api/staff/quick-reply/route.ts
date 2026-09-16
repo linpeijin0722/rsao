@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
 import { adminSupabase } from "@/lib/supabase";
-import { getQuickReplyQuestionSlots, normalizeConsultationReturnText, upsertQuickConsultationQuestionReplies } from "@/lib/google-consultation-docs";
+import { getQuickReplyQuestionSlots, getQuickReplySectionSlots, normalizeConsultationReturnText, upsertQuickConsultationQuestionReplies, upsertQuickConsultationSectionReplies } from "@/lib/google-consultation-docs";
 
 const one=(value:any)=>Array.isArray(value)?value[0]:value;
 const asArray=(value:any):any[]=>Array.isArray(value)?value:value?[value]:[];
 
 async function context(bookingNo:string,requestedDocumentId=""){
   const db=adminSupabase();
-  const {data:booking,error}=await db.from("bookings").select("id,booking_no,customers(line_display_name,full_name),booking_details(id,created_at,item_title,google_document_id,google_document_url,booking_items(code),booking_consultation_answers(questions))").eq("booking_no",bookingNo).single();
+  const {data:booking,error}=await db.from("bookings").select("id,booking_no,customers(line_display_name,full_name),booking_details(id,created_at,item_title,google_document_id,google_document_url,booking_items(code),booking_detail_sub_items(sub_item_title),booking_consultation_answers(questions))").eq("booking_no",bookingNo).single();
   if(error||!booking)throw new Error("找不到這筆預約");
   const details=asArray(booking.booking_details).sort((a:any,b:any)=>String(a.created_at).localeCompare(String(b.created_at)));
   const documentDetail=details.find((detail:any)=>detail.google_document_id===requestedDocumentId)||details.find((detail:any)=>detail.google_document_id);
@@ -25,27 +25,33 @@ async function context(bookingNo:string,requestedDocumentId=""){
   const normalizedTopics=(topics||[]).map((topic:any)=>({...topic,options:asArray(topic.quick_reply_options).filter((option:any)=>option.is_active).sort((a:any,b:any)=>a.sort_order-b.sort_order)}));
   const itemTopic:Record<string,string>={"infant-spirit":"infant_spirit","deceased-relative":"deceased","spiritual-interference":"spiritual","home-energy":"home","personal-romance":"love","marriage-bazi":"love","health":"health","lawsuit-benefactor":"lawsuit","naming":"naming_result","date-time-selection":"date_result"};
   const recommendedByQuestion=Object.fromEntries(questionSlots.map(slot=>{const fromItem=itemTopic[slot.itemCode],fromWords=normalizedTopics.filter((topic:any)=>asArray(topic.keywords).some((keyword:string)=>slot.question.toLocaleLowerCase("zh-TW").includes(String(keyword).toLocaleLowerCase("zh-TW")))).map((topic:any)=>topic.code);return [String(slot.slotIndex),slot.manualOnly?[]:Array.from(new Set([fromItem,...fromWords].filter(Boolean)))]}));
-  const {data:saved,error:savedError}=await db.from("booking_quick_replies").select("question_replies,updated_at").eq("booking_id",booking.id).maybeSingle();
+  const sectionMeta=details.flatMap((detail:any)=>{const labels=[detail.item_title,...asArray(detail.booking_detail_sub_items).map((entry:any)=>entry.sub_item_title)].filter(Boolean);return labels.map((label:string)=>({label:String(label).replace(/[【】]/g,"").trim(),itemCode:one(detail.booking_items)?.code||""}))});
+  const sectionSlots=(await getQuickReplySectionSlots(documentDetail.google_document_id)).map(slot=>{const meta=sectionMeta.find((entry:any)=>entry.label===slot.label)||sectionMeta.find((entry:any)=>slot.label.includes(entry.label)||entry.label.includes(slot.label));const itemCode=meta?.itemCode||"";return {...slot,itemCode,manualOnly:itemCode.startsWith("past-life-")||/前世|綜觀今生/.test(slot.label)}});
+  const recommendedBySection=Object.fromEntries(sectionSlots.map(slot=>[String(slot.slotIndex),slot.manualOnly?[]:[itemTopic[slot.itemCode]||normalizedTopics.find((topic:any)=>asArray(topic.keywords).some((keyword:string)=>slot.label.includes(String(keyword))))?.code].filter(Boolean)]));
+  const {data:saved,error:savedError}=await db.from("booking_quick_replies").select("question_replies,section_replies,updated_at").eq("booking_id",booking.id).maybeSingle();
   if(savedError)throw new Error(savedError.message.includes("question_replies")?"請先執行新版快速諮詢回覆 Supabase SQL":savedError.message);
   const savedReplies=saved?.question_replies&&typeof saved.question_replies==="object"?saved.question_replies:{};
+  const savedSections=saved?.section_replies&&typeof saved.section_replies==="object"?saved.section_replies:{};
   const questionReplies=Object.fromEntries(questionSlots.map(slot=>{const existing=savedReplies[String(slot.slotIndex)]||{};return [String(slot.slotIndex),{selections:existing.selections||{},phraseIds:existing.phraseIds||[],answer:existing.answer||slot.answer||"",completed:existing.completed===true}]}));
-  return {db,booking,customer:one(booking.customers)||{},documentDetail,questionSlots,topics:normalizedTopics,recommendedByQuestion,questionReplies,updatedAt:saved?.updated_at||null};
+  const sectionReplies=Object.fromEntries(sectionSlots.map(slot=>{const existing=savedSections[String(slot.slotIndex)]||{};return [String(slot.slotIndex),{optionIds:asArray(existing.optionIds).map(String),phraseIds:asArray(existing.phraseIds).map(String),answer:existing.answer||slot.answer||"",completed:existing.completed===true}]}));
+  return {db,booking,customer:one(booking.customers)||{},documentDetail,questionSlots,sectionSlots,topics:normalizedTopics,recommendedByQuestion,recommendedBySection,questionReplies,sectionReplies,updatedAt:saved?.updated_at||null};
 }
 
 function pick<T extends {id:string}>(values:T[],previous:Set<string>){const alternatives=values.filter(value=>!previous.has(value.id)),pool=alternatives.length?alternatives:values;return pool.length?pool[Math.floor(Math.random()*pool.length)]:null}
 
 export async function GET(request:NextRequest){
   if(!isAdminSession((await cookies()).get("admin_session")?.value))return NextResponse.json({error:"未登入"},{status:401});
-  try{const data=await context(request.nextUrl.searchParams.get("bookingNo")||"",request.nextUrl.searchParams.get("documentId")||"");return NextResponse.json({ok:true,bookingNo:data.booking.booking_no,customerName:data.customer.full_name||data.customer.line_display_name||"LINE 用戶",questions:data.questionSlots,topics:data.topics,recommendedByQuestion:data.recommendedByQuestion,questionReplies:data.questionReplies,updatedAt:data.updatedAt,documentId:data.documentDetail.google_document_id,documentUrl:data.documentDetail.google_document_url||`https://docs.google.com/document/d/${data.documentDetail.google_document_id}/edit`})}catch(error){return NextResponse.json({error:error instanceof Error?error.message:"讀取快速回覆失敗"},{status:400})}
+  try{const data=await context(request.nextUrl.searchParams.get("bookingNo")||"",request.nextUrl.searchParams.get("documentId")||"");return NextResponse.json({ok:true,bookingNo:data.booking.booking_no,customerName:data.customer.full_name||data.customer.line_display_name||"LINE 用戶",questions:data.questionSlots,sections:data.sectionSlots,topics:data.topics,recommendedByQuestion:data.recommendedByQuestion,recommendedBySection:data.recommendedBySection,questionReplies:data.questionReplies,sectionReplies:data.sectionReplies,updatedAt:data.updatedAt,documentId:data.documentDetail.google_document_id,documentUrl:data.documentDetail.google_document_url||`https://docs.google.com/document/d/${data.documentDetail.google_document_id}/edit`})}catch(error){return NextResponse.json({error:error instanceof Error?error.message:"讀取快速回覆失敗"},{status:400})}
 }
 
 export async function POST(request:NextRequest){
   if(!isAdminSession((await cookies()).get("admin_session")?.value))return NextResponse.json({error:"未登入"},{status:401});
   try{
     const body=await request.json(),data=await context(String(body.bookingNo||""),String(body.documentId||""));
-    if(body.mode==="compose"){
+    if(body.mode==="compose"||body.mode==="compose_section"){
       const selections=body.selections&&typeof body.selections==="object"?body.selections:{},valid:{topicCode:string;optionId:string}[]=[];
-      for(const [topicCode,optionCode] of Object.entries(selections)){const topic=data.topics.find((entry:any)=>entry.code===topicCode),option=topic?.options.find((entry:any)=>entry.code===optionCode);if(option)valid.push({topicCode,optionId:option.id})}
+      if(body.mode==="compose_section"){for(const optionId of asArray(body.optionIds).map(String)){for(const topic of data.topics){const option=topic.options.find((entry:any)=>entry.id===optionId);if(option)valid.push({topicCode:topic.code,optionId:option.id})}}}
+      else for(const [topicCode,optionCode] of Object.entries(selections)){const topic=data.topics.find((entry:any)=>entry.code===topicCode),option=topic?.options.find((entry:any)=>entry.code===optionCode);if(option)valid.push({topicCode,optionId:option.id})}
       if(!valid.length)return NextResponse.json({error:"請先選擇這個問題的判斷結果"},{status:400});
       const optionIds=valid.map(entry=>entry.optionId),previous=new Set(asArray(body.previousPhraseIds).map(String));
       const {data:phrases,error}=await data.db.from("quick_reply_phrases").select("id,option_id,content").eq("is_active",true).eq("phrase_type","judgment").in("option_id",optionIds);
@@ -58,11 +64,14 @@ export async function POST(request:NextRequest){
     if(body.mode!=="write")return NextResponse.json({error:"不支援的操作"},{status:400});
     const incoming=body.questionReplies&&typeof body.questionReplies==="object"?body.questionReplies:{},questionReplies:Record<string,any>={},answers:Record<string,string>={};
     for(const slot of data.questionSlots){const row=incoming[String(slot.slotIndex)]||{},answer=normalizeConsultationReturnText(String(row.answer||""));if(!answer)continue;questionReplies[String(slot.slotIndex)]={selections:row.selections||{},phraseIds:asArray(row.phraseIds).map(String),answer,completed:row.completed===true};answers[String(slot.slotIndex)]=answer}
-    if(!Object.keys(answers).length)return NextResponse.json({error:"至少要完成一題回答"},{status:400});
-    const recommended=Array.from(new Set(Object.values(data.recommendedByQuestion).flat())) as string[],phraseIds=Object.values(questionReplies).flatMap((row:any)=>row.phraseIds),finalAnswer=Object.entries(questionReplies).map(([index,row]:any)=>`A${data.questionSlots[Number(index)]?.questionNumber||Number(index)+1}:${row.answer}`).join("\n");
-    const record={booking_id:data.booking.id,recommended_topic_codes:recommended,selections:Object.fromEntries(Object.entries(questionReplies).map(([key,row]:any)=>[key,row.selections])),phrase_ids:phraseIds,final_answer:finalAnswer,question_replies:questionReplies,phrase_usage:Object.fromEntries(Object.entries(questionReplies).map(([key,row]:any)=>[key,row.phraseIds])),google_document_id:data.documentDetail.google_document_id,google_document_url:data.documentDetail.google_document_url||`https://docs.google.com/document/d/${data.documentDetail.google_document_id}/edit`,updated_at:new Date().toISOString()};
+    const incomingSections=body.sectionReplies&&typeof body.sectionReplies==="object"?body.sectionReplies:{},sectionReplies:Record<string,any>={},sectionAnswers:Record<string,string>={};
+    for(const slot of data.sectionSlots){const row=incomingSections[String(slot.slotIndex)]||{},answer=normalizeConsultationReturnText(String(row.answer||""));if(!answer)continue;sectionReplies[String(slot.slotIndex)]={optionIds:asArray(row.optionIds).map(String),phraseIds:asArray(row.phraseIds).map(String),answer,completed:row.completed===true};sectionAnswers[String(slot.slotIndex)]=answer}
+    if(!Object.keys(answers).length&&!Object.keys(sectionAnswers).length)return NextResponse.json({error:"至少要完成一個回答"},{status:400});
+    const recommended=Array.from(new Set([...Object.values(data.recommendedByQuestion).flat(),...Object.values(data.recommendedBySection).flat()])) as string[],phraseIds=[...Object.values(questionReplies).flatMap((row:any)=>row.phraseIds),...Object.values(sectionReplies).flatMap((row:any)=>row.phraseIds)],finalAnswer=[...Object.entries(questionReplies).map(([index,row]:any)=>`A${data.questionSlots[Number(index)]?.questionNumber||Number(index)+1}:${row.answer}`),...Object.entries(sectionReplies).map(([index,row]:any)=>`【${data.sectionSlots[Number(index)]?.label||"項目"}】${row.answer}`)].join("\n");
+    const record={booking_id:data.booking.id,recommended_topic_codes:recommended,selections:Object.fromEntries(Object.entries(questionReplies).map(([key,row]:any)=>[key,row.selections])),phrase_ids:phraseIds,final_answer:finalAnswer,question_replies:questionReplies,section_replies:sectionReplies,phrase_usage:{questions:Object.fromEntries(Object.entries(questionReplies).map(([key,row]:any)=>[key,row.phraseIds])),sections:Object.fromEntries(Object.entries(sectionReplies).map(([key,row]:any)=>[key,row.phraseIds]))},google_document_id:data.documentDetail.google_document_id,google_document_url:data.documentDetail.google_document_url||`https://docs.google.com/document/d/${data.documentDetail.google_document_id}/edit`,updated_at:new Date().toISOString()};
     const {error:saveError}=await data.db.from("booking_quick_replies").upsert(record,{onConflict:"booking_id"});if(saveError)throw new Error(saveError.message);
-    await upsertQuickConsultationQuestionReplies(data.documentDetail.google_document_id,answers);
+    if(Object.keys(answers).length)await upsertQuickConsultationQuestionReplies(data.documentDetail.google_document_id,answers);
+    if(Object.keys(sectionAnswers).length)await upsertQuickConsultationSectionReplies(data.documentDetail.google_document_id,sectionAnswers);
     return NextResponse.json({ok:true,written:true,updatedAt:record.updated_at});
   }catch(error){return NextResponse.json({error:error instanceof Error?error.message:"快速回覆處理失敗"},{status:400})}
 }
