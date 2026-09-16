@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-const folderId = process.env.GOOGLE_DRIVE_OUTPUT_FOLDER_ID || process.env.GOOGLE_DRIVE_TEMPLATE_FOLDER_ID || "";
+const folderId = "1pihxwGH-FJtWPiCAwBcSvs65L603HVu-";
 const returnedFolderId = process.env.GOOGLE_DRIVE_RETURNED_FOLDER_ID || "18zRTeG1bAmWDCev0LJLslpo5LC7frYhX";
 const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || "";
 const privateKey = (process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || "").replace(/\\n/g, "\n");
@@ -1085,4 +1085,3 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     throw normalizationError instanceof Error ? normalizationError : new Error("Google 文件最終整理失敗");
   }
 }
-
