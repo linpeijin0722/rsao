@@ -444,6 +444,65 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
   });
 }
 
+const QUICK_REPLY_HEADING = "【阿嫂回答】";
+
+function indexedDocumentText(document: any) {
+  const chunks: { text: string; start: number; end: number }[] = [];
+  for (const block of document.body?.content || []) {
+    for (const element of block.paragraph?.elements || []) {
+      const value = String(element.textRun?.content || "");
+      if (value) chunks.push({ text: value, start: Number(element.startIndex || 1), end: Number(element.endIndex || 1) });
+    }
+  }
+  const plain = chunks.map((entry) => entry.text).join("");
+  const documentIndexAt = (offset: number) => {
+    let consumed = 0;
+    for (const entry of chunks) {
+      if (offset <= consumed + entry.text.length) return entry.start + Math.max(0, offset - consumed);
+      consumed += entry.text.length;
+    }
+    return Math.max(1, Number(document.body?.content?.at(-1)?.endIndex || 2) - 1);
+  };
+  return { plain, documentIndexAt, bodyEnd: Math.max(1, Number(document.body?.content?.at(-1)?.endIndex || 2) - 1) };
+}
+
+export async function getQuickConsultationReplyFromDocument(documentId: string) {
+  if (!documentId) return "";
+  const token = await accessToken();
+  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const { plain } = indexedDocumentText(document);
+  const marker = plain.lastIndexOf(QUICK_REPLY_HEADING);
+  return marker < 0 ? "" : normalizeConsultationReturnText(plain.slice(marker + QUICK_REPLY_HEADING.length));
+}
+
+export async function upsertQuickConsultationReply(documentId: string, answer: string) {
+  const normalized = normalizeConsultationReturnText(answer);
+  if (!documentId) throw new Error("缺少 Google 文件 ID");
+  if (!normalized) throw new Error("請先輸入阿嫂回答");
+  const token = await accessToken();
+  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const { plain, documentIndexAt, bodyEnd } = indexedDocumentText(document);
+  const markerOffset = plain.lastIndexOf(QUICK_REPLY_HEADING);
+  const replacing = markerOffset >= 0;
+  const insertIndex = replacing ? documentIndexAt(markerOffset) : bodyEnd;
+  const prefix = replacing || !plain.trim() ? "" : "\n\n";
+  const inserted = `${prefix}${QUICK_REPLY_HEADING}\n${normalized}\n`;
+  const headingStart = insertIndex + prefix.length;
+  const answerStart = headingStart + QUICK_REPLY_HEADING.length + 1;
+  const requests: any[] = [];
+  if (replacing && insertIndex < bodyEnd) requests.push({ deleteContentRange: { range: { startIndex: insertIndex, endIndex: bodyEnd } } });
+  requests.push({ insertText: { location: { index: insertIndex }, text: inserted } });
+  requests.push({ updateTextStyle: { range: { startIndex: headingStart, endIndex: headingStart + QUICK_REPLY_HEADING.length }, textStyle: {
+    bold: true, fontSize: { magnitude: 15, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: 0, green: 0, blue: 0 } } },
+  }, fields: "bold,fontSize,foregroundColor" } });
+  requests.push({ updateTextStyle: { range: { startIndex: answerStart, endIndex: answerStart + normalized.length }, textStyle: {
+    bold: false, fontSize: { magnitude: 12, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: 0.102, green: 0.349, blue: 0.8 } } },
+  }, fields: "bold,fontSize,foregroundColor" } });
+  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+    method: "POST", body: JSON.stringify({ requests }),
+  });
+}
+
 const fieldLabels: Record<string, string> = {
   relationship_status: "目前關係狀態", relationship_duration: "這段關係多久了？",
   main_event: "這次最想解決的事件？", relationship_goal: "你最希望達成的目標？",
@@ -995,3 +1054,4 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     throw normalizationError instanceof Error ? normalizationError : new Error("Google 文件最終整理失敗");
   }
 }
+
