@@ -790,3 +790,129 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 .returnScheduleWarning{display:block;margin:14px 0 2px;padding:12px 14px;border:1px solid #e7a572;border-radius:11px;background:#fff4e9;color:#9a431d;font-size:14px;line-height:1.55}
 .returnScheduleConfirm{border-top:5px solid #862f44}
 @media(max-width:600px){.returnDeliveryButtons,.returnScheduleFields{grid-template-columns:1fr}.returnDeliveryButtons button{min-height:100px}}
+.quickReplyDeceasedStatus {
+  display: grid;
+  gap: 14px;
+}
+
+.quickReplyNestedGroup {
+  overflow: hidden;
+  border: 1px solid #dec9c0;
+  border-radius: 14px;
+  background: #fffdfc;
+}
+
+.quickReplyNestedGroup > button {
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 18px;
+  border: 0;
+  background: #fffdfc;
+  color: #3f3531;
+  font-size: 17px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.quickReplyNestedGroup > button::after {
+  content: "展開選項";
+  float: right;
+  color: #856f66;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.quickReplyNestedGroup > button.active {
+  background: #9d2f4c;
+  color: #fff;
+}
+
+.quickReplyNestedGroup > button.active::after {
+  content: "收起";
+  color: #fff;
+}
+
+.quickReplyNestedBody {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid #eadbd4;
+  background: #fff8f5;
+}
+
+.quickReplyNestedBody h5 {
+  margin: 2px 0 0;
+  color: #5f443a;
+  font-size: 16px;
+}
+
+.quickReplyNestedBody > input,
+.quickReplyNestedCustom input {
+  min-height: 45px;
+  padding: 10px 13px;
+  border: 1px solid #d6c1b7;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 16px;
+}
+
+.quickReplyNestedChoices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.quickReplyNestedChoices button {
+  min-height: 46px;
+  padding: 9px 12px;
+  border: 1px solid #d8c5bb;
+  border-radius: 11px;
+  background: #fff;
+  color: #453b36;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.quickReplyNestedChoices button.selected {
+  border-color: #c7254e;
+  background: #fff0f4;
+  color: #a31f41;
+  box-shadow: 0 0 0 1px rgba(199, 37, 78, .08);
+}
+
+.quickReplyNestedChoices button.selected::before {
+  content: "✓ ";
+  color: #c7254e;
+}
+
+.quickReplyNestedCustom {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 9px;
+}
+
+.quickReplyNestedCustom button {
+  min-width: 106px;
+  border: 0;
+  border-radius: 10px;
+  background: #244f46;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+@media (max-width: 640px) {
+  .quickReplyNestedChoices {
+    grid-template-columns: 1fr;
+  }
+
+  .quickReplyNestedCustom {
+    grid-template-columns: 1fr;
+  }
+
+  .quickReplyNestedCustom button {
+    min-height: 44px;
+  }
+}
