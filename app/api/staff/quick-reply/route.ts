@@ -76,6 +76,20 @@ const overallBuiltInOptions = [
     is_active: true,
   },
   {
+    id: "virtual-deity-bao-fu",
+    code: "deity_bao_fu",
+    label: "包府千歲",
+    sort_order: 30,
+    is_active: true,
+  },
+  {
+    id: "virtual-deity-city-god",
+    code: "deity_city_god",
+    label: "城隍爺",
+    sort_order: 31,
+    is_active: true,
+  },
+  {
     id: "virtual-deity-relation-affinity",
     code: "deity_relation_affinity",
     label: "有緣",
@@ -1315,6 +1329,7 @@ export async function POST(request: NextRequest) {
       const subject = clean(body.locationSubject) || "祂",
         pronoun = clean(body.genderPronoun) || "祂",
         deity = clean(body.customDeity) || "神佛",
+        worshipDeities = asArray(body.worshipDeities).map(clean).filter(Boolean),
         visitTarget = clean(body.visitTarget) || "親友",
         customVisitReason = clean(body.customVisitReason),
         vary = (value: string) => {
@@ -1442,10 +1457,9 @@ export async function POST(request: NextRequest) {
         ],
         uniqueDeities = Array.from(new Set(deityLabels)),
         relationCodes = new Set(deityRelationRows.map((row) => row.optionCode)),
+        hasRelation = relationCodes.size > 0,
         relationParts = [
-          relationCodes.has("deity_relation_affinity")
-            ? `與${uniqueDeities.join("、")}有緣`
-            : "",
+          hasRelation ? `與${uniqueDeities.join("、")}有緣` : "",
           relationCodes.has("deity_relation_protect")
             ? "也有在身邊護持著自己"
             : "",
@@ -1453,11 +1467,23 @@ export async function POST(request: NextRequest) {
             ? "遇到事情時也會得到一些指引"
             : "",
         ].filter(Boolean),
+        uniqueWorshipDeities = Array.from(new Set(worshipDeities)),
+        sameWorship =
+          uniqueWorshipDeities.length > 0 &&
+          uniqueWorshipDeities.length === uniqueDeities.length &&
+          uniqueWorshipDeities.every((name) => uniqueDeities.includes(name)),
+        worshipSentence = uniqueWorshipDeities.length
+          ? sameWorship
+            ? "有空可以多走其大廟，對自己會有最直接的助力。"
+            : `有空可以多走其大廟，另外也可以多拜${uniqueWorshipDeities.join("、")}，對自己會有最直接的助力。`
+          : "",
         deitySentence = uniqueDeities.length
           ? relationParts.length
-            ? `${relationParts.join("，")}，有空可以到大廟多拜${uniqueDeities[0]}，對自己會有最直接的助力。`
-            : `有空可以多拜${uniqueDeities.join("、")}，對自己會有最直接的助力。`
-          : "",
+            ? `${relationParts.join("，")}${worshipSentence ? `，${worshipSentence}` : "。"}`
+            : worshipSentence || `與${uniqueDeities.join("、")}有緣。`
+          : uniqueWorshipDeities.length
+            ? `有空可以多拜${uniqueWorshipDeities.join("、")}，對自己會有最直接的助力。`
+            : "",
         answer = [
           locationSentence,
           elementSentence,

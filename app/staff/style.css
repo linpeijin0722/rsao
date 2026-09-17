@@ -1068,6 +1068,7 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
   font-size: 16px;
   text-align: left;
 }
+.quickReplyWorshipHint{margin:0 0 9px;padding:9px 11px;border-radius:9px;background:#f6eee9;color:#715e54;font-size:14px;line-height:1.5;text-align:left}
 .quickReplyQuestionGroups > p {
   margin: 0 0 10px;
   color: #756961;

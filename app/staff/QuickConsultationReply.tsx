@@ -103,6 +103,7 @@ export default function QuickConsultationReply({
     [reincarnatedPlace, setReincarnatedPlace] = useState<Record<string, string>>({}),
     [reincarnatedAge, setReincarnatedAge] = useState<Record<string, string>>({}),
     [customDeity, setCustomDeity] = useState<Record<string, string>>({}),
+    [worshipDeities, setWorshipDeities] = useState<Record<string, string[]>>({}),
     [namingRows, setNamingRows] = useState<
       Record<string, { name: string; aid: string; custom: string }[]>
     >({}),
@@ -337,6 +338,18 @@ export default function QuickConsultationReply({
       sectionTopic?.options.filter((o) =>
         o.code.startsWith("deity_relation_"),
       ) || [],
+    selectedDeityOptions = deityOptions.filter((option) =>
+      sectionDraft.optionIds.includes(option.id),
+    ),
+    selectedDeityLabels = selectedDeityOptions.map((option) => option.label),
+    effectiveWorshipDeities = Object.prototype.hasOwnProperty.call(worshipDeities, sectionKey)
+      ? worshipDeities[sectionKey]
+      : selectedDeityLabels,
+    worshipDeityOptions = [...deityOptions].sort((a, b) => {
+      const priority = ["城隍爺", "包府千歲", "觀世音菩薩", "媽祖", "玄天上帝", "關聖帝君", "土地公"];
+      const ai = priority.indexOf(a.label), bi = priority.indexOf(b.label);
+      return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
+    }),
     buddhistOptions =
       sectionTopic?.options.filter((o) => o.code.startsWith("buddhist_")) || [],
     standardOptions =
@@ -488,6 +501,7 @@ export default function QuickConsultationReply({
     targetSection = section,
     targetKey = sectionKey,
     requestVersion?: number,
+    worshipOverride?: string[],
   ) {
     if (!targetSection || !optionIds.length) return;
     const version =
@@ -525,6 +539,16 @@ export default function QuickConsultationReply({
           ]
             .filter(Boolean)
             .join("、"),
+        worshipDeities: worshipOverride || (Object.prototype.hasOwnProperty.call(worshipDeities, targetKey)
+          ? worshipDeities[targetKey]
+          : (sectionTopic?.options || [])
+              .filter((option) =>
+                option.code.startsWith("deity_") &&
+                !option.code.startsWith("deity_relation_") &&
+                option.code !== "deity_custom" &&
+                optionIds.includes(option.id),
+              )
+              .map((option) => option.label)),
         visitTarget: deceasedDetails.current[targetKey]?.visitTarget || "親友",
         customVisitReason:
           deceasedDetails.current[targetKey]?.customVisitReason || "",
@@ -632,6 +656,22 @@ export default function QuickConsultationReply({
       return;
     }
     scheduleSectionCompose(next);
+  }
+  function toggleWorshipDeity(label: string) {
+    const current = effectiveWorshipDeities,
+      next = current.includes(label)
+        ? current.filter((value) => value !== label)
+        : [...current, label];
+    setWorshipDeities((values) => ({ ...values, [sectionKey]: next }));
+    if (sectionDraft.optionIds.length)
+      void composeSection(
+        sectionDraft.optionIds,
+        false,
+        section,
+        sectionKey,
+        undefined,
+        next,
+      );
   }
   function selectSingleOption(id: string, group: Option[]) {
     const groupIds = new Set(group.map((option) => option.id)),
@@ -1986,6 +2026,24 @@ export default function QuickConsultationReply({
                                           {sectionDraft.optionIds.includes(
                                             o.id,
                                           ) && <span>✓</span>}
+                                          {o.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
+                                {sectionTopic?.code === "overall" && (
+                                  <>
+                                    <h5 className="quickReplySubheading">有空要多拜（可複選）</h5>
+                                    <p className="quickReplyWorshipHint">預設跟隨上方選擇的暗貴人，也可以另外選擇遇到困難時想多拜的神明。</p>
+                                    <div className="quickReplySpecialChoices">
+                                      {worshipDeityOptions.map((o) => (
+                                        <button
+                                          key={`worship-${o.id}`}
+                                          className={effectiveWorshipDeities.includes(o.label) ? "selected" : ""}
+                                          onClick={() => toggleWorshipDeity(o.label)}
+                                        >
+                                          {effectiveWorshipDeities.includes(o.label) && <span>✓</span>}
                                           {o.label}
                                         </button>
                                       ))}
