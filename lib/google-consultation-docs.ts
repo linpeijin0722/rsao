@@ -1143,26 +1143,23 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const result = await response.json();
   if (!response.ok || !result.ok) throw new Error(result.error || "Apps Script 建立文件失敗");
   if (result.version !== requiredAppsScriptVersion) throw new Error(`目前連到舊版 Google Apps Script（目前：${result.version || "無版本資訊"}；需要：${requiredAppsScriptVersion}），請更新 Vercel 的 GOOGLE_APPS_SCRIPT_WEB_APP_URL 後重新部署`);
-  if (createMode === "new" && result.documentId && result.documentTitle) {
-    const reorderedTitle = String(result.documentTitle).replace(/\s+([A-Z][a-z]{2}\d{2})\.新(\d+)$/u, ".新$2 $1");
-    if (reorderedTitle !== result.documentTitle) {
-      const token = await accessToken();
-      await google(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(result.documentId)}?supportsAllDrives=true`, token, {
-        method: "PATCH",
-        body: JSON.stringify({ name: reorderedTitle }),
-      });
-      result.documentTitle = reorderedTitle;
-    }
-  }
   // 二次整理失敗時仍先把已建立的文件連結寫回後台，但不能再「靜默成功」。
   // 寫回完成後會把錯誤拋回 API，讓後台與 Vercel log 都能明確看到真正失敗原因。
   let normalizationError: unknown = null;
-  try {
-    await normalizeDocumentHeaderAndFooter(result.documentId, bookingNo, requestOrigin);
-    if (isCancelledOrRefunded) await markConsultationOrderCancelled(result.documentId);
-  } catch (error) {
-    normalizationError = error;
-    console.error("[consultation-doc] Google 文件最終整理失敗", { documentId: result.documentId, bookingNo, error });
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      await normalizeDocumentHeaderAndFooter(result.documentId, bookingNo, requestOrigin);
+      if (isCancelledOrRefunded) await markConsultationOrderCancelled(result.documentId);
+      normalizationError = null;
+      break;
+    } catch (error) {
+      normalizationError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const canRetry = /Document is missing|not found|read access|找不到/i.test(message) && attempt < 3;
+      console.error("[consultation-doc] Google 文件最終整理失敗", { documentId: result.documentId, bookingNo, attempt: attempt + 1, error });
+      if (!canRetry) break;
+      await new Promise((resolve) => setTimeout(resolve, [800, 1600, 2600][attempt]));
+    }
   }
   const createdAt = existingDetails.map((detail: any) => detail.google_document_created_at).filter(Boolean).sort()[0] || new Date().toISOString();
   const { error: updateError } = await db.from("booking_details").update({
@@ -1175,6 +1172,21 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     google_document_id: null, google_document_url: null, google_document_created_at: null,
   }).eq("booking_id", bookingId).neq("id", anchor.id);
   if (clearError) throw clearError;
+  // 檔名重排是附加整理；即使 Drive 權限同步較慢，也不能阻斷按鈕、連結與資料庫寫回。
+  if (createMode === "new" && result.documentId && result.documentTitle) {
+    const reorderedTitle = String(result.documentTitle).replace(/\s+([A-Z][a-z]{2}\d{2})\.新(\d+)$/u, ".新$2 $1");
+    if (reorderedTitle !== result.documentTitle) {
+      try {
+        const token = await accessToken();
+        await google(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(result.documentId)}?supportsAllDrives=true`, token, {
+          method: "PATCH",
+          body: JSON.stringify({ name: reorderedTitle }),
+        });
+      } catch (renameError) {
+        console.error("[consultation-doc] 新版諮詢單檔名重排失敗，不影響文件功能", { documentId: result.documentId, renameError });
+      }
+    }
+  }
   if (normalizationError) {
     throw normalizationError instanceof Error ? normalizationError : new Error("Google 文件最終整理失敗");
   }
