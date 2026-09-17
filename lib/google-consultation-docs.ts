@@ -14,6 +14,12 @@ const requiredAppsScriptVersion = "2026-09-14-v19";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
+const resultMatchesConsultationItem = (content: unknown, itemCode: string) => {
+  const value = text(content);
+  if (itemCode === "deceased-relative") return !/【\s*過世寵物\s*】/u.test(value);
+  if (itemCode === "deceased-pet") return !/【\s*過世親人\s*】/u.test(value);
+  return true;
+};
 
 async function accessToken() {
   if (!email || !privateKey) throw new Error("尚未設定 Google 服務帳號環境變數");
@@ -933,9 +939,9 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const lineName = text(customer.line_display_name) || "LINE用戶";
   const ownerName = text(customer.full_name) || lineName;
   const isVideo = one(booking?.consultation_methods)?.code === "video" && Boolean(booking?.slot_start);
-  const isCancelledOrRefunded = booking?.status === "cancelled" ||
-    booking?.payment_status === "failed" ||
-    ["手動退款", "自行退款", "用戶退款", "自行取消", "取消訂單"].includes(text(booking?.cancellation_reason));
+  // 只看訂單目前的最終狀態。曾取消後又改成手動收款時，舊的取消原因可能仍保留，
+  // 但不能再把已恢復且已付款的訂單標成取消。
+  const isCancelledOrRefunded = booking?.status === "cancelled" || booking?.payment_status === "failed";
   const { data: details, error } = await db.from("booking_details").select(`
     id,item_id,item_title,created_at,google_document_id,google_document_created_at,
     booking_items(code),booking_detail_sub_items(sub_item_title),
@@ -1004,7 +1010,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     const currentItemIds = Array.from(new Set(pages.map((pageSpec) => text(pageSpec.detail.item_id)).filter(Boolean)));
     if (currentProfileIds.length && currentItemIds.length) {
       const { data: histories, error: historyError } = await db.from("consultation_result_history")
-        .select("booking_detail_id,item_id,profile_id,target_profile_id,result_content,consultation_method,consultation_created_at,video_slot_start,returned_at")
+        .select("booking_detail_id,item_id,profile_id,target_profile_id,result_content,consultation_method,consultation_created_at,video_slot_start,returned_at,booking_details(bookings(status,payment_status))")
         .in("profile_id", currentProfileIds).in("item_id", currentItemIds)
         .order("returned_at", { ascending: false });
       if (historyError && !String(historyError.message || "").includes("consultation_result_history")) throw historyError;
@@ -1013,9 +1019,12 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
         const targetId = text(one(pageSpec.target?.consultation_profiles)?.id || pageSpec.target?.profile_id) || null;
         const match = (histories || []).find((row: any) =>
           !currentDetailIds.has(text(row.booking_detail_id)) &&
+          one(one(row.booking_details)?.bookings)?.status !== "cancelled" &&
+          one(one(row.booking_details)?.bookings)?.payment_status !== "failed" &&
           text(row.item_id) === text(pageSpec.detail.item_id) &&
           text(row.profile_id) === text(answer?.profile_id) &&
-          (text(row.target_profile_id) || null) === targetId,
+          (text(row.target_profile_id) || null) === targetId &&
+          resultMatchesConsultationItem(row.result_content, one(pageSpec.detail.booking_items)?.code || ""),
         );
         if (match?.result_content) {
           pageSpec.previousResult = match.result_content;
@@ -1034,6 +1043,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
           booking_items(code),booking_detail_sub_items(sub_item_title),
           booking_consultation_answers(profile_id,booking_answer_participants(profile_id,position)))
       `).eq("customer_id", booking.customer_id).neq("id", bookingId)
+        .neq("status", "cancelled").neq("payment_status", "failed")
         .not("consultation_result_returned_at", "is", null)
         .order("consultation_result_returned_at", { ascending: false });
       if (oldBookingError) throw oldBookingError;
@@ -1057,7 +1067,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
           try {
             if (!previewCache.has(documentId)) previewCache.set(documentId, await getConsultationReturnPreview(documentId));
             const previous = previewCache.get(documentId)?.[oldPageIndex];
-            if (previous?.content) {
+            if (previous?.content && resultMatchesConsultationItem(previous.content, one(pageSpec.detail.booking_items)?.code || "")) {
               if (!pageSpec.previousResult) pageSpec.previousResult = previous.content;
               pageSpec.previousCreatedAt = documentDetail?.google_document_created_at || documentDetail?.created_at || oldBooking.consultation_result_returned_at;
               pageSpec.previousMethod = one(oldBooking.consultation_methods)?.code;
