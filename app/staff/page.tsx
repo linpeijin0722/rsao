@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import StaffAnswerEditorV2 from "./StaffAnswerEditorV2";
+import QuickConsultationReply from "./QuickConsultationReply";
 const key = (v: string) =>
   new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Taipei" }).format(
     new Date(v),
@@ -122,14 +123,19 @@ export default function Staff() {
   const [password, setPassword] = useState(""),
     [rows, setRows] = useState<any[]>([]),
     [items, setItems] = useState<any[]>([]),
+    [methods, setMethods] = useState<any[]>([]),
     [manualCustomers, setManualCustomers] = useState<any[]>([]),
     [manualUserSearch, setManualUserSearch] = useState(""),
+    [manualUserPage, setManualUserPage] = useState(1),
     [customerProfiles, setCustomerProfiles] = useState<any[]>([]),
     [manualOpen, setManualOpen] = useState(false),
     [manualMethod, setManualMethod] = useState<"video"|"text">("text"),
     [manualCustomerId, setManualCustomerId] = useState(""),
     [manualSlotStart, setManualSlotStart] = useState(""),
     [manualLines, setManualLines] = useState<any[]>([]),
+    [manualCustomTotal, setManualCustomTotal] = useState<number|null>(null),
+    [manualTotalEditor, setManualTotalEditor] = useState(false),
+    [manualTotalValue, setManualTotalValue] = useState(""),
     [manualNotifyPayment, setManualNotifyPayment] = useState(true),
     [manualSaving, setManualSaving] = useState(false),
     [error, setError] = useState(""),
@@ -191,6 +197,8 @@ export default function Staff() {
     [priceValue,setPriceValue]=useState(""),
     [paymentActions,setPaymentActions]=useState<any>(null),
     [paymentActionBusy,setPaymentActionBusy]=useState(false),
+    [quickReplyTarget,setQuickReplyTarget]=useState<{bookingNo:string;documentId:string}|null>(null),
+    [excludeVideoBase,setExcludeVideoBase]=useState(false),
     [profileCopyToast,setProfileCopyToast]=useState("");
   async function staffPost(body:any,retry=true){
     let response=await fetch("/api/staff/bookings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
@@ -252,6 +260,7 @@ export default function Staff() {
     return <span className="consultationSheetLinks">
       <button className="consultationSheetLink documentGenerateButton" disabled={busy} onClick={()=>links.length&&asArray(x.data_submissions).length>1?setDocumentVersionPicker(x):links.length?setDocumentRebuild(x):generateDocument(x)} title={links.length?"重新建立諮詢單":"建立諮詢單"} aria-label={links.length?"重新建立諮詢單":"建立諮詢單"}>{busy?"…":"📄"}</button>
       <button className="consultationSheetLink documentRelinkButton" onClick={()=>{setDocumentLinkEdit(x);setDocumentLinkValue(links[0]?.consultation_url||"")}} title="更改為現有 Google 文件連結" aria-label="更改諮詢單連結">🔄</button>
+      {links[0]?.google_document_id&&<button className="quickReplyLaunch" onClick={()=>setQuickReplyTarget({bookingNo:x.booking_no,documentId:links[0].google_document_id})} title="使用固定句庫建立諮詢回覆">✦ 回覆</button>}
       {links.map((detail:any)=><a key={detail.id} className="consultationSheetLink consultationDocumentLink" href={detail.consultation_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗{showNumber&&<small>{consultationNumberFor(x)}</small>}</a>)}
     </span>
   }
@@ -297,7 +306,12 @@ export default function Staff() {
     load();
     fetch("/api/catalog")
       .then((r) => r.json())
-      .then((j) => setItems(j.items || []));
+      .then((j) => {setItems(j.items || []);setMethods(j.methods || [])});
+  }, []);
+  useEffect(() => {
+    const params=new URLSearchParams(window.location.search),bookingNo=params.get("quickReplyBookingNo")||"",documentId=params.get("quickReplyDocumentId")||"";
+    if(!bookingNo||!documentId)return;
+    window.location.replace(`/staff/quick-reply?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}`);
   }, []);
   useEffect(() => {
     setTextPage(1);
@@ -322,6 +336,7 @@ export default function Staff() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [paymentActions,paymentActionBusy,teacherOverwrite,documentVersionPicker,documentRebuild,documentLinkEdit,lineContact,priceEdit,addPicker,editing,manualOpen,dataBooking,userView]);
   function toggleManualItem(item:any,checked:boolean){
+    setManualCustomTotal(null);
     setManualLines(value=>checked?[...value,{itemId:item.id,subId:item.sub_items?.length===1?item.sub_items[0].id:"",qty:1}]:value.filter(line=>line.itemId!==item.id));
   }
   function openReturnedData(booking:any){
@@ -339,10 +354,10 @@ export default function Staff() {
     setManualSaving(true);
     try{
       const slotStart=manualSlotStart?`${manualSlotStart}:00+08:00`:null,
-        response=await staffPost({action:"create_manual_booking",customerId:manualCustomerId,methodCode:manualMethod,slotStart,lines:manualLines,notifyPayment:manualNotifyPayment}),result=await response.json();
+        response=await staffPost({action:"create_manual_booking",customerId:manualCustomerId,methodCode:manualMethod,slotStart,lines:manualLines,totalPrice:manualTotal,notifyPayment:manualNotifyPayment}),result=await response.json();
       if(!response.ok)throw new Error(result.error||"建立預約失敗");
       alert(`預約已建立\n訂單編號：${result.bookingNo}\n${result.paymentNotified?"已傳送付款資訊給用戶":"未傳送付款資訊；可在訂單設為已付款後，通知用戶填寫資料"}`);
-      setManualOpen(false);setManualCustomerId("");setManualSlotStart("");setManualLines([]);setManualNotifyPayment(true);await load();
+      setManualOpen(false);setManualCustomerId("");setManualSlotStart("");setManualLines([]);setManualCustomTotal(null);setManualNotifyPayment(true);await load();
     }catch(error){alert(error instanceof Error?error.message:"建立預約失敗")}finally{setManualSaving(false)}
   }
   async function sendLineContact(message:string,action:"text"|"video_reminder"="text"){
@@ -519,6 +534,13 @@ export default function Staff() {
         ),
       ];
     }, [month]);
+  const isRevenueBooking=(booking:any)=>booking.payment_status==="paid"&&booking.status!=="cancelled";
+  const textRevenue=text.filter(isRevenueBooking).reduce((sum:number,booking:any)=>sum+Number(booking.total_price||0),0);
+  const videoRevenue=video.filter(isRevenueBooking).reduce((sum:number,booking:any)=>{
+    const amount=Number(booking.total_price||0),base=excludeVideoBase?Number(booking.consultation_methods?.base_price||0):0;
+    return sum+Math.max(0,amount-base);
+  },0);
+  const textRevenueCount=text.filter(isRevenueBooking).length,videoRevenueCount=video.filter(isRevenueBooking).length;
   function openEdit(x: any) {
     setEditing(x);
     setEditTime(
@@ -619,6 +641,16 @@ export default function Staff() {
         .includes(keyword),
     );
   }, [manualCustomers, manualUserSearch]);
+  const manualUserPageCount=Math.max(1,Math.min(5,Math.ceil(filteredManualCustomers.length/5)));
+  const visibleManualCustomers=filteredManualCustomers.slice((Math.min(manualUserPage,manualUserPageCount)-1)*5,Math.min(manualUserPage,manualUserPageCount)*5);
+  const manualCalculatedTotal=useMemo(()=>{
+    const base=Number(methods.find(method=>method.code===manualMethod)?.base_price||0);
+    return manualLines.reduce((sum,line)=>{
+      const item=items.find(candidate=>candidate.id===line.itemId),sub=item?.sub_items?.find((candidate:any)=>candidate.id===line.subId);
+      return sum+Number(sub?.price??item?.price??0)*Math.max(1,Number(line.qty)||1);
+    },base);
+  },[items,methods,manualLines,manualMethod]);
+  const manualTotal=manualCustomTotal??manualCalculatedTotal;
   if (error === "未登入")
     return (
       <main className="adminLogin staffLogin"><div>
@@ -761,6 +793,7 @@ export default function Staff() {
             </div>
           </div>
         )}
+        <div className="staffRevenueCard videoRevenueCard"><div><span>視訊預約已付款總計</span><small>{videoDateFrom||videoDateTo?`付款日期：${videoDateFrom||"最早"} ～ ${videoDateTo||"今天"}`:"全部付款日期"}・共 {videoRevenueCount} 筆</small></div><strong>NT$ {videoRevenue.toLocaleString("zh-TW")}</strong><label><input type="checkbox" checked={excludeVideoBase} onChange={event=>setExcludeVideoBase(event.target.checked)}/><span>不計入視訊費用（每筆依系統設定扣除 NT$ {Number(methods.find(method=>method.code==="video")?.base_price||1200).toLocaleString("zh-TW")}）</span></label></div>
       </section>
       {userView && (
         <div className="modalBackdrop priorityModal" onClick={() => setUserView(null)}>
@@ -933,7 +966,9 @@ export default function Staff() {
           <span>第 {Math.min(textPage,textPageCount)}／{textPageCount} 頁・共 {text.length} 筆</span>
           <div><button disabled={textPage<=1} onClick={()=>setTextPage(page=>Math.max(1,page-1))}>‹ 上一頁</button><button disabled={textPage>=textPageCount} onClick={()=>setTextPage(page=>Math.min(textPageCount,page+1))}>下一頁 ›</button></div>
         </nav>
+        <div className="staffRevenueCard textRevenueCard"><div><span>文字預約已付款總計</span><small>{textDateFrom||textDateTo?`付款日期：${textDateFrom||"最早"} ～ ${textDateTo||"今天"}`:"全部付款日期"}・共 {textRevenueCount} 筆</small></div><strong>NT$ {textRevenue.toLocaleString("zh-TW")}</strong></div>
       </section>
+      {quickReplyTarget&&<QuickConsultationReply bookingNo={quickReplyTarget.bookingNo} documentId={quickReplyTarget.documentId} onClose={()=>setQuickReplyTarget(null)}/>} 
       {manualOpen && (
         <div className="modalBackdrop" onClick={()=>setManualOpen(false)}>
           <div className="modal manualBookingModal" onClick={event=>event.stopPropagation()}>
@@ -941,16 +976,17 @@ export default function Staff() {
             <h2>手動建立預約</h2>
             <p>僅列出已經登入 LINE 並完成本人資料的用戶。</p>
             <div className="manualMethodTabs">
-              <button className={manualMethod==="text"?"active":""} onClick={()=>setManualMethod("text")}>文字諮詢</button>
-              <button className={manualMethod==="video"?"active":""} onClick={()=>setManualMethod("video")}>視訊諮詢</button>
+              <button className={manualMethod==="text"?"active":""} onClick={()=>{setManualMethod("text");setManualCustomTotal(null)}}>文字諮詢</button>
+              <button className={manualMethod==="video"?"active":""} onClick={()=>{setManualMethod("video");setManualCustomTotal(null)}}>視訊諮詢</button>
             </div>
             <div className="manualUserPicker">
               <label htmlFor="manual-user-search">選擇用戶</label>
-              <div className="manualUserSearchBox"><span aria-hidden="true">⌕</span><input id="manual-user-search" type="search" value={manualUserSearch} onChange={event=>setManualUserSearch(event.target.value)} placeholder="搜尋 LINE 名稱或姓名" autoComplete="off" /></div>
+              <div className="manualUserSearchBox"><span aria-hidden="true">⌕</span><input id="manual-user-search" type="search" value={manualUserSearch} onChange={event=>{setManualUserSearch(event.target.value);setManualUserPage(1)}} placeholder="搜尋 LINE 名稱或姓名" autoComplete="off" /></div>
+              <strong className="manualRecentUserLabel">最近註冊的用戶</strong>
               <small>{manualUserSearch.trim() ? `找到 ${filteredManualCustomers.length} 位符合的用戶` : `共 ${manualCustomers.length} 位可選用戶`}</small>
             </div>
             <div className="manualUserResults" role="listbox" aria-label="符合條件的 LINE 用戶">
-              {filteredManualCustomers.map(customer=><div key={customer.id} className={`manualUserResult ${manualCustomerId===customer.id?"selected":""}`}>
+              {visibleManualCustomers.map(customer=><div key={customer.id} className={`manualUserResult ${manualCustomerId===customer.id?"selected":""}`}>
                 <button type="button" className="manualUserSelect" onClick={()=>setManualCustomerId(customer.id)}>
                   {customer.line_picture_url?<img src={customer.line_picture_url} alt="LINE 頭像"/>:<span className="avatarFallback">LINE</span>}
                   <span><b>{customer.line_display_name||"LINE 用戶"}｜{customer.full_name}</b><small>{manualCustomerId===customer.id?"已選取":"點此選取"}</small></span>
@@ -959,14 +995,17 @@ export default function Staff() {
               </div>)}
               {!filteredManualCustomers.length&&<p className="manualUserEmpty">找不到符合條件的用戶</p>}
             </div>
+            {filteredManualCustomers.length>5&&<nav className="manualUserPagination" aria-label="最近註冊用戶分頁"><button disabled={manualUserPage<=1} onClick={()=>setManualUserPage(page=>Math.max(1,page-1))}>‹ 上一頁</button><span>第 {Math.min(manualUserPage,manualUserPageCount)}／{manualUserPageCount} 頁</span><button disabled={manualUserPage>=manualUserPageCount} onClick={()=>setManualUserPage(page=>Math.min(manualUserPageCount,page+1))}>下一頁 ›</button></nav>}
             {manualMethod==="video"&&<label className="manualMainField">視訊日期與時間<input type="datetime-local" value={manualSlotStart} onChange={event=>setManualSlotStart(event.target.value)}/><small>後台可依實際需要建立 4 天內的視訊預約；時間為台灣時間。</small></label>}
             <section className="manualItems"><h3>選擇諮詢項目</h3>{items.map(item=>{const line=manualLines.find(candidate=>candidate.itemId===item.id);return <article key={item.id} className={line?"selected":""}>
               <label><input type="checkbox" checked={Boolean(line)} onChange={event=>toggleManualItem(item,event.target.checked)}/><b>{item.title}</b><span>NT$ {Number(item.price||0).toLocaleString("zh-TW")}</span></label>
-              {line&&item.sub_items?.length>0&&<select value={line.subId} onChange={event=>setManualLines(value=>value.map(candidate=>candidate.itemId===item.id?{...candidate,subId:event.target.value}:candidate))}><option value="">請選擇子項目</option>{item.sub_items.map((sub:any)=><option key={sub.id} value={sub.id}>{sub.title}　NT$ {Number(sub.price||0).toLocaleString("zh-TW")}</option>)}</select>}
-              {line&&<label className="manualQuantity">數量<input type="number" min="1" max="20" value={line.qty} onChange={event=>setManualLines(value=>value.map(candidate=>candidate.itemId===item.id?{...candidate,qty:Math.max(1,Number(event.target.value)||1)}:candidate))}/></label>}
+              {line&&item.sub_items?.length>0&&<select value={line.subId} onChange={event=>{setManualCustomTotal(null);setManualLines(value=>value.map(candidate=>candidate.itemId===item.id?{...candidate,subId:event.target.value}:candidate))}}><option value="">請選擇子項目</option>{item.sub_items.map((sub:any)=><option key={sub.id} value={sub.id}>{sub.title}　NT$ {Number(sub.price||0).toLocaleString("zh-TW")}</option>)}</select>}
+              {line&&<label className="manualQuantity">數量<input type="number" min="1" max="20" value={line.qty} onChange={event=>{setManualCustomTotal(null);setManualLines(value=>value.map(candidate=>candidate.itemId===item.id?{...candidate,qty:Math.max(1,Number(event.target.value)||1)}:candidate))}}/></label>}
             </article>})}</section>
+            <div className="manualBookingTotal"><span>總金額{manualCustomTotal!==null&&<small>已手動調整</small>}</span><strong>NT$ {manualTotal.toLocaleString("zh-TW")}</strong><button type="button" aria-label="編輯總金額" title="編輯總金額" onClick={()=>{setManualTotalValue(String(manualTotal));setManualTotalEditor(true)}}>✎</button></div>
             <fieldset className="manualPaymentChoice"><legend>建立後是否傳送付款資訊？</legend><label><input type="radio" checked={manualNotifyPayment} onChange={()=>setManualNotifyPayment(true)}/><span><b>傳送付款資訊</b><small>用戶會收到「待付款」訊息，可直接前往付款。</small></span></label><label><input type="radio" checked={!manualNotifyPayment} onChange={()=>setManualNotifyPayment(false)}/><span><b>暫不傳送付款資訊</b><small>適合另外轉帳；後台設為已付款後仍可通知用戶填寫資料。</small></span></label></fieldset>
             <button className="manualCreateButton" disabled={manualSaving} onClick={createManualBooking}>{manualSaving?"建立中，請稍候…":"確認建立預約"}</button>
+            {manualTotalEditor&&<div className="manualTotalBackdrop" onClick={()=>setManualTotalEditor(false)}><div className="manualTotalDialog" role="dialog" aria-modal="true" aria-labelledby="manual-total-title" onClick={event=>event.stopPropagation()}><h3 id="manual-total-title">確認修改總金額</h3><p>此金額會成為這筆訂單實際向用戶收取的金額。</p><label>新的總金額<div><span>NT$</span><input type="number" min="0" step="1" value={manualTotalValue} onChange={event=>setManualTotalValue(event.target.value)} autoFocus/></div></label><div className="manualTotalActions"><button type="button" onClick={()=>setManualTotalEditor(false)}>取消</button><button type="button" onClick={()=>{const amount=Number(manualTotalValue);if(!Number.isInteger(amount)||amount<0)return alert("請輸入正確的整數金額");setManualCustomTotal(amount);setManualTotalEditor(false)}}>確認修改</button></div></div></div>}
           </div>
         </div>
       )}
@@ -1092,7 +1131,7 @@ export default function Staff() {
           </div>
         </div>
       )}
-      {documentLinkEdit&&<div className="modalBackdrop documentLinkBackdrop" onClick={()=>setDocumentLinkEdit(null)}><div className="modal documentLinkModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setDocumentLinkEdit(null)}>×</button><h2>更改諮詢單連結</h2><p>先到 Google 雲端硬碟開啟要使用的文件，複製網址後貼到下方。</p><a className="openGoogleDrive" href="https://drive.google.com/drive/folders/1jajjmq_vxySLJBVWleIGrmkRI0TykJgI?usp=drive_link" target="_blank" rel="noreferrer">開啟<strong>阿嫂諮詢單</strong>資料夾</a><label>Google 文件連結<input autoFocus placeholder="https://docs.google.com/document/d/..." value={documentLinkValue} onChange={e=>setDocumentLinkValue(e.target.value)}/></label><div className="documentLinkActions"><button onClick={()=>void saveDocumentLink()}>確認更改連結</button><button className="cancel" onClick={()=>setDocumentLinkEdit(null)}>取消</button></div></div></div>}
+      {documentLinkEdit&&<div className="modalBackdrop documentLinkBackdrop" onClick={()=>setDocumentLinkEdit(null)}><div className="modal documentLinkModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setDocumentLinkEdit(null)}>×</button><h2>更改諮詢單連結</h2><p>先到 Google 雲端硬碟開啟要使用的文件，複製網址後貼到下方。</p><a className="openGoogleDrive" href="https://drive.google.com/drive/folders/1pihxwGH-FJtWPiCAwBcSvs65L603HVu-?usp=drive_link" target="_blank" rel="noreferrer">開啟<strong>阿嫂諮詢單</strong>資料夾</a><label>Google 文件連結<input autoFocus placeholder="https://docs.google.com/document/d/..." value={documentLinkValue} onChange={e=>setDocumentLinkValue(e.target.value)}/></label><div className="documentLinkActions"><button onClick={()=>void saveDocumentLink()}>確認更改連結</button><button className="cancel" onClick={()=>setDocumentLinkEdit(null)}>取消</button></div></div></div>}
       {documentVersionPicker&&<div className="modalBackdrop" onClick={()=>setDocumentVersionPicker(null)}><div className="modal rebuildDocumentModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setDocumentVersionPicker(null)}>×</button><h2>請選擇要建立的版本</h2><div className="submissionVersionList">{asArray(documentVersionPicker.data_submissions).map((submission:any,index:number)=><button key={submission.id} onClick={()=>{setDocumentRebuild({...documentVersionPicker,_submissionId:submission.id});setDocumentVersionPicker(null)}}><b>第 {asArray(documentVersionPicker.data_submissions).length-index} 次填寫</b><small>{submissionTime(submission.submitted_at)}</small></button>)}</div><button className="cancel" onClick={()=>setDocumentVersionPicker(null)}>取消</button></div></div>}
       {documentRebuild&&<div className="modalBackdrop" onClick={()=>setDocumentRebuild(null)}><div className="modal rebuildDocumentModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setDocumentRebuild(null)}>×</button><h2>重新建立諮詢單</h2><p>請選擇這次要如何建立：</p><button onClick={()=>void generateDocument(documentRebuild,"replace")}><b>覆蓋原諮詢單</b><small>更新連結，原本的文件會移至垃圾桶</small></button><button onClick={()=>void generateDocument(documentRebuild,"new")}><b>建立新的諮詢單</b><small>保留原文件，新檔名會依序加上 .新01、.新02</small></button><button className="cancel" onClick={()=>setDocumentRebuild(null)}>取消</button></div></div>}
       {teacherOverwrite&&<div className="modalBackdrop" onClick={()=>setTeacherOverwrite(null)}><div className="modal teacherOverwriteModal" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setTeacherOverwrite(null)}>×</button><h2>阿嫂已編輯過此諮詢單</h2><p>覆蓋後，阿嫂已輸入的內容可能無法復原。若仍要覆蓋，請在下方輸入：</p><b>確定覆蓋諮詢單</b><input value={overwritePhrase} onChange={e=>setOverwritePhrase(e.target.value)} placeholder="請輸入指定文字"/><button disabled={overwritePhrase!=="確定覆蓋諮詢單"} onClick={()=>{const target=teacherOverwrite;setTeacherOverwrite(null);void generateDocument(target,"replace",true)}}>確認覆蓋諮詢單</button><button className="cancel" onClick={()=>setTeacherOverwrite(null)}>取消</button></div></div>}

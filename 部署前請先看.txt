@@ -1,0 +1,16 @@
+完整修正版：2026-09-17-v23
+
+1. GitHub / Vercel
+   將本資料夾內容完整上傳到專案根目錄。
+   不需要上傳 node_modules、.next 或 tsconfig.tsbuildinfo；本修正版已排除這些暫存檔。
+
+2. Google Apps Script（這是獨立平台，無法靠上傳 GitHub 自動更新）
+   將 google-apps-script/Code.gs 完整複製到 Apps Script 編輯器的 Code.gs。
+   選擇「部署」→「管理部署作業」→「編輯」→「新版本」→「部署」。
+
+3. 確認 Apps Script 網頁應用程式網址顯示：
+   {"ok":true,"version":"2026-09-17-v23"}
+
+4. 等待 Vercel 部署完成後，再測試建立諮詢單。
+
+注意：網站程式和 Apps Script 必須同為 2026-09-17-v23，否則系統會拒絕使用舊版程式。
