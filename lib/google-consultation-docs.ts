@@ -10,7 +10,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-09-14-v19";
+const requiredAppsScriptVersion = "2026-09-17-v20";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -1133,7 +1133,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     method: "POST",
     headers: { "content-type": "text/plain;charset=utf-8" },
     body: JSON.stringify({
-      secret: appsScriptSecret, expectedVersion: requiredAppsScriptVersion, folderId,
+      secret: appsScriptSecret, expectedVersion: requiredAppsScriptVersion, folderId, serviceAccountEmail: email,
       title: fileTitle, bookingNo, content, marks, images, createMode,
       cancelledWarning: isCancelledOrRefunded,
       previousDocumentIds: force ? existingDetails.map((detail: any) => detail.google_document_id).filter(Boolean) : [],
