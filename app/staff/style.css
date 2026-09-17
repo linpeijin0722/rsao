@@ -1023,6 +1023,113 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
   color: #fff;
 }
 
+/* 快速回覆分類：預設收合；過世親人位置與整體運勢本命格固定展開。 */
+.quickReplySpecialField:not(.expanded):not(.quickReplyAlwaysOpen) > :not(.quickReplySpecialHeading),
+.quickReplySpiritCard:not(.expanded):not(.quickReplyAlwaysOpen) > :not(.quickReplySpiritHeading),
+.quickReplyHelpCard:not(.expanded):not(.quickReplyAlwaysOpen) > :not(.quickReplyHelpHeading) {
+  display: none !important;
+}
+.quickReplySpecialHeading,
+.quickReplySpiritHeading,
+.quickReplyHelpHeading {
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+.quickReplySpecialField:not(.quickReplyAlwaysOpen) .quickReplySpecialHeading::after,
+.quickReplySpiritCard:not(.quickReplyAlwaysOpen) .quickReplySpiritHeading::after,
+.quickReplyHelpCard:not(.quickReplyAlwaysOpen) .quickReplyHelpHeading::after {
+  content: "展開 ＋";
+  margin-left: auto;
+  color: #8a3045;
+  font-size: 14px;
+  font-weight: 900;
+}
+.quickReplySpecialField.expanded .quickReplySpecialHeading::after,
+.quickReplySpiritCard.expanded .quickReplySpiritHeading::after,
+.quickReplyHelpCard.expanded .quickReplyHelpHeading::after {
+  content: "收合 －";
+}
+.quickReplySpecialHeading h4 em,
+.quickReplySpiritHeading h4 em {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #a91436;
+  color: #fff;
+  font-size: 13px;
+  font-style: normal;
+  vertical-align: middle;
+}
+.quickReplySubheading {
+  margin: 14px 0 8px;
+  color: #684b40;
+  font-size: 16px;
+  text-align: left;
+}
+.quickReplyQuestionGroups > p {
+  margin: 0 0 10px;
+  color: #756961;
+  text-align: left;
+}
+.quickReplyQuestionGroup {
+  display: grid;
+  gap: 9px;
+  margin-top: 10px;
+  padding: 11px;
+  border: 1px solid #ddcec5;
+  border-radius: 11px;
+  background: #faf6f2;
+}
+.quickReplyQuestionGroup > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid #d4c4ba;
+  border-radius: 9px;
+  background: #fff;
+  color: #463833;
+  font-size: 16px;
+  cursor: pointer;
+}
+.quickReplyQuestionGroup > button.active {
+  border-color: #8a3045;
+  color: #8a3045;
+}
+.quickReplyQuestionGroup > button span {
+  color: #8a3045;
+  font-size: 13px;
+  font-weight: 900;
+}
+.quickReplyQuestionGroup > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+.quickReplyQuestionGroup > div > button {
+  min-height: 48px;
+  border: 1px solid #d3c5bc;
+  border-radius: 9px;
+  background: #fff;
+  color: #403632;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.quickReplyQuestionGroup > div > button.selected {
+  border: 2px solid #a91436;
+  background: #fff0f4;
+  color: #8e1532;
+}
+@media (max-width: 700px) {
+  .quickReplyQuestionGroup > div {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 640px) {
   .quickReplyNestedChoices {
     grid-template-columns: 1fr;
