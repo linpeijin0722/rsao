@@ -904,6 +904,8 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 }
 
 .quickReplyScripturePanel {
+  display: block !important;
+  width: 100%;
   margin-top: 12px;
   padding: 15px;
   border: 1px solid #dec9c0;
@@ -915,6 +917,110 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
   margin: 0 0 12px;
   color: #5f443a;
   font-size: 16px;
+}
+
+.quickReplyScripturePanel .quickReplyNestedChoices {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  width: 100%;
+}
+
+.quickReplyScripturePanel .quickReplyNestedChoices button {
+  width: 100%;
+}
+
+.quickReplyLocationTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+}
+
+.quickReplyLocationTitle p {
+  margin: 0;
+  color: #147447;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.quickReplyLocationTitle strong {
+  margin-left: 4px;
+  color: #08713e;
+  font-weight: 950;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.quickReplyConfirmBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(38, 27, 23, .62);
+}
+
+.quickReplyConfirmDialog {
+  width: min(520px, 100%);
+  padding: 24px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, .28);
+}
+
+.quickReplyConfirmDialog h3 {
+  margin: 0 0 14px;
+  color: #713047;
+  font-size: 22px;
+}
+
+.quickReplyConfirmDialog p {
+  margin: 0;
+  color: #3f3531;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.8;
+}
+
+.quickReplyConfirmDialog p strong {
+  margin: 0 5px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #ffe2e7;
+  color: #c01842;
+  font-size: 20px;
+  font-weight: 950;
+}
+
+.quickReplyConfirmDialog p b {
+  margin-left: 4px;
+  color: #9c2444;
+}
+
+.quickReplyConfirmDialog > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.quickReplyConfirmDialog button {
+  min-height: 48px;
+  border: 1px solid #cfbeb6;
+  border-radius: 10px;
+  background: #fff;
+  color: #4a3d37;
+  font-size: 16px;
+  font-weight: 850;
+}
+
+.quickReplyConfirmDialog button.confirm {
+  border-color: #9d2f4c;
+  background: #9d2f4c;
+  color: #fff;
 }
 
 @media (max-width: 640px) {
