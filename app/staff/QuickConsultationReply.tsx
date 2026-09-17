@@ -285,6 +285,31 @@ export default function QuickConsultationReply({
           ? o.code.startsWith("advice_overall_")
           : o.code.startsWith("advice_"),
       ) || [],
+    recentPositiveOptions =
+      sectionTopic?.options.filter((o) =>
+        o.code.startsWith("recent_positive_"),
+      ) || [],
+    recentNegativeOptions =
+      sectionTopic?.options.filter((o) =>
+        o.code.startsWith("recent_negative_"),
+      ) || [],
+    recentDetailOptions =
+      sectionTopic?.options.filter((o) =>
+        o.code.startsWith("recent_detail_"),
+      ) || [],
+    recentAdviceOptions =
+      sectionTopic?.options.filter((o) =>
+        o.code.startsWith("recent_advice_"),
+      ) || [],
+    bodyOptions =
+      sectionTopic?.options.filter((o) => {
+        if (!o.code.startsWith("body_")) return false;
+        if (o.code.startsWith("body_female_"))
+          return section?.genderPronoun === "她";
+        if (o.code.startsWith("body_male_"))
+          return section?.genderPronoun !== "她";
+        return true;
+      }) || [],
     elementOptions =
       sectionTopic?.options.filter((o) => o.code.startsWith("element_")) || [],
     deityOptions =
@@ -313,6 +338,8 @@ export default function QuickConsultationReply({
           !o.code.startsWith("status_") &&
           !o.code.startsWith("condition_") &&
           !o.code.startsWith("advice_") &&
+          !o.code.startsWith("recent_") &&
+          !o.code.startsWith("body_") &&
           !o.code.startsWith("element_") &&
           !o.code.startsWith("deity_") &&
           !o.code.startsWith("buddhist_") &&
@@ -338,14 +365,35 @@ export default function QuickConsultationReply({
       const groups = new Map<string, Option[]>();
       for (const option of category?.options || []) {
         const code = option.code,
-          label = code.startsWith("love_trend_")
-            ? "感情順利穩定"
+          text = option.label,
+          label = code.startsWith("love_trend_") && /紅鸞|桃花|正緣|結婚/.test(text)
+            ? "正緣、桃花與結婚機會"
+            : code.startsWith("love_trend_") && /阻礙|不順|爛桃花|較淡/.test(text)
+              ? "感情阻礙與需要留意"
+            : code.startsWith("love_trend_")
+              ? "感情順利穩定"
+            : code.startsWith("meet_") && /工作|同事|合作|生活圈/.test(text)
+              ? "工作與日常生活圈"
+            : code.startsWith("meet_") && /朋友|聚會|活動/.test(text)
+              ? "朋友介紹與社交場合"
+            : code.startsWith("meet_") && /外地|網路/.test(text)
+              ? "外地與網路"
+            : code.startsWith("meet_") && /上課|進修|興趣/.test(text)
+              ? "學習與共同興趣"
             : code.startsWith("meet_")
-              ? "容易在哪裡遇到正緣"
+              ? "其它相遇方式"
               : code.startsWith("self_personality_")
                 ? "自己的個性"
-                : code.startsWith("partner_personality_")
-                  ? "對方／對象個性"
+              : code.startsWith("partner_personality_")
+                  ? "對方或容易遇到的對象個性"
+                  : code.startsWith("status_overall_")
+                    ? "整體運勢走向"
+                  : code.startsWith("recent_positive_")
+                    ? "近期正面狀況"
+                  : code.startsWith("recent_negative_")
+                    ? "近期需要留意"
+                  : code.startsWith("body_")
+                    ? "身體狀況"
                   : code.startsWith("advice_")
                     ? "建議"
                     : code.startsWith("status_") ||
@@ -353,10 +401,18 @@ export default function QuickConsultationReply({
                       ? "現在狀況"
                       : code.startsWith("assistance_")
                         ? "需要幫助"
-                        : "其它判斷";
+                        : /財|錢|收入|支出|投資/.test(text)
+                          ? "財運與金錢"
+                          : /工作|事業|職場/.test(text)
+                            ? "工作與事業"
+                            : /健康|身體|開刀|血光|車關/.test(text)
+                              ? "健康與安全"
+                              : "其它";
         groups.set(label, [...(groups.get(label) || []), option]);
       }
-      return Array.from(groups.entries());
+      return Array.from(groups.entries()).sort(([a], [b]) =>
+        a === "其它" || a.startsWith("其它") ? 1 : b === "其它" || b.startsWith("其它") ? -1 : 0,
+      );
     }, [category]),
     deceasedDetail = deceasedDetails.current[sectionKey] || {
       deity: "趙聖帝君",
@@ -1080,7 +1136,7 @@ export default function QuickConsultationReply({
                       {sectionTopic &&
                         sectionTopic.code !== "naming_result" && (
                           <section
-                            className="quickReplyOptions quickReplyMultiOptions"
+                            className={`quickReplyOptions quickReplyMultiOptions${sectionTopic.code === "overall" ? " quickReplyOverallOptions" : ""}`}
                             onClick={togglePanel}
                           >
                             <h3>
@@ -1710,7 +1766,7 @@ export default function QuickConsultationReply({
                                 </div>
                               )}
                             {statusOptions.length > 0 && (
-                              <div className="quickReplySpecialField">
+                              <div className={`quickReplySpecialField${sectionTopic?.code === "overall" ? " quickReplyOverallStatus" : ""}`}>
                                 <div className="quickReplySpecialHeading">
                                   <span>
                                     {[
@@ -1720,7 +1776,7 @@ export default function QuickConsultationReply({
                                     ].includes(sectionTopic?.code || "")
                                       ? "②"
                                       : sectionTopic?.code === "overall"
-                                        ? "③"
+                                        ? "②"
                                       : "①"}
                                   </span>
                                   <div>
@@ -1754,7 +1810,7 @@ export default function QuickConsultationReply({
                               </div>
                             )}
                             {adviceOptions.length > 0 && (
-                              <div className="quickReplySpecialField">
+                              <div className={`quickReplySpecialField${sectionTopic?.code === "overall" ? " quickReplyOverallAdvice" : ""}`}>
                                 <div className="quickReplySpecialHeading">
                                   <span>
                                     {sectionTopic?.code === "love"
@@ -1796,7 +1852,7 @@ export default function QuickConsultationReply({
                             )}
                             {elementOptions.length > 0 && (
                               <div
-                                className={`quickReplySpecialField${sectionTopic?.code === "overall" ? " quickReplyAlwaysOpen" : ""}`}
+                                className={`quickReplySpecialField${sectionTopic?.code === "overall" ? " quickReplyAlwaysOpen quickReplyOverallElement" : ""}`}
                               >
                                 <div className="quickReplySpecialHeading">
                                   <span>①</span>
@@ -1830,9 +1886,9 @@ export default function QuickConsultationReply({
                               </div>
                             )}
                             {deityOptions.length > 0 && (
-                              <div className="quickReplySpecialField">
+                              <div className={`quickReplySpecialField${sectionTopic?.code === "overall" ? " quickReplyOverallDeity" : ""}`}>
                                 <div className="quickReplySpecialHeading">
-                                  <span>②</span>
+                                  <span>{sectionTopic?.code === "overall" ? "③" : "②"}</span>
                                   <div>
                                     <h4>暗貴人</h4>
                                   </div>
@@ -1896,6 +1952,67 @@ export default function QuickConsultationReply({
                                   <button onClick={applyCustomDeity}>
                                     帶入暗貴人
                                   </button>
+                                </div>
+                              </div>
+                            )}
+                            {sectionTopic?.code === "overall" &&
+                              (recentPositiveOptions.length > 0 || recentNegativeOptions.length > 0) && (
+                              <div className="quickReplySpecialField quickReplyOverallRecent">
+                                <div className="quickReplySpecialHeading">
+                                  <span>⑤</span>
+                                  <div><h4>最近狀況</h4></div>
+                                </div>
+                                <h5 className="quickReplySubheading">正面狀況（可複選）</h5>
+                                <div className="quickReplySpecialChoices">
+                                  {recentPositiveOptions.map((o) => (
+                                    <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
+                                      {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
+                                    </button>
+                                  ))}
+                                </div>
+                                <h5 className="quickReplySubheading">需要留意（可複選）</h5>
+                                <div className="quickReplySpecialChoices">
+                                  {recentNegativeOptions.map((o) => (
+                                    <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
+                                      {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
+                                    </button>
+                                  ))}
+                                </div>
+                                {recentNegativeOptions.some((o) => sectionDraft.optionIds.includes(o.id)) && (
+                                  <>
+                                    <h5 className="quickReplySubheading">狀況程度（選擇較符合的描述）</h5>
+                                    <div className="quickReplySpecialChoices">
+                                      {recentDetailOptions.map((o) => (
+                                        <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
+                                          {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                    <h5 className="quickReplySubheading">建議（醫療與安全優先，民俗方式為輔）</h5>
+                                    <div className="quickReplySpecialChoices">
+                                      {recentAdviceOptions.map((o) => (
+                                        <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
+                                          {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                            {sectionTopic?.code === "overall" && bodyOptions.length > 0 && (
+                              <div className="quickReplySpecialField quickReplyOverallBody">
+                                <div className="quickReplySpecialHeading">
+                                  <span>⑥</span>
+                                  <div><h4>身體狀況</h4></div>
+                                </div>
+                                <div className="quickReplyHealthNotice">可複選；內容僅作日常提醒，實際狀況仍應以合格醫療人員的檢查為準。</div>
+                                <div className="quickReplySpecialChoices">
+                                  {bodyOptions.map((o) => (
+                                    <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
+                                      {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
+                                    </button>
+                                  ))}
                                 </div>
                               </div>
                             )}
@@ -2164,7 +2281,7 @@ export default function QuickConsultationReply({
                   {question && (
                     <>
                       {!question.manualOnly && (
-                        <section className="quickReplyCategoryPicker">
+                        <section className="quickReplyCategoryPicker quickReplyQuestionCategoryPicker">
                           <h3>Q{question.questionNumber} 要判斷哪一類？</h3>
                           <p>
                             <b>{question.itemTitle}</b>

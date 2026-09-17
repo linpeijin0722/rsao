@@ -1106,10 +1106,12 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 }
 .quickReplyQuestionGroup > div {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 9px;
+  width: 100%;
 }
 .quickReplyQuestionGroup > div > button {
+  width: 100%;
   min-height: 48px;
   border: 1px solid #d3c5bc;
   border-radius: 9px;
@@ -1118,6 +1120,48 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
   font-size: 16px;
   font-weight: 800;
   cursor: pointer;
+}
+
+/* 客人問題 Q&A 與項目標籤回覆使用相同的上下、滿版結構。 */
+.quickReplyQuestionCategoryPicker > div {
+  display: grid;
+  grid-template-columns: 1fr;
+  justify-content: stretch;
+  width: 100%;
+}
+.quickReplyQuestionCategoryPicker > div > button {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 11px;
+}
+.quickReplyQuestionGroups,
+.quickReplyQuestionGroup {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* 整體運勢固定依 1→6 排序；本命格維持固定展開。 */
+.quickReplyOverallOptions {
+  display: flex !important;
+  flex-direction: column;
+}
+.quickReplyOverallOptions > h3 { order: 0; }
+.quickReplyOverallOptions .quickReplyOverallElement { order: 1; }
+.quickReplyOverallOptions .quickReplyOverallStatus { order: 2; }
+.quickReplyOverallOptions .quickReplyOverallDeity { order: 3; }
+.quickReplyOverallOptions .quickReplyOverallAdvice { order: 4; }
+.quickReplyOverallOptions .quickReplyOverallRecent { order: 5; }
+.quickReplyOverallOptions .quickReplyOverallBody { order: 6; }
+.quickReplyOverallOptions .quickReplyOtherField { order: 99; }
+.quickReplyHealthNotice {
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: #fff8df;
+  color: #725c20;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.55;
+  text-align: left;
 }
 .quickReplyQuestionGroup > div > button.selected {
   border: 2px solid #a91436;
