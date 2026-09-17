@@ -1,4 +1,4 @@
-const SCRIPT_VERSION = "2026-09-17-v24";
+const SCRIPT_VERSION = "2026-09-17-v25";
 const RETURN_BUTTON_ANCHOR = "\u200B";
 const RETURN_BUTTON_ALT_TITLE = "RSAO_CONSULTATION_RETURN_BUTTON";
 
@@ -221,8 +221,8 @@ function insertQuickReplyIntoBody_(body, linkUrl, label) {
   paragraph.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
   paragraph.setSpacingBefore(4).setSpacingAfter(8);
   var styled = paragraph.editAsText();
-  styled.setBold(true).setFontSize(15).setForegroundColor("#ffffff").setBackgroundColor("#8a3045");
   styled.setLinkUrl(linkUrl);
+  styled.setBold(true).setFontSize(18).setForegroundColor("#ffffff").setBackgroundColor("#8a3045");
 }
 
 function insertReturnButtonIntoBody_(body, imageUrl, returnUrl) {
@@ -260,8 +260,8 @@ function upsertQuickReplyLink_(payload) {
   paragraph.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
   paragraph.setSpacingBefore(4).setSpacingAfter(8);
   var styled = paragraph.editAsText();
-  styled.setBold(true).setFontSize(15).setForegroundColor("#ffffff").setBackgroundColor("#8a3045");
   styled.setLinkUrl(payload.linkUrl);
+  styled.setBold(true).setFontSize(18).setForegroundColor("#ffffff").setBackgroundColor("#8a3045");
   doc.saveAndClose();
 }
 
