@@ -1110,7 +1110,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const numberDate=new Date(booking?.paid_at||booking?.created_at||Date.now());
   const numberMonth=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",month:"short"}).format(numberDate);
   const numberYear=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"2-digit"}).format(numberDate);
-  let fileTitle = `${consultationNumber(documentPosition)}.${numberMonth}${numberYear}-${lineName}-${ownerName}`;
+  let fileTitle = `${consultationNumber(documentPosition)}-${lineName}.${ownerName} ${numberMonth}${numberYear}`;
   if (isVideo) {
     const date = new Date(booking.slot_start);
     const parts = new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", month: "numeric", day: "numeric", weekday: "short" }).formatToParts(date);
@@ -1133,6 +1133,17 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const result = await response.json();
   if (!response.ok || !result.ok) throw new Error(result.error || "Apps Script 建立文件失敗");
   if (result.version !== requiredAppsScriptVersion) throw new Error(`目前連到舊版 Google Apps Script（目前：${result.version || "無版本資訊"}；需要：${requiredAppsScriptVersion}），請更新 Vercel 的 GOOGLE_APPS_SCRIPT_WEB_APP_URL 後重新部署`);
+  if (createMode === "new" && result.documentId && result.documentTitle) {
+    const reorderedTitle = String(result.documentTitle).replace(/\s+([A-Z][a-z]{2}\d{2})\.新(\d+)$/u, ".新$2 $1");
+    if (reorderedTitle !== result.documentTitle) {
+      const token = await accessToken();
+      await google(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(result.documentId)}?supportsAllDrives=true`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ name: reorderedTitle }),
+      });
+      result.documentTitle = reorderedTitle;
+    }
+  }
   // 二次整理失敗時仍先把已建立的文件連結寫回後台，但不能再「靜默成功」。
   // 寫回完成後會把錯誤拋回 API，讓後台與 Vercel log 都能明確看到真正失敗原因。
   let normalizationError: unknown = null;
