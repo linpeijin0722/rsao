@@ -10,7 +10,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-09-17-v21";
+const requiredAppsScriptVersion = "2026-09-17-v22";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -1166,6 +1166,18 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const result = await response.json();
   if (!response.ok || !result.ok) throw new Error(result.error || "Apps Script 建立文件失敗");
   if (result.version !== requiredAppsScriptVersion) throw new Error(`目前連到舊版 Google Apps Script（目前：${result.version || "無版本資訊"}；需要：${requiredAppsScriptVersion}），請更新 Vercel 的 GOOGLE_APPS_SCRIPT_WEB_APP_URL 後重新部署`);
+  // 文件是由 Apps Script 建立，先由同一個文件擁有者補上兩個必要入口。
+  // 這樣即使服務帳號的 Docs API 權限尚未同步，使用者仍能看到快速回覆與回傳 LINE。
+  let appsScriptEntrypointsReady = false;
+  if (requestOrigin) {
+    await insertQuickReplyLinkViaAppsScript(result.documentId, bookingNo, requestOrigin);
+    await updatePositionedReturnButton({
+      documentId: result.documentId,
+      imageUrl: `${requestOrigin.replace(/\/$/, "")}/consultation-return-button.png`,
+      returnUrl: `${requestOrigin.replace(/\/$/, "")}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(result.documentId)}`,
+    });
+    appsScriptEntrypointsReady = true;
+  }
   // 二次整理失敗時仍先把已建立的文件連結寫回後台，但不能再「靜默成功」。
   // 寫回完成後會把錯誤拋回 API，讓後台與 Vercel log 都能明確看到真正失敗原因。
   let normalizationError: unknown = null;
@@ -1199,6 +1211,14 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     } catch (fallbackError) {
       console.error("[consultation-doc] Apps Script 備援補寫失敗", { documentId: result.documentId, bookingNo, fallbackError });
     }
+  }
+  if (normalizationError && appsScriptEntrypointsReady) {
+    console.warn("[consultation-doc] Docs API 整理失敗，但 Apps Script 已建立必要操作入口；保留已建立文件", {
+      documentId: result.documentId,
+      bookingNo,
+      normalizationError,
+    });
+    normalizationError = null;
   }
   const createdAt = existingDetails.map((detail: any) => detail.google_document_created_at).filter(Boolean).sort()[0] || new Date().toISOString();
   const { error: updateError } = await db.from("booking_details").update({
