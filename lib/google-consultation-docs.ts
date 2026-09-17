@@ -10,7 +10,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-09-17-v23";
+const requiredAppsScriptVersion = "2026-09-17-v24";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -1170,59 +1170,15 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const result = await response.json();
   if (!response.ok || !result.ok) throw new Error(result.error || "Apps Script 建立文件失敗");
   if (result.version !== requiredAppsScriptVersion) throw new Error(`目前連到舊版 Google Apps Script（目前：${result.version || "無版本資訊"}；需要：${requiredAppsScriptVersion}），請更新 Vercel 的 GOOGLE_APPS_SCRIPT_WEB_APP_URL 後重新部署`);
-  // 文件是由 Apps Script 建立，先由同一個文件擁有者補上兩個必要入口。
-  // 這樣即使服務帳號的 Docs API 權限尚未同步，使用者仍能看到快速回覆與回傳 LINE。
-  let appsScriptEntrypointsReady = Boolean(result.entrypointsReady);
-  if (requestOrigin && !appsScriptEntrypointsReady) {
-    await insertQuickReplyLinkViaAppsScript(result.documentId, bookingNo, requestOrigin);
-    await updatePositionedReturnButton({
-      documentId: result.documentId,
-      imageUrl: `${requestOrigin.replace(/\/$/, "")}/consultation-return-button.png`,
-      returnUrl: `${requestOrigin.replace(/\/$/, "")}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(result.documentId)}`,
-    });
-    appsScriptEntrypointsReady = true;
-  }
-  // 二次整理失敗時仍先把已建立的文件連結寫回後台，但不能再「靜默成功」。
-  // 寫回完成後會把錯誤拋回 API，讓後台與 Vercel log 都能明確看到真正失敗原因。
-  let normalizationError: unknown = null;
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    try {
-      await normalizeDocumentHeaderAndFooter(result.documentId, bookingNo, requestOrigin);
-      if (isCancelledOrRefunded) await markConsultationOrderCancelled(result.documentId);
-      normalizationError = null;
-      break;
-    } catch (error) {
-      normalizationError = error;
-      const message = error instanceof Error ? error.message : String(error);
-      const canRetry = /Document is missing|not found|read access|找不到/i.test(message) && attempt < 3;
-      console.error("[consultation-doc] Google 文件最終整理失敗", { documentId: result.documentId, bookingNo, attempt: attempt + 1, error });
-      if (!canRetry) break;
-      await new Promise((resolve) => setTimeout(resolve, [800, 1600, 2600][attempt]));
-    }
-  }
-  // 若服務帳號的 Docs API 仍無法讀取，改由文件擁有者身分執行的 Apps Script
-  // 直接補上兩個操作入口，避免文件已建立卻沒有快速回覆與回傳 LINE。
-  if (normalizationError && requestOrigin) {
-    try {
-      await insertQuickReplyLinkViaAppsScript(result.documentId, bookingNo, requestOrigin);
-      await updatePositionedReturnButton({
-        documentId: result.documentId,
-        imageUrl: `${requestOrigin.replace(/\/$/, "")}/consultation-return-button.png`,
-        returnUrl: `${requestOrigin.replace(/\/$/, "")}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(result.documentId)}`,
-      });
-      console.warn("[consultation-doc] Docs API 無法讀取，已由 Apps Script 補上操作入口", { documentId: result.documentId, bookingNo });
-      normalizationError = null;
-    } catch (fallbackError) {
-      console.error("[consultation-doc] Apps Script 備援補寫失敗", { documentId: result.documentId, bookingNo, fallbackError });
-    }
-  }
-  if (normalizationError && appsScriptEntrypointsReady) {
-    console.warn("[consultation-doc] Docs API 整理失敗，但 Apps Script 已建立必要操作入口；保留已建立文件", {
+  // 新文件的格式、快速回覆與回傳 LINE 已在同一次 Apps Script 建立流程完成。
+  // 不再立刻透過服務帳號重新讀取新文件，徹底避開 Google 權限同步期間的
+  //「Document is missing」錯誤。
+  if (Array.isArray(result.warnings) && result.warnings.length) {
+    console.warn("[consultation-doc] 文件已建立，附加整理有非致命警告", {
       documentId: result.documentId,
       bookingNo,
-      normalizationError,
+      warnings: result.warnings,
     });
-    normalizationError = null;
   }
   const createdAt = existingDetails.map((detail: any) => detail.google_document_created_at).filter(Boolean).sort()[0] || new Date().toISOString();
   const { error: updateError } = await db.from("booking_details").update({
@@ -1249,8 +1205,5 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
         console.error("[consultation-doc] 新版諮詢單檔名重排失敗，不影響文件功能", { documentId: result.documentId, renameError });
       }
     }
-  }
-  if (normalizationError) {
-    throw normalizationError instanceof Error ? normalizationError : new Error("Google 文件最終整理失敗");
   }
 }

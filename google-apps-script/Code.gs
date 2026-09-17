@@ -1,4 +1,4 @@
-const SCRIPT_VERSION = "2026-09-17-v23";
+const SCRIPT_VERSION = "2026-09-17-v24";
 const RETURN_BUTTON_ANCHOR = "\u200B";
 const RETURN_BUTTON_ALT_TITLE = "RSAO_CONSULTATION_RETURN_BUTTON";
 
@@ -132,41 +132,54 @@ function doPost(e) {
       insertDocumentWarning_(body, "此筆訂單已取消，請確認。");
     }
 
+    var documentId = doc.getId();
+    var quickReplyUrl = String(payload.quickReplyUrl || "").replace("__DOCUMENT_ID__", encodeURIComponent(documentId));
+    var returnUrl = String(payload.returnUrl || "").replace("__DOCUMENT_ID__", encodeURIComponent(documentId));
+    var entrypointWarnings = [];
+    if (quickReplyUrl) {
+      insertQuickReplyIntoBody_(body, quickReplyUrl, payload.quickReplyLabel || "✦ 點這裡建立諮詢回覆");
+    }
+    if (payload.returnImageUrl && returnUrl) {
+      try {
+        insertReturnButtonIntoBody_(body, payload.returnImageUrl, returnUrl);
+      } catch (returnButtonError) {
+        // 圖片下載失敗時仍建立可點擊的文字入口，不能讓整份諮詢單建立失敗。
+        insertReturnTextLinkIntoBody_(body, returnUrl);
+        entrypointWarnings.push("回傳按鈕圖片建立失敗，已改用文字連結：" + String(returnButtonError.message || returnButtonError));
+      }
+    }
+
     doc.saveAndClose();
     var createdFile = DriveApp.getFileById(doc.getId());
     createdFile.moveTo(folder);
     if (payload.serviceAccountEmail) {
-      createdFile.addEditor(String(payload.serviceAccountEmail).trim());
-    }
-    // 必要入口在建立文件的同一次執行內完成，避免新文件尚未同步時，
-    // 第二次請求立刻 openById 而出現 Document is missing。
-    if (payload.quickReplyUrl) {
-      upsertQuickReplyLink_({
-        documentId: doc.getId(),
-        linkUrl: String(payload.quickReplyUrl).replace("__DOCUMENT_ID__", encodeURIComponent(doc.getId())),
-        label: payload.quickReplyLabel || "✦ 點這裡建立諮詢回覆",
-      });
-    }
-    if (payload.returnImageUrl && payload.returnUrl) {
-      upsertReturnButton_({
-        documentId: doc.getId(),
-        imageUrl: payload.returnImageUrl,
-        returnUrl: String(payload.returnUrl).replace("__DOCUMENT_ID__", encodeURIComponent(doc.getId())),
-      });
+      try {
+        createdFile.addEditor(String(payload.serviceAccountEmail).trim());
+      } catch (shareError) {
+        entrypointWarnings.push("服務帳號共用失敗：" + String(shareError.message || shareError));
+      }
     }
 
     // 新文件成功建立後，兩種重建模式都先在每一份舊文件加上警告。
     // 覆蓋模式必須等警告確實寫入後，才可以把舊文件移到垃圾桶。
     (payload.previousDocumentIds || []).forEach(function(documentId) {
       if (!documentId || documentId === doc.getId()) return;
-      var previousDoc = DocumentApp.openById(documentId);
-      insertDocumentWarning_(previousDoc.getBody(), "此筆訂單已建立新諮詢單，請確認。");
-      previousDoc.saveAndClose();
+      try {
+        var previousDoc = DocumentApp.openById(documentId);
+        insertDocumentWarning_(previousDoc.getBody(), "此筆訂單已建立新諮詢單，請確認。");
+        previousDoc.saveAndClose();
+      } catch (previousWarningError) {
+        entrypointWarnings.push("舊文件無法加上警告（" + documentId + "）：" + String(previousWarningError.message || previousWarningError));
+      }
     });
     if (payload.createMode !== "new") {
       (payload.previousDocumentIds || []).forEach(function(documentId) {
         if (documentId && documentId !== doc.getId()) {
-          DriveApp.getFileById(documentId).setTrashed(true);
+          try {
+            DriveApp.getFileById(documentId).setTrashed(true);
+          } catch (trashError) {
+            entrypointWarnings.push("舊文件無法移至垃圾桶（" + documentId + "）：" + String(trashError.message || trashError));
+          }
         }
       });
     }
@@ -177,6 +190,7 @@ function doPost(e) {
       documentUrl: doc.getUrl(),
       documentTitle: finalTitle,
       entrypointsReady: Boolean(payload.quickReplyUrl && payload.returnImageUrl && payload.returnUrl),
+      warnings: entrypointWarnings,
     })).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
     return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(error.message || error) }))
@@ -199,6 +213,41 @@ function insertDocumentWarning_(body, warning) {
 
 function escapeRegExp_(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function insertQuickReplyIntoBody_(body, linkUrl, label) {
+  if (!linkUrl || body.getText().indexOf(label) >= 0) return;
+  var paragraph = body.insertParagraph(0, label);
+  paragraph.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+  paragraph.setSpacingBefore(4).setSpacingAfter(8);
+  var styled = paragraph.editAsText();
+  styled.setBold(true).setFontSize(15).setForegroundColor("#ffffff").setBackgroundColor("#8a3045");
+  styled.setLinkUrl(linkUrl);
+}
+
+function insertReturnButtonIntoBody_(body, imageUrl, returnUrl) {
+  var response = UrlFetchApp.fetch(imageUrl, { muteHttpExceptions: true });
+  if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) {
+    throw new Error("無法下載回傳按鈕圖片，HTTP " + response.getResponseCode());
+  }
+  var paragraph = body.insertParagraph(0, RETURN_BUTTON_ANCHOR);
+  paragraph.setAlignment(DocumentApp.HorizontalAlignment.LEFT).setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+  paragraph.editAsText().setFontSize(0, 0, 1).setForegroundColor(0, 0, "#FFFFFF");
+  var image = paragraph.appendInlineImage(response.getBlob().setName("consultation-return-button.png"))
+    .setAltTitle(RETURN_BUTTON_ALT_TITLE)
+    .setAltDescription("回傳諮詢者結果")
+    .setLinkUrl(returnUrl);
+  var width = image.getWidth();
+  var height = image.getHeight();
+  image.setWidth(180).setHeight(Math.max(1, Math.round(height * 180 / Math.max(1, width))));
+}
+
+function insertReturnTextLinkIntoBody_(body, returnUrl) {
+  var label = "↩ 點這裡回傳 LINE 諮詢結果";
+  var paragraph = body.insertParagraph(0, label);
+  paragraph.setAlignment(DocumentApp.HorizontalAlignment.LEFT).setSpacingBefore(2).setSpacingAfter(4);
+  var styled = paragraph.editAsText();
+  styled.setBold(true).setFontSize(13).setForegroundColor("#1d5e55").setLinkUrl(returnUrl);
 }
 
 function upsertQuickReplyLink_(payload) {
