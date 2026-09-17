@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
+import { makeQuickReplyToken } from "@/lib/quick-reply-token";
 
-const folderId = process.env.GOOGLE_DRIVE_OUTPUT_FOLDER_ID || process.env.GOOGLE_DRIVE_TEMPLATE_FOLDER_ID || "";
+const folderId = "1pihxwGH-FJtWPiCAwBcSvs65L603HVu-";
 const returnedFolderId = process.env.GOOGLE_DRIVE_RETURNED_FOLDER_ID || "18zRTeG1bAmWDCev0LJLslpo5LC7frYhX";
 const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || "";
 const privateKey = (process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || "").replace(/\\n/g, "\n");
@@ -9,10 +10,16 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-09-14-v19";
+const requiredAppsScriptVersion = "2026-09-17-v23";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
+const resultMatchesConsultationItem = (content: unknown, itemCode: string) => {
+  const value = text(content);
+  if (itemCode === "deceased-relative") return !/【\s*過世寵物\s*】/u.test(value);
+  if (itemCode === "deceased-pet") return !/【\s*過世親人\s*】/u.test(value);
+  return true;
+};
 
 async function accessToken() {
   if (!email || !privateKey) throw new Error("尚未設定 Google 服務帳號環境變數");
@@ -299,6 +306,13 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
   await cleanupFinalBlankPage(documentId, token);
   if (requestOrigin) {
     try {
+      await insertQuickReplyLink(documentId, bookingNo, requestOrigin, token);
+    } catch (error) {
+      console.error("[consultation-doc] 建立諮詢回覆連結失敗", {
+        documentId, bookingNo, error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    try {
       await insertConsultationReturnButton(documentId, bookingNo, requestOrigin, token);
     } catch (error) {
       console.error("[consultation-doc] 回傳諮詢結果圖片按鈕建立失敗", {
@@ -306,6 +320,58 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
       });
     }
   }
+}
+
+async function insertQuickReplyLink(documentId: string, bookingNo: string, requestOrigin: string, token: string) {
+  const origin = requestOrigin.replace(/\/$/, "");
+  if (!/^https:\/\//i.test(origin)) throw new Error("建立諮詢回覆連結需要 HTTPS 網址");
+  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const label = "✦ 點這裡建立諮詢回覆";
+  if (documentPlainText(document).includes(label)) return;
+  const replyToken=makeQuickReplyToken(bookingNo,documentId);
+  const linkUrl = `${origin}/staff/quick-reply?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}&token=${encodeURIComponent(replyToken)}`;
+  const inserted = `${label}\n`;
+  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+    method: "POST",
+    body: JSON.stringify({ requests: [
+      { insertText: { location: { index: 1 }, text: inserted } },
+      { updateTextStyle: { range: { startIndex: 1, endIndex: 1 + label.length }, textStyle: {
+        bold: true,
+        fontSize: { magnitude: 15, unit: "PT" },
+        foregroundColor: { color: { rgbColor: { red: 1, green: 1, blue: 1 } } },
+        backgroundColor: { color: { rgbColor: { red: 0.541, green: 0.188, blue: 0.271 } } },
+        link: { url: linkUrl },
+      }, fields: "bold,fontSize,foregroundColor,backgroundColor,link" } },
+      { updateParagraphStyle: { range: { startIndex: 1, endIndex: 1 + inserted.length }, paragraphStyle: {
+        alignment: "CENTER",
+        spaceAbove: { magnitude: 4, unit: "PT" },
+        spaceBelow: { magnitude: 8, unit: "PT" },
+      }, fields: "alignment,spaceAbove,spaceBelow" } },
+    ] }),
+  });
+}
+
+async function insertQuickReplyLinkViaAppsScript(documentId: string, bookingNo: string, requestOrigin: string) {
+  const origin = requestOrigin.replace(/\/$/, "");
+  if (!/^https:\/\//i.test(origin)) throw new Error("建立諮詢回覆連結需要 HTTPS 網址");
+  const replyToken = makeQuickReplyToken(bookingNo, documentId);
+  const linkUrl = `${origin}/staff/quick-reply?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}&token=${encodeURIComponent(replyToken)}`;
+  const response = await fetch(appsScriptUrl, {
+    method: "POST",
+    headers: { "content-type": "text/plain;charset=utf-8" },
+    redirect: "follow",
+    body: JSON.stringify({
+      secret: appsScriptSecret,
+      expectedVersion: requiredAppsScriptVersion,
+      action: "upsertQuickReplyLink",
+      documentId,
+      label: "✦ 點這裡建立諮詢回覆",
+      linkUrl,
+    }),
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.error || "快速建立回覆連結補寫失敗");
+  if (result.version !== requiredAppsScriptVersion) throw new Error(`Google Apps Script 版本不一致（目前：${result.version || "未知"}；需要：${requiredAppsScriptVersion}）`);
 }
 
 async function insertConsultationReturnButton(documentId: string, bookingNo: string, requestOrigin: string, token: string) {
@@ -442,6 +508,132 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
     const content = normalizeConsultationReturnText(segment.slice(startOffset));
     return { index: idx + 1, itemTitle: firstLine, content };
   });
+}
+
+const QUICK_REPLY_HEADING = "【阿嫂回答】";
+
+function indexedDocumentText(document: any) {
+  const chunks: { text: string; start: number; end: number }[] = [];
+  for (const block of document.body?.content || []) {
+    for (const element of block.paragraph?.elements || []) {
+      const value = String(element.textRun?.content || "");
+      if (value) chunks.push({ text: value, start: Number(element.startIndex || 1), end: Number(element.endIndex || 1) });
+    }
+  }
+  const plain = chunks.map((entry) => entry.text).join("");
+  const documentIndexAt = (offset: number) => {
+    let consumed = 0;
+    for (const entry of chunks) {
+      if (offset <= consumed + entry.text.length) return entry.start + Math.max(0, offset - consumed);
+      consumed += entry.text.length;
+    }
+    return Math.max(1, Number(document.body?.content?.at(-1)?.endIndex || 2) - 1);
+  };
+  return { plain, documentIndexAt, bodyEnd: Math.max(1, Number(document.body?.content?.at(-1)?.endIndex || 2) - 1) };
+}
+
+export async function getQuickConsultationReplyFromDocument(documentId: string) {
+  if (!documentId) return "";
+  const token = await accessToken();
+  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const { plain } = indexedDocumentText(document);
+  const marker = plain.lastIndexOf(QUICK_REPLY_HEADING);
+  return marker < 0 ? "" : normalizeConsultationReturnText(plain.slice(marker + QUICK_REPLY_HEADING.length));
+}
+
+export async function upsertQuickConsultationReply(documentId: string, answer: string) {
+  const normalized = normalizeConsultationReturnText(answer);
+  if (!documentId) throw new Error("缺少 Google 文件 ID");
+  if (!normalized) throw new Error("請先輸入阿嫂回答");
+  const token = await accessToken();
+  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const { plain, documentIndexAt, bodyEnd } = indexedDocumentText(document);
+  const markerOffset = plain.lastIndexOf(QUICK_REPLY_HEADING);
+  const replacing = markerOffset >= 0;
+  const insertIndex = replacing ? documentIndexAt(markerOffset) : bodyEnd;
+  const prefix = replacing || !plain.trim() ? "" : "\n\n";
+  const inserted = `${prefix}${QUICK_REPLY_HEADING}\n${normalized}\n`;
+  const headingStart = insertIndex + prefix.length;
+  const answerStart = headingStart + QUICK_REPLY_HEADING.length + 1;
+  const requests: any[] = [];
+  if (replacing && insertIndex < bodyEnd) requests.push({ deleteContentRange: { range: { startIndex: insertIndex, endIndex: bodyEnd } } });
+  requests.push({ insertText: { location: { index: insertIndex }, text: inserted } });
+  requests.push({ updateTextStyle: { range: { startIndex: headingStart, endIndex: headingStart + QUICK_REPLY_HEADING.length }, textStyle: {
+    bold: true, fontSize: { magnitude: 15, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: 0, green: 0, blue: 0 } } },
+  }, fields: "bold,fontSize,foregroundColor" } });
+  requests.push({ updateTextStyle: { range: { startIndex: answerStart, endIndex: answerStart + normalized.length }, textStyle: {
+    bold: false, fontSize: { magnitude: 12, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: 0.102, green: 0.349, blue: 0.8 } } },
+  }, fields: "bold,fontSize,foregroundColor" } });
+  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+    method: "POST", body: JSON.stringify({ requests }),
+  });
+}
+
+export type QuickReplyQuestionSlot = { slotIndex:number; questionNumber:number; question:string; answer:string };
+export type QuickReplySectionSlot = { slotIndex:number; label:string; answer:string };
+
+export async function getQuickReplyQuestionSlots(documentId:string):Promise<QuickReplyQuestionSlot[]> {
+  if(!documentId)throw new Error("缺少 Google 文件 ID");
+  const token=await accessToken();
+  const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
+  const {plain}=indexedDocumentText(document),questionPattern=/(?:^|\n)Q(\d+)\s*[:：]\s*([^\n]*)\nA\1\s*[:：]\s*([^\n]*)/g;
+  return Array.from(plain.matchAll(questionPattern)).map((match,slotIndex)=>({slotIndex,questionNumber:Number(match[1]),question:normalizeConsultationReturnText(match[2]),answer:normalizeConsultationReturnText(match[3])}));
+}
+
+export async function getQuickReplySectionSlots(documentId:string):Promise<QuickReplySectionSlot[]> {
+  if(!documentId)throw new Error("缺少 Google 文件 ID");
+  const token=await accessToken();
+  const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
+  const {plain}=indexedDocumentText(document),headingPattern=/(?:^|\n)【([^】\n]+)】[^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset);
+  const matches=Array.from(scopedPlain.matchAll(headingPattern));
+  return matches.map((match,slotIndex)=>{
+    const start=baseOffset+(match.index||0)+match[0].length;
+    const rest=plain.slice(start),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/);
+    const raw=boundary>=0?rest.slice(0,boundary):rest;
+    return {slotIndex,label:normalizeConsultationReturnText(match[1]),answer:normalizeConsultationReturnText(raw.replace(/[\u00a0\u200b]/g," "))};
+  });
+}
+
+export async function upsertQuickConsultationQuestionReplies(documentId:string,answers:Record<string,string>) {
+  if(!documentId)throw new Error("缺少 Google 文件 ID");
+  const token=await accessToken();
+  const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
+  const {plain,documentIndexAt}=indexedDocumentText(document);
+  const answerPattern=/(?:^|\n)A(\d+)\s*[:：]([^\n]*)/g;
+  const slots=Array.from(plain.matchAll(answerPattern)).map((match,slotIndex)=>{
+    const whole=match[0],leading=whole.startsWith("\n")?1:0,colonOffset=whole.search(/[:：]/),value=normalizeConsultationReturnText(String(answers[String(slotIndex)]||""));
+    const lineOffset=(match.index||0)+leading,startOffset=(match.index||0)+colonOffset+1,endOffset=(match.index||0)+whole.length;
+    return {slotIndex,value,startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset),lineStart:documentIndexAt(lineOffset)};
+  }).filter(slot=>slot.value).sort((a,b)=>b.startIndex-a.startIndex);
+  if(!slots.length)throw new Error("找不到可寫入的 A1、A2 回答位置");
+  const requests:any[]=[];
+  for(const slot of slots){
+    if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
+    requests.push({insertText:{location:{index:slot.startIndex},text:slot.value}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+  }
+  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
+}
+
+export async function upsertQuickConsultationSectionReplies(documentId:string,answers:Record<string,string>) {
+  if(!documentId)throw new Error("缺少 Google 文件 ID");
+  const token=await accessToken();
+  const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
+  const {plain,documentIndexAt}=indexedDocumentText(document),headingPattern=/(?:^|\n)【([^】\n]+)】[^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset);
+  const matches=Array.from(scopedPlain.matchAll(headingPattern));
+  const slots=matches.map((match,slotIndex)=>{
+    const startOffset=baseOffset+(match.index||0)+match[0].length,rest=plain.slice(startOffset),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:Math.max(startOffset,plain.replace(/\n$/,"").length);
+    return {slotIndex,value:normalizeConsultationReturnText(String(answers[String(slotIndex)]||"")),startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset)};
+  }).filter(slot=>slot.value).sort((a,b)=>b.startIndex-a.startIndex);
+  if(!slots.length)return;
+  const requests:any[]=[];
+  for(const slot of slots){
+    if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
+    const inserted=`${slot.value}\n`;
+    requests.push({insertText:{location:{index:slot.startIndex},text:inserted}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+  }
+  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
 
 const fieldLabels: Record<string, string> = {
@@ -770,9 +962,9 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const lineName = text(customer.line_display_name) || "LINE用戶";
   const ownerName = text(customer.full_name) || lineName;
   const isVideo = one(booking?.consultation_methods)?.code === "video" && Boolean(booking?.slot_start);
-  const isCancelledOrRefunded = booking?.status === "cancelled" ||
-    booking?.payment_status === "failed" ||
-    ["手動退款", "自行退款", "用戶退款", "自行取消", "取消訂單"].includes(text(booking?.cancellation_reason));
+  // 只看訂單目前的最終狀態。曾取消後又改成手動收款時，舊的取消原因可能仍保留，
+  // 但不能再把已恢復且已付款的訂單標成取消。
+  const isCancelledOrRefunded = booking?.status === "cancelled" || booking?.payment_status === "failed";
   const { data: details, error } = await db.from("booking_details").select(`
     id,item_id,item_title,created_at,google_document_id,google_document_created_at,
     booking_items(code),booking_detail_sub_items(sub_item_title),
@@ -841,7 +1033,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     const currentItemIds = Array.from(new Set(pages.map((pageSpec) => text(pageSpec.detail.item_id)).filter(Boolean)));
     if (currentProfileIds.length && currentItemIds.length) {
       const { data: histories, error: historyError } = await db.from("consultation_result_history")
-        .select("booking_detail_id,item_id,profile_id,target_profile_id,result_content,consultation_method,consultation_created_at,video_slot_start,returned_at")
+        .select("booking_detail_id,item_id,profile_id,target_profile_id,result_content,consultation_method,consultation_created_at,video_slot_start,returned_at,booking_details(bookings(status,payment_status))")
         .in("profile_id", currentProfileIds).in("item_id", currentItemIds)
         .order("returned_at", { ascending: false });
       if (historyError && !String(historyError.message || "").includes("consultation_result_history")) throw historyError;
@@ -850,9 +1042,12 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
         const targetId = text(one(pageSpec.target?.consultation_profiles)?.id || pageSpec.target?.profile_id) || null;
         const match = (histories || []).find((row: any) =>
           !currentDetailIds.has(text(row.booking_detail_id)) &&
+          one(one(row.booking_details)?.bookings)?.status !== "cancelled" &&
+          one(one(row.booking_details)?.bookings)?.payment_status !== "failed" &&
           text(row.item_id) === text(pageSpec.detail.item_id) &&
           text(row.profile_id) === text(answer?.profile_id) &&
-          (text(row.target_profile_id) || null) === targetId,
+          (text(row.target_profile_id) || null) === targetId &&
+          resultMatchesConsultationItem(row.result_content, one(pageSpec.detail.booking_items)?.code || ""),
         );
         if (match?.result_content) {
           pageSpec.previousResult = match.result_content;
@@ -871,6 +1066,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
           booking_items(code),booking_detail_sub_items(sub_item_title),
           booking_consultation_answers(profile_id,booking_answer_participants(profile_id,position)))
       `).eq("customer_id", booking.customer_id).neq("id", bookingId)
+        .neq("status", "cancelled").neq("payment_status", "failed")
         .not("consultation_result_returned_at", "is", null)
         .order("consultation_result_returned_at", { ascending: false });
       if (oldBookingError) throw oldBookingError;
@@ -894,7 +1090,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
           try {
             if (!previewCache.has(documentId)) previewCache.set(documentId, await getConsultationReturnPreview(documentId));
             const previous = previewCache.get(documentId)?.[oldPageIndex];
-            if (previous?.content) {
+            if (previous?.content && resultMatchesConsultationItem(previous.content, one(pageSpec.detail.booking_items)?.code || "")) {
               if (!pageSpec.previousResult) pageSpec.previousResult = previous.content;
               pageSpec.previousCreatedAt = documentDetail?.google_document_created_at || documentDetail?.created_at || oldBooking.consultation_result_returned_at;
               pageSpec.previousMethod = one(oldBooking.consultation_methods)?.code;
@@ -947,7 +1143,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const numberDate=new Date(booking?.paid_at||booking?.created_at||Date.now());
   const numberMonth=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",month:"short"}).format(numberDate);
   const numberYear=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"2-digit"}).format(numberDate);
-  let fileTitle = `${consultationNumber(documentPosition)}.${numberMonth}${numberYear}-${lineName}-${ownerName}`;
+  let fileTitle = `${consultationNumber(documentPosition)}-${lineName}.${ownerName} ${numberMonth}${numberYear}`;
   if (isVideo) {
     const date = new Date(booking.slot_start);
     const parts = new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", month: "numeric", day: "numeric", weekday: "short" }).formatToParts(date);
@@ -960,8 +1156,12 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     method: "POST",
     headers: { "content-type": "text/plain;charset=utf-8" },
     body: JSON.stringify({
-      secret: appsScriptSecret, expectedVersion: requiredAppsScriptVersion, folderId,
+      secret: appsScriptSecret, expectedVersion: requiredAppsScriptVersion, folderId, serviceAccountEmail: email,
       title: fileTitle, bookingNo, content, marks, images, createMode,
+      quickReplyUrl: requestOrigin ? `${requestOrigin.replace(/\/$/, "")}/staff/quick-reply?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent("__DOCUMENT_ID__")}` : "",
+      quickReplyLabel: "✦ 點這裡建立諮詢回覆",
+      returnImageUrl: requestOrigin ? `${requestOrigin.replace(/\/$/, "")}/consultation-return-button.png` : "",
+      returnUrl: requestOrigin ? `${requestOrigin.replace(/\/$/, "")}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent("__DOCUMENT_ID__")}` : "",
       cancelledWarning: isCancelledOrRefunded,
       previousDocumentIds: force ? existingDetails.map((detail: any) => detail.google_document_id).filter(Boolean) : [],
     }),
@@ -970,15 +1170,59 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
   const result = await response.json();
   if (!response.ok || !result.ok) throw new Error(result.error || "Apps Script 建立文件失敗");
   if (result.version !== requiredAppsScriptVersion) throw new Error(`目前連到舊版 Google Apps Script（目前：${result.version || "無版本資訊"}；需要：${requiredAppsScriptVersion}），請更新 Vercel 的 GOOGLE_APPS_SCRIPT_WEB_APP_URL 後重新部署`);
+  // 文件是由 Apps Script 建立，先由同一個文件擁有者補上兩個必要入口。
+  // 這樣即使服務帳號的 Docs API 權限尚未同步，使用者仍能看到快速回覆與回傳 LINE。
+  let appsScriptEntrypointsReady = Boolean(result.entrypointsReady);
+  if (requestOrigin && !appsScriptEntrypointsReady) {
+    await insertQuickReplyLinkViaAppsScript(result.documentId, bookingNo, requestOrigin);
+    await updatePositionedReturnButton({
+      documentId: result.documentId,
+      imageUrl: `${requestOrigin.replace(/\/$/, "")}/consultation-return-button.png`,
+      returnUrl: `${requestOrigin.replace(/\/$/, "")}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(result.documentId)}`,
+    });
+    appsScriptEntrypointsReady = true;
+  }
   // 二次整理失敗時仍先把已建立的文件連結寫回後台，但不能再「靜默成功」。
   // 寫回完成後會把錯誤拋回 API，讓後台與 Vercel log 都能明確看到真正失敗原因。
   let normalizationError: unknown = null;
-  try {
-    await normalizeDocumentHeaderAndFooter(result.documentId, bookingNo, requestOrigin);
-    if (isCancelledOrRefunded) await markConsultationOrderCancelled(result.documentId);
-  } catch (error) {
-    normalizationError = error;
-    console.error("[consultation-doc] Google 文件最終整理失敗", { documentId: result.documentId, bookingNo, error });
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      await normalizeDocumentHeaderAndFooter(result.documentId, bookingNo, requestOrigin);
+      if (isCancelledOrRefunded) await markConsultationOrderCancelled(result.documentId);
+      normalizationError = null;
+      break;
+    } catch (error) {
+      normalizationError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const canRetry = /Document is missing|not found|read access|找不到/i.test(message) && attempt < 3;
+      console.error("[consultation-doc] Google 文件最終整理失敗", { documentId: result.documentId, bookingNo, attempt: attempt + 1, error });
+      if (!canRetry) break;
+      await new Promise((resolve) => setTimeout(resolve, [800, 1600, 2600][attempt]));
+    }
+  }
+  // 若服務帳號的 Docs API 仍無法讀取，改由文件擁有者身分執行的 Apps Script
+  // 直接補上兩個操作入口，避免文件已建立卻沒有快速回覆與回傳 LINE。
+  if (normalizationError && requestOrigin) {
+    try {
+      await insertQuickReplyLinkViaAppsScript(result.documentId, bookingNo, requestOrigin);
+      await updatePositionedReturnButton({
+        documentId: result.documentId,
+        imageUrl: `${requestOrigin.replace(/\/$/, "")}/consultation-return-button.png`,
+        returnUrl: `${requestOrigin.replace(/\/$/, "")}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(result.documentId)}`,
+      });
+      console.warn("[consultation-doc] Docs API 無法讀取，已由 Apps Script 補上操作入口", { documentId: result.documentId, bookingNo });
+      normalizationError = null;
+    } catch (fallbackError) {
+      console.error("[consultation-doc] Apps Script 備援補寫失敗", { documentId: result.documentId, bookingNo, fallbackError });
+    }
+  }
+  if (normalizationError && appsScriptEntrypointsReady) {
+    console.warn("[consultation-doc] Docs API 整理失敗，但 Apps Script 已建立必要操作入口；保留已建立文件", {
+      documentId: result.documentId,
+      bookingNo,
+      normalizationError,
+    });
+    normalizationError = null;
   }
   const createdAt = existingDetails.map((detail: any) => detail.google_document_created_at).filter(Boolean).sort()[0] || new Date().toISOString();
   const { error: updateError } = await db.from("booking_details").update({
@@ -991,6 +1235,21 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     google_document_id: null, google_document_url: null, google_document_created_at: null,
   }).eq("booking_id", bookingId).neq("id", anchor.id);
   if (clearError) throw clearError;
+  // 檔名重排是附加整理；即使 Drive 權限同步較慢，也不能阻斷按鈕、連結與資料庫寫回。
+  if (createMode === "new" && result.documentId && result.documentTitle) {
+    const reorderedTitle = String(result.documentTitle).replace(/\s+([A-Z][a-z]{2}\d{2})\.新(\d+)$/u, ".新$2 $1");
+    if (reorderedTitle !== result.documentTitle) {
+      try {
+        const token = await accessToken();
+        await google(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(result.documentId)}?supportsAllDrives=true`, token, {
+          method: "PATCH",
+          body: JSON.stringify({ name: reorderedTitle }),
+        });
+      } catch (renameError) {
+        console.error("[consultation-doc] 新版諮詢單檔名重排失敗，不影響文件功能", { documentId: result.documentId, renameError });
+      }
+    }
+  }
   if (normalizationError) {
     throw normalizationError instanceof Error ? normalizationError : new Error("Google 文件最終整理失敗");
   }
