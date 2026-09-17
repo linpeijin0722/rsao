@@ -1122,22 +1122,36 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
   cursor: pointer;
 }
 
-/* 客人問題 Q&A 與項目標籤回覆使用相同的上下、滿版結構。 */
+/* 上方類別維持同一框內的標籤排列；下方細分類才採滿版向下展開。 */
 .quickReplyQuestionCategoryPicker > div {
-  display: grid;
-  grid-template-columns: 1fr;
-  justify-content: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   width: 100%;
 }
 .quickReplyQuestionCategoryPicker > div > button {
-  width: 100%;
-  min-height: 52px;
-  border-radius: 11px;
+  width: auto;
+  min-height: 44px;
+  border-radius: 999px;
 }
 .quickReplyQuestionGroups,
 .quickReplyQuestionGroup {
   box-sizing: border-box;
   width: 100%;
+}
+.quickReplyQuestionGroups > .quickReplyQuestionGroup {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  width: 100% !important;
+}
+.quickReplyQuestionGroups > .quickReplyQuestionGroup > button {
+  grid-column: 1 / -1;
+  width: 100% !important;
+}
+.quickReplyQuestionGroups > .quickReplyQuestionGroup > div {
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr !important;
+  width: 100% !important;
 }
 
 /* 整體運勢固定依 1→6 排序；本命格維持固定展開。 */
@@ -1187,3 +1201,12 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
     min-height: 44px;
   }
 }
+
+/* 投胎資料：先選人／動物，再填寫可選細節。 */
+.quickReplyReincarnatedField{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;align-items:stretch!important}
+.quickReplyReincarnatedKind{display:grid!important;grid-template-columns:1fr 1fr!important;gap:9px!important}
+.quickReplyReincarnatedDetails{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;padding:12px;border:1px solid #e1d4cb;border-radius:10px;background:#fffaf7}
+.quickReplyReincarnatedDetails label{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto!important;align-items:center!important;gap:5px!important;text-align:left}
+.quickReplyReincarnatedDetails input{width:100%!important;box-sizing:border-box!important}
+.quickReplyReincarnatedDetails>button{min-height:46px!important;border:0!important;border-radius:9px!important;background:#20423d!important;color:#fff!important;font-size:16px!important;font-weight:900!important}
+@media(max-width:640px){.quickReplyReincarnatedDetails label{grid-template-columns:1fr!important}.quickReplyReincarnatedDetails label input{margin:4px 0!important}}

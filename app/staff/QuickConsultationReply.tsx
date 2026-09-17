@@ -99,6 +99,9 @@ export default function QuickConsultationReply({
     [locationMode, setLocationMode] = useState<Record<string, string>>({}),
     [locationHall, setLocationHall] = useState<Record<string, string>>({}),
     [reincarnatedAs, setReincarnatedAs] = useState<Record<string, string>>({}),
+    [reincarnatedKind, setReincarnatedKind] = useState<Record<string, "human" | "animal">>({}),
+    [reincarnatedPlace, setReincarnatedPlace] = useState<Record<string, string>>({}),
+    [reincarnatedAge, setReincarnatedAge] = useState<Record<string, string>>({}),
     [customDeity, setCustomDeity] = useState<Record<string, string>>({}),
     [namingRows, setNamingRows] = useState<
       Record<string, { name: string; aid: string; custom: string }[]>
@@ -273,7 +276,9 @@ export default function QuickConsultationReply({
       sectionTopic?.options
         .filter(
           (o) =>
-            (sectionTopic?.code === "overall"
+            (sectionTopic?.code === "home"
+              ? false
+              : sectionTopic?.code === "overall"
               ? o.code.startsWith("status_overall_")
               : o.code.startsWith("status_") ||
                 o.code.startsWith("condition_")),
@@ -281,7 +286,9 @@ export default function QuickConsultationReply({
         ?.concat(spiritPlainOptions) || [],
     adviceOptions =
       sectionTopic?.options.filter((o) =>
-        sectionTopic?.code === "overall"
+        sectionTopic?.code === "home"
+          ? false
+          : sectionTopic?.code === "overall"
           ? o.code.startsWith("advice_overall_")
           : o.code.startsWith("advice_"),
       ) || [],
@@ -310,6 +317,13 @@ export default function QuickConsultationReply({
           return section?.genderPronoun !== "她";
         return true;
       }) || [],
+    homeConditionOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_condition_")) || [],
+    homeImpactOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_impact_")) || [],
+    homeAreaOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_area_")) || [],
+    homeAdjustOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_adjust_")) || [],
+    homeSuitableOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_suitable_")) || [],
+    homeFortuneOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_fortune_")) || [],
+    homeFinalOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_final_")) || [],
     elementOptions =
       sectionTopic?.options.filter((o) => o.code.startsWith("element_")) || [],
     deityOptions =
@@ -340,6 +354,7 @@ export default function QuickConsultationReply({
           !o.code.startsWith("advice_") &&
           !o.code.startsWith("recent_") &&
           !o.code.startsWith("body_") &&
+          !o.code.startsWith("home_") &&
           !o.code.startsWith("element_") &&
           !o.code.startsWith("deity_") &&
           !o.code.startsWith("buddhist_") &&
@@ -350,6 +365,7 @@ export default function QuickConsultationReply({
       section?.itemCode === "personal-romance" ||
       /個人感情運|僅看自己/.test(section?.label || ""),
     showPartnerPersonality = sectionTopic?.code === "love";
+  const deceasedLayout = ["deceased", "infant_spirit"].includes(sectionTopic?.code || "");
   const question = data?.questions[activeQuestion],
     questionKey = String(question?.slotIndex ?? 0),
     draft = drafts[questionKey] || {
@@ -366,22 +382,16 @@ export default function QuickConsultationReply({
       for (const option of category?.options || []) {
         const code = option.code,
           text = option.label,
-          label = code.startsWith("love_trend_") && /紅鸞|桃花|正緣|結婚/.test(text)
+          label = text === "容易受到工作影響"
+            ? "其它"
+            : code.startsWith("love_trend_") && /紅鸞|桃花|正緣|結婚/.test(text)
             ? "正緣、桃花與結婚機會"
             : code.startsWith("love_trend_") && /阻礙|不順|爛桃花|較淡/.test(text)
               ? "感情阻礙與需要留意"
             : code.startsWith("love_trend_")
               ? "感情順利穩定"
-            : code.startsWith("meet_") && /工作|同事|合作|生活圈/.test(text)
-              ? "工作與日常生活圈"
-            : code.startsWith("meet_") && /朋友|聚會|活動/.test(text)
-              ? "朋友介紹與社交場合"
-            : code.startsWith("meet_") && /外地|網路/.test(text)
-              ? "外地與網路"
-            : code.startsWith("meet_") && /上課|進修|興趣/.test(text)
-              ? "學習與共同興趣"
             : code.startsWith("meet_")
-              ? "其它相遇方式"
+              ? "容易在哪裡遇到正緣"
               : code.startsWith("self_personality_")
                 ? "自己的個性"
               : code.startsWith("partner_personality_")
@@ -504,6 +514,9 @@ export default function QuickConsultationReply({
         locationMode: mode,
         customLocation,
         reincarnatedAs: reincarnatedAs[targetKey] || "",
+        reincarnatedKind: reincarnatedKind[targetKey] || "",
+        reincarnatedPlace: reincarnatedPlace[targetKey] || "",
+        reincarnatedAge: reincarnatedAge[targetKey] || "",
         customDeity:
           customDeity[targetKey] ||
           [
@@ -773,7 +786,7 @@ export default function QuickConsultationReply({
       },
     }));
     if (mode === "hell" && !hall) return;
-    if (mode === "reincarnated" && !reincarnatedAs[sectionKey]?.trim()) return;
+    if (mode === "reincarnated" && !reincarnatedKind[sectionKey]) return;
     clearTimeout(sectionTimers.current[sectionKey]);
     setSectionPending((c) => ({ ...c, [sectionKey]: true }));
     const customLocation =
@@ -787,6 +800,9 @@ export default function QuickConsultationReply({
       locationMode: mode,
       customLocation,
       reincarnatedAs: reincarnatedAs[sectionKey] || "",
+      reincarnatedKind: reincarnatedKind[sectionKey] || "",
+      reincarnatedPlace: reincarnatedPlace[sectionKey] || "",
+      reincarnatedAge: reincarnatedAge[sectionKey] || "",
       locationSubject: section?.locationSubject || "祂",
       genderPronoun: section?.genderPronoun || "祂",
       previousPhraseIds: [],
@@ -839,7 +855,7 @@ export default function QuickConsultationReply({
         topic = topicMap.get(
           data?.recommendedBySection?.[String(target.slotIndex)]?.[0] || "",
         );
-        if (target.itemCode === "deceased-relative") {
+        if (["infant-spirit", "deceased-relative", "deceased-pet"].includes(target.itemCode)) {
           const hasLocation = targetDraft.optionIds.some((id) =>
             topic?.options.some(
               (option) => option.id === id && option.code === "location",
@@ -851,11 +867,11 @@ export default function QuickConsultationReply({
             (mode === "hell" &&
               !!locationHall[String(target.slotIndex)]?.trim()) ||
             (mode === "reincarnated" &&
-              !!reincarnatedAs[String(target.slotIndex)]?.trim());
+              !!reincarnatedKind[String(target.slotIndex)]);
           if (!hasLocation || !locationComplete) {
           setView("section");
           setActiveSection(index);
-          window.alert("【過世親人】的「現在在哪裡」為必填，請先選擇位置。");
+          window.alert(`【${target.label}】的「現在在哪裡」為必填，請先選擇完整位置。`);
           return;
         }
       }
@@ -1148,17 +1164,16 @@ export default function QuickConsultationReply({
                               "deceased_pet",
                             ].includes(sectionTopic.code) && (
                               <div
-                                className={`quickReplyLocationChoices quickReplySpiritCard${sectionTopic.code === "deceased" ? " quickReplyAlwaysOpen" : ""}`}
+                                className="quickReplyLocationChoices quickReplySpiritCard quickReplyAlwaysOpen"
                               >
                                 <div className="quickReplySpiritHeading">
                                   <span>①</span>
                                   <div className="quickReplyLocationTitle">
                                     <h4>
                                       現在在哪裡
-                                      {sectionTopic.code === "deceased" && <em>必填</em>}
+                                      <em>必填</em>
                                     </h4>
-                                    {sectionTopic.code === "deceased" &&
-                                      section.previousLocation && (
+                                    {section.previousLocation && (
                                         <p>
                                           {section.previousLocation.date}
                                           諮詢結果：
@@ -1232,8 +1247,14 @@ export default function QuickConsultationReply({
                                 {locationMode[sectionKey] ===
                                   "reincarnated" && (
                                   <div className="quickReplyReincarnatedField">
+                                    <div className="quickReplyReincarnatedKind">
+                                      <button className={reincarnatedKind[sectionKey] === "human" ? "selected" : ""} onClick={() => setReincarnatedKind((current) => ({ ...current, [sectionKey]: "human" }))}>人</button>
+                                      <button className={reincarnatedKind[sectionKey] === "animal" ? "selected" : ""} onClick={() => setReincarnatedKind((current) => ({ ...current, [sectionKey]: "animal" }))}>動物</button>
+                                    </div>
+                                    {reincarnatedKind[sectionKey] && (
+                                    <div className="quickReplyReincarnatedDetails">
                                     <label>
-                                      現在是「
+                                      現在是一{reincarnatedKind[sectionKey] === "animal" ? "隻" : "個"}「
                                       <input
                                         value={reincarnatedAs[sectionKey] || ""}
                                         onChange={(e) =>
@@ -1242,10 +1263,18 @@ export default function QuickConsultationReply({
                                             [sectionKey]: e.target.value,
                                           }))
                                         }
-                                        placeholder="例如：小女孩"
+                                        placeholder={reincarnatedKind[sectionKey] === "animal" ? "例如：虎斑貓" : "例如：小女孩"}
                                       />
                                       」
                                     </label>
+                                    <label>
+                                      已投胎到「
+                                      <input value={reincarnatedPlace[sectionKey] || ""} onChange={(e) => setReincarnatedPlace((current) => ({ ...current, [sectionKey]: e.target.value }))} placeholder={reincarnatedKind[sectionKey] === "animal" ? "例如：台灣南部的某間動物之家" : "例如：靠近新竹跟苗栗附近的陳姓人家"} />
+                                      」
+                                    </label>
+                                    {reincarnatedKind[sectionKey] === "human" && (
+                                      <label>目前約「<input inputMode="numeric" value={reincarnatedAge[sectionKey] || ""} onChange={(e) => setReincarnatedAge((current) => ({ ...current, [sectionKey]: e.target.value.replace(/[^0-9]/g, "") }))} placeholder="例如：3" />」歲</label>
+                                    )}
                                     <button
                                       onClick={() =>
                                         applyLocation("reincarnated")
@@ -1253,11 +1282,13 @@ export default function QuickConsultationReply({
                                     >
                                       帶入
                                     </button>
+                                    </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
                             )}
-                            {sectionTopic.code === "deceased" && (
+                            {["deceased", "infant_spirit"].includes(sectionTopic.code) && (
                               <>
                                 <div className="quickReplySpecialField">
                                   <div className="quickReplySpecialHeading">
@@ -1765,6 +1796,29 @@ export default function QuickConsultationReply({
                                   </div>
                                 </div>
                               )}
+                            {sectionTopic?.code === "home" && [
+                              ["①", "房子目前狀況", homeConditionOptions],
+                              ["②", "對人的影響", homeImpactOptions],
+                              ["③", "家裡哪個地方需要注意", homeAreaOptions],
+                              ["④", "有沒有需要調整", homeAdjustOptions],
+                              ["⑤", "適不適合繼續住", homeSuitableOptions],
+                              ["⑥", "最近住家運勢", homeFortuneOptions],
+                              ["⑦", "阿嫂最後建議", homeFinalOptions],
+                            ].map(([number, title, options]) => (
+                              <div className="quickReplySpecialField" key={String(title)}>
+                                <div className="quickReplySpecialHeading">
+                                  <span>{String(number)}</span>
+                                  <div><h4>{String(title)}</h4></div>
+                                </div>
+                                <div className="quickReplySpecialChoices">
+                                  {(options as Option[]).map((o) => (
+                                    <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
+                                      {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
                             {statusOptions.length > 0 && (
                               <div className={`quickReplySpecialField${sectionTopic?.code === "overall" ? " quickReplyOverallStatus" : ""}`}>
                                 <div className="quickReplySpecialHeading">
@@ -2020,7 +2074,7 @@ export default function QuickConsultationReply({
                               <div className="quickReplySpecialField">
                                 <div className="quickReplySpecialHeading">
                                   <span>
-                                    {sectionTopic?.code === "deceased"
+                                    {deceasedLayout
                                       ? "④"
                                       : "③"}
                                   </span>
@@ -2052,7 +2106,7 @@ export default function QuickConsultationReply({
                               <div className="quickReplyHelpCard">
                                 <div className="quickReplyHelpHeading">
                                   <span>
-                                    {sectionTopic?.code === "deceased"
+                                    {deceasedLayout
                                       ? "⑤"
                                       : "④"}
                                   </span>
@@ -2081,7 +2135,7 @@ export default function QuickConsultationReply({
                                       {o.label}
                                     </button>
                                   ))}
-                                  {sectionTopic?.code === "deceased" && (
+                                  {deceasedLayout && (
                                     <button
                                       className={
                                         scriptureOptions.some((o) =>
@@ -2103,7 +2157,7 @@ export default function QuickConsultationReply({
                                     </button>
                                   )}
                                 </div>
-                                {sectionTopic?.code === "deceased" &&
+                                {deceasedLayout &&
                                   openPanels[`${sectionKey}-scripture`] && (
                                     <div className="quickReplyScripturePanel">
                                       <h5>選擇要唸的經文（可複選）</h5>
@@ -2137,7 +2191,7 @@ export default function QuickConsultationReply({
                                       ? showPartnerPersonality
                                         ? "⑥"
                                         : "⑤"
-                                      : sectionTopic?.code === "deceased"
+                                      : deceasedLayout
                                         ? "⑥"
                                         : spiritTopicCodes.includes(
                                               sectionTopic?.code || "",

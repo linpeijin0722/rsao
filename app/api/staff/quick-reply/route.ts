@@ -347,6 +347,77 @@ const overallBuiltInCopy: Record<string, string> = {
   body_male_prostate: "攝護腺方面需要留意，若有排尿異常應安排檢查。",
   body_male_urinary: "男性泌尿狀況需要留意，有持續不適時應及早就醫。",
 };
+const homeBuiltInOptions = [
+  ...[
+    ["home_condition_stable", "整體氣場穩定"], ["home_condition_bright", "採光氣場不錯"],
+    ["home_condition_cluttered", "雜氣比較重"], ["home_condition_stagnant", "氣場流動較慢"],
+    ["home_condition_yin", "陰氣稍重"], ["home_condition_conflict", "格局氣場有沖煞"],
+    ["home_impact_calm", "住起來心情安定"], ["home_impact_support", "對家運有助力"],
+    ["home_impact_sleep", "容易影響睡眠"], ["home_impact_mood", "容易心浮氣躁"],
+    ["home_impact_health", "容易影響精神與體力"], ["home_impact_relationship", "家人較容易有口角"],
+    ["home_area_entrance", "玄關"], ["home_area_living", "客廳"], ["home_area_bedroom", "房間"],
+    ["home_area_kitchen", "廚房"], ["home_area_bathroom", "廁所"], ["home_area_door", "大門"],
+    ["home_area_balcony", "陽台"], ["home_area_ok", "整體都還可以"],
+    ["home_adjust_tidy", "整理環境"], ["home_adjust_move", "換位置"],
+    ["home_adjust_light", "增加採光"], ["home_adjust_air", "保持通風"],
+    ["home_suitable_yes", "適合繼續住"], ["home_suitable_observe", "可以住但要觀察"],
+    ["home_suitable_adjust", "調整後可以繼續住"], ["home_suitable_short", "短期居住較合適"],
+    ["home_suitable_move", "長期建議考慮搬遷"], ["home_suitable_family", "要看家人適應情況"],
+    ["home_fortune_positive_gather", "旺氣漸聚"], ["home_fortune_positive_family", "家運轉穩"],
+    ["home_fortune_positive_noble", "貴人氣入宅"], ["home_fortune_positive_wealth", "財氣慢慢提升"],
+    ["home_fortune_negative_block", "宅運受阻"], ["home_fortune_negative_leak", "財氣容易外洩"],
+    ["home_fortune_negative_dispute", "口舌之氣較重"], ["home_fortune_negative_unsettled", "家宅較不安定"],
+    ["home_final_steady", "先穩定居家氣場"], ["home_final_clean", "定期清理與除濕"],
+    ["home_final_sun", "讓陽光進到屋內"], ["home_final_route", "保持主要動線通暢"],
+    ["home_final_pray", "依信仰祈福安宅"], ["home_final_observe", "調整後再觀察一段時間"],
+  ].map(([code, label], index) => ({ id: `virtual-${code.replaceAll("_", "-")}`, code, label, sort_order: 100 + index, is_active: true })),
+];
+const homeBuiltInCopy: Record<string, string> = {
+  home_condition_stable: "這間房子目前的整體氣場算穩定，住起來沒有太大的問題。",
+  home_condition_bright: "屋內的採光與陽氣不錯，整體氣場比較明亮。",
+  home_condition_cluttered: "屋內目前的雜氣比較重，東西堆放太多的地方尤其明顯。",
+  home_condition_stagnant: "房子的氣場流動比較慢，容易讓人覺得沉悶或做事提不起勁。",
+  home_condition_yin: "屋內的陰氣稍微重一些，陰暗、潮濕或長期沒有使用的地方要多留意。",
+  home_condition_conflict: "房子的格局氣場有一些沖煞，主要動線與家具擺放需要再調整。",
+  home_impact_calm: "這間房子對居住者有安定情緒的作用，住在裡面比較容易靜下來。",
+  home_impact_support: "目前的住宅氣場對家運有一些助力，家人相處與做事會比較穩。",
+  home_impact_sleep: "這裡的氣場比較容易影響睡眠，晚上可能較難放鬆或容易醒來。",
+  home_impact_mood: "住在這裡比較容易心浮氣躁，情緒也可能受到空間氣場影響。",
+  home_impact_health: "這裡的環境容易讓精神與體力受到影響，要留意長期疲倦或不舒服的情況。",
+  home_impact_relationship: "家中的口舌之氣比較明顯，家人之間容易因小事產生摩擦。",
+  home_area_entrance: "這個房子需要注意玄關，入口不要堆放太多雜物，讓氣能順利進來。",
+  home_area_living: "這個房子的主要問題比較集中在客廳，公共空間要保持明亮與整齊。",
+  home_area_bedroom: "這個房子的主要問題比較集中在房間，尤其是晚上休息的地方，不要堆太多雜物。",
+  home_area_kitchen: "廚房的火氣與清潔需要留意，保持乾淨會比較有利於家中氣場。",
+  home_area_bathroom: "廁所的濕氣與穢氣要多留意，平常要維持乾燥與通風。",
+  home_area_door: "大門附近的氣場需要留意，門口與主要動線要保持通暢。",
+  home_area_balcony: "陽台是屋內納氣的重要位置，不要長期堆滿雜物或完全遮住採光。",
+  home_area_ok: "房子各個區域整體都還可以，目前沒有哪一處特別需要擔心。",
+  home_adjust_tidy: "建議先整理環境，把長期不用與堆積的物品清掉，氣場會比較流通。",
+  home_adjust_move: "部分家具或物品可以換個位置，避開阻擋動線與長期壓迫的擺法。",
+  home_adjust_light: "屋內可以增加採光，白天多讓自然光進來，有助於提升陽氣。",
+  home_adjust_air: "平常要保持通風，讓屋內的濕氣與沉滯氣場能夠散出去。",
+  home_suitable_yes: "這間房子目前適合繼續居住，只要維持整潔與正常使用即可。",
+  home_suitable_observe: "目前還可以繼續住，但要觀察家人的睡眠、情緒與生活是否持續受影響。",
+  home_suitable_adjust: "這間房子調整之後可以繼續住，暫時不需要急著搬走。",
+  home_suitable_short: "這裡比較適合短期居住，若要長住仍要評估環境與家人的適應情況。",
+  home_suitable_move: "若長期住下來一直不舒服，可以開始評估搬遷，不需要勉強留在原處。",
+  home_suitable_family: "是否適合繼續住，也要看每一位家人的實際適應情況再決定。",
+  home_fortune_positive_gather: "最近家中的旺氣正在慢慢聚集，宅運會比前一段時間穩定。",
+  home_fortune_positive_family: "最近家運有慢慢轉穩的現象，家裡的事情會比較容易安定下來。",
+  home_fortune_positive_noble: "最近有貴人氣入宅，家人遇到事情比較容易得到外來的幫助。",
+  home_fortune_positive_wealth: "最近家中的財氣會慢慢提升，但仍要穩穩累積，不宜過度冒險。",
+  home_fortune_negative_block: "最近宅運有一些受阻，做事情容易反覆或進展比較慢。",
+  home_fortune_negative_leak: "最近家中的財氣比較容易外洩，要留意不必要的支出與物品損壞。",
+  home_fortune_negative_dispute: "最近家中的口舌之氣比較重，家人說話要多留一點餘地。",
+  home_fortune_negative_unsettled: "最近家宅氣場比較不安定，居住者的睡眠與情緒可能容易受到影響。",
+  home_final_steady: "最後建議先把居家氣場穩定下來，不要一次做太多大幅度改動。",
+  home_final_clean: "可以固定清理、除濕與淘汰不用的物品，讓空間維持乾淨清爽。",
+  home_final_sun: "白天可以多拉開窗簾，讓陽光進到屋內，對整體宅氣會有幫助。",
+  home_final_route: "玄關、大門與主要走道要保持通暢，不要讓大型物品擋住動線。",
+  home_final_pray: "若有民俗信仰，可以到信任的宮廟祈福安宅，讓家人心裡更安定。",
+  home_final_observe: "環境調整後先觀察一段時間，再依家人的實際感受決定下一步。",
+};
 const historyMatchesItem = (content: any, itemCode: string) =>
   itemCode === "deceased-relative"
     ? !/【\s*過世寵物\s*】/u.test(clean(content))
@@ -355,6 +426,12 @@ const historyMatchesItem = (content: any, itemCode: string) =>
       : true;
 const previousDeceasedLocation = (value: any) => {
   const text = clean(value).replace(/\s+/g, "");
+  const detailedReborn = text.match(/(?:已經|已)?投胎[^。！？\n]{0,20}?現在是(一個|一隻)([^，。！？\n]{1,16})/);
+  if (detailedReborn)
+    return {
+      text: `已投胎成為${detailedReborn[1]}${detailedReborn[2]}`,
+      rank: 5,
+    };
   const reborn = text.match(
     /(?:目前|現在)?(?:已經)?(?:投胎|轉世)(?:成為|成|為)?([^，。！？\n]{1,16})/,
   );
@@ -532,6 +609,8 @@ async function context(bookingNo: string, requestedDocumentId = "") {
         ? loveBuiltInOptions
         : topic.code === "overall"
           ? overallBuiltInOptions
+          : topic.code === "home"
+            ? homeBuiltInOptions
           : [];
     for (const option of builtIns)
       if (!options.some((entry: any) => entry.code === option.code))
@@ -541,6 +620,12 @@ async function context(bookingNo: string, requestedDocumentId = "") {
       options: options.sort((a: any, b: any) => a.sort_order - b.sort_order),
     };
   });
+  const deceasedTopic = normalizedTopics.find((topic: any) => topic.code === "deceased"),
+    infantTopic = normalizedTopics.find((topic: any) => topic.code === "infant_spirit");
+  if (deceasedTopic && infantTopic) {
+    const infantOptions = new Map(infantTopic.options.map((option: any) => [option.code, option]));
+    infantTopic.options = deceasedTopic.options.map((option: any) => infantOptions.get(option.code) || option);
+  }
   const itemTopic: Record<string, string> = {
     "infant-spirit": "infant_spirit",
     "deceased-relative": "deceased",
@@ -628,7 +713,7 @@ async function context(bookingNo: string, requestedDocumentId = "") {
     });
   const historyEligible = sectionMeta.filter(
       (entry: any) =>
-        ["deceased-relative", "deceased-pet"].includes(entry.itemCode) ||
+        ["infant-spirit", "deceased-relative", "deceased-pet"].includes(entry.itemCode) ||
         entry.itemCode.startsWith("past-life-"),
     ),
     historyItemIds = Array.from(
@@ -705,7 +790,7 @@ async function context(bookingNo: string, requestedDocumentId = "") {
   >();
   if (
     booking.customer_id &&
-    historyEligible.some((entry: any) => entry.itemCode === "deceased-relative")
+    historyEligible.some((entry: any) => ["infant-spirit", "deceased-relative", "deceased-pet"].includes(entry.itemCode))
   ) {
     const { data: oldBookings, error: oldBookingsError } = await db
       .from("bookings")
@@ -734,24 +819,25 @@ async function context(bookingNo: string, requestedDocumentId = "") {
           entry,
         ]),
       );
-      for (const meta of historyEligible.filter(
-        (entry: any) => entry.itemCode === "deceased-relative",
+      for (const meta of historyEligible.filter((entry: any) =>
+        ["infant-spirit", "deceased-relative", "deceased-pet"].includes(entry.itemCode),
       )) {
         const currentProfile = meta.profile;
         for (const oldBooking of asArray(oldBookings)) {
           const matchingDetail = asArray(oldBooking.booking_details).find(
             (detail: any) =>
-              one(detail.booking_items)?.code === "deceased-relative" &&
+              one(detail.booking_items)?.code === meta.itemCode &&
               asArray(detail.booking_consultation_answers).some((answer: any) =>
                 samePerson(currentProfile, one(answer.consultation_profiles)),
               ),
           );
           const saved = replyByBooking.get(String(oldBooking.id));
           if (!matchingDetail || !saved?.final_answer) continue;
-          const block =
-            clean(saved.final_answer).match(
-              /【\s*過世親人\s*】([\s\S]*?)(?=\n【|$)/u,
-            )?.[1] || "";
+          const blockTitle = meta.itemCode === "infant-spirit" ? "嬰靈" : meta.itemCode === "deceased-pet" ? "過世寵物" : "過世親人";
+          const escapedTitle = blockTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const block = clean(saved.final_answer).match(
+            new RegExp(`【\\s*${escapedTitle}\\s*】([\\s\\S]*?)(?=\\n【|$)`, "u"),
+          )?.[1] || "";
           const location = previousDeceasedLocation(block);
           if (location) {
             quickReplyLocationByProfile.set(String(meta.profileId), {
@@ -792,14 +878,14 @@ async function context(bookingNo: string, requestedDocumentId = "") {
         const content = clean(row.result_content).replace(/^【[^】]+】\s*/, ""),
           date = formatDate(row.consultation_created_at || row.returned_at);
         let excerpt = "";
-        if (["deceased-relative", "deceased-pet"].includes(entry.itemCode)) {
+        if (["infant-spirit", "deceased-relative", "deceased-pet"].includes(entry.itemCode)) {
           const sentences = content
             .split(/[。！？\n]+/)
             .map((value: string) => value.trim())
             .filter(Boolean);
           excerpt =
             sentences.find((value: string) =>
-              /(現在在|目前已投胎|在地府|在枉死城|奈何橋)/.test(value),
+              /(現在在|目前已(?:經)?投胎|在地府|在枉死城|奈何橋)/.test(value),
             ) || "";
           if (excerpt) excerpt += "。";
         } else {
@@ -861,7 +947,7 @@ async function context(bookingNo: string, requestedDocumentId = "") {
       const meta = sectionMeta[metaIndex],
         itemCode = meta.itemCode || "",
         previousRow =
-          itemCode === "deceased-relative"
+          ["infant-spirit", "deceased-relative", "deceased-pet"].includes(itemCode)
             ? histories.find(
                 (history: any) =>
                   !currentDetailIds.has(String(history.booking_detail_id)) &&
@@ -971,9 +1057,12 @@ async function context(bookingNo: string, requestedDocumentId = "") {
           recommendedBySection[String(slot.slotIndex)]?.[0] || "",
         ),
         originalIds = asArray(existing.optionIds).map(String),
-        optionIds = originalIds.filter(
-          (id: string) => !expected || optionTopicById.get(id) === expected,
-        ),
+        optionIds = originalIds.filter((id: string) => {
+          if (!expected) return true;
+          const actual = optionTopicById.get(id);
+          return actual === expected ||
+            (expected === "infant_spirit" && actual === "deceased");
+        }),
         contaminated = originalIds.length !== optionIds.length;
       return [
         String(slot.slotIndex),
@@ -1193,6 +1282,7 @@ export async function POST(request: NextRequest) {
                   content:
                     loveBuiltInCopy[selection.optionCode] ||
                     overallBuiltInCopy[selection.optionCode] ||
+                    homeBuiltInCopy[selection.optionCode] ||
                     "",
                 }
               : pick(
@@ -1209,10 +1299,15 @@ export async function POST(request: NextRequest) {
         customLocation = clean(body.customLocation),
         locationSubject = clean(body.locationSubject) || "祂",
         reincarnatedAs = clean(body.reincarnatedAs),
+        reincarnatedKind = clean(body.reincarnatedKind),
+        reincarnatedPlace = clean(body.reincarnatedPlace),
+        reincarnatedAge = clean(body.reincarnatedAge),
         locationMode = clean(body.locationMode),
         locationSentence = locationSelected
-          ? locationMode === "reincarnated" && reincarnatedAs
-            ? `目前已投胎成一個${reincarnatedAs}，`
+          ? locationMode === "reincarnated" && reincarnatedKind
+            ? reincarnatedKind === "animal"
+              ? `目前已經投胎，現在是一隻${reincarnatedAs || "動物"}${reincarnatedPlace ? `，已投胎到${reincarnatedPlace}` : ""}。`
+              : `目前已經投胎，現在是一個${reincarnatedAs || "人"}${reincarnatedPlace ? `，已投胎到${reincarnatedPlace}` : ""}${reincarnatedAge ? `，目前約${reincarnatedAge}歲` : ""}。`
             : customLocation
               ? `${locationSubject}現在在${customLocation}。`
               : ""
@@ -1381,7 +1476,7 @@ export async function POST(request: NextRequest) {
           {
             error:
               locationMode === "reincarnated"
-                ? "請填寫現在投胎成什麼"
+                ? "請先選擇投胎為人或動物"
                 : "請先選擇現在的位置",
           },
           { status: 400 },
