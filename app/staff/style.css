@@ -1151,9 +1151,10 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 }
 .quickReplyQuestionGroups > .quickReplyQuestionGroup > div {
   grid-column: 1 / -1;
-  grid-template-columns: 1fr !important;
   width: 100% !important;
 }
+.quickReplyQuestionGroups > .quickReplyQuestionGroup > .quickReplySpecialHeading{display:flex!important;width:100%!important}
+.quickReplyQuestionGroups > .quickReplyQuestionGroup > .quickReplySpecialChoices{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;width:100%!important}
 
 /* 整體運勢固定依 1→6 排序；本命格維持固定展開。 */
 .quickReplyOverallOptions {

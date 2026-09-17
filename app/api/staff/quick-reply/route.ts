@@ -432,6 +432,40 @@ const homeBuiltInCopy: Record<string, string> = {
   home_final_pray: "若有民俗信仰，可以到信任的宮廟祈福安宅，讓家人心裡更安定。",
   home_final_observe: "環境調整後先觀察一段時間，再依家人的實際感受決定下一步。",
 };
+const spiritualBuiltInRows = [
+  ["spiritual_level_none", "沒有外靈干擾", "目前沒有看到外靈干擾，這部分不用太擔心。如果最近有哪裡不舒服，先從睡眠、壓力跟生活作息去調整就好。"],
+  ["spiritual_level_light", "有一點干擾", "目前是有一點干擾，不算很嚴重。這陣子比較容易覺得累，心裡也容易不安，晚上安靜下來的時候，感覺會比較明顯。"],
+  ["spiritual_level_heavy", "干擾比較重", "這邊的干擾比較重，所以最近整個人容易覺得不舒服，精神也比較差，晚上也容易睡不好。這種狀況已經有影響到生活，就不要一直放著。"],
+  ["spiritual_level_recent", "最近才出現", "這個干擾是最近才出現的，跟最近生活上的一些變化有關係。可以想一下，最近是不是有去過什麼比較特殊的地方，或是去了哪裡之後，才開始覺得怪怪的。"],
+  ["spiritual_level_long", "已經一段時間", "這個狀況已經有一段時間了，所以才會一直覺得哪裡不太對。不是這一兩天突然有的，這個就要把前面的事情一起想一想。"],
+  ["spiritual_follow_self", "跟著本人", "這個是跟著本人的，所以不管到哪裡，多少都還是容易有感覺。單純換地方住，不一定就能解決。"],
+  ["spiritual_follow_home", "跟著房子", "這個跟房子的關係比較大，住在這裡的人容易受到影響。如果是搬來這裡之後才開始有狀況，這間房子就要多注意。"],
+  ["spiritual_follow_family", "跟著家人", "這個是跟著家裡其中一個人，不是每個人都會有感覺。所以要看一下，到底是哪一個人最近特別容易不舒服或覺得怪怪的。"],
+  ["spiritual_follow_outside", "從外面帶回來", "這個是從外面帶回來的，跟之前去過的地方或接觸到的人事物有關係。可以回想一下，是不是去哪裡回來之後，狀況才開始出現。"],
+  ["spiritual_follow_karma", "原本就有因緣", "這個因緣本來就存在，不是最近才突然有的，只是最近狀況比較明顯，所以才開始感覺得到。"],
+  ["spiritual_symptom_tired", "容易疲累", "最近身體很容易累，明明也沒有特別做什麼，整個人就是一直提不起精神，休息了也還是覺得累。"],
+  ["spiritual_symptom_sleep", "容易睡不好", "晚上比較容易受到影響，容易睡不著、半夜醒來，或者一直做夢，睡了一覺起來還是覺得很累。"],
+  ["spiritual_symptom_irritable", "容易心煩", "最近心情比較容易受到影響，一點小事情就容易煩，耐性也比較差，常常自己都覺得怎麼最近這麼容易不開心。"],
+  ["spiritual_symptom_uneasy", "容易心裡不安", "最近心裡容易有一種不安的感覺，明明沒有發生什麼事情，就是覺得怪怪的、靜不下來，做事情也比較容易分心。"],
+  ["spiritual_symptom_minor", "影響沒有很大", "雖然這邊有一些干擾，但是目前影響沒有很大，生活還是可以正常過。不要一直盯著這件事情，越想反而越容易讓自己不舒服。"],
+  ["spiritual_entity_kind", "沒有惡意", "這個沒有惡意，不是要來傷害人的，所以不用自己嚇自己。把該處理的事情處理好，慢慢就會穩下來。"],
+  ["spiritual_entity_family", "對家人有牽掛", "這個對家人還有牽掛，所以容易出現在家人的身邊，讓家人有感覺。這種不用一直害怕，好好表達心意就可以。"],
+  ["spiritual_entity_message", "有事情要表達", "這個有事情想讓家人知道，所以才會一直有一些感覺。如果最近一直出現同樣的狀況，就要留意一下。"],
+  ["spiritual_entity_unfinished", "因緣還沒完", "這邊還有一些因緣沒有處理完，所以才會一直有感覺。事情處理清楚之後，狀況才會慢慢淡掉。"],
+  ["spiritual_entity_handle", "需要處理", "這個狀況已經有影響到生活了，就不要一直拖著。該處理的就處理掉，不要放著讓它一直影響。"],
+  ["spiritual_advice_none", "先不用特別處理", "目前不用特別做什麼，先把生活過好就好。睡覺、吃飯、作息正常一點，也不要每天一直去想這件事情。"],
+  ["spiritual_advice_clean", "先整理家裡", "家裡先整理一下，尤其房間不要堆太多東西，該丟的就丟、該清的就清，窗戶有空也打開通通風，整個環境舒服一點，人也會比較穩。"],
+  ["spiritual_advice_temple", "去熟悉的廟走走", "如果心裡一直覺得不安，可以去平常有在拜的廟走走，拜拜、坐一下，讓心先靜下來，不要一直胡思亂想。"],
+  ["spiritual_advice_karma", "把因緣處理好", "既然這個事情已經影響到生活，就把該做的處理好。該表達的心意就表達，不要一直拖著，也不要自己亂試一些方法。"],
+  ["spiritual_advice_careful", "不要亂處理", "這種事情不要看到網路上什麼方法就跟著做，這個很容易越弄越亂。真的有需要，就找懂的人處理，不要自己在那邊一直試。"],
+  ["spiritual_advice_doctor", "身體不舒服先看醫生", "如果本身有身體上的不舒服，還是要先去看醫生。外靈歸外靈，身體的問題還是要處理，不能什麼都算在這上面。"],
+] as const;
+const spiritualBuiltInOptions = spiritualBuiltInRows.map(([code, label], index) => ({
+  id: `virtual-${code.replaceAll("_", "-")}`, code, label, sort_order: 100 + index, is_active: true,
+}));
+const spiritualBuiltInCopy = Object.fromEntries(
+  spiritualBuiltInRows.map(([code, , content]) => [code, content]),
+) as Record<string, string>;
 const historyMatchesItem = (content: any, itemCode: string) =>
   itemCode === "deceased-relative"
     ? !/【\s*過世寵物\s*】/u.test(clean(content))
@@ -615,9 +649,11 @@ async function context(bookingNo: string, requestedDocumentId = "") {
         : topicError.message,
     );
   const normalizedTopics = (topics || []).map((topic: any) => {
-    const options = asArray(topic.quick_reply_options).filter(
-      (option: any) => option.is_active,
-    );
+    const options: any[] = topic.code === "spiritual"
+      ? []
+      : asArray(topic.quick_reply_options).filter(
+          (option: any) => option.is_active,
+        );
     const builtIns =
       topic.code === "love"
         ? loveBuiltInOptions
@@ -625,6 +661,8 @@ async function context(bookingNo: string, requestedDocumentId = "") {
           ? overallBuiltInOptions
           : topic.code === "home"
             ? homeBuiltInOptions
+            : topic.code === "spiritual"
+              ? spiritualBuiltInOptions
           : [];
     for (const option of builtIns)
       if (!options.some((entry: any) => entry.code === option.code))
@@ -1297,6 +1335,7 @@ export async function POST(request: NextRequest) {
                     loveBuiltInCopy[selection.optionCode] ||
                     overallBuiltInCopy[selection.optionCode] ||
                     homeBuiltInCopy[selection.optionCode] ||
+                    spiritualBuiltInCopy[selection.optionCode] ||
                     "",
                 }
               : pick(

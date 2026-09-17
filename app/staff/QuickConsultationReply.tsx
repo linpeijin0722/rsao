@@ -277,7 +277,7 @@ export default function QuickConsultationReply({
       sectionTopic?.options
         .filter(
           (o) =>
-            (sectionTopic?.code === "home"
+            (["home", "spiritual"].includes(sectionTopic?.code || "")
               ? false
               : sectionTopic?.code === "overall"
               ? o.code.startsWith("status_overall_")
@@ -287,7 +287,7 @@ export default function QuickConsultationReply({
         ?.concat(spiritPlainOptions) || [],
     adviceOptions =
       sectionTopic?.options.filter((o) =>
-        sectionTopic?.code === "home"
+        ["home", "spiritual"].includes(sectionTopic?.code || "")
           ? false
           : sectionTopic?.code === "overall"
           ? o.code.startsWith("advice_overall_")
@@ -325,6 +325,11 @@ export default function QuickConsultationReply({
     homeSuitableOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_suitable_")) || [],
     homeFortuneOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_fortune_")) || [],
     homeFinalOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_final_")) || [],
+    spiritualLevelOptions = sectionTopic?.options.filter((o) => o.code.startsWith("spiritual_level_")) || [],
+    spiritualFollowOptions = sectionTopic?.options.filter((o) => o.code.startsWith("spiritual_follow_")) || [],
+    spiritualSymptomOptions = sectionTopic?.options.filter((o) => o.code.startsWith("spiritual_symptom_")) || [],
+    spiritualEntityOptions = sectionTopic?.options.filter((o) => o.code.startsWith("spiritual_entity_")) || [],
+    spiritualAdviceOptions = sectionTopic?.options.filter((o) => o.code.startsWith("spiritual_advice_")) || [],
     elementOptions =
       sectionTopic?.options.filter((o) => o.code.startsWith("element_")) || [],
     deityOptions =
@@ -355,6 +360,7 @@ export default function QuickConsultationReply({
     standardOptions =
       sectionTopic?.options.filter(
         (o) =>
+          !["home", "spiritual"].includes(sectionTopic?.code || "") &&
           o.code !== "location" &&
           !o.code.startsWith("assistance_") &&
           !o.code.startsWith("love_trend_") &&
@@ -368,6 +374,7 @@ export default function QuickConsultationReply({
           !o.code.startsWith("recent_") &&
           !o.code.startsWith("body_") &&
           !o.code.startsWith("home_") &&
+          !o.code.startsWith("spiritual_") &&
           !o.code.startsWith("element_") &&
           !o.code.startsWith("deity_") &&
           !o.code.startsWith("buddhist_") &&
@@ -389,7 +396,6 @@ export default function QuickConsultationReply({
     },
     categoryCode = activeCategory[questionKey] || "",
     category = topicMap.get(categoryCode),
-    recommended = new Set(data?.recommendedByQuestion?.[questionKey] || []),
     questionOptionGroups = useMemo(() => {
       const groups = new Map<string, Option[]>();
       for (const option of category?.options || []) {
@@ -411,6 +417,16 @@ export default function QuickConsultationReply({
                   ? "對方或容易遇到的對象個性"
                   : code.startsWith("status_overall_")
                     ? "整體運勢走向"
+                  : code.startsWith("spiritual_level_")
+                    ? "目前干擾程度"
+                  : code.startsWith("spiritual_follow_")
+                    ? "外靈跟著哪裡"
+                  : code.startsWith("spiritual_symptom_")
+                    ? "容易出現什麼狀況"
+                  : code.startsWith("spiritual_entity_")
+                    ? "外靈的情況"
+                  : code.startsWith("spiritual_advice_")
+                    ? "阿嫂建議"
                   : code.startsWith("recent_positive_")
                     ? "近期正面狀況"
                   : code.startsWith("recent_negative_")
@@ -1859,6 +1875,27 @@ export default function QuickConsultationReply({
                                 </div>
                               </div>
                             ))}
+                            {sectionTopic?.code === "spiritual" && [
+                              ["①", "目前干擾程度", spiritualLevelOptions],
+                              ["②", "外靈跟著哪裡", spiritualFollowOptions],
+                              ["③", "容易出現什麼狀況", spiritualSymptomOptions],
+                              ["④", "外靈的情況", spiritualEntityOptions],
+                              ["⑤", "阿嫂建議", spiritualAdviceOptions],
+                            ].map(([number, title, options]) => (
+                              <div className="quickReplySpecialField" key={String(title)}>
+                                <div className="quickReplySpecialHeading">
+                                  <span>{String(number)}</span>
+                                  <div><h4>{String(title)}</h4></div>
+                                </div>
+                                <div className="quickReplySpecialChoices">
+                                  {(options as Option[]).map((o) => (
+                                    <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
+                                      {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
                             {statusOptions.length > 0 && (
                               <div className={`quickReplySpecialField${sectionTopic?.code === "overall" ? " quickReplyOverallStatus" : ""}`}>
                                 <div className="quickReplySpecialHeading">
@@ -2392,33 +2429,6 @@ export default function QuickConsultationReply({
                   </section>
                   {question && (
                     <>
-                      {!question.manualOnly && (
-                        <section className="quickReplyCategoryPicker quickReplyQuestionCategoryPicker">
-                          <h3>Q{question.questionNumber} 要判斷哪一類？</h3>
-                          <p>
-                            <b>{question.itemTitle}</b>
-                            {question.question}
-                          </p>
-                          <div>
-                            {data.topics.map((t) => (
-                              <button
-                                key={t.code}
-                                className={`${categoryCode === t.code ? "active" : ""} ${asCodes(draft.selections[t.code]).length ? "answered" : ""}`}
-                                onClick={() =>
-                                  setActiveCategory((c) => ({
-                                    ...c,
-                                    [questionKey]: t.code,
-                                  }))
-                                }
-                              >
-                                <span>{t.icon}</span>
-                                {t.title}
-                                {recommended.has(t.code) && <small>預設</small>}
-                              </button>
-                            ))}
-                          </div>
-                        </section>
-                      )}
                       {question.profileLines?.length > 0 && (
                         <section className="quickReplyProfileCard">
                           <h3>本項目諮詢者資料</h3>
@@ -2433,15 +2443,15 @@ export default function QuickConsultationReply({
                             {category.icon} {category.title}
                           </h3>
                           <p>每一個分類最多可複選 3 個選項。</p>
-                          {questionOptionGroups.map(([groupLabel, options]) => {
+                          {questionOptionGroups.map(([groupLabel, options], groupIndex) => {
                             const panelKey = `question-${questionKey}-${category.code}-${groupLabel}`;
                             const selectedCodes = asCodes(
                               draft.selections[category.code],
                             );
                             return (
-                              <div className="quickReplyQuestionGroup" key={groupLabel}>
-                                <button
-                                  className={openPanels[panelKey] ? "active" : ""}
+                              <div className={`quickReplySpecialField quickReplyQuestionGroup${openPanels[panelKey] ? " expanded" : ""}`} key={groupLabel}>
+                                <div
+                                  className="quickReplySpecialHeading"
                                   onClick={() =>
                                     setOpenPanels((current) => ({
                                       ...current,
@@ -2449,17 +2459,11 @@ export default function QuickConsultationReply({
                                     }))
                                   }
                                 >
-                                  <b>{groupLabel}</b>
-                                  <span>
-                                    {options.filter((option) =>
-                                      selectedCodes.includes(option.code),
-                                    ).length
-                                      ? `已選 ${options.filter((option) => selectedCodes.includes(option.code)).length}`
-                                      : "點擊展開"}
-                                  </span>
-                                </button>
+                                  <span>{["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧"][groupIndex] || groupIndex + 1}</span>
+                                  <div><h4>{groupLabel}</h4></div>
+                                </div>
                                 {openPanels[panelKey] && (
-                                  <div>
+                                  <div className="quickReplySpecialChoices">
                                     {options.map((o) => (
                                       <button
                                         key={o.code}
