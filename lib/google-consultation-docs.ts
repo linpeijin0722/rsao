@@ -10,7 +10,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-09-17-v20";
+const requiredAppsScriptVersion = "2026-09-17-v21";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -349,6 +349,29 @@ async function insertQuickReplyLink(documentId: string, bookingNo: string, reque
       }, fields: "alignment,spaceAbove,spaceBelow" } },
     ] }),
   });
+}
+
+async function insertQuickReplyLinkViaAppsScript(documentId: string, bookingNo: string, requestOrigin: string) {
+  const origin = requestOrigin.replace(/\/$/, "");
+  if (!/^https:\/\//i.test(origin)) throw new Error("建立諮詢回覆連結需要 HTTPS 網址");
+  const replyToken = makeQuickReplyToken(bookingNo, documentId);
+  const linkUrl = `${origin}/staff/quick-reply?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}&token=${encodeURIComponent(replyToken)}`;
+  const response = await fetch(appsScriptUrl, {
+    method: "POST",
+    headers: { "content-type": "text/plain;charset=utf-8" },
+    redirect: "follow",
+    body: JSON.stringify({
+      secret: appsScriptSecret,
+      expectedVersion: requiredAppsScriptVersion,
+      action: "upsertQuickReplyLink",
+      documentId,
+      label: "✦ 點這裡建立諮詢回覆",
+      linkUrl,
+    }),
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.error || "快速建立回覆連結補寫失敗");
+  if (result.version !== requiredAppsScriptVersion) throw new Error(`Google Apps Script 版本不一致（目前：${result.version || "未知"}；需要：${requiredAppsScriptVersion}）`);
 }
 
 async function insertConsultationReturnButton(documentId: string, bookingNo: string, requestOrigin: string, token: string) {
@@ -1159,6 +1182,22 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
       console.error("[consultation-doc] Google 文件最終整理失敗", { documentId: result.documentId, bookingNo, attempt: attempt + 1, error });
       if (!canRetry) break;
       await new Promise((resolve) => setTimeout(resolve, [800, 1600, 2600][attempt]));
+    }
+  }
+  // 若服務帳號的 Docs API 仍無法讀取，改由文件擁有者身分執行的 Apps Script
+  // 直接補上兩個操作入口，避免文件已建立卻沒有快速回覆與回傳 LINE。
+  if (normalizationError && requestOrigin) {
+    try {
+      await insertQuickReplyLinkViaAppsScript(result.documentId, bookingNo, requestOrigin);
+      await updatePositionedReturnButton({
+        documentId: result.documentId,
+        imageUrl: `${requestOrigin.replace(/\/$/, "")}/consultation-return-button.png`,
+        returnUrl: `${requestOrigin.replace(/\/$/, "")}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(result.documentId)}`,
+      });
+      console.warn("[consultation-doc] Docs API 無法讀取，已由 Apps Script 補上操作入口", { documentId: result.documentId, bookingNo });
+      normalizationError = null;
+    } catch (fallbackError) {
+      console.error("[consultation-doc] Apps Script 備援補寫失敗", { documentId: result.documentId, bookingNo, fallbackError });
     }
   }
   const createdAt = existingDetails.map((detail: any) => detail.google_document_created_at).filter(Boolean).sort()[0] || new Date().toISOString();
