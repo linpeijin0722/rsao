@@ -54,7 +54,9 @@ type Section = {
   profileLines: string[];
   requestLines: string[];
   targetDisplay?: string;
+  targetName?: string;
   infantMultiple?: boolean;
+  infantRecords?: { title: string; lines: string[] }[];
   locationSubject: string;
   genderPronoun: string;
   isPet: boolean;
@@ -105,7 +107,7 @@ export default function QuickConsultationReply({
   initialAccessToken?: string;
 }) {
   const emptyNames = () =>
-    Array.from({ length: 6 }, () => ({ name: "", aid: "貴人運", custom: "" }));
+    Array.from({ length: 6 }, () => ({ name: "", aid: "未選擇", custom: "未選擇" }));
   const [data, setData] = useState<ReplyData | null>(null),
     [accessToken, setAccessToken] = useState(initialAccessToken),
     [error, setError] = useState(""),
@@ -147,7 +149,7 @@ export default function QuickConsultationReply({
       {},
     ),
     [manualSectionReplies, setManualSectionReplies] = useState<Record<string, string>>({}),
-    [infantSavedAnswers, setInfantSavedAnswers] = useState<Record<string, string[]>>({}),
+    [activeInfantBySection, setActiveInfantBySection] = useState<Record<string, number>>({}),
     [sectionPending, setSectionPending] = useState<Record<string, boolean>>({}),
     [busy, setBusy] = useState(false),
     [written, setWritten] = useState(false),
@@ -218,15 +220,21 @@ export default function QuickConsultationReply({
     ),
     sections = (data?.sections || []).filter((s) => !s.manualOnly),
     section = sections[activeSection],
-    sectionKey = String(section?.slotIndex ?? 0),
+    baseSectionKey = String(section?.slotIndex ?? 0),
+    infantRecordCount = section?.itemCode === "infant-spirit" ? Math.max(section.infantRecords?.length || 0, section.infantMultiple ? 2 : 1) : 1,
+    activeInfantIndex = Object.prototype.hasOwnProperty.call(activeInfantBySection, baseSectionKey)
+      ? Math.min(activeInfantBySection[baseSectionKey], infantRecordCount - 1)
+      : 0,
+    effectiveInfantIndex = Math.max(0, activeInfantIndex),
+    sectionKey = section?.itemCode === "infant-spirit" && effectiveInfantIndex > 0 ? `${baseSectionKey}:infant:${effectiveInfantIndex}` : baseSectionKey,
     sectionDraft = sectionDrafts[sectionKey] || {
       optionIds: [],
       phraseIds: [],
       answer: "",
       completed: false,
     },
-    sectionTopic = topicMap.get(sectionCategory[sectionKey] || ""),
-    sectionTopicCodes = data?.recommendedBySection?.[sectionKey] || [],
+    sectionTopic = topicMap.get(sectionCategory[sectionKey] || sectionCategory[baseSectionKey] || ""),
+    sectionTopicCodes = data?.recommendedBySection?.[baseSectionKey] || [],
     spiritTopicCodes = ["infant_spirit", "deceased", "deceased_pet"],
     visibleSectionTopics = (data?.topics || []).filter(
       (topic) =>
@@ -449,6 +457,10 @@ export default function QuickConsultationReply({
     isPersonalLove =
       section?.itemCode === "personal-romance" ||
       /個人感情運|僅看自己/.test(section?.label || ""),
+    isFirstRelationshipSection = section?.itemCode !== "marriage-bazi" ||
+      sections.findIndex((entry) => entry.itemCode === "marriage-bazi") === activeSection,
+    namingSurname = section?.requestLines.find((line) => line.startsWith("希望姓氏："))?.split("：").slice(1).join("：").trim() || "",
+    defaultNamingRows = () => emptyNames().map((row) => ({ ...row, name: namingSurname })),
     showPartnerPersonality = sectionTopic?.code === "love";
   const selfPersonalityGroups = Object.entries(
     selfPersonalityOptions.reduce<Record<string, Option[]>>((groups, option) => {
@@ -635,7 +647,7 @@ export default function QuickConsultationReply({
       const partner2Ids = partner2Override || partner2Selections[targetKey] || [];
       const x = await post({
         mode: "compose_section",
-        sectionSlotIndex: Number(targetKey),
+        sectionSlotIndex: Number(targetSection.slotIndex),
         optionIds: Array.from(new Set([...optionIds, ...partner2Ids])),
         partner2OptionIds: partner2Ids,
         locationMode: mode,
@@ -671,8 +683,9 @@ export default function QuickConsultationReply({
         locationSubject: targetSection.locationSubject,
         genderPronoun: targetSection.genderPronoun,
         selfName: targetSection.profileName || data?.customerName || "",
-        partnerName: targetSection.profileName || "",
+        partnerName: targetSection.targetName || targetSection.profileName || "",
         personalLove: targetIsPersonalLove,
+        loveFormat: targetSection.itemCode === "personal-romance" || targetSection.itemCode === "marriage-bazi",
         previousPhraseIds: reroll
           ? sectionDrafts[targetKey]?.phraseIds || []
           : [],
@@ -869,24 +882,31 @@ export default function QuickConsultationReply({
     value: string,
   ) {
     setNamingRows((current) => {
-      const rows = [...(current[sectionKey] || emptyNames())];
+      const rows = [...(current[sectionKey] || defaultNamingRows())];
       rows[index] = { ...rows[index], [field]: value };
       return { ...current, [sectionKey]: rows };
     });
   }
   function generateNamingAnswer() {
-    const rows = (namingRows[sectionKey] || emptyNames()).filter((row) =>
-      row.name.trim(),
-    );
+    const rows = (namingRows[sectionKey] || defaultNamingRows()).filter((row) => row.name.trim() && row.name.trim() !== namingSurname);
     if (!rows.length) {
       window.alert("請至少填寫一個名字");
       return;
     }
+    const templates = [
+      (name: string, benefits: string) => `${name}：${benefits}會直接帶起來，做事有人推、重要關卡也比較容易過。`,
+      (name: string, benefits: string) => `${name}：主旺${benefits}，往後的人際與發展會走得順，遇事也比較有人接應。`,
+      (name: string, benefits: string) => `${name}：格局落在${benefits}，反應快、機會抓得住，長大後做事不會拖泥帶水。`,
+      (name: string, benefits: string) => `${name}：${benefits}最突出，能把原本欠缺的助力補上，發展會比同齡更穩。`,
+      (name: string, benefits: string) => `${name}：走的是${benefits}，關鍵時刻有人幫，自己也有能力把機會接住。`,
+      (name: string, benefits: string) => `${name}：整體名字有力，${benefits}會旺，讀書、工作到成家都走得比較順。`,
+    ];
     const answer = rows
-      .map(
-        (row) =>
-          `${row.name.trim()}：這個名字可以增加${(row.custom || row.aid).trim()}，對之後的發展有正面的助力。`,
-      )
+      .map((row, index) => {
+        const selected = [row.aid, row.custom].filter((value) => value && value !== "未選擇");
+        const benefits = selected.length ? selected.join("、") : "整體運勢與行動力";
+        return templates[index % templates.length](row.name.trim(), benefits);
+      })
       .join("\n");
     setSectionDrafts((current) => ({
       ...current,
@@ -1026,27 +1046,37 @@ export default function QuickConsultationReply({
     }
     if (!hasAnswer) return;
     const incompleteInfant = sections.find((entry) => {
-      if (!entry.infantMultiple) return false;
-      const key = String(entry.slotIndex);
-      const count = (infantSavedAnswers[key]?.length || 0) + (sectionDrafts[key]?.answer?.trim() ? 1 : 0);
-      return count < 2;
+      if (entry.itemCode !== "infant-spirit") return false;
+      const count = Math.max(entry.infantRecords?.length || 0, entry.infantMultiple ? 2 : 1);
+      if (count < 2) return false;
+      const baseKey = String(entry.slotIndex);
+      const completed = Array.from({ length: count }, (_, index) => sectionDrafts[index ? `${baseKey}:infant:${index}` : baseKey]?.answer?.trim()).filter(Boolean).length;
+      return completed < count;
     });
-    if (incompleteInfant && !window.confirm("這筆預約是一位以上的嬰靈，目前只填寫一位嬰靈資料，請確認是否仍要送出？")) return;
+    if (incompleteInfant && !window.confirm("這筆預約有多筆流產資料，目前仍有寶寶資料尚未填寫，請確認是否仍要送出？")) return;
     setBusy(true);
     setError("");
     try {
       await post({
         mode: "write",
         questionReplies: drafts,
-        sectionReplies: Object.fromEntries(Object.entries(sectionDrafts).map(([key, row]) => {
-          const infantAnswers = [...(infantSavedAnswers[key] || []), row.answer].map((value) => value?.trim()).filter(Boolean);
-          const generatedAnswer = infantAnswers.length > 1
-            ? infantAnswers.map((value, index) => `【嬰靈${index + 1}】\n${value}`).join("\n\n")
-            : infantAnswers[0] || "";
-          return [key, {
-            ...row,
-            answer: [generatedAnswer, manualSectionReplies[key]].map((value) => value?.trim()).filter(Boolean).join("\n\n"),
-          }];
+        sectionReplies: Object.fromEntries(sections.map((entry) => {
+          const baseKey = String(entry.slotIndex);
+          if (entry.itemCode === "infant-spirit") {
+            const count = Math.max(entry.infantRecords?.length || 0, entry.infantMultiple ? 2 : 1);
+            const rows = Array.from({ length: count }, (_, index) => sectionDrafts[index ? `${baseKey}:infant:${index}` : baseKey]).filter(Boolean);
+            const answers = rows.map((row) => row.answer?.trim()).filter(Boolean);
+            const baseRow = sectionDrafts[baseKey] || { optionIds: [], phraseIds: [], answer: "", completed: false };
+            return [baseKey, {
+              ...baseRow,
+              optionIds: rows.flatMap((row) => row.optionIds || []),
+              phraseIds: rows.flatMap((row) => row.phraseIds || []),
+              answer: [answers.map((value, index) => `【嬰靈${index + 1}】\n${value}`).join("\n\n"), manualSectionReplies[baseKey]].map((value) => value?.trim()).filter(Boolean).join("\n\n"),
+              completed: answers.length > 0,
+            }];
+          }
+          const row = sectionDrafts[baseKey] || { optionIds: [], phraseIds: [], answer: "", completed: false };
+          return [baseKey, { ...row, answer: [row.answer, manualSectionReplies[baseKey]].map((value) => value?.trim()).filter(Boolean).join("\n\n") }];
         })),
       });
       setWritten(true);
@@ -1063,8 +1093,7 @@ export default function QuickConsultationReply({
   const hasAnswer =
       Object.values(drafts).some((r) => r.answer?.trim()) ||
       Object.values(sectionDrafts).some((r) => r.answer?.trim()) ||
-      Object.values(manualSectionReplies).some((value) => value.trim()) ||
-      Object.values(infantSavedAnswers).some((values) => values.some((value) => value.trim())),
+      Object.values(manualSectionReplies).some((value) => value.trim()),
     hasPending = Object.values(sectionDrafts).some(
       (r) => r.optionIds?.length && !r.answer?.trim(),
     ),
@@ -1122,19 +1151,6 @@ export default function QuickConsultationReply({
     setError("");
     setWritten(false);
   };
-  const addInfantEntry = () => {
-    if (!section?.infantMultiple) return;
-    if (sectionIsPending) return window.alert("目前內容仍在產生，請稍後再新增嬰靈資料");
-    const answer = sectionDraft.answer?.trim();
-    if (!answer) return window.alert("請先完成目前這一位嬰靈的選項，再新增下一位");
-    setInfantSavedAnswers((current) => ({ ...current, [sectionKey]: [...(current[sectionKey] || []), answer] }));
-    sectionSelections.current[sectionKey] = [];
-    setSectionDrafts((current) => ({ ...current, [sectionKey]: { optionIds: [], phraseIds: [], answer: "", completed: false } }));
-    setLocationMode((current) => ({ ...current, [sectionKey]: "" }));
-    setLocationHall((current) => ({ ...current, [sectionKey]: "" }));
-    setInfantYears((current) => ({ ...current, [sectionKey]: "" }));
-    setWritten(false);
-  };
   const togglePanel = (event: any) => {
     const target = event.target as HTMLElement,
       heading = target.closest(
@@ -1190,9 +1206,11 @@ export default function QuickConsultationReply({
                       <h3>先點選要填寫的項目標籤</h3>
                       <div>
                         {sections.map((s, i) => {
-                          const done =
-                            sectionDrafts[String(s.slotIndex)]?.completed ===
-                            true;
+                          const baseKey = String(s.slotIndex);
+                          const babyCount = s.itemCode === "infant-spirit" ? Math.max(s.infantRecords?.length || 0, s.infantMultiple ? 2 : 1) : 1;
+                          const done = s.itemCode === "infant-spirit"
+                            ? Array.from({ length: babyCount }, (_, babyIndex) => sectionDrafts[babyIndex ? `${baseKey}:infant:${babyIndex}` : baseKey]?.completed === true).every(Boolean)
+                            : sectionDrafts[baseKey]?.completed === true;
                           return (
                             <button
                               key={s.slotIndex}
@@ -1306,6 +1324,33 @@ export default function QuickConsultationReply({
                             </>}
                           </section>
                         )}
+                      {section.itemCode === "infant-spirit" && (
+                        <section className="quickReplyInfantAccordions">
+                          <h3>嬰靈資料</h3>
+                          {Array.from({ length: infantRecordCount }, (_, index) => {
+                            const record = section.infantRecords?.[index];
+                            const key = index ? `${baseSectionKey}:infant:${index}` : baseSectionKey;
+                            const expanded = activeInfantIndex === index;
+                            const completed = Boolean(sectionDrafts[key]?.answer?.trim());
+                            return (
+                              <article className={expanded ? "expanded" : ""} key={key}>
+                                <button type="button" onClick={() => setActiveInfantBySection((current) => ({ ...current, [baseSectionKey]: expanded ? -1 : index }))}>
+                                  <b>寶寶資料 {index + 1}</b>
+                                  <span>{completed ? "✓ 已完成" : expanded ? "收合－" : "展開＋"}</span>
+                                </button>
+                                {expanded && (
+                                  <div>
+                                    <strong>媽媽填寫的流產資料</strong>
+                                    {(record?.lines?.length ? record.lines : ["這一筆沒有另外填寫日期、時辰或備註。"])
+                                      .map((line, lineIndex) => <p key={lineIndex}>{line}</p>)}
+                                    <small>請在下方替寶寶 {index + 1} 選擇完整的嬰靈資料。</small>
+                                  </div>
+                                )}
+                              </article>
+                            );
+                          })}
+                        </section>
+                      )}
                       <section className="quickReplyCategoryPicker quickReplySectionCategoryPicker">
                         <h3>【{section.label}】常用命理回覆</h3>
                         <p>先選分類，再複選多個答案。</p>
@@ -1331,13 +1376,6 @@ export default function QuickConsultationReply({
                           ))}
                         </div>
                       </section>
-                      {section.infantMultiple && (
-                        <section className="quickReplyInfantEntries">
-                          {(infantSavedAnswers[sectionKey] || []).map((_, index) => <span key={index}>✓ 嬰靈{index + 1}資料已完成</span>)}
-                          <button type="button" onClick={addInfantEntry}>＋新增嬰靈資料</button>
-                          <small>完成目前這一位的選項後再新增，下面會清空並帶出同一套選項供下一位填寫。</small>
-                        </section>
-                      )}
                       {sectionTopic?.code === "naming_result" && (
                         <section className="quickReplyNamingPanel">
                           <div className="quickReplyNamingNeeds">
@@ -1351,7 +1389,7 @@ export default function QuickConsultationReply({
                             )}
                           </div>
                           <h3>請填寫六組名字與名字助力</h3>
-                          {(namingRows[sectionKey] || emptyNames()).map(
+                          {(namingRows[sectionKey] || defaultNamingRows()).map(
                             (row, index) => (
                               <div className="quickReplyNamingRow" key={index}>
                                 <b>{index + 1}</b>
@@ -1368,14 +1406,12 @@ export default function QuickConsultationReply({
                                 />
                                 <select
                                   value={row.aid}
-                                  onChange={(e) =>
-                                    updateNamingRow(
-                                      index,
-                                      "aid",
-                                      e.target.value,
-                                    )
-                                  }
+                                  onChange={(e) => {
+                                    if (e.target.value !== "未選擇" && e.target.value === row.custom) return window.alert("兩格請選擇不同的名字優點");
+                                    updateNamingRow(index, "aid", e.target.value);
+                                  }}
                                 >
+                                  <option>未選擇</option>
                                   <option>貴人運</option>
                                   <option>財運</option>
                                   <option>事業運</option>
@@ -1389,17 +1425,27 @@ export default function QuickConsultationReply({
                                   <option>行動力</option>
                                   <option>家庭和諧</option>
                                 </select>
-                                <input
+                                <select
                                   value={row.custom}
-                                  onChange={(e) =>
-                                    updateNamingRow(
-                                      index,
-                                      "custom",
-                                      e.target.value,
-                                    )
-                                  }
-                                  placeholder="或自行填寫助力"
-                                />
+                                  onChange={(e) => {
+                                    if (e.target.value !== "未選擇" && e.target.value === row.aid) return window.alert("兩格請選擇不同的名字優點");
+                                    updateNamingRow(index, "custom", e.target.value);
+                                  }}
+                                >
+                                  <option>未選擇</option>
+                                  <option>貴人運</option>
+                                  <option>財運</option>
+                                  <option>事業運</option>
+                                  <option>工作運</option>
+                                  <option>人緣</option>
+                                  <option>感情運</option>
+                                  <option>婚姻運</option>
+                                  <option>健康運</option>
+                                  <option>學業運</option>
+                                  <option>智慧與判斷力</option>
+                                  <option>行動力</option>
+                                  <option>家庭和諧</option>
+                                </select>
                               </div>
                             ),
                           )}
@@ -1412,7 +1458,8 @@ export default function QuickConsultationReply({
                         </section>
                       )}
                       {sectionTopic &&
-                        sectionTopic.code !== "naming_result" && (
+                        sectionTopic.code !== "naming_result" &&
+                        (section.itemCode !== "infant-spirit" || activeInfantIndex >= 0) && (
                           <section
                             className={`quickReplyOptions quickReplyMultiOptions${sectionTopic.code === "overall" ? " quickReplyOverallOptions" : ""}`}
                             onClick={togglePanel}
@@ -2069,7 +2116,7 @@ export default function QuickConsultationReply({
                                 </div>
                               </div>
                             )}
-                            {selfPersonalityOptions.length > 0 && (
+                            {selfPersonalityOptions.length > 0 && (isPersonalLove || isFirstRelationshipSection) && (
                               <div className="quickReplySpecialField">
                                 <div className="quickReplySpecialHeading">
                                   <span>③</span>

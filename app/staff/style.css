@@ -379,7 +379,7 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 .quickReplyNamingNeeds{padding:15px 17px;border:2px solid #d9c7bc;border-radius:12px;background:#faf5f1}
 .quickReplyNamingNeeds h3{margin:0 0 8px;color:#7f2d46;font-size:19px}
 .quickReplyNamingNeeds p{margin:5px 0;color:#493e38;font-size:16px;line-height:1.6}
-.quickReplyNamingRow{display:grid;grid-template-columns:36px minmax(140px,1fr) minmax(150px,.8fr) minmax(170px,1fr);gap:9px;align-items:center;padding:10px;border:1px solid #dfd0c7;border-radius:11px;background:#fffaf7}
+.quickReplyNamingRow{display:grid;grid-template-columns:36px minmax(105px,.58fr) minmax(150px,1fr) minmax(150px,1fr);gap:9px;align-items:center;padding:10px;border:1px solid #dfd0c7;border-radius:11px;background:#fffaf7}
 .quickReplyNamingRow>b{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#8a3045;color:#fff;font-size:16px}
 .quickReplyNamingRow input,.quickReplyNamingRow select{min-height:46px;padding:0 11px;border:1px solid #cdbeb5;border-radius:8px;background:#fff;font-size:16px}
 .quickReplyGenerateNames{min-height:52px;border:0;border-radius:10px;background:#96314d;color:#fff;font-size:18px;font-weight:900}
@@ -925,10 +925,13 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 .quickReplyScripturePanel .quickReplyNestedChoices {
   display: grid !important;
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  justify-content: stretch !important;
+  align-items: stretch !important;
   width: 100%;
 }
 
 .quickReplyScripturePanel .quickReplyNestedChoices button {
+  min-width: 0 !important;
   width: 100%;
 }
 
@@ -1301,6 +1304,7 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 .quickReplyLawsuitGroup{width:100%}
 .quickReplyTargetDisplay{color:#244f46;font-size:17px;font-style:normal;font-weight:800}
 .quickReplyInfantEntries{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;padding:14px;border:1px solid #dfd0c5;border-radius:12px;background:#fffaf7}.quickReplyInfantEntries>span{display:flex;align-items:center;padding:9px 11px;border-radius:8px;background:#edf8f2;color:#176b45;font-weight:800}.quickReplyInfantEntries>button{grid-column:1/-1;min-height:48px;border:1px dashed #8a3045;border-radius:10px;background:#fff;color:#8a3045;font-size:17px;font-weight:900}.quickReplyInfantEntries>small{grid-column:1/-1;color:#746861;font-size:13px;text-align:left}
+.quickReplyInfantAccordions{display:grid;gap:9px;padding:15px;border:1px solid #dfd0c5;border-radius:13px;background:#fff}.quickReplyInfantAccordions>h3{margin-bottom:3px}.quickReplyInfantAccordions article{overflow:hidden;border:1px solid #dbcfc6;border-radius:10px;background:#fffaf7}.quickReplyInfantAccordions article.expanded{border-color:#8a3045;box-shadow:0 0 0 2px rgba(138,48,69,.07)}.quickReplyInfantAccordions article>button{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;min-height:52px;padding:11px 14px;border:0;background:#f8f3ef;color:#3e332e;font-size:16px;text-align:left}.quickReplyInfantAccordions article.expanded>button{background:#8a3045;color:#fff}.quickReplyInfantAccordions article>button span{font-size:14px;font-weight:800}.quickReplyInfantAccordions article>div{padding:12px 14px;text-align:left}.quickReplyInfantAccordions article>div strong{display:block;margin-bottom:7px;color:#7b3048}.quickReplyInfantAccordions article>div p{margin:3px 0;color:#332d29;line-height:1.45}.quickReplyInfantAccordions article>div small{display:block;margin-top:9px;color:#16815a;font-weight:800}
 @media(max-width:640px){.quickReplyOverallInputFields{grid-template-columns:1fr}.quickReplyOverallInputFields>div:nth-child(odd),.quickReplyOverallInputFields>div:nth-child(even){padding-left:0;padding-right:0}}
 @media(max-width:640px){.quickReplyOverallAdviceInput{grid-template-columns:auto auto minmax(0,1fr) auto}.quickReplyOverallAdviceInput>b{grid-column:1 / -1}.quickReplyOverallAdviceInput>textarea{min-height:72px}}
 @media(max-width:700px){.quickReplyBody{padding-bottom:110px!important}.quickReplyBody>footer.quickReplyWriteBar{grid-template-columns:1fr!important;margin-top:90px!important}.quickReplyFooterProfile{grid-template-columns:1fr!important}.quickReplyWriteBar>.quickReplyWrite{min-height:50px!important}}

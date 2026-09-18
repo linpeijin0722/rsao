@@ -1027,10 +1027,18 @@ async function context(bookingNo: string, requestedDocumentId = "") {
           ].filter(Boolean);
           return values.length ? [`【流產資料${asArray(extra.pregnancy_losses).length > 1 ? index + 1 : ""}】`, ...values] : [];
         }),
+        infantRecords = asArray(extra.pregnancy_losses).map((loss: any, index: number) => ({
+          title: `嬰靈${index + 1}`,
+          lines: [
+            renderInputValue(loss?.lunar_date) ? `農曆日期：${renderInputValue(loss.lunar_date)}` : "",
+            renderInputValue(loss?.shichen) ? `時辰：${renderInputValue(loss.shichen)}` : "",
+            renderInputValue(loss?.notes) ? `備註：${renderInputValue(loss.notes)}` : "",
+          ].filter(Boolean),
+        })),
         directQuestions = asArray(answer?.questions).map(clean).filter(Boolean),
         targetQuestions = Object.values(extra.target_questions || {}).flatMap((values) => asArray(values).map(clean).filter(Boolean)),
         questionLines = Array.from(new Set(relationshipLines.length ? directQuestions : [...directQuestions, ...targetQuestions])).map((value, index) => `問題${index + 1}：${value}`),
-        requestLines = [...focusLines, ...relationshipLines, ...pregnancyLines, ...healthTreatmentLines, ...simpleRequestLines, ...questionLines],
+        requestLines = [...focusLines, ...relationshipLines, ...(itemCode === "infant-spirit" ? [] : pregnancyLines), ...healthTreatmentLines, ...simpleRequestLines, ...questionLines],
         labels = [
           detail.item_title,
           ...asArray(detail.booking_detail_sub_items).map(
@@ -1048,6 +1056,7 @@ async function context(bookingNo: string, requestedDocumentId = "") {
           profile,
           profileName: clean(profile?.name),
           infantMultiple,
+          infantRecords,
           ...presentation,
         };
         if (itemCode === "marriage-bazi" && relationshipTargets.length) {
@@ -1058,6 +1067,7 @@ async function context(bookingNo: string, requestedDocumentId = "") {
             const targetRelation = clean(targetProfile?.relationship_detail || targetProfile?.relationship);
             return {
               ...base,
+              targetName,
               targetDisplay: `對象：${targetName}${targetGender ? `／${targetGender}` : ""}${targetRelation ? `（${targetRelation}）` : ""}`,
               requestLines: target.lines,
             };
@@ -1348,7 +1358,9 @@ async function context(bookingNo: string, requestedDocumentId = "") {
         profileLines: meta.profileLines || [],
         requestLines: meta.requestLines || [],
         targetDisplay: (meta as any).targetDisplay || "",
+        targetName: (meta as any).targetName || "",
         infantMultiple: (meta as any).infantMultiple === true,
+        infantRecords: (meta as any).infantRecords || [],
         locationSubject:
           itemCode === "infant-spirit" ? "寶寶" : meta.locationSubject || "祂",
         genderPronoun: meta.genderPronoun || "祂",
@@ -1761,6 +1773,7 @@ export async function POST(request: NextRequest) {
       const selfName = clean(body.selfName) || "本人",
         partnerName = clean(body.partnerName) || "對方",
         personalLove = body.personalLove === true,
+        loveFormat = body.loveFormat === true || personalLove,
         pickRows = (rows: any[]) =>
           rows
             .map((row) => row.optionId.startsWith("virtual-")
@@ -1908,14 +1921,14 @@ export async function POST(request: NextRequest) {
           overallRecent ? `${safeHeading("最近狀況")}\n${overallRecent}` : "",
           overallAdvice ? `${safeHeading("建議")}\n${overallAdvice}` : "",
         ].filter(Boolean).join("\n\n"),
-        answer = personalLove
+        answer = loveFormat
           ? [
               selfSentence ? `${safeHeading("本身的個性")}\n${selfSentence}` : "",
               partnerSentence || partner2Sentence
-                ? `${safeHeading("對象特質")}\n以下是容易遇到的對象特質\n${[
-                    partnerSentence ? `對象1：${partnerSentence}` : "",
-                    partner2Sentence ? `對象2：${partner2Sentence}` : "",
-                  ].filter(Boolean).join("\n")}`
+                ? `${safeHeading("對象特質")}\n${personalLove ? `以下是容易遇到的對象特質\n${[
+                      partnerSentence ? `對象1：${partnerSentence}` : "",
+                      partner2Sentence ? `對象2：${partner2Sentence}` : "",
+                    ].filter(Boolean).join("\n")}` : [partnerSentence, partner2Sentence].filter(Boolean).join("\n")}`
                 : "",
               romanceTimingSentence || divorceTimingSentence || standardAnswerParts.length
                 ? `${safeHeading("感情運")}\n${[romanceTimingSentence, divorceTimingSentence].filter(Boolean).join("\n")}${(romanceTimingSentence || divorceTimingSentence) && standardAnswerParts.length ? "\n\n" : ""}${standardAnswerParts.join(" ")}`
