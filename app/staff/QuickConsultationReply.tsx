@@ -403,7 +403,7 @@ export default function QuickConsultationReply({
   const selfPersonalityGroups = Object.entries(
     selfPersonalityOptions.reduce<Record<string, Option[]>>((groups, option) => {
       const text = option.label;
-      const group = /固執|說教|急|敏感|想太多|心軟|沒安全感/.test(text)
+      const group = /固執|說教|急|敏感|想太多|心軟|沒安全感|過度要求/.test(text)
         ? "需要留意的個性"
         : /原則|能力|反應|責任|做事|穩重|成熟/.test(text)
           ? "做事與責任感"
@@ -414,6 +414,17 @@ export default function QuickConsultationReply({
       return groups;
     }, {}),
   );
+  const personalLoveProfileMeta = (() => {
+    const text = (section?.profileLines || []).join(" ");
+    const gender = text.match(/姓名\s*：[^／/\n]+[／/]\s*([男女])/)?.[1] || "";
+    const age = Number(text.match(/虛歲\s*：\s*(\d+)/)?.[1] || 0);
+    return {
+      name: section?.profileName || "諮詢者",
+      gender,
+      age,
+      label: `${section?.profileName || "諮詢者"}${gender ? `(${gender})` : ""}${age ? ` 虛歲：${age}歲` : ""}`,
+    };
+  })();
   const deceasedLayout = ["deceased", "infant_spirit"].includes(sectionTopic?.code || "");
   const question = data?.questions[activeQuestion],
     questionKey = String(question?.slotIndex ?? 0),
@@ -938,6 +949,23 @@ export default function QuickConsultationReply({
     }));
     if (Object.values(next).some((values) => asCodes(values).length))
       void compose(next);
+  }
+  function confirmPersonalLoveAge(kind: "romance" | "divorce", index: number) {
+    const values = kind === "romance" ? romanceAges : divorceAges;
+    const raw = values[sectionKey]?.[index] || "";
+    const entered = Number(raw);
+    if (!entered || !personalLoveProfileMeta.age || entered >= personalLoveProfileMeta.age) return;
+    const confirmed = window.confirm(
+      `${personalLoveProfileMeta.name}${personalLoveProfileMeta.gender ? `(${personalLoveProfileMeta.gender})` : ""} 今年虛歲：${personalLoveProfileMeta.age}歲，請確認是否要填入${entered}`,
+    );
+    if (!confirmed) {
+      const setter = kind === "romance" ? setRomanceAges : setDivorceAges;
+      setter((current) => {
+        const next = [...(current[sectionKey] || [])];
+        next[index] = "";
+        return { ...current, [sectionKey]: next };
+      });
+    }
   }
   async function write() {
     if (busy || sectionIsPending) {
@@ -1975,18 +2003,18 @@ export default function QuickConsultationReply({
                               <div className="quickReplySpecialField quickReplyRomanceTiming">
                                 <div className="quickReplySpecialHeading">
                                   <span>⑤</span>
-                                  <div><h4>感情時間</h4></div>
+                                  <div className="quickReplyTimingHeading"><h4>感情時間</h4><small>{personalLoveProfileMeta.label}</small></div>
                                 </div>
                                 <h5>紅鸞星動時間（最多三個）</h5>
                                 <div className="quickReplyAgeInputs">
                                   {[0, 1, 2].map((index) => (
-                                    <label key={`romance-${index}`}><input inputMode="numeric" value={romanceAges[sectionKey]?.[index] || ""} onChange={(e) => setRomanceAges((current) => { const next = [...(current[sectionKey] || [])]; next[index] = e.target.value.replace(/\D/g, ""); return { ...current, [sectionKey]: next }; })} placeholder={`年齡${index + 1}`} /><span>歲</span></label>
+                                    <label key={`romance-${index}`}><input inputMode="numeric" value={romanceAges[sectionKey]?.[index] || ""} onChange={(e) => setRomanceAges((current) => { const next = [...(current[sectionKey] || [])]; next[index] = e.target.value.replace(/\D/g, ""); return { ...current, [sectionKey]: next }; })} onBlur={() => confirmPersonalLoveAge("romance", index)} placeholder={`年齡${index + 1}`} /><span>歲</span></label>
                                   ))}
                                 </div>
                                 <h5>離婚或離異高風險年齡（最多兩個）</h5>
                                 <div className="quickReplyAgeInputs two">
                                   {[0, 1].map((index) => (
-                                    <label key={`divorce-${index}`}><input inputMode="numeric" value={divorceAges[sectionKey]?.[index] || ""} onChange={(e) => setDivorceAges((current) => { const next = [...(current[sectionKey] || [])]; next[index] = e.target.value.replace(/\D/g, ""); return { ...current, [sectionKey]: next }; })} placeholder={`年齡${index + 1}`} /><span>歲</span></label>
+                                    <label key={`divorce-${index}`}><input inputMode="numeric" value={divorceAges[sectionKey]?.[index] || ""} onChange={(e) => setDivorceAges((current) => { const next = [...(current[sectionKey] || [])]; next[index] = e.target.value.replace(/\D/g, ""); return { ...current, [sectionKey]: next }; })} onBlur={() => confirmPersonalLoveAge("divorce", index)} placeholder={`年齡${index + 1}`} /><span>歲</span></label>
                                   ))}
                                 </div>
                                 <button className="quickReplyApplyTiming" onClick={() => void composeSection(sectionDraft.optionIds)}>帶入感情時間</button>

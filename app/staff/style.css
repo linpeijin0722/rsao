@@ -1256,6 +1256,8 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 .quickReplyAgeInputs label{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px;color:#604a40;font-weight:800}
 .quickReplyAgeInputs input{width:100%;min-height:45px;box-sizing:border-box;padding:9px 11px;border:1px solid #d7c5bb;border-radius:9px;background:#fff;font-size:16px}
 .quickReplyApplyTiming{width:100%;min-height:47px;border:0!important;border-radius:10px!important;background:#244f46!important;color:#fff!important;font-size:16px!important;font-weight:900!important}
+.quickReplyTimingHeading{display:flex;flex-wrap:wrap;align-items:baseline;gap:7px 12px}
+.quickReplyTimingHeading small{color:#14815f;font-size:15px;font-weight:900;line-height:1.4}
 @media(max-width:640px){.quickReplyAgeInputs,.quickReplyAgeInputs.two{grid-template-columns:1fr}.quickReplyPartnerTwoHeading{align-items:flex-start}}
 .quickReplyReincarnatedDetails{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;padding:12px;border:1px solid #e1d4cb;border-radius:10px;background:#fffaf7}
 .quickReplyReincarnatedDetails label{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto!important;align-items:center!important;gap:5px!important;text-align:left}

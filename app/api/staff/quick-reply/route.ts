@@ -29,6 +29,8 @@ const loveBuiltInOptions = [
   { id: "virtual-self-personality-stubborn", code: "self_personality_stubborn", label: "容易固執己見", sort_order: 208, is_active: true },
   { id: "virtual-self-personality-preachy", code: "self_personality_preachy", label: "有時比較愛說教", sort_order: 209, is_active: true },
   { id: "virtual-self-personality-mature", code: "self_personality_mature", label: "想法成熟穩重", sort_order: 210, is_active: true },
+  { id: "virtual-self-personality-orderly", code: "self_personality_orderly", label: "做事有條理", sort_order: 211, is_active: true },
+  { id: "virtual-self-personality-self-demanding", code: "self_personality_self_demanding", label: "容易過度要求自己", sort_order: 212, is_active: true },
   {
     id: "virtual-love-trend-better",
     code: "love_trend_getting_better",
@@ -76,6 +78,8 @@ const loveBuiltInCopy: Record<string, string> = {
   self_personality_stubborn: "但是容易固執己見，有時候不太容易聽進別人的想法。",
   self_personality_preachy: "有時候想法會比較清高，而顯得比較愛說教。",
   self_personality_mature: "想法基本成熟，做事情也穩重。",
+  self_personality_orderly: "做事情有條理，會先把順序和細節安排好。",
+  self_personality_self_demanding: "有時候容易過度要求自己，會把太多壓力放在自己身上。",
   love_trend_getting_better:
     "感情方面會慢慢進入比較好的狀態，不用急著要求馬上有結果，照著自己的步調往前，後面的發展會比現在順一些。",
   advice_expand_social:
@@ -719,6 +723,25 @@ async function context(bookingNo: string, requestedDocumentId = "") {
   });
   const deceasedTopic = normalizedTopics.find((topic: any) => topic.code === "deceased"),
     infantTopic = normalizedTopics.find((topic: any) => topic.code === "infant_spirit");
+  const loveTopic = normalizedTopics.find((topic: any) => topic.code === "love");
+  if (loveTopic) {
+    const selfOptions = loveTopic.options.filter((option: any) => option.code.startsWith("self_personality_"));
+    const mirroredPartners = selfOptions.map((option: any, index: number) => {
+      const code = `partner_personality_mirror_${option.code.replace(/^self_personality_/, "")}`;
+      const label = String(option.label || "");
+      const selfCopy = loveBuiltInCopy[option.code];
+      loveBuiltInCopy[code] = selfCopy
+        ? selfCopy.replace(/^但是/, "有時候").replace(/^本身/, "對方")
+        : /^(比較|容易|很|有|重|不)/.test(label)
+          ? `對方${label}。`
+          : `對方的個性${label}。`;
+      return { id: `virtual-${code.replaceAll("_", "-")}`, code, label, sort_order: 240 + index, is_active: true };
+    });
+    loveTopic.options = [
+      ...loveTopic.options.filter((option: any) => !option.code.startsWith("partner_personality_")),
+      ...mirroredPartners,
+    ].sort((a: any, b: any) => a.sort_order - b.sort_order);
+  }
   if (deceasedTopic && infantTopic) {
     const infantOptions = new Map(infantTopic.options.map((option: any) => [option.code, option]));
     infantTopic.options = deceasedTopic.options.map((option: any) => infantOptions.get(option.code) || option);
