@@ -333,6 +333,8 @@ export default function QuickConsultationReply({
           return section?.genderPronoun !== "她";
         return true;
       }) || [],
+    bodyPositiveOptions = bodyOptions.filter((o) => o.code.startsWith("body_positive_")),
+    bodyConcernOptions = bodyOptions.filter((o) => !o.code.startsWith("body_positive_")),
     homeConditionOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_condition_")) || [],
     homeImpactOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_impact_")) || [],
     homeAreaOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_area_")) || [],
@@ -2318,9 +2320,17 @@ export default function QuickConsultationReply({
                                   <span>⑥</span>
                                   <div><h4>身體狀況</h4></div>
                                 </div>
-                                <div className="quickReplyHealthNotice">可複選；內容僅作日常提醒，實際狀況仍應以合格醫療人員的檢查為準。</div>
+                                <h5 className="quickReplySubheading">本身狀況不錯（可複選）</h5>
                                 <div className="quickReplySpecialChoices">
-                                  {bodyOptions.map((o) => (
+                                  {bodyPositiveOptions.map((o) => (
+                                    <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
+                                      {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
+                                    </button>
+                                  ))}
+                                </div>
+                                <h5 className="quickReplySubheading">需要留意的身體狀況（可複選）</h5>
+                                <div className="quickReplySpecialChoices">
+                                  {bodyConcernOptions.map((o) => (
                                     <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
                                       {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
                                     </button>
