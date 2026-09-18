@@ -1259,6 +1259,26 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 .quickReplyTimingHeading{display:flex;flex-wrap:wrap;align-items:baseline;gap:7px 12px}
 .quickReplyTimingHeading small{color:#14815f;font-size:15px;font-weight:900;line-height:1.4}
 @media(max-width:640px){.quickReplyAgeInputs,.quickReplyAgeInputs.two{grid-template-columns:1fr}.quickReplyPartnerTwoHeading{align-items:flex-start}}
+.quickReplyBody>footer.quickReplyWriteBar{
+  display:grid!important;
+  grid-template-columns:minmax(190px,.72fr) minmax(0,1.7fr) auto!important;
+  align-items:center!important;
+  gap:10px!important;
+  width:100%!important;
+  padding:9px 11px!important;
+  border:1px solid #d8c8bf!important;
+  border-radius:12px!important;
+  background:#f1e8e3!important;
+}
+.quickReplyWriteBar>.quickReplyWrite{align-self:stretch;min-height:58px!important;padding:8px 14px!important}
+.quickReplyFooterProfile{display:grid!important;grid-template-columns:auto minmax(0,1fr)!important;align-items:center!important;gap:4px 10px!important;min-width:0!important;padding:0 4px!important;color:#43362f!important;text-align:left!important}
+.quickReplyFooterProfile>b{color:#784055;font-size:13px;white-space:nowrap}
+.quickReplyFooterProfile>div{display:grid;gap:1px;min-width:0}
+.quickReplyFooterProfile span{display:block;font-size:12px;font-weight:600;line-height:1.25;white-space:normal;overflow-wrap:anywhere}
+.quickReplyFooterActions{display:grid!important;gap:5px!important;min-height:0!important;border-radius:0!important;font-size:inherit!important;cursor:default!important}
+.quickReplyFooterActions>a,.quickReplyFooterActions>.quickReplyCancel{display:flex;align-items:center;justify-content:center;min-height:34px!important;padding:6px 10px!important;border:0;border-radius:8px;font-size:12px!important;font-weight:900;white-space:nowrap;text-decoration:none}
+.quickReplyFooterActions>a{background:#168a54;color:#fff}.quickReplyFooterActions>.quickReplyCancel{background:#e2d9d3;color:#524640}
+@media(max-width:700px){.quickReplyBody>footer.quickReplyWriteBar{grid-template-columns:1fr!important}.quickReplyFooterProfile{grid-template-columns:1fr!important}.quickReplyWriteBar>.quickReplyWrite{min-height:50px!important}}
 .quickReplyReincarnatedDetails{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;padding:12px;border:1px solid #e1d4cb;border-radius:10px;background:#fffaf7}
 .quickReplyReincarnatedDetails label{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto!important;align-items:center!important;gap:5px!important;text-align:left}
 .quickReplyReincarnatedDetails input{width:100%!important;box-sizing:border-box!important}

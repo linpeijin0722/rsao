@@ -335,6 +335,23 @@ export default function QuickConsultationReply({
       }) || [],
     bodyPositiveOptions = bodyOptions.filter((o) => o.code.startsWith("body_positive_")),
     bodyConcernOptions = bodyOptions.filter((o) => !o.code.startsWith("body_positive_")),
+    bodyConcernOrder = [
+      "body_headache", "body_dizziness", "body_eyes", "body_neck",
+      "body_sleep", "body_breath", "body_allergy", "body_pressure",
+      "body_liver", "body_stomach", "body_fatigue", "body_circulation",
+      "body_cold", "body_hot", "body_back", "body_joint",
+      "body_kidney", "body_female_gynecology", "body_female_cycle",
+      "body_male_prostate", "body_male_urinary",
+    ],
+    sortedBodyConcerns = [...bodyConcernOptions].sort(
+      (a, b) => bodyConcernOrder.indexOf(a.code) - bodyConcernOrder.indexOf(b.code),
+    ),
+    lowerBodyCodes = new Set([
+      "body_back", "body_joint", "body_kidney", "body_female_gynecology",
+      "body_female_cycle", "body_male_prostate", "body_male_urinary",
+    ]),
+    upperBodyOptions = sortedBodyConcerns.filter((o) => !lowerBodyCodes.has(o.code)),
+    lowerBodyOptions = sortedBodyConcerns.filter((o) => lowerBodyCodes.has(o.code)),
     homeConditionOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_condition_")) || [],
     homeImpactOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_impact_")) || [],
     homeAreaOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_area_")) || [],
@@ -510,6 +527,8 @@ export default function QuickConsultationReply({
         sectionDraft.optionIds.includes(option.id),
       )?.code || "";
   void detailVersion;
+  const footerProfileLines =
+    (view === "section" ? section?.profileLines : question?.profileLines) || [];
   async function post(payload: any) {
     const r = await fetch("/api/staff/quick-reply", {
         method: "POST",
@@ -2328,9 +2347,17 @@ export default function QuickConsultationReply({
                                     </button>
                                   ))}
                                 </div>
-                                <h5 className="quickReplySubheading">需要留意的身體狀況（可複選）</h5>
+                                <h5 className="quickReplySubheading">需要留意的身體狀況－上半身（可複選）</h5>
                                 <div className="quickReplySpecialChoices">
-                                  {bodyConcernOptions.map((o) => (
+                                  {upperBodyOptions.map((o) => (
+                                    <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
+                                      {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
+                                    </button>
+                                  ))}
+                                </div>
+                                <h5 className="quickReplySubheading">需要留意的身體狀況－下半身（可複選）</h5>
+                                <div className="quickReplySpecialChoices">
+                                  {lowerBodyOptions.map((o) => (
                                     <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
                                       {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
                                     </button>
@@ -2774,7 +2801,7 @@ export default function QuickConsultationReply({
                   </div>
                 </div>
               )}
-              <footer>
+              <footer className="quickReplyWriteBar">
                 <button
                   className="quickReplyWrite"
                   disabled={!hasAnswer && !hasPending}
@@ -2786,15 +2813,27 @@ export default function QuickConsultationReply({
                       ? "再次寫入更新"
                       : "確認寫入全部回答"}
                 </button>
-                {written && (
-                  <a href={data.documentUrl} target="_blank" rel="noreferrer">
-                    查看 Google 文件
-                  </a>
+                {footerProfileLines.length > 0 && (
+                  <div className="quickReplyFooterProfile" aria-label="本項目諮詢者資料">
+                    <b>本項目諮詢者資料</b>
+                    <div>
+                      {footerProfileLines.map((line, index) => <span key={index}>{line}</span>)}
+                    </div>
+                  </div>
                 )}
-                {!standalone && (
-                  <button className="quickReplyCancel" onClick={onClose}>
-                    返回預約後台
-                  </button>
+                {(written || !standalone) && (
+                  <div className="quickReplyFooterActions">
+                    {written && (
+                      <a href={data.documentUrl} target="_blank" rel="noreferrer">
+                        查看 Google 文件
+                      </a>
+                    )}
+                    {!standalone && (
+                      <button className="quickReplyCancel" onClick={onClose}>
+                        返回預約後台
+                      </button>
+                    )}
+                  </div>
                 )}
               </footer>
             </div>
