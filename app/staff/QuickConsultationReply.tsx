@@ -305,6 +305,12 @@ export default function QuickConsultationReply({
     loveOtherOptions =
       sectionTopic?.options.filter((o) => o.code.startsWith("love_other_")) ||
       [],
+    relationshipSituationLabels = new Set(["可能有遠距離", "年齡可能有差距", "容易受到工作影響", "容易受到家人意見影響"]),
+    relationshipSituationOptions = Array.from(new Map(
+      (sectionTopic?.options.filter((o) => o.code.startsWith("relationship_situation_") || relationshipSituationLabels.has(o.label)) || [])
+        .map((o) => [o.label, o]),
+    ).values()),
+    remainingLoveOtherOptions = loveOtherOptions.filter((o) => !relationshipSituationLabels.has(o.label)),
     relationshipAdviceOptions =
       sectionTopic?.options.filter((o) => o.code.startsWith("relationship_advice_")) || [],
     spiritPlainOptions =
@@ -445,6 +451,7 @@ export default function QuickConsultationReply({
           !o.code.startsWith("partner_personality_") &&
           !o.code.startsWith("love_other_") &&
           !o.code.startsWith("relationship_advice_") &&
+          !o.code.startsWith("relationship_situation_") &&
           !o.code.startsWith("status_") &&
           !o.code.startsWith("condition_") &&
           !o.code.startsWith("advice_") &&
@@ -509,8 +516,8 @@ export default function QuickConsultationReply({
       for (const option of category?.options || []) {
         const code = option.code,
           text = option.label,
-          label = text === "容易受到工作影響"
-            ? "其它"
+          label = /可能有遠距離|年齡可能有差距|容易受到工作影響|容易受到家人意見影響/.test(text)
+            ? "兩人之間容易遇到"
             : code.startsWith("love_trend_") && /紅鸞|桃花|正緣|結婚/.test(text)
             ? "正緣、桃花與結婚機會"
             : code.startsWith("love_trend_") && /阻礙|不順|爛桃花|較淡/.test(text)
@@ -1156,6 +1163,39 @@ export default function QuickConsultationReply({
       </label>
     );
   };
+  const infantRecordCard = (index: number) => {
+    if (!section || section.itemCode !== "infant-spirit") return null;
+    const record = section.infantRecords?.[index];
+    const recordKey = index ? `${baseSectionKey}:infant:${index}` : baseSectionKey;
+    const expanded = activeInfantIndex === index;
+    return (
+      <article className={expanded ? "expanded" : ""} key={recordKey}>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            setActiveInfantBySection((current) => ({
+              ...current,
+              [baseSectionKey]: expanded ? -1 : index,
+            }));
+            setEditing(false);
+          }}
+        >
+          <b>寶寶資料 {index + 1}</b>
+          <span>{expanded ? "收合 −" : "展開 ＋"}</span>
+        </button>
+        {expanded && (
+          <div>
+            <strong>流產時間資料</strong>
+            {record?.lines?.length
+              ? record.lines.map((line, lineIndex) => <p key={lineIndex}>{line}</p>)
+              : <p>這一筆沒有填寫流產時間資料。</p>}
+            <small>以下選項與回覆都屬於這一位寶寶</small>
+          </div>
+        )}
+      </article>
+    );
+  };
   const pickTarget = (kind: "section" | "question", index: number) => {
     setView(kind);
     kind === "section" ? setActiveSection(index) : setActiveQuestion(index);
@@ -1443,38 +1483,10 @@ export default function QuickConsultationReply({
                             </h3>
                             {section.itemCode === "infant-spirit" && (
                               <div className="quickReplyInfantInlineRecords">
-                                {Array.from({ length: infantRecordCount }, (_, index) => {
-                                  const record = section.infantRecords?.[index];
-                                  const recordKey = index ? `${baseSectionKey}:infant:${index}` : baseSectionKey;
-                                  const expanded = activeInfantIndex === index;
-                                  return (
-                                    <article className={expanded ? "expanded" : ""} key={recordKey}>
-                                      <button
-                                        type="button"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          setActiveInfantBySection((current) => ({
-                                            ...current,
-                                            [baseSectionKey]: expanded ? -1 : index,
-                                          }));
-                                          setEditing(false);
-                                        }}
-                                      >
-                                        <b>寶寶資料 {index + 1}</b>
-                                        <span>{expanded ? "收合 −" : "展開 ＋"}</span>
-                                      </button>
-                                      {expanded && (
-                                        <div>
-                                          <strong>流產時間資料</strong>
-                                          {record?.lines?.length
-                                            ? record.lines.map((line, lineIndex) => <p key={lineIndex}>{line}</p>)
-                                            : <p>這一筆沒有填寫流產時間資料。</p>}
-                                          <small>以下選項與回覆都屬於這一位寶寶</small>
-                                        </div>
-                                      )}
-                                    </article>
-                                  );
-                                })}
+                                {Array.from(
+                                  { length: activeInfantIndex < 0 ? infantRecordCount : activeInfantIndex + 1 },
+                                  (_, index) => infantRecordCard(index),
+                                )}
                               </div>
                             )}
                             {[
@@ -2159,7 +2171,7 @@ export default function QuickConsultationReply({
                               partnerPersonalityOptions.length > 0 && (
                                 <div className="quickReplySpecialField">
                                   <div className="quickReplySpecialHeading">
-                                    <span>④</span>
+                                    <span>{!isPersonalLove && !isFirstRelationshipSection ? "③" : "④"}</span>
                                     <div>
                                       <h4>
                                         {isPersonalLove
@@ -2736,10 +2748,24 @@ export default function QuickConsultationReply({
                                   )}
                               </div>
                             )}
+                            {sectionTopic.code === "love" && !isPersonalLove && relationshipSituationOptions.length > 0 && (
+                              <div className="quickReplySpecialField quickReplyRelationshipSituation">
+                                <div className="quickReplySpecialHeading">
+                                  <span>{isFirstRelationshipSection ? "⑤" : "④"}</span><div><h4>兩人之間容易遇到</h4></div>
+                                </div>
+                                <div className="quickReplySpecialChoices">
+                                  {relationshipSituationOptions.map((o) => (
+                                    <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
+                                      {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                             {sectionTopic.code === "love" && !isPersonalLove && relationshipAdviceOptions.length > 0 && (
                               <div className="quickReplySpecialField quickReplyRelationshipAdvice">
                                 <div className="quickReplySpecialHeading">
-                                  <span>⑤</span><div><h4>建議相處</h4></div>
+                                  <span>{isFirstRelationshipSection ? "⑥" : "⑤"}</span><div><h4>給諮詢者建議</h4></div>
                                 </div>
                                 <div className="quickReplySpecialChoices">
                                   {relationshipAdviceOptions.map((o) => (
@@ -2751,14 +2777,14 @@ export default function QuickConsultationReply({
                               </div>
                             )}
                             {(standardOptions.length > 0 ||
-                              loveOtherOptions.length > 0) && (
+                              remainingLoveOtherOptions.length > 0) && (
                               <div className="quickReplySpecialField quickReplyOtherField">
                                 <div className="quickReplySpecialHeading">
                                   <span>
                                     {sectionTopic?.code === "love"
-                                      ? showPartnerPersonality
+                                      ? isPersonalLove
                                         ? "⑥"
-                                        : "⑤"
+                                        : isFirstRelationshipSection ? "⑦" : "⑥"
                                       : deceasedLayout
                                         ? "⑥"
                                         : spiritTopicCodes.includes(
@@ -2782,7 +2808,7 @@ export default function QuickConsultationReply({
                                 <div className="quickReplySpecialChoices">
                                   {[
                                     ...standardOptions,
-                                    ...loveOtherOptions,
+                                    ...remainingLoveOtherOptions,
                                   ].map((o) => (
                                     <button
                                       key={o.id}
@@ -2807,6 +2833,14 @@ export default function QuickConsultationReply({
                                     </button>
                                   ))}
                                 </div>
+                              </div>
+                            )}
+                            {section.itemCode === "infant-spirit" && activeInfantIndex >= 0 && activeInfantIndex < infantRecordCount - 1 && (
+                              <div className="quickReplyInfantInlineRecords quickReplyInfantFollowingRecords">
+                                {Array.from(
+                                  { length: infantRecordCount - activeInfantIndex - 1 },
+                                  (_, offset) => infantRecordCard(activeInfantIndex + offset + 1),
+                                )}
                               </div>
                             )}
                           </section>
