@@ -1144,13 +1144,11 @@ export default function QuickConsultationReply({
                             <h3>用戶填寫的內容</h3>
                             {section.itemCode === "overall-fortune" ? (
                               <div className="quickReplyOverallInputGroups">
-                                {groupOverallRequestLines(section.requestLines).map((group) => {
-                                  const adviceQuestion = data.questions.find(
-                                    (entry) =>
-                                      entry.itemCode === "overall-fortune" &&
-                                      (entry.question === `${group.title}建議` ||
-                                        entry.question.startsWith(group.title)),
-                                  );
+                                {groupOverallRequestLines(section.requestLines).map((group, groupIndex) => {
+                                  const adviceQuestion =
+                                    data.questions.find((entry) =>
+                                      entry.question.includes(group.title),
+                                    ) || data.questions[groupIndex];
                                   const adviceKey = adviceQuestion
                                     ? String(adviceQuestion.slotIndex)
                                     : "";
