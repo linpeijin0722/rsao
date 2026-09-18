@@ -905,7 +905,9 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 
 .quickReplyScripturePanel {
   display: block !important;
+  grid-column: 1 / -1 !important;
   width: 100%;
+  box-sizing: border-box;
   margin-top: 12px;
   padding: 15px;
   border: 1px solid #dec9c0;
@@ -1207,6 +1209,24 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 /* 投胎資料：先選人／動物，再填寫可選細節。 */
 .quickReplyReincarnatedField{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;align-items:stretch!important}
 .quickReplyReincarnatedKind{display:grid!important;grid-template-columns:1fr 1fr!important;gap:9px!important}
+.quickReplyLocationChoices .quickReplyReincarnatedKind button{
+  min-height:52px!important;
+  padding:11px 18px!important;
+  border:1px solid #cdbdb2!important;
+  border-radius:11px!important;
+  background:#fff!important;
+  color:#433630!important;
+  font-size:17px!important;
+  font-weight:900!important;
+  line-height:1.2!important;
+  box-shadow:0 2px 5px rgba(76,52,42,.05)!important;
+}
+.quickReplyLocationChoices .quickReplyReincarnatedKind button.selected{
+  border:2px solid #a91436!important;
+  background:#fff0f4!important;
+  color:#951638!important;
+  box-shadow:0 0 0 2px rgba(169,20,54,.08)!important;
+}
 .quickReplyReincarnatedDetails{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;padding:12px;border:1px solid #e1d4cb;border-radius:10px;background:#fffaf7}
 .quickReplyReincarnatedDetails label{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto!important;align-items:center!important;gap:5px!important;text-align:left}
 .quickReplyReincarnatedDetails input{width:100%!important;box-sizing:border-box!important}

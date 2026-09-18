@@ -55,7 +55,8 @@ function doPost(e) {
     const doc = DocumentApp.create(finalTitle);
     const body = doc.getBody();
     body.setText(payload.content);
-    body.setMarginTop(28.3465).setMarginBottom(28.3465).setMarginLeft(28.3465).setMarginRight(28.3465);
+    // 上下各 0.5 公分；左右維持原本 1 公分。
+    body.setMarginTop(14.17325).setMarginBottom(14.17325).setMarginLeft(28.3465).setMarginRight(28.3465);
     body.getParagraphs().forEach(function(paragraph) {
       paragraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
     });
