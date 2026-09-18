@@ -484,6 +484,7 @@ const previousDeceasedLocation = (value: any) => {
     /(?:目前|現在)?(?:已經)?(?:投胎|轉世)(?:成為|成|為)?([^，。！？\n]{1,16})/,
   );
   if (reborn) return { text: `已投胎成為${reborn[1]}`, rank: 5 };
+  if (/奈何橋/.test(text)) return { text: "在奈何橋", rank: 0 };
   if (/枉死城/.test(text)) return { text: "在枉死城", rank: 0 };
   const hall = text.match(/(?:目前|現在)?在?地府(?:第)?([一二三四1234])殿/);
   if (hall) {
@@ -731,18 +732,99 @@ async function context(bookingNo: string, requestedDocumentId = "") {
       core_question: "最想詢問的問題",
       situation: "目前情況",
       notes: "其他補充",
+      love_status: "目前感情狀態",
+      lawsuit_type: "官司或糾紛類型",
+      lawsuit_progress: "目前訴訟進度",
+      next_court_date: "下次開庭或調解日期",
+      dispute_summary: "事件簡述與爭議點",
+      professional_help: "目前是否有專業人士或他人協助",
+      previous_handling: "過去是否曾處理過",
+      health_concerns: "當前關注的健康問題",
+      major_treatment_planned: "近期是否有手術或重大治療規劃",
+      treatment_question: "想瞭解的問題",
+      treatment_question_other: "其他想瞭解的問題",
+      health_notes: "健康備註",
+      current_regret: "目前的困擾或遺憾",
+      consultation_goal: "這次諮詢最希望獲得什麼",
+      old_name: "公司目前名字或舊名",
+      business: "主要業務與產品",
+      mode: "公司經營模式",
+      preferences: "命名喜好與禁忌",
+      favorite_words: "特別喜歡或想放進去的字",
+      relationship_status: "目前關係狀態",
+      relationship_duration: "這段關係多久了",
+      main_event: "這次最想解決的事件",
+      relationship_goal: "最希望達成的目標",
+      purpose: "擇日用途",
+      other_purpose: "其他擇日用途",
+      date_range: "指定日期範圍或避諱",
+      location: "地點",
+      partner: "其他合夥人",
+    },
+    cleanInputLabel = (value: string) => value.replace(/[／/]/g, "或"),
+    renderInputValue = (value: any): string =>
+      Array.isArray(value)
+        ? value.map((entry) => clean(entry)).filter(Boolean).join("、")
+        : clean(value),
+    overallFocusLabel: Record<string, Record<string, string>> = {
+      想換工作: {
+        "目前公司／產業": "公司或產業", "目前職位與主要工作內容": "職位或工作",
+        "希望轉往的方向／職務": "希望轉往", "想離開或換工作的主要原因": "離開原因",
+      },
+      職涯迷惘: {
+        "目前正在考慮的選擇": "考慮中的選擇", "目前的工作／待業狀態": "工作或待業狀態",
+        "選擇工作時最在意的條件": "最在意的條件", "目前最大的困難": "目前困難",
+      },
+      財務壓力: {
+        "最希望改善的事情": "想改善", "目前主要的壓力來源": "壓力來源",
+        "這個狀況持續多久了": "持續時間", "是否有重要期限": "重要期限",
+      },
+    },
+    focusFieldOrder: Record<string, string[]> = {
+      想換工作: ["目前公司／產業", "目前職位與主要工作內容", "希望轉往的方向／職務", "想離開或換工作的主要原因"],
+      職涯迷惘: ["目前正在考慮的選擇", "目前的工作／待業狀態", "選擇工作時最在意的條件", "目前最大的困難"],
+      財務壓力: ["最希望改善的事情", "目前主要的壓力來源", "這個狀況持續多久了", "是否有重要期限"],
     },
     sectionMeta = details.flatMap((detail: any) => {
       const answer = one(detail.booking_consultation_answers),
         profile = one(answer?.consultation_profiles),
         presentation = profilePresentation(profile, ownerName),
         extra = answer?.extra_data || {},
-        requestLines = Object.entries(extra)
+        simpleRequestLines = Object.entries(extra)
           .filter(
             ([key, value]) =>
-              inputLabels[key] && clean(value) && typeof value !== "object",
+              inputLabels[key] && renderInputValue(value) && typeof value !== "object" ||
+              inputLabels[key] && Array.isArray(value) && renderInputValue(value),
           )
-          .map(([key, value]) => `${inputLabels[key]}：${clean(value)}`),
+          .map(([key, value]) => `${cleanInputLabel(inputLabels[key])}：${renderInputValue(value)}`),
+        focusLines = Object.entries(extra.overall_focus_details || {}).flatMap(([focus, rawRows]) => {
+          const rows = rawRows && typeof rawRows === "object" ? rawRows as Record<string, unknown> : {};
+          const keys = focusFieldOrder[focus] || Object.keys(rows);
+          const content = keys.map((key) => {
+            const value = renderInputValue(rows[key]);
+            if (!value) return "";
+            return `${overallFocusLabel[focus]?.[key] || cleanInputLabel(key)}：${value}`;
+          }).filter(Boolean);
+          return content.length ? [`【${focus}】`, ...content] : [];
+        }).filter(Boolean),
+        relationshipLines = Object.values(extra.relationship_details || {}).flatMap((rawRows) => {
+          const rows = rawRows && typeof rawRows === "object" ? rawRows as Record<string, unknown> : {};
+          return ["relationship_status", "relationship_duration", "main_event", "relationship_goal"]
+            .map((key) => renderInputValue(rows[key]) ? `${inputLabels[key]}：${renderInputValue(rows[key])}` : "")
+            .filter(Boolean);
+        }),
+        pregnancyLines = asArray(extra.pregnancy_losses).flatMap((loss: any, index: number) => {
+          const values = [
+            renderInputValue(loss?.lunar_date) ? `農曆日期：${renderInputValue(loss.lunar_date)}` : "",
+            renderInputValue(loss?.shichen) ? `時辰：${renderInputValue(loss.shichen)}` : "",
+            renderInputValue(loss?.notes) ? `備註：${renderInputValue(loss.notes)}` : "",
+          ].filter(Boolean);
+          return values.length ? [`【流產資料${asArray(extra.pregnancy_losses).length > 1 ? index + 1 : ""}】`, ...values] : [];
+        }),
+        directQuestions = asArray(answer?.questions).map(clean).filter(Boolean),
+        targetQuestions = Object.values(extra.target_questions || {}).flatMap((values) => asArray(values).map(clean).filter(Boolean)),
+        questionLines = Array.from(new Set([...directQuestions, ...targetQuestions])).map((value, index) => `問題${index + 1}：${value}`),
+        requestLines = [...focusLines, ...relationshipLines, ...pregnancyLines, ...simpleRequestLines, ...questionLines],
         labels = [
           detail.item_title,
           ...asArray(detail.booking_detail_sub_items).map(
@@ -763,6 +845,13 @@ async function context(bookingNo: string, requestedDocumentId = "") {
         ...presentation,
       }));
     });
+  questionSlots = questionSlots.map((slot: any) => {
+    const matching = sectionMeta.find((entry: any) =>
+      entry.itemCode === slot.itemCode &&
+      (!slot.profileName || entry.profileName === slot.profileName),
+    );
+    return { ...slot, requestLines: matching?.requestLines || [] };
+  });
   const historyEligible = sectionMeta.filter(
       (entry: any) =>
         ["infant-spirit", "deceased-relative", "deceased-pet"].includes(entry.itemCode) ||
@@ -1357,10 +1446,14 @@ export async function POST(request: NextRequest) {
         reincarnatedAge = clean(body.reincarnatedAge),
         locationMode = clean(body.locationMode),
         locationSentence = locationSelected
-          ? locationMode === "reincarnated" && reincarnatedKind
+          ? locationMode === "reincarnated"
             ? reincarnatedKind === "animal"
               ? `目前已經投胎，現在是一隻${reincarnatedAs || "動物"}${reincarnatedPlace ? `，已投胎到${reincarnatedPlace}` : ""}。`
-              : `目前已經投胎，現在是一個${reincarnatedAs || "人"}${reincarnatedPlace ? `，已投胎到${reincarnatedPlace}` : ""}${reincarnatedAge ? `，目前約${reincarnatedAge}歲` : ""}。`
+              : reincarnatedKind === "human"
+                ? `目前已經投胎，現在是一個${reincarnatedAs || "人"}${reincarnatedPlace ? `，已投胎到${reincarnatedPlace}` : ""}${reincarnatedAge ? `，目前約${reincarnatedAge}歲` : ""}。`
+                : "目前已經投胎。"
+            : locationMode === "bridge"
+              ? `${locationSubject}現在在奈何橋。`
             : customLocation
               ? `${locationSubject}現在在${customLocation}。`
               : ""
@@ -1536,16 +1629,6 @@ export async function POST(request: NextRequest) {
         ]
           .filter(Boolean)
           .join(" ");
-      if (locationSelected && !locationSentence)
-        return NextResponse.json(
-          {
-            error:
-              locationMode === "reincarnated"
-                ? "請先選擇投胎為人或動物"
-                : "請先選擇現在的位置",
-          },
-          { status: 400 },
-        );
       if (!answer)
         return NextResponse.json(
           { error: "這些選項目前沒有可用句子" },
@@ -1565,7 +1648,7 @@ export async function POST(request: NextRequest) {
         body.questionReplies && typeof body.questionReplies === "object"
           ? body.questionReplies
           : {},
-      questionReplies: Record<string, any> = {},
+      questionReplies: Record<string, any> = { ...(data.questionReplies || {}) },
       answers: Record<string, string> = {};
     for (const slot of data.questionSlots) {
       const row = incoming[String(slot.slotIndex)] || {},
@@ -1583,7 +1666,7 @@ export async function POST(request: NextRequest) {
         body.sectionReplies && typeof body.sectionReplies === "object"
           ? body.sectionReplies
           : {},
-      sectionReplies: Record<string, any> = {},
+      sectionReplies: Record<string, any> = { ...(data.sectionReplies || {}) },
       sectionAnswers: Record<string, string> = {};
     for (const slot of data.sectionSlots) {
       const row = incomingSections[String(slot.slotIndex)] || {},
@@ -1611,7 +1694,7 @@ export async function POST(request: NextRequest) {
       phraseIds = [
         ...Object.values(questionReplies).flatMap((row: any) => row.phraseIds),
         ...Object.values(sectionReplies).flatMap((row: any) => row.phraseIds),
-      ],
+      ].map(String).filter((id) => id && !id.startsWith("virtual-")),
       finalAnswer = [
         ...Object.entries(questionReplies).map(
           ([index, row]: any) =>

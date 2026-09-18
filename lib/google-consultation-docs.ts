@@ -859,11 +859,41 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
       if (["relationship_status", "relationship_duration", "main_event", "relationship_goal", "purpose", "situation", "date_range", "location", "notes", "old_name", "business", "mode", "partner", "preferences", "favorite_words"].includes(key)) return;
       addField(fieldLabels[key], extra[key]);
     });
-    if (Array.isArray(extra.overall_focuses)) addField("目前最關心的事件", extra.overall_focuses);
     const focusDetails = extra.overall_focus_details || {};
+    const conciseFocusLabels: Record<string, Record<string, string>> = {
+      想換工作: {
+        "目前公司／產業": "公司或產業", "目前職位與主要工作內容": "職位或工作",
+        "希望轉往的方向／職務": "希望轉往", "想離開或換工作的主要原因": "離開原因",
+      },
+      職涯迷惘: {
+        "目前正在考慮的選擇": "考慮中的選擇", "目前的工作／待業狀態": "工作或待業狀態",
+        "選擇工作時最在意的條件": "最在意的條件", "目前最大的困難": "目前困難",
+      },
+      財務壓力: {
+        "最希望改善的事情": "想改善", "目前主要的壓力來源": "壓力來源",
+        "這個狀況持續多久了": "持續時間", "是否有重要期限": "重要期限",
+      },
+    };
+    const conciseFocusOrder: Record<string, string[]> = {
+      想換工作: ["目前公司／產業", "目前職位與主要工作內容", "希望轉往的方向／職務", "想離開或換工作的主要原因"],
+      職涯迷惘: ["目前正在考慮的選擇", "目前的工作／待業狀態", "選擇工作時最在意的條件", "目前最大的困難"],
+      財務壓力: ["最希望改善的事情", "目前主要的壓力來源", "這個狀況持續多久了", "是否有重要期限"],
+    };
     Object.entries(focusDetails).forEach(([focus, rows]) => {
       if (!rows || typeof rows !== "object") return;
-      Object.entries(rows as Record<string, unknown>).forEach(([label, value]) => addField(`${focus}－${label}`, value));
+      const values = rows as Record<string, unknown>;
+      const keys = conciseFocusOrder[focus] || Object.keys(values);
+      const lines = keys.map((key) => {
+        const value = text(values[key]);
+        if (!value) return "";
+        const label = conciseFocusLabels[focus]?.[key] || key.replace(/[／/]/g, "或");
+        return `${label}：${value}`;
+      }).filter(Boolean);
+      if (lines.length) {
+        add(focus, "fieldLabel");
+        lines.forEach((line) => add(line, "fieldAnswer"));
+        add("");
+      }
     });
   }
   const previousResult = compactPreviousResult(pageSpec.previousResult);

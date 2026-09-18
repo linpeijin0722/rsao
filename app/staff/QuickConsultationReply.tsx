@@ -17,6 +17,7 @@ type Question = {
   itemTitle: string;
   profileName: string;
   profileLines: string[];
+  requestLines: string[];
   manualOnly: boolean;
 };
 type PreviousLocation = {
@@ -529,6 +530,8 @@ export default function QuickConsultationReply({
           ? `地府${locationHall[targetKey]}`
           : mode === "city"
             ? "枉死城"
+            : mode === "bridge"
+              ? "奈何橋"
             : "",
       targetIsPersonalLove =
         targetSection.itemCode === "personal-romance" ||
@@ -801,7 +804,9 @@ export default function QuickConsultationReply({
         第四殿: 4,
       },
       nextRank =
-        mode === "city"
+        mode === "bridge"
+          ? 0
+          : mode === "city"
           ? 0
           : mode === "reincarnated"
             ? 5
@@ -810,7 +815,9 @@ export default function QuickConsultationReply({
               : -1,
       previous = section?.previousLocation,
       nextLabel =
-        mode === "city"
+        mode === "bridge"
+          ? "奈何橋"
+          : mode === "city"
           ? "枉死城"
           : mode === "reincarnated"
             ? "已投胎"
@@ -842,11 +849,10 @@ export default function QuickConsultationReply({
       },
     }));
     if (mode === "hell" && !hall) return;
-    if (mode === "reincarnated" && !reincarnatedKind[sectionKey]) return;
     clearTimeout(sectionTimers.current[sectionKey]);
     setSectionPending((c) => ({ ...c, [sectionKey]: true }));
     const customLocation =
-      mode === "hell" ? `地府${hall}` : mode === "city" ? "枉死城" : "";
+      mode === "hell" ? `地府${hall}` : mode === "city" ? "枉死城" : mode === "bridge" ? "奈何橋" : "";
     setError("");
     setWritten(false);
     void post({
@@ -900,50 +906,6 @@ export default function QuickConsultationReply({
     if (busy || sectionIsPending) {
       window.alert("帶入內容中請勿跳轉畫面");
       return;
-    }
-    for (let index = 0; index < sections.length; index++) {
-      const target = sections[index],
-        targetDraft = sectionDrafts[String(target.slotIndex)] || {
-          optionIds: [],
-          phraseIds: [],
-          answer: "",
-        },
-        topic = topicMap.get(
-          data?.recommendedBySection?.[String(target.slotIndex)]?.[0] || "",
-        );
-        if (["infant-spirit", "deceased-relative", "deceased-pet"].includes(target.itemCode)) {
-          const hasLocation = targetDraft.optionIds.some((id) =>
-            topic?.options.some(
-              (option) => option.id === id && option.code === "location",
-            ),
-          );
-          const mode = locationMode[String(target.slotIndex)] || "";
-          const locationComplete =
-            mode === "city" ||
-            (mode === "hell" &&
-              !!locationHall[String(target.slotIndex)]?.trim()) ||
-            (mode === "reincarnated" &&
-              !!reincarnatedKind[String(target.slotIndex)]);
-          if (!hasLocation || !locationComplete) {
-          setView("section");
-          setActiveSection(index);
-          window.alert(`【${target.label}】的「現在在哪裡」為必填，請先選擇完整位置。`);
-          return;
-        }
-      }
-      if (target.itemCode === "overall-fortune") {
-        const hasElement = targetDraft.optionIds.some((id) =>
-          topic?.options.some(
-            (option) => option.id === id && option.code.startsWith("element_"),
-          ),
-        );
-        if (!hasElement) {
-          setView("section");
-          setActiveSection(index);
-          window.alert("【整體運勢】的「本命格」為必填，請至少選擇一項。");
-          return;
-        }
-      }
     }
     if (!hasAnswer) return;
     setBusy(true);
@@ -1092,6 +1054,13 @@ export default function QuickConsultationReply({
                             <h3>用戶填寫的內容</h3>
                             {section.requestLines.map((line, index) => {
                               const split = line.indexOf("：");
+                              const heading = /^【(.+)】$/.exec(line);
+                              if (heading)
+                                return (
+                                  <div key={index} className="quickReplyInputGroupHeading">
+                                    <b>{heading[1]}</b>
+                                  </div>
+                                );
                               return (
                                 <div key={index}>
                                   <b>
@@ -1227,7 +1196,6 @@ export default function QuickConsultationReply({
                                   <div className="quickReplyLocationTitle">
                                     <h4>
                                       現在在哪裡
-                                      <em>必填</em>
                                     </h4>
                                     {section.previousLocation && (
                                         <p>
@@ -1242,6 +1210,18 @@ export default function QuickConsultationReply({
                                   </div>
                                 </div>
                                 <div className="quickReplyPrimaryChoices">
+                                  {sectionTopic.code === "infant_spirit" ? (
+                                    <>
+                                      <button
+                                        className={locationMode[sectionKey] === "bridge" ? "selected" : ""}
+                                        onClick={() => applyLocation("bridge")}
+                                      >奈何橋</button>
+                                      <button
+                                        className={locationMode[sectionKey] === "reincarnated" ? "selected" : ""}
+                                        onClick={() => applyLocation("reincarnated")}
+                                      >已投胎</button>
+                                    </>
+                                  ) : <>
                                   <button
                                     className={
                                       locationMode[sectionKey] === "hell"
@@ -1275,6 +1255,7 @@ export default function QuickConsultationReply({
                                   >
                                     已投胎
                                   </button>
+                                  </>}
                                 </div>
                                 {locationMode[sectionKey] === "hell" && (
                                   <div className="quickReplyHallChoices">
@@ -1988,12 +1969,7 @@ export default function QuickConsultationReply({
                                 <div className="quickReplySpecialHeading">
                                   <span>①</span>
                                   <div>
-                                    <h4>
-                                      本命格
-                                      {sectionTopic?.code === "overall" && (
-                                        <em>必填</em>
-                                      )}
-                                    </h4>
+                                    <h4>本命格</h4>
                                   </div>
                                 </div>
                                 <div className="quickReplySpecialChoices quickReplyFiveElements">
@@ -2435,6 +2411,23 @@ export default function QuickConsultationReply({
                           {question.profileLines.map((line, index) => (
                             <p key={index}>{line}</p>
                           ))}
+                        </section>
+                      )}
+                      {question.requestLines?.length > 0 && (
+                        <section className="quickReplyInputCard">
+                          <h3>用戶填寫的內容</h3>
+                          {question.requestLines.map((line, index) => {
+                            const split = line.indexOf("：");
+                            const heading = /^【(.+)】$/.exec(line);
+                            if (heading)
+                              return <div key={index} className="quickReplyInputGroupHeading"><b>{heading[1]}</b></div>;
+                            return (
+                              <div key={index}>
+                                <b>{split >= 0 ? line.slice(0, split) : "補充內容"}</b>
+                                <p>{split >= 0 ? line.slice(split + 1) : line}</p>
+                              </div>
+                            );
+                          })}
                         </section>
                       )}
                       {!question.manualOnly && category && (
