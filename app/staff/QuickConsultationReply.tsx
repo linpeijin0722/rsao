@@ -1089,12 +1089,6 @@ export default function QuickConsultationReply({
                 >
                   項目標籤回覆
                 </button>
-                <button
-                  className={view === "question" ? "active" : ""}
-                  onClick={() => setView("question")}
-                >
-                  客人問題 Q&amp;A
-                </button>
               </nav>
               {data.previousSummaries?.length > 0 && (
                 <section className="quickReplyPreviousSummary">
@@ -2849,7 +2843,6 @@ export default function QuickConsultationReply({
                 </button>
                 {footerProfileLines.length > 0 && (
                   <div className="quickReplyFooterProfile" aria-label="本項目諮詢者資料">
-                    <b>本項目諮詢者資料</b>
                     <div>
                       {footerProfileLines.map((line, index) => <span key={index}>{line}</span>)}
                     </div>
