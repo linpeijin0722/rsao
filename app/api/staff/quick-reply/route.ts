@@ -161,112 +161,112 @@ const overallBuiltInOptions = [
   {
     id: "virtual-overall-steady",
     code: "status_overall_steady",
-    label: "運勢平穩",
+    label: "目前穩定，短期沒有大變動",
     sort_order: 101,
     is_active: true,
   },
   {
     id: "virtual-overall-better",
     code: "status_overall_better",
-    label: "慢慢轉好",
+    label: "阻力正在減少，卡關可重啟",
     sort_order: 102,
     is_active: true,
   },
   {
     id: "virtual-overall-rising",
     code: "status_overall_rising",
-    label: "運勢漸旺",
+    label: "人脈與機會同步增加",
     sort_order: 103,
     is_active: true,
   },
   {
     id: "virtual-overall-sweet",
     code: "status_overall_sweet",
-    label: "先苦後甘",
+    label: "前段辛苦，後段開始收成果",
     sort_order: 104,
     is_active: true,
   },
   {
     id: "virtual-overall-help",
     code: "status_overall_help",
-    label: "貴人助力增加",
+    label: "會有人主動提供協助",
     sort_order: 105,
     is_active: true,
   },
   {
     id: "virtual-overall-chance",
     code: "status_overall_chance",
-    label: "機會慢慢出現",
+    label: "工作、人脈或邀約帶來新機會",
     sort_order: 106,
     is_active: true,
   },
   {
     id: "virtual-overall-busy",
     code: "status_overall_busy",
-    label: "忙中有收穫",
+    label: "工作量增加，但成果看得見",
     sort_order: 107,
     is_active: true,
   },
   {
     id: "virtual-overall-adjust",
     code: "status_overall_adjust",
-    label: "需要調整步調",
+    label: "事情過多，需要重排優先順序",
     sort_order: 108,
     is_active: true,
   },
   {
     id: "virtual-overall-hold",
     code: "status_overall_hold",
-    label: "目前宜守成",
+    label: "不宜大變動，先守住現況",
     sort_order: 109,
     is_active: true,
   },
   {
     id: "virtual-overall-break",
     code: "status_overall_break",
-    label: "即將突破關卡",
+    label: "卡關處會出現具體解法",
     sort_order: 110,
     is_active: true,
   },
   {
     id: "virtual-overall-advice-steady",
     code: "advice_overall_steady",
-    label: "穩住自己",
+    label: "先固定作息與工作節奏",
     sort_order: 201,
     is_active: true,
   },
   {
     id: "virtual-overall-advice-focus",
     code: "advice_overall_focus",
-    label: "先處理眼前事情",
+    label: "只保留三件最優先的事",
     sort_order: 202,
     is_active: true,
   },
   {
     id: "virtual-overall-advice-patience",
     code: "advice_overall_patience",
-    label: "保持耐心",
+    label: "重要決定延後確認，不急著答應",
     sort_order: 203,
     is_active: true,
   },
   {
     id: "virtual-overall-advice-plan",
     code: "advice_overall_plan",
-    label: "做好規劃再行動",
+    label: "先列成本、風險與退路再行動",
     sort_order: 204,
     is_active: true,
   },
   {
     id: "virtual-overall-advice-rest",
     code: "advice_overall_rest",
-    label: "適度休息調整",
+    label: "安排固定休息，避免疲勞判斷",
     sort_order: 205,
     is_active: true,
   },
   {
     id: "virtual-overall-advice-help",
     code: "advice_overall_help",
-    label: "善用身邊資源",
+    label: "主動找可靠的人分工或詢問",
     sort_order: 206,
     is_active: true,
   },
@@ -337,37 +337,37 @@ const overallBuiltInOptions = [
 ];
 const overallBuiltInCopy: Record<string, string> = {
   status_overall_steady:
-    "整體的運勢算是平穩，沒有什麼太大的問題，只是很多事情不會一下子就看到結果，慢慢做、穩穩來，反而比較容易把事情做好。",
+    "目前整體狀況穩定，短期內不會有太大的變動。手上的計畫可以照原定進度進行，但不適合同時新增太多目標。",
   status_overall_better:
-    "前一段時間可能會覺得事情比較卡，做什麼都不是很順，不過現在運勢有慢慢往好的方向走，接下來會比之前輕鬆一些，有些事情也會開始慢慢有進展。",
+    "前一段時間卡住的事情正在鬆動，現在適合把擱置的工作、申請或聯絡重新啟動，比繼續等待更容易看到進展。",
   status_overall_rising:
-    "現在的運勢有慢慢起來，但不會突然一下子就大旺，而是慢慢累積起來。只要自己不要太急，接下來會越來越順。",
+    "近期人脈與機會會一起增加，新的合作、工作邀約或他人介紹值得留意；先確認條件，再選最適合的一項投入。",
   status_overall_sweet:
-    "這段時間可能會比較辛苦一點，很多事情都要自己處理，也比較容易覺得累，但是後面的運勢會慢慢拉起來，不用太擔心。",
+    "前段需要自己處理較多問題，付出的時間也比較長；後段會開始看到成果，先把已投入的事情完成，不要中途更換方向。",
   status_overall_help:
-    "接下來身邊的貴人助力會比之前明顯，有些原本只能自己處理的事情，慢慢會有人願意提供意見或幫忙。",
+    "近期會有人主動提供資訊、引薦或實際協助。遇到問題要直接說明需求，越具體越容易得到有效幫忙。",
   status_overall_chance:
-    "目前新的機會正在慢慢出現，雖然一開始不一定很明顯，但只要多留意身邊的變化，會找到適合自己的方向。",
+    "新機會主要會從工作往來、人脈介紹或臨時邀約出現。收到消息時先確認內容與期限，不要因為猶豫而錯過回覆時間。",
   status_overall_busy:
-    "最近事情會比較多，也容易覺得忙碌，不過這些付出不會白費，後面可以慢慢看到成果。",
+    "最近工作量會增加，但完成後能換到實際成果或評價。要先排截止日，避免同時處理太多事情而漏掉重要細節。",
   status_overall_adjust:
-    "目前不是運勢不好，而是做事的步調需要稍微調整。不要每件事都急著一次完成，分清楚先後順序會更順。",
+    "目前的問題不是沒有機會，而是事情太多、順序混亂。先刪除不必要的安排，再依期限與重要程度重新排序。",
   status_overall_hold:
-    "現階段比較適合先把手上的事情顧好，不需要急著做太大的變動。基礎穩定之後，再往下一步走會比較安全。",
+    "現階段不適合突然離職、投入大筆資金或一次改變太多事情。先守住收入與既有成果，條件確認完整後再變動。",
   status_overall_break:
-    "現在已經慢慢走到轉折的位置，原本卡住的事情有機會出現突破口，再多堅持一下，後面會比目前順利。",
+    "原本卡住的事情會出現具體解法，可能是關鍵資訊、可協助的人，或替代方案。找到突破口後要立即處理，不要再拖延。",
   advice_overall_steady:
-    "現在比較重要的不是一直往外衝，而是先把自己的生活、工作和心情穩下來。先把眼前的事情處理好，後面的路會慢慢清楚。",
+    "先固定睡眠、工作與處理事情的時間，連續維持穩定節奏，再評估下一步；狀態不穩時不要做重大決定。",
   advice_overall_focus:
-    "先把眼前最重要的事情一件一件處理好，不需要同時顧太多方向；事情有順序之後，心裡也會比較安定。",
+    "把目前事項列出來，只保留三件最重要且有期限的事先完成，其餘延後，避免每件都做卻沒有一件完成。",
   advice_overall_patience:
-    "目前做事情需要多一點耐心，有些結果只是還沒有到時間，不代表沒有進展，穩穩做下去會比較有利。",
+    "重要合作、離職或金錢決定不要當下答應，至少把條件重新確認一次；資訊不完整時先保留，不要勉強決定。",
   advice_overall_plan:
-    "遇到重要決定時可以先做好規劃，把可能的狀況想清楚再行動，會比一時衝動更容易得到好的結果。",
+    "行動前先列出預算、最壞風險與退出方式，三項都能承擔再開始；其中一項不清楚，就先補齊資料。",
   advice_overall_rest:
-    "最近如果覺得心累或身體比較疲倦，要記得留一點時間休息。自己的狀態調整好，做事情才不容易一直卡住。",
+    "每週安排固定休息時間，疲倦或睡眠不足時不要處理重要文件、駕駛長途或做高風險決定。",
   advice_overall_help:
-    "有些事情不用全部自己扛，可以多聽聽身邊可靠的人怎麼看，也可以善用現有的資源，會讓事情推進得更順。",
+    "把需要協助的事情說清楚，直接找有經驗、能做決定或能提供資源的人詢問；可以分工的事情不要全部自己扛。",
   recent_positive_windfall: "最近有一些偏財機會，可以多留意額外收入或意外出現的小收穫，但仍要量力而為。",
   recent_positive_support: "最近的貴人運比較明顯，遇到問題時容易有人提供意見或伸手幫忙。",
   recent_positive_progress: "最近工作上的事情會慢慢有進展，原本卡住的地方也比較有機會往前推動。",
@@ -1759,14 +1759,19 @@ export async function POST(request: NextRequest) {
           .map((entry: any) => render(entry.content))
           .filter(Boolean)
           .join(" "),
+        overallBody = overallChosenGroup(["body_"]),
+        overallStatus = overallChosenGroup(["status_overall_"]),
+        overallRecent = chosen
+          .filter((entry: any) => String(entry.optionCode || "").startsWith("recent_") && !String(entry.optionCode || "").startsWith("recent_advice_"))
+          .map((entry: any) => render(entry.content)).filter(Boolean).join(" "),
+        overallAdvice = [overallChosenGroup(["advice_overall_", "recent_advice_"]), overallOther].filter(Boolean).join(" "),
+        overallDestiny = [elementSentence, deitySentence].filter(Boolean).join(" "),
         overallAnswer = [
-          elementSentence ? `${safeHeading("本命格")}\n${elementSentence}` : "",
-          overallChosenGroup(["status_overall_"]) ? `${safeHeading("整體運勢")}\n${overallChosenGroup(["status_overall_"])}` : "",
-          deitySentence ? `${safeHeading("暗貴人")}\n${deitySentence}` : "",
-          overallChosenGroup(["advice_overall_"]) ? `${safeHeading("建議")}\n${overallChosenGroup(["advice_overall_"])}` : "",
-          overallChosenGroup(["recent_"]) ? `${safeHeading("最近狀況")}\n${overallChosenGroup(["recent_"])}` : "",
-          overallChosenGroup(["body_"]) ? `${safeHeading("身體狀況")}\n${overallChosenGroup(["body_"])}` : "",
-          overallOther ? `${safeHeading("其他補充")}\n${overallOther}` : "",
+          overallBody ? `${safeHeading("身體狀況")}\n${overallBody}` : "",
+          overallDestiny ? `${safeHeading("本命格")}\n${overallDestiny}` : "",
+          overallStatus ? `${safeHeading("整體運勢")}\n${overallStatus}` : "",
+          overallRecent ? `${safeHeading("最近狀況")}\n${overallRecent}` : "",
+          overallAdvice ? `${safeHeading("建議")}\n${overallAdvice}` : "",
         ].filter(Boolean).join("\n\n"),
         answer = personalLove
           ? [
