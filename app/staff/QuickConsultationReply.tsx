@@ -104,6 +104,10 @@ export default function QuickConsultationReply({
     [reincarnatedPlace, setReincarnatedPlace] = useState<Record<string, string>>({}),
     [reincarnatedAge, setReincarnatedAge] = useState<Record<string, string>>({}),
     [infantYears, setInfantYears] = useState<Record<string, string>>({}),
+    [partner2Enabled, setPartner2Enabled] = useState<Record<string, boolean>>({}),
+    [partner2Selections, setPartner2Selections] = useState<Record<string, string[]>>({}),
+    [romanceAges, setRomanceAges] = useState<Record<string, string[]>>({}),
+    [divorceAges, setDivorceAges] = useState<Record<string, string[]>>({}),
     [customDeity, setCustomDeity] = useState<Record<string, string>>({}),
     [worshipDeities, setWorshipDeities] = useState<Record<string, string[]>>({}),
     [namingRows, setNamingRows] = useState<
@@ -396,6 +400,20 @@ export default function QuickConsultationReply({
       section?.itemCode === "personal-romance" ||
       /個人感情運|僅看自己/.test(section?.label || ""),
     showPartnerPersonality = sectionTopic?.code === "love";
+  const selfPersonalityGroups = Object.entries(
+    selfPersonalityOptions.reduce<Record<string, Option[]>>((groups, option) => {
+      const text = option.label;
+      const group = /固執|說教|急|敏感|想太多|心軟|沒安全感/.test(text)
+        ? "需要留意的個性"
+        : /原則|能力|反應|責任|做事|穩重|成熟/.test(text)
+          ? "做事與責任感"
+          : /助人|同情|人緣|忠厚|重感情|體貼/.test(text)
+            ? "待人與感情態度"
+            : "內在想法與相處方式";
+      groups[group] = [...(groups[group] || []), option];
+      return groups;
+    }, {}),
+  );
   const deceasedLayout = ["deceased", "infant_spirit"].includes(sectionTopic?.code || "");
   const question = data?.questions[activeQuestion],
     questionKey = String(question?.slotIndex ?? 0),
@@ -529,6 +547,7 @@ export default function QuickConsultationReply({
     targetKey = sectionKey,
     requestVersion?: number,
     worshipOverride?: string[],
+    partner2Override?: string[],
   ) {
     if (!targetSection || !optionIds.length) return;
     const version =
@@ -550,10 +569,12 @@ export default function QuickConsultationReply({
     setError("");
     setWritten(false);
     try {
+      const partner2Ids = partner2Override || partner2Selections[targetKey] || [];
       const x = await post({
         mode: "compose_section",
         sectionSlotIndex: Number(targetKey),
-        optionIds,
+        optionIds: Array.from(new Set([...optionIds, ...partner2Ids])),
+        partner2OptionIds: partner2Ids,
         locationMode: mode,
         customLocation,
         reincarnatedAs: reincarnatedAs[targetKey] || "",
@@ -561,6 +582,8 @@ export default function QuickConsultationReply({
         reincarnatedPlace: reincarnatedPlace[targetKey] || "",
         reincarnatedAge: reincarnatedAge[targetKey] || "",
         infantYears: infantYears[targetKey] || "",
+        romanceAges: romanceAges[targetKey] || [],
+        divorceAges: divorceAges[targetKey] || [],
         customDeity:
           customDeity[targetKey] ||
           [
@@ -1854,22 +1877,23 @@ export default function QuickConsultationReply({
                                     <h4>自己的個性</h4>
                                   </div>
                                 </div>
-                                <div className="quickReplySpecialChoices">
-                                  {selfPersonalityOptions.map((o) => (
-                                    <button
-                                      key={o.id}
-                                      className={
-                                        sectionDraft.optionIds.includes(o.id)
-                                          ? "selected"
-                                          : ""
-                                      }
-                                      onClick={() => toggleOption(o.id)}
-                                    >
-                                      {sectionDraft.optionIds.includes(
-                                        o.id,
-                                      ) && <span>✓</span>}
-                                      {o.label}
-                                    </button>
+                                <div className="quickReplyPersonalityGroups">
+                                  {selfPersonalityGroups.map(([group, options]) => (
+                                    <div key={group}>
+                                      <h5>{group}</h5>
+                                      <div className="quickReplySpecialChoices">
+                                        {options.map((o) => (
+                                          <button
+                                            key={o.id}
+                                            className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""}
+                                            onClick={() => toggleOption(o.id)}
+                                          >
+                                            {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}
+                                            {o.label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
                                   ))}
                                 </div>
                               </div>
@@ -1905,8 +1929,69 @@ export default function QuickConsultationReply({
                                       </button>
                                     ))}
                                   </div>
+                                  {isPersonalLove && (
+                                    <div className="quickReplyPartnerTwo">
+                                      {!partner2Enabled[sectionKey] ? (
+                                        <button
+                                          className="quickReplyAddPartner"
+                                          onClick={() => setPartner2Enabled((current) => ({ ...current, [sectionKey]: true }))}
+                                        >＋ 增加對象2</button>
+                                      ) : (
+                                        <>
+                                          <div className="quickReplyPartnerTwoHeading">
+                                            <h5>對象2（可另外選擇）</h5>
+                                            <button onClick={() => {
+                                              setPartner2Enabled((current) => ({ ...current, [sectionKey]: false }));
+                                              setPartner2Selections((current) => ({ ...current, [sectionKey]: [] }));
+                                              void composeSection(sectionDraft.optionIds, false, section, sectionKey, undefined, undefined, []);
+                                            }}>移除對象2</button>
+                                          </div>
+                                          <div className="quickReplySpecialChoices">
+                                            {partnerPersonalityOptions.map((o) => {
+                                              const selected = (partner2Selections[sectionKey] || []).includes(o.id);
+                                              return (
+                                                <button
+                                                  key={`partner2-${o.id}`}
+                                                  className={selected ? "selected" : ""}
+                                                  onClick={() => {
+                                                    const current = partner2Selections[sectionKey] || [];
+                                                    const next = selected ? current.filter((id) => id !== o.id) : [...current, o.id];
+                                                    setPartner2Selections((values) => ({ ...values, [sectionKey]: next }));
+                                                    void composeSection(sectionDraft.optionIds, false, section, sectionKey, undefined, undefined, next);
+                                                  }}
+                                                >
+                                                  {selected && <span>✓</span>}{o.label}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               )}
+                            {isPersonalLove && (
+                              <div className="quickReplySpecialField quickReplyRomanceTiming">
+                                <div className="quickReplySpecialHeading">
+                                  <span>⑤</span>
+                                  <div><h4>感情時間</h4></div>
+                                </div>
+                                <h5>紅鸞星動時間（最多三個）</h5>
+                                <div className="quickReplyAgeInputs">
+                                  {[0, 1, 2].map((index) => (
+                                    <label key={`romance-${index}`}><input inputMode="numeric" value={romanceAges[sectionKey]?.[index] || ""} onChange={(e) => setRomanceAges((current) => { const next = [...(current[sectionKey] || [])]; next[index] = e.target.value.replace(/\D/g, ""); return { ...current, [sectionKey]: next }; })} placeholder={`年齡${index + 1}`} /><span>歲</span></label>
+                                  ))}
+                                </div>
+                                <h5>離婚或離異高風險年齡（最多兩個）</h5>
+                                <div className="quickReplyAgeInputs two">
+                                  {[0, 1].map((index) => (
+                                    <label key={`divorce-${index}`}><input inputMode="numeric" value={divorceAges[sectionKey]?.[index] || ""} onChange={(e) => setDivorceAges((current) => { const next = [...(current[sectionKey] || [])]; next[index] = e.target.value.replace(/\D/g, ""); return { ...current, [sectionKey]: next }; })} placeholder={`年齡${index + 1}`} /><span>歲</span></label>
+                                  ))}
+                                </div>
+                                <button className="quickReplyApplyTiming" onClick={() => void composeSection(sectionDraft.optionIds)}>帶入感情時間</button>
+                              </div>
+                            )}
                             {sectionTopic?.code === "home" && [
                               ["①", "房子目前狀況", homeConditionOptions],
                               ["②", "對人的影響", homeImpactOptions],

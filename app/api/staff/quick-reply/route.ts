@@ -19,6 +19,16 @@ const asArray = (value: any): any[] =>
   Array.isArray(value) ? value : value ? [value] : [];
 const clean = (value: any) => String(value || "").trim();
 const loveBuiltInOptions = [
+  { id: "virtual-self-personality-loyal", code: "self_personality_loyal", label: "忠厚重感情", sort_order: 201, is_active: true },
+  { id: "virtual-self-personality-empathy", code: "self_personality_empathy", label: "有同情心", sort_order: 202, is_active: true },
+  { id: "virtual-self-personality-principled", code: "self_personality_principled", label: "做事講原則", sort_order: 203, is_active: true },
+  { id: "virtual-self-personality-responsive", code: "self_personality_responsive", label: "反應靈敏", sort_order: 204, is_active: true },
+  { id: "virtual-self-personality-capable", code: "self_personality_capable", label: "有能力", sort_order: 205, is_active: true },
+  { id: "virtual-self-personality-helpful", code: "self_personality_helpful", label: "熱心助人", sort_order: 206, is_active: true },
+  { id: "virtual-self-personality-responsible", code: "self_personality_responsible", label: "有責任心", sort_order: 207, is_active: true },
+  { id: "virtual-self-personality-stubborn", code: "self_personality_stubborn", label: "容易固執己見", sort_order: 208, is_active: true },
+  { id: "virtual-self-personality-preachy", code: "self_personality_preachy", label: "有時比較愛說教", sort_order: 209, is_active: true },
+  { id: "virtual-self-personality-mature", code: "self_personality_mature", label: "想法成熟穩重", sort_order: 210, is_active: true },
   {
     id: "virtual-love-trend-better",
     code: "love_trend_getting_better",
@@ -56,6 +66,16 @@ const loveBuiltInOptions = [
   },
 ];
 const loveBuiltInCopy: Record<string, string> = {
+  self_personality_loyal: "個性忠厚，也很重感情。",
+  self_personality_empathy: "有人緣，也會有同情心。",
+  self_personality_principled: "有耿直的心性，做事情會講求原則。",
+  self_personality_responsive: "反應靈敏，遇到事情能很快掌握狀況。",
+  self_personality_capable: "本身有能力，交代的事情通常能處理好。",
+  self_personality_helpful: "有熱心助人的心性，看到別人需要時會願意幫忙。",
+  self_personality_responsible: "有責任心，答應的事情會想辦法做到。",
+  self_personality_stubborn: "但是容易固執己見，有時候不太容易聽進別人的想法。",
+  self_personality_preachy: "有時候想法會比較清高，而顯得比較愛說教。",
+  self_personality_mature: "想法基本成熟，做事情也穩重。",
   love_trend_getting_better:
     "感情方面會慢慢進入比較好的狀態，不用急著要求馬上有結果，照著自己的步調往前，後面的發展會比現在順一些。",
   advice_expand_social:
@@ -1421,8 +1441,12 @@ export async function POST(request: NextRequest) {
         selfRows = valid.filter((selection) =>
           selection.optionCode.startsWith("self_personality_"),
         ),
+        partner2Ids = new Set(asArray(body.partner2OptionIds).map(String)),
         partnerRows = valid.filter((selection) =>
-          selection.optionCode.startsWith("partner_personality_"),
+          selection.optionCode.startsWith("partner_personality_") && !partner2Ids.has(selection.optionId),
+        ),
+        partner2Rows = valid.filter((selection) =>
+          selection.optionCode.startsWith("partner_personality_") && partner2Ids.has(selection.optionId),
         ),
         elementRows = valid.filter((selection) =>
           selection.optionCode.startsWith("element_"),
@@ -1564,25 +1588,30 @@ export async function POST(request: NextRequest) {
         personalLove = body.personalLove === true,
         pickRows = (rows: any[]) =>
           rows
-            .map((row) =>
-              pick(
+            .map((row) => row.optionId.startsWith("virtual-")
+              ? { id: row.optionId, content: loveBuiltInCopy[row.optionCode] || "" }
+              : pick(
                 (phrases || []).filter(
                   (entry: any) => entry.option_id === row.optionId,
                 ),
                 previous,
               ),
             )
-            .filter(Boolean) as any[],
+            .filter((entry: any) => entry?.content) as any[],
         selfPhrases = pickRows(selfRows),
         partnerPhrases = pickRows(partnerRows),
+        partner2Phrases = pickRows(partner2Rows),
         selfSentence = selfPhrases
           .map((entry, index) => {
             let value = render(entry.content);
-            if (index === 0)
-              return value
-                .replace(/^你自己的/, `本身(${selfName})`)
-                .replace(/^你的/, `本身(${selfName})的`)
-                .replace(/^你/, `本身(${selfName})`);
+            if (index === 0) {
+              const prefix = personalLove ? `(${selfName})` : `本身(${selfName})`;
+              const transformed = value
+                .replace(/^你自己的/, prefix)
+                .replace(/^你的/, `${prefix}的`)
+                .replace(/^你/, prefix);
+              return transformed === value ? `${prefix}${value}` : transformed;
+            }
             return value
               .replace(/^你自己的/, "")
               .replace(/^你的/, "")
@@ -1594,16 +1623,32 @@ export async function POST(request: NextRequest) {
           .map((entry, index) => {
             let value = render(entry.content);
             if (personalLove)
-              return index === 0
-                ? value
-                    .replace(/^對方的個性/, "容易遇到的對象，個性")
-                    .replace(/^對方/, "容易遇到的對象，")
-                : value.replace(/^對方的?/, "").trim();
+              return value
+                .replace(/^容易遇到的對象[，,]?/, "")
+                .replace(/^對方的個性/, "")
+                .replace(/^對方的?/, "")
+                .trim();
             return index === 0
               ? value.replace(/^對方/, `對方(${partnerName})`)
               : value;
           })
-          .join(" ");
+          .join(" "),
+        partner2Sentence = partner2Phrases
+          .map((entry, index) => {
+            const value = render(entry.content);
+            return index === 0
+              ? value.replace(/^對方的個性/, "").replace(/^對方的?/, "").trim()
+              : value.replace(/^對方的?/, "").trim();
+          })
+          .join(" "),
+        romanceAges = asArray(body.romanceAges).map(clean).filter(Boolean).slice(0, 3),
+        divorceAges = asArray(body.divorceAges).map(clean).filter(Boolean).slice(0, 2),
+        romanceTimingSentence = romanceAges.length
+          ? `紅鸞星：會落在${romanceAges.map((age) => `${age}歲`).join("、")}（容易會遇到有緣份的對象，或者是感情會有明顯進展。）`
+          : "",
+        divorceTimingSentence = divorceAges.length
+          ? `而離婚或離異的高風險年齡則要特別注意：${divorceAges.map((age) => `${age}歲`).join("、")}。`
+          : "";
       const elementLabels = elementRows.map((row) => row.optionLabel),
         elementTraits: Record<string, string> = {
           金: "做事果斷，對專業和細節有要求",
@@ -1653,19 +1698,30 @@ export async function POST(request: NextRequest) {
           : uniqueWorshipDeities.length
             ? `有空可以多拜${uniqueWorshipDeities.join("、")}，對自己會有最直接的助力。`
             : "",
-        answer = [
+        standardAnswerParts = [
           locationSentence,
           elementSentence,
           deitySentence,
           meetSentence,
-          selfSentence,
-          partnerSentence,
           ...chosen.map((entry) => render(entry.content)),
           combinedHelp,
           combinedScripture,
-        ]
-          .filter(Boolean)
-          .join(" ");
+        ].filter(Boolean),
+        safeHeading = (label: string) => `\u2060【${label}】`,
+        answer = personalLove
+          ? [
+              selfSentence ? `${safeHeading("本身的個性")}\n${selfSentence}` : "",
+              partnerSentence || partner2Sentence
+                ? `${safeHeading("對象特質")}\n以下是容易遇到的對象特質\n${[
+                    partnerSentence ? `對象1：${partnerSentence}` : "",
+                    partner2Sentence ? `對象2：${partner2Sentence}` : "",
+                  ].filter(Boolean).join("\n")}`
+                : "",
+              romanceTimingSentence || divorceTimingSentence || standardAnswerParts.length
+                ? `${safeHeading("感情運")}\n${[romanceTimingSentence, divorceTimingSentence].filter(Boolean).join("\n")}${(romanceTimingSentence || divorceTimingSentence) && standardAnswerParts.length ? "\n\n" : ""}${standardAnswerParts.join(" ")}`
+                : "",
+            ].filter(Boolean).join("\n\n")
+          : [selfSentence, partnerSentence, ...standardAnswerParts].filter(Boolean).join(" ");
       if (!answer)
         return NextResponse.json(
           { error: "這些選項目前沒有可用句子" },
@@ -1674,7 +1730,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         ok: true,
         answer,
-        phraseIds: [...chosen, ...selfPhrases, ...partnerPhrases].map(
+        phraseIds: [...chosen, ...selfPhrases, ...partnerPhrases, ...partner2Phrases].map(
           (entry) => entry.id,
         ),
       });
