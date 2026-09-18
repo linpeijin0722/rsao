@@ -1227,6 +1227,22 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
   color:#951638!important;
   box-shadow:0 0 0 2px rgba(169,20,54,.08)!important;
 }
+.quickReplyInfantBridgeChoices{
+  display:block!important;
+  grid-column:1 / -1!important;
+  padding:12px!important;
+  border:1px solid #e1d4cb!important;
+  border-radius:11px!important;
+  background:#fffaf7!important;
+}
+.quickReplyInfantBridgeChoices h5{margin:0 0 10px;color:#65483d;font-size:16px;text-align:left}
+.quickReplyInfantBridgeChoices .quickReplySpecialChoices{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}
+.quickReplyYearsInput{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:9px}
+.quickReplyYearsInput input{min-height:46px;padding:9px 12px;border:1px solid #d8c5bb;border-radius:10px;background:#fff;font-size:16px}
+.quickReplyYearsInput span{color:#5f443a;font-size:16px;font-weight:800}
+.quickReplyYearsInput button{min-height:46px;padding:9px 22px;border:0!important;border-radius:10px!important;background:#244f46!important;color:#fff!important;font-size:16px!important;font-weight:900!important}
+.quickReplyYearsInput button:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:640px){.quickReplyInfantBridgeChoices .quickReplySpecialChoices{grid-template-columns:1fr!important}.quickReplyYearsInput{grid-template-columns:minmax(0,1fr) auto}.quickReplyYearsInput button{grid-column:1 / -1}}
 .quickReplyReincarnatedDetails{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;padding:12px;border:1px solid #e1d4cb;border-radius:10px;background:#fffaf7}
 .quickReplyReincarnatedDetails label{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto!important;align-items:center!important;gap:5px!important;text-align:left}
 .quickReplyReincarnatedDetails input{width:100%!important;box-sizing:border-box!important}

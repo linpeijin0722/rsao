@@ -67,6 +67,30 @@ const loveBuiltInCopy: Record<string, string> = {
   advice_care_for_self:
     "現階段可以先把自己的生活照顧好，讓心情和生活都穩定下來；當自己的狀態越來越好，也會更容易吸引到適合的人。",
 };
+const infantBuiltInRows = [
+  ["infant_bridge_stones", "玩石頭", "寶寶目前還在奈何橋底下，有時候會自己玩石頭。"],
+  ["infant_bridge_self_play", "自己玩耍", "寶寶目前還在奈何橋底下，有時候會自己玩耍。"],
+  ["infant_bridge_friends", "會跟其他小朋友玩", "寶寶目前還在奈何橋底下，有時候會跟其他小朋友一起玩。"],
+  ["infant_rebirth_excellent", "機會很好", "現在投胎的機會滿好的，已經有地方可以去了，時間到了就會去投胎。"],
+  ["infant_rebirth_available", "有機會了", "現在已經有投胎的機會了，只是還在等時間，還沒有真的走。"],
+  ["infant_rebirth_waiting", "正在等", "現在還在等投胎，還沒有那麼快，但已經慢慢有機會了。"],
+  ["infant_rebirth_choosing", "還在挑", "現在有看到幾個可以投胎的地方，還在看看哪一個比較適合。"],
+  ["infant_rebirth_undecided", "還沒決定", "現在還沒有決定好要去哪裡投胎，所以還在那邊等著。"],
+  ["infant_rebirth_early", "機會還早", "現在投胎的機會還沒有那麼快，還要再等一陣子。"],
+  ["infant_rebirth_not_ready", "暫時不想投胎", "現在還沒有很想急著投胎，自己在那邊待著、玩著，還沒有要走。"],
+  ["infant_rebirth_blocked", "卡著還沒走", "現在還在那邊，投胎這件事情還沒有走得很順，所以暫時還沒辦法去。"],
+  ["infant_rebirth_years", "大約多久可以投胎", "大約還要{infantYears}年可以投胎。"],
+] as const;
+const meritBuiltInRows = [
+  ["buddhist_merit_very_good", "有很好的福德", "本身有很好的福德，很多事情都能得到一些善緣與助力。"],
+  ["buddhist_merit_good", "福德不錯", "本身累積的福德不錯，遇到事情時比較容易有人幫忙，也比較有機會慢慢化開。"],
+] as const;
+const spiritBuiltInOptions = [...infantBuiltInRows, ...meritBuiltInRows].map(([code, label], index) => ({
+  id: `virtual-${code.replaceAll("_", "-")}`, code, label, sort_order: 700 + index, is_active: true,
+}));
+const spiritBuiltInCopy = Object.fromEntries(
+  [...infantBuiltInRows, ...meritBuiltInRows].map(([code, , content]) => [code, content]),
+) as Record<string, string>;
 const overallBuiltInOptions = [
   {
     id: "virtual-deity-wangmu",
@@ -678,6 +702,16 @@ async function context(bookingNo: string, requestedDocumentId = "") {
   if (deceasedTopic && infantTopic) {
     const infantOptions = new Map(infantTopic.options.map((option: any) => [option.code, option]));
     infantTopic.options = deceasedTopic.options.map((option: any) => infantOptions.get(option.code) || option);
+  }
+  for (const topic of normalizedTopics) {
+    if (["deceased", "deceased_pet", "infant_spirit"].includes(topic.code)) {
+      for (const option of spiritBuiltInOptions) {
+        const infantOnly = option.code.startsWith("infant_");
+        if ((!infantOnly || topic.code === "infant_spirit") && !topic.options.some((entry: any) => entry.code === option.code))
+          topic.options.push(option);
+      }
+      topic.options.sort((a: any, b: any) => a.sort_order - b.sort_order);
+    }
   }
   const itemTopic: Record<string, string> = {
     "infant-spirit": "infant_spirit",
@@ -1425,6 +1459,7 @@ export async function POST(request: NextRequest) {
                     overallBuiltInCopy[selection.optionCode] ||
                     homeBuiltInCopy[selection.optionCode] ||
                     spiritualBuiltInCopy[selection.optionCode] ||
+                    spiritBuiltInCopy[selection.optionCode] ||
                     "",
                 }
               : pick(
@@ -1444,6 +1479,7 @@ export async function POST(request: NextRequest) {
         reincarnatedKind = clean(body.reincarnatedKind),
         reincarnatedPlace = clean(body.reincarnatedPlace),
         reincarnatedAge = clean(body.reincarnatedAge),
+        infantYears = clean(body.infantYears),
         locationMode = clean(body.locationMode),
         locationSentence = locationSelected
           ? locationMode === "reincarnated"
@@ -1485,6 +1521,7 @@ export async function POST(request: NextRequest) {
               .replaceAll("{pronoun}", pronoun)
               .replaceAll("{deity}", deity)
               .replaceAll("{visitTarget}", visitTarget)
+              .replaceAll("{infantYears}", infantYears || "一段時間")
               .replaceAll("{customVisitReason}", customVisitReason)
               .trim(),
           ),

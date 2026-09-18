@@ -103,6 +103,7 @@ export default function QuickConsultationReply({
     [reincarnatedKind, setReincarnatedKind] = useState<Record<string, "human" | "animal">>({}),
     [reincarnatedPlace, setReincarnatedPlace] = useState<Record<string, string>>({}),
     [reincarnatedAge, setReincarnatedAge] = useState<Record<string, string>>({}),
+    [infantYears, setInfantYears] = useState<Record<string, string>>({}),
     [customDeity, setCustomDeity] = useState<Record<string, string>>({}),
     [worshipDeities, setWorshipDeities] = useState<Record<string, string[]>>({}),
     [namingRows, setNamingRows] = useState<
@@ -246,6 +247,14 @@ export default function QuickConsultationReply({
           o.code.startsWith("deceased_offering_") &&
           !o.code.startsWith("deceased_offering_reason_"),
       ) || [],
+    infantBridgeOptions =
+      sectionTopic?.options.filter((o) => o.code.startsWith("infant_bridge_")) || [],
+    infantRebirthOptions =
+      sectionTopic?.options.filter(
+        (o) => o.code.startsWith("infant_rebirth_") && o.code !== "infant_rebirth_years",
+      ) || [],
+    infantYearsOption =
+      sectionTopic?.options.find((o) => o.code === "infant_rebirth_years"),
     loveTrendOptions =
       sectionTopic?.options.filter((o) => o.code.startsWith("love_trend_")) ||
       [],
@@ -271,7 +280,8 @@ export default function QuickConsultationReply({
               !o.code.startsWith("buddhist_") &&
               !o.code.startsWith("status_") &&
               !o.code.startsWith("condition_") &&
-              !o.code.startsWith("deceased_"),
+              !o.code.startsWith("deceased_") &&
+              !o.code.startsWith("infant_"),
           )
         : [],
     statusOptions =
@@ -550,6 +560,7 @@ export default function QuickConsultationReply({
         reincarnatedKind: reincarnatedKind[targetKey] || "",
         reincarnatedPlace: reincarnatedPlace[targetKey] || "",
         reincarnatedAge: reincarnatedAge[targetKey] || "",
+        infantYears: infantYears[targetKey] || "",
         customDeity:
           customDeity[targetKey] ||
           [
@@ -833,11 +844,13 @@ export default function QuickConsultationReply({
     if (!locationOption) return;
     setLocationMode((c) => ({ ...c, [sectionKey]: mode }));
     if (hall) setLocationHall((c) => ({ ...c, [sectionKey]: hall }));
-    const current =
-        sectionSelections.current[sectionKey] || sectionDraft.optionIds,
-      next = current.includes(locationOption.id)
-        ? current
-        : [locationOption.id, ...current];
+    const current = sectionSelections.current[sectionKey] || sectionDraft.optionIds,
+      cleanedCurrent = mode === "reincarnated"
+        ? current.filter((id) => !infantBridgeOptions.some((option) => option.id === id))
+        : current,
+      next = cleanedCurrent.includes(locationOption.id)
+        ? cleanedCurrent
+        : [locationOption.id, ...cleanedCurrent];
     sectionSelections.current[sectionKey] = next;
     setSectionDrafts((c) => ({
       ...c,
@@ -865,6 +878,7 @@ export default function QuickConsultationReply({
       reincarnatedKind: reincarnatedKind[sectionKey] || "",
       reincarnatedPlace: reincarnatedPlace[sectionKey] || "",
       reincarnatedAge: reincarnatedAge[sectionKey] || "",
+      infantYears: infantYears[sectionKey] || "",
       locationSubject: section?.locationSubject || "祂",
       genderPronoun: section?.genderPronoun || "祂",
       previousPhraseIds: [],
@@ -1257,6 +1271,24 @@ export default function QuickConsultationReply({
                                   </button>
                                   </>}
                                 </div>
+                                {sectionTopic.code === "infant_spirit" &&
+                                  locationMode[sectionKey] === "bridge" && (
+                                    <div className="quickReplyInfantBridgeChoices">
+                                      <h5>寶寶在奈何橋的情況</h5>
+                                      <div className="quickReplySpecialChoices">
+                                        {infantBridgeOptions.map((o) => (
+                                          <button
+                                            key={o.id}
+                                            className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""}
+                                            onClick={() => selectSingleOption(o.id, infantBridgeOptions)}
+                                          >
+                                            {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}
+                                            {o.label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                 {locationMode[sectionKey] === "hell" && (
                                   <div className="quickReplyHallChoices">
                                     {[
@@ -1471,12 +1503,10 @@ export default function QuickConsultationReply({
                                         <h5>會探望誰</h5>
                                         <div className="quickReplyNestedChoices">
                                           {[
+                                            "父母",
                                             "親友",
                                             "家人",
-                                            "另一半",
                                             "兄弟姊妹",
-                                            "朋友",
-                                            "子女",
                                           ].map((name) => (
                                             <button
                                               key={name}
@@ -1715,6 +1745,50 @@ export default function QuickConsultationReply({
                                   </div>
                                 </div>
                               </>
+                            )}
+                            {sectionTopic.code === "infant_spirit" && infantRebirthOptions.length > 0 && (
+                              <div className="quickReplySpecialField quickReplyInfantRebirth">
+                                <div className="quickReplySpecialHeading">
+                                  <span>④</span>
+                                  <div><h4>投胎機會</h4></div>
+                                </div>
+                                <div className="quickReplySpecialChoices">
+                                  {infantRebirthOptions.map((o) => (
+                                    <button
+                                      key={o.id}
+                                      className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""}
+                                      onClick={() => selectSingleOption(o.id, infantRebirthOptions)}
+                                    >
+                                      {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}
+                                      {o.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {sectionTopic.code === "infant_spirit" && infantYearsOption && (
+                              <div className="quickReplySpecialField quickReplyInfantYears">
+                                <div className="quickReplySpecialHeading">
+                                  <span>⑤</span>
+                                  <div><h4>大約多久可以投胎</h4></div>
+                                </div>
+                                <div className="quickReplyYearsInput">
+                                  <input
+                                    inputMode="decimal"
+                                    value={infantYears[sectionKey] || ""}
+                                    onChange={(e) => setInfantYears((current) => ({
+                                      ...current,
+                                      [sectionKey]: e.target.value.replace(/[^0-9.]/g, ""),
+                                    }))}
+                                    placeholder="請輸入年數"
+                                  />
+                                  <span>年</span>
+                                  <button
+                                    disabled={!infantYears[sectionKey]?.trim()}
+                                    onClick={() => selectSingleOption(infantYearsOption.id, [infantYearsOption])}
+                                  >帶入</button>
+                                </div>
+                              </div>
                             )}
                             {loveTrendOptions.length > 0 && (
                               <div className="quickReplySpecialField">
@@ -2145,7 +2219,9 @@ export default function QuickConsultationReply({
                               <div className="quickReplySpecialField">
                                 <div className="quickReplySpecialHeading">
                                   <span>
-                                    {deceasedLayout
+                                    {sectionTopic?.code === "infant_spirit"
+                                      ? "⑥"
+                                      : deceasedLayout
                                       ? "④"
                                       : "③"}
                                   </span>
@@ -2177,7 +2253,9 @@ export default function QuickConsultationReply({
                               <div className="quickReplyHelpCard">
                                 <div className="quickReplyHelpHeading">
                                   <span>
-                                    {deceasedLayout
+                                    {sectionTopic?.code === "infant_spirit"
+                                      ? "⑦"
+                                      : deceasedLayout
                                       ? "⑤"
                                       : "④"}
                                   </span>
