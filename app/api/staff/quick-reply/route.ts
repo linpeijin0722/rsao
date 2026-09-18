@@ -431,6 +431,38 @@ const overallBuiltInCopy: Record<string, string> = {
   body_positive_mobility: "筋骨活動穩定。",
   body_positive_circulation: "氣色與循環不錯。",
 };
+const healthBuiltInOptions = overallBuiltInOptions.filter((option) =>
+  /^(body_|recent_positive_recovery|recent_negative_(?:car|blood|surgery)|recent_detail_|recent_advice_)/.test(option.code),
+);
+const lawsuitBuiltInRows = [
+  ["lawsuit_attitude_continue", "對方會繼續追究", "這件事情對方還不會放掉，後面還會繼續處理，不會這麼快結束。"],
+  ["lawsuit_attitude_step_back", "對方會退一步", "這件事情後面對方的態度會軟下來，不會一直強硬到底。"],
+  ["lawsuit_settlement_talk", "雙方會談和解", "這件事情最後會往談和解的方向走，後面會有人出來談條件。"],
+  ["lawsuit_settlement_slow", "不會這麼快和解", "現在還談不到一個雙方都能接受的結果，這件事情還要再拖一段時間。"],
+  ["lawsuit_court_details", "開庭會被問細節", "下次開庭不會只是簡單問幾句，細節、經過、前後說法都會被問得比較仔細。"],
+  ["lawsuit_evidence_opponent_gap", "對方說法有漏洞", "對方講的東西前後有些地方對不起來，細節會被拿出來看。"],
+  ["lawsuit_court_speak_carefully", "自己說話要小心", "這場官司最怕自己講太多，尤其前後說法不能不一樣，該講的講清楚就好。"],
+  ["lawsuit_evidence_key", "證據是關鍵", "這件事情最後不是靠誰講得大聲，證據才是關鍵，手上的資料一定要整理好。"],
+  ["lawsuit_support_tiring", "一個人處理會比較累", "現在一個人處理這件事情，後面會越來越繁瑣，光靠自己會比較吃力。"],
+  ["lawsuit_support_help", "有人會幫忙", "後面會有人出手幫忙，可能是熟人提供意見，也可能有人幫忙處理細節。"],
+  ["lawsuit_support_professional", "需要找專業人士", "這件事情牽涉的細節比較多，不適合完全自己摸索，法律上的部分該問專業就要問。"],
+  ["lawsuit_injury_attitude_continue", "傷害案件：對方還在追究", "這件事情對方現在還沒有要放手，後面還會繼續追。"],
+  ["lawsuit_injury_settlement_terms", "傷害案件：雙方會談條件", "後面會談到賠償、條件這些事情，不會只是一直僵著。"],
+  ["lawsuit_injury_settlement_possible", "傷害案件：和解有機會", "後面確實會走到談和解這一步。"],
+  ["lawsuit_injury_settlement_amount", "傷害案件：和解金額會拉鋸", "真正卡住的不是要不要談，是條件跟金額談不攏。"],
+  ["lawsuit_injury_evidence_key", "傷害案件：證據很重要", "這件事情最後還是要看證據，口頭講法不能當全部。"],
+  ["lawsuit_injury_evidence_review", "傷害案件：對方說法會被檢視", "對方講的內容後面會被一項一項拿出來看。"],
+  ["lawsuit_injury_court_speak", "傷害案件：自己不能亂講", "開庭前後說法一定要一致，不要想到什麼就補什麼。"],
+  ["lawsuit_injury_time_drag", "傷害案件：這件事情會拖", "不會一次開完就結束，後面還有程序要跑。"],
+  ["lawsuit_injury_support_help", "傷害案件：有人會出手協助", "現在雖然自己一個人處理，後面還是會有人提供協助。"],
+  ["lawsuit_injury_support_professional", "傷害案件：需要專業協助", "這件事情不要什麼都自己猜，法律上的部分該問專業就要問。"],
+] as const;
+const lawsuitBuiltInOptions = lawsuitBuiltInRows.map(([code, label], index) => ({
+  id: `virtual-${code.replaceAll("_", "-")}`, code, label, sort_order: 100 + index, is_active: true,
+}));
+const lawsuitBuiltInCopy = Object.fromEntries(
+  lawsuitBuiltInRows.map(([code, , content]) => [code, content]),
+) as Record<string, string>;
 const homeBuiltInOptions = [
   ...[
     ["home_condition_stable", "整體氣場穩定"], ["home_condition_bright", "採光氣場不錯"],
@@ -638,7 +670,7 @@ async function context(bookingNo: string, requestedDocumentId = "") {
   const { data: booking, error } = await db
     .from("bookings")
     .select(
-      "id,customer_id,booking_no,customers(line_display_name,full_name),booking_details(id,item_id,created_at,item_title,google_document_id,google_document_url,booking_items(code),booking_detail_sub_items(sub_item_title),booking_consultation_answers(profile_id,questions,extra_data,consultation_profiles(*)))",
+      "id,customer_id,booking_no,customers(line_display_name,full_name),booking_details(id,item_id,created_at,item_title,google_document_id,google_document_url,booking_items(code),booking_detail_sub_items(sub_item_title),booking_consultation_answers(profile_id,questions,extra_data,consultation_profiles(*),booking_answer_participants(position,profile_id,consultation_profiles(*))))",
     )
     .eq("booking_no", bookingNo)
     .single();
@@ -743,6 +775,10 @@ async function context(bookingNo: string, requestedDocumentId = "") {
         ? loveBuiltInOptions
         : topic.code === "overall"
           ? overallBuiltInOptions
+          : topic.code === "health"
+            ? healthBuiltInOptions
+            : topic.code === "lawsuit"
+              ? lawsuitBuiltInOptions
           : topic.code === "home"
             ? homeBuiltInOptions
             : topic.code === "spiritual"
@@ -902,11 +938,18 @@ async function context(bookingNo: string, requestedDocumentId = "") {
         profile = one(answer?.consultation_profiles),
         presentation = profilePresentation(profile, ownerName),
         extra = answer?.extra_data || {},
+        itemCode = one(detail.booking_items)?.code || "",
+        healthQuestion = renderInputValue(extra.treatment_question || extra.treatment_question_other),
+        healthPlanned = renderInputValue(extra.major_treatment_planned),
+        healthTreatmentLines = itemCode === "health" && (healthPlanned || healthQuestion)
+          ? [`${/有|是|規劃/.test(healthPlanned) ? "近期是有手術或重大治療規劃，想瞭解" : "近期手術或重大治療規劃，想瞭解"}：${healthQuestion || healthPlanned}`]
+          : [],
         simpleRequestLines = Object.entries(extra)
           .filter(
             ([key, value]) =>
-              inputLabels[key] && renderInputValue(value) && typeof value !== "object" ||
-              inputLabels[key] && Array.isArray(value) && renderInputValue(value),
+              !["major_treatment_planned", "treatment_question", "treatment_question_other"].includes(key) &&
+              ((inputLabels[key] && renderInputValue(value) && typeof value !== "object") ||
+              (inputLabels[key] && Array.isArray(value) && renderInputValue(value))),
           )
           .map(([key, value]) => `${cleanInputLabel(inputLabels[key])}：${renderInputValue(value)}`),
         focusLines = Object.entries(extra.overall_focus_details || {}).flatMap(([focus, rawRows]) => {
@@ -919,11 +962,18 @@ async function context(bookingNo: string, requestedDocumentId = "") {
           }).filter(Boolean);
           return content.length ? [`【${focus}】`, ...content] : [];
         }).filter(Boolean),
-        relationshipLines = Object.values(extra.relationship_details || {}).flatMap((rawRows) => {
+        relationshipLines = Object.entries(extra.relationship_details || {}).flatMap(([targetId, rawRows]) => {
           const rows = rawRows && typeof rawRows === "object" ? rawRows as Record<string, unknown> : {};
-          return ["relationship_status", "relationship_duration", "main_event", "relationship_goal"]
+          const participant = asArray(answer?.booking_answer_participants).find((entry: any) => String(entry.profile_id) === String(targetId));
+          const targetProfile = one(participant?.consultation_profiles);
+          const targetPresentation = profilePresentation(targetProfile, ownerName);
+          const fields = ["relationship_status", "relationship_duration", "main_event", "relationship_goal"]
             .map((key) => renderInputValue(rows[key]) ? `${inputLabels[key]}：${renderInputValue(rows[key])}` : "")
             .filter(Boolean);
+          const questions = asArray(extra.target_questions?.[targetId]).map(clean).filter(Boolean).map((value: string, index: number) => `問題${index + 1}：${value}`);
+          return targetProfile
+            ? [`【對象：${clean(targetProfile.name) || "未命名"}】`, ...targetPresentation.profileLines, ...fields, ...questions]
+            : [...fields, ...questions];
         }),
         pregnancyLines = asArray(extra.pregnancy_losses).flatMap((loss: any, index: number) => {
           const values = [
@@ -935,8 +985,8 @@ async function context(bookingNo: string, requestedDocumentId = "") {
         }),
         directQuestions = asArray(answer?.questions).map(clean).filter(Boolean),
         targetQuestions = Object.values(extra.target_questions || {}).flatMap((values) => asArray(values).map(clean).filter(Boolean)),
-        questionLines = Array.from(new Set([...directQuestions, ...targetQuestions])).map((value, index) => `問題${index + 1}：${value}`),
-        requestLines = [...focusLines, ...relationshipLines, ...pregnancyLines, ...simpleRequestLines, ...questionLines],
+        questionLines = Array.from(new Set(relationshipLines.length ? directQuestions : [...directQuestions, ...targetQuestions])).map((value, index) => `問題${index + 1}：${value}`),
+        requestLines = [...focusLines, ...relationshipLines, ...pregnancyLines, ...healthTreatmentLines, ...simpleRequestLines, ...questionLines],
         labels = [
           detail.item_title,
           ...asArray(detail.booking_detail_sub_items).map(
@@ -950,7 +1000,7 @@ async function context(bookingNo: string, requestedDocumentId = "") {
         detailId: detail.id,
         itemId: detail.item_id,
         profileId: answer?.profile_id,
-        itemCode: one(detail.booking_items)?.code || "",
+        itemCode,
         profile,
         profileName: clean(profile?.name),
         requestLines,
@@ -1540,6 +1590,7 @@ export async function POST(request: NextRequest) {
                   content:
                     loveBuiltInCopy[selection.optionCode] ||
                     overallBuiltInCopy[selection.optionCode] ||
+                    lawsuitBuiltInCopy[selection.optionCode] ||
                     homeBuiltInCopy[selection.optionCode] ||
                     spiritualBuiltInCopy[selection.optionCode] ||
                     spiritBuiltInCopy[selection.optionCode] ||

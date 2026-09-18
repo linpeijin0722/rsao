@@ -370,6 +370,19 @@ export default function QuickConsultationReply({
     ]),
     upperBodyOptions = sortedBodyConcerns.filter((o) => !lowerBodyCodes.has(o.code)),
     lowerBodyOptions = sortedBodyConcerns.filter((o) => lowerBodyCodes.has(o.code)),
+    lawsuitOptionGroups = [
+      ["對方態度", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_attitude_")) || []],
+      ["證據", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_evidence_")) || []],
+      ["開庭", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_court_")) || []],
+      ["和解", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_settlement_")) || []],
+      ["後續協助", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_support_")) || []],
+      ["傷害案件－對方態度", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_injury_attitude_")) || []],
+      ["傷害案件－證據", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_injury_evidence_")) || []],
+      ["傷害案件－開庭", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_injury_court_")) || []],
+      ["傷害案件－和解", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_injury_settlement_")) || []],
+      ["傷害案件－後續協助", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_injury_support_")) || []],
+      ["傷害案件－時間", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_injury_time_")) || []],
+    ].filter(([, options]) => (options as Option[]).length) as [string, Option[]][],
     homeConditionOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_condition_")) || [],
     homeImpactOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_impact_")) || [],
     homeAreaOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_area_")) || [],
@@ -431,6 +444,7 @@ export default function QuickConsultationReply({
           !o.code.startsWith("deity_") &&
           !o.code.startsWith("buddhist_") &&
           !o.code.startsWith("deceased_") &&
+          !o.code.startsWith("lawsuit_") &&
           !spiritTopicCodes.includes(sectionTopic?.code || ""),
       ) || [],
     isPersonalLove =
@@ -1038,6 +1052,39 @@ export default function QuickConsultationReply({
       (r) => r.optionIds?.length && !r.answer?.trim(),
     ),
     sectionIsPending = Object.values(sectionPending).some(Boolean);
+  const adviceFieldFor = (questionText: string, label: string) => {
+    const normalized = questionText.replace(/[？?。.!！\s]/g, "");
+    const adviceQuestion = data?.questions.find((entry) => {
+      const candidate = entry.question.replace(/[？?。.!！\s]/g, "");
+      return candidate && (candidate.includes(normalized) || normalized.includes(candidate));
+    });
+    if (!adviceQuestion) return null;
+    const key = String(adviceQuestion.slotIndex);
+    return (
+      <label className="quickReplyInlineAdvice">
+        <b>阿嫂建議</b>
+        <span>【</span>
+        <textarea
+          value={drafts[key]?.answer || ""}
+          placeholder={`請填寫「${label}」的回答`}
+          onChange={(event) => {
+            const answer = event.target.value;
+            setDrafts((current) => ({
+              ...current,
+              [key]: {
+                selections: current[key]?.selections || {},
+                phraseIds: current[key]?.phraseIds || [],
+                answer,
+                completed: Boolean(answer.trim()),
+              },
+            }));
+            setWritten(false);
+          }}
+        />
+        <span>】</span>
+      </label>
+    );
+  };
   const pickTarget = (kind: "section" | "question", index: number) => {
     setView(kind);
     kind === "section" ? setActiveSection(index) : setActiveQuestion(index);
@@ -1142,6 +1189,20 @@ export default function QuickConsultationReply({
                         sectionTopic?.code !== "naming_result" && (
                           <section className="quickReplyInputCard">
                             <h3>用戶填寫的內容</h3>
+                            {section.itemCode === "lawsuit-benefactor" && (() => {
+                              const values = Object.fromEntries(section.requestLines.map((line) => {
+                                const split = line.indexOf("：");
+                                return split >= 0 ? [line.slice(0, split), line.slice(split + 1)] : [line, ""];
+                              }));
+                              return (
+                                <div className="quickReplyLawsuitSummary">
+                                  <b>⚖️ 官司：{values["官司或糾紛類型"] || "待確認"}</b>
+                                  <span>下次開庭：{values["下次開庭或調解日期"] || "尚未填寫"}</span>
+                                  <span>目前：{values["目前訴訟進度"] || "尚未填寫"}</span>
+                                  <span>協助：{values["目前是否有專業人士或他人協助"] || "尚未填寫"}</span>
+                                </div>
+                              );
+                            })()}
                             {section.itemCode === "overall-fortune" ? (
                               <div className="quickReplyOverallInputGroups">
                                 {groupOverallRequestLines(section.requestLines).map((group, groupIndex) => {
@@ -1200,16 +1261,16 @@ export default function QuickConsultationReply({
                                     <b>{heading[1]}</b>
                                   </div>
                                 );
+                              const label = split >= 0 ? line.slice(0, split) : "補充內容";
+                              const value = split >= 0 ? line.slice(split + 1) : line;
+                              const shouldAnswer = /^問題\d*$/.test(label) || /想瞭解/.test(label);
                               return (
-                                <div key={index}>
+                                <div key={index} className={shouldAnswer ? "quickReplyInputQuestion" : ""}>
                                   <b>
-                                    {split >= 0
-                                      ? line.slice(0, split)
-                                      : "補充內容"}
+                                    {label}
                                   </b>
-                                  <p>
-                                    {split >= 0 ? line.slice(split + 1) : line}
-                                  </p>
+                                  <p>{value}</p>
+                                  {shouldAnswer && adviceFieldFor(value, label)}
                                 </div>
                               );
                             })}
@@ -2341,7 +2402,7 @@ export default function QuickConsultationReply({
                                 </div>
                               </div>
                             )}
-                            {sectionTopic?.code === "overall" &&
+                            {["overall", "health"].includes(sectionTopic?.code || "") &&
                               (recentPositiveOptions.length > 0 || recentNegativeOptions.length > 0) && (
                               <div className="quickReplySpecialField quickReplyOverallRecent">
                                 <div className="quickReplySpecialHeading">
@@ -2386,7 +2447,7 @@ export default function QuickConsultationReply({
                                 )}
                               </div>
                             )}
-                            {sectionTopic?.code === "overall" && bodyOptions.length > 0 && (
+                            {["overall", "health"].includes(sectionTopic?.code || "") && bodyOptions.length > 0 && (
                               <div className="quickReplySpecialField quickReplyOverallBody">
                                 <div className="quickReplySpecialHeading">
                                   <span>⑥</span>
@@ -2418,6 +2479,22 @@ export default function QuickConsultationReply({
                                 </div>
                               </div>
                             )}
+                            {sectionTopic?.code === "lawsuit" && lawsuitOptionGroups.map(([title, options], groupIndex) => (
+                              <div className="quickReplySpecialField quickReplyLawsuitGroup" key={title}>
+                                <div className="quickReplySpecialHeading">
+                                  <span>{groupIndex + 1}</span>
+                                  <div><h4>{title}</h4></div>
+                                </div>
+                                <div className="quickReplySpecialChoices">
+                                  {options.map((o) => (
+                                    <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
+                                      {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}
+                                      {o.label.replace(/^傷害案件：/, "")}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
                             {buddhistOptions.length > 0 && (
                               <div className="quickReplySpecialField">
                                 <div className="quickReplySpecialHeading">

@@ -132,6 +132,10 @@ export default function Staff() {
     [manualMethod, setManualMethod] = useState<"video"|"text">("text"),
     [manualCustomerId, setManualCustomerId] = useState(""),
     [manualSlotStart, setManualSlotStart] = useState(""),
+    [manualVideoYear, setManualVideoYear] = useState(() => new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Taipei", year:"numeric"}).format(new Date())),
+    [manualVideoMonth, setManualVideoMonth] = useState(() => new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Taipei", month:"2-digit"}).format(new Date())),
+    [manualVideoDay, setManualVideoDay] = useState(""),
+    [manualVideoTime, setManualVideoTime] = useState(""),
     [manualLines, setManualLines] = useState<any[]>([]),
     [manualCustomTotal, setManualCustomTotal] = useState<number|null>(null),
     [manualTotalEditor, setManualTotalEditor] = useState(false),
@@ -348,16 +352,17 @@ export default function Staff() {
   async function createManualBooking(){
     if(!manualCustomerId)return alert("請選擇用戶");
     if(!manualLines.length)return alert("請至少選擇一個諮詢項目");
-    if(manualMethod==="video"&&!manualSlotStart)return alert("請選擇視訊日期與時間");
+    if(manualMethod==="video"&&(!manualVideoDay||!manualVideoTime))return alert("請選擇完整的視訊日期與時間");
     const missing=manualLines.find(line=>items.find(item=>item.id===line.itemId)?.option_mode==="single_required"&&!line.subId);
     if(missing)return alert(`請完成「${items.find(item=>item.id===missing.itemId)?.title||"諮詢項目"}」的子項目選擇`);
     setManualSaving(true);
     try{
-      const slotStart=manualSlotStart?`${manualSlotStart}:00+08:00`:null,
+      const manualVideoDate=manualMethod==="video"?`${manualVideoYear}-${manualVideoMonth}-${manualVideoDay.padStart(2,"0")}`:"",
+        slotStart=manualMethod==="video"?`${manualVideoDate}T${manualVideoTime}:00+08:00`:(manualSlotStart?`${manualSlotStart}:00+08:00`:null),
         response=await staffPost({action:"create_manual_booking",customerId:manualCustomerId,methodCode:manualMethod,slotStart,lines:manualLines,totalPrice:manualTotal,notifyPayment:manualNotifyPayment}),result=await response.json();
       if(!response.ok)throw new Error(result.error||"建立預約失敗");
       alert(`預約已建立\n訂單編號：${result.bookingNo}\n${result.paymentNotified?"已傳送付款資訊給用戶":"未傳送付款資訊；可在訂單設為已付款後，通知用戶填寫資料"}`);
-      setManualOpen(false);setManualCustomerId("");setManualSlotStart("");setManualLines([]);setManualCustomTotal(null);setManualNotifyPayment(true);await load();
+      setManualOpen(false);setManualCustomerId("");setManualSlotStart("");setManualVideoDay("");setManualVideoTime("");setManualLines([]);setManualCustomTotal(null);setManualNotifyPayment(true);await load();
     }catch(error){alert(error instanceof Error?error.message:"建立預約失敗")}finally{setManualSaving(false)}
   }
   async function sendLineContact(message:string,action:"text"|"video_reminder"="text"){
@@ -996,7 +1001,7 @@ export default function Staff() {
               {!filteredManualCustomers.length&&<p className="manualUserEmpty">找不到符合條件的用戶</p>}
             </div>
             {filteredManualCustomers.length>5&&<nav className="manualUserPagination" aria-label="最近註冊用戶分頁"><button disabled={manualUserPage<=1} onClick={()=>setManualUserPage(page=>Math.max(1,page-1))}>‹ 上一頁</button><span>第 {Math.min(manualUserPage,manualUserPageCount)}／{manualUserPageCount} 頁</span><button disabled={manualUserPage>=manualUserPageCount} onClick={()=>setManualUserPage(page=>Math.min(manualUserPageCount,page+1))}>下一頁 ›</button></nav>}
-            {manualMethod==="video"&&<label className="manualMainField">視訊日期與時間<input type="datetime-local" value={manualSlotStart} onChange={event=>setManualSlotStart(event.target.value)}/><small>後台可依實際需要建立 4 天內的視訊預約；時間為台灣時間。</small></label>}
+            {manualMethod==="video"&&<div className="manualVideoDateTime"><label><b>視訊日期</b><span className="manualVideoDateParts"><select aria-label="年份" value={manualVideoYear} onChange={event=>{setManualVideoYear(event.target.value);setManualVideoDay("")}}>{[0,1].map(offset=>{const year=String(new Date().getFullYear()+offset);return <option key={year} value={year}>{year}年</option>})}</select><select aria-label="月份" value={manualVideoMonth} onChange={event=>{setManualVideoMonth(event.target.value);setManualVideoDay("")}}>{Array.from({length:12},(_,index)=>String(index+1).padStart(2,"0")).map(month=><option key={month} value={month}>{Number(month)}月</option>)}</select><select aria-label="日期" value={manualVideoDay} onChange={event=>setManualVideoDay(event.target.value)}><option value="">選擇日期</option>{Array.from({length:new Date(Number(manualVideoYear),Number(manualVideoMonth),0).getDate()},(_,index)=>String(index+1)).map(day=><option key={day} value={day}>{day}日</option>)}</select></span></label><label><b>視訊時間</b><input type="time" value={manualVideoTime} onChange={event=>setManualVideoTime(event.target.value)}/></label><small>年份與月份已帶入本月，請選擇日期與時間；時間為台灣時間。</small></div>}
             <section className="manualItems"><h3>選擇諮詢項目</h3>{items.map(item=>{const line=manualLines.find(candidate=>candidate.itemId===item.id);return <article key={item.id} className={line?"selected":""}>
               <label><input type="checkbox" checked={Boolean(line)} onChange={event=>toggleManualItem(item,event.target.checked)}/><b>{item.title}</b><span>NT$ {Number(item.price||0).toLocaleString("zh-TW")}</span></label>
               {line&&item.sub_items?.length>0&&<select value={line.subId} onChange={event=>{setManualCustomTotal(null);setManualLines(value=>value.map(candidate=>candidate.itemId===item.id?{...candidate,subId:event.target.value}:candidate))}}><option value="">請選擇子項目</option>{item.sub_items.map((sub:any)=><option key={sub.id} value={sub.id}>{sub.title}　NT$ {Number(sub.price||0).toLocaleString("zh-TW")}</option>)}</select>}
