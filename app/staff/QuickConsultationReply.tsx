@@ -305,6 +305,8 @@ export default function QuickConsultationReply({
     loveOtherOptions =
       sectionTopic?.options.filter((o) => o.code.startsWith("love_other_")) ||
       [],
+    relationshipAdviceOptions =
+      sectionTopic?.options.filter((o) => o.code.startsWith("relationship_advice_")) || [],
     spiritPlainOptions =
       sectionTopic && spiritTopicCodes.includes(sectionTopic.code)
         ? sectionTopic.options.filter(
@@ -354,6 +356,8 @@ export default function QuickConsultationReply({
       sectionTopic?.options.filter((o) =>
         o.code.startsWith("recent_advice_"),
       ) || [],
+    healthAdviceOptions =
+      sectionTopic?.options.filter((o) => o.code.startsWith("health_advice_")) || [],
     bodyOptions =
       sectionTopic?.options.filter((o) => {
         if (!o.code.startsWith("body_")) return false;
@@ -440,10 +444,12 @@ export default function QuickConsultationReply({
           !o.code.startsWith("self_personality_") &&
           !o.code.startsWith("partner_personality_") &&
           !o.code.startsWith("love_other_") &&
+          !o.code.startsWith("relationship_advice_") &&
           !o.code.startsWith("status_") &&
           !o.code.startsWith("condition_") &&
           !o.code.startsWith("advice_") &&
           !o.code.startsWith("recent_") &&
+          !o.code.startsWith("health_advice_") &&
           !o.code.startsWith("body_") &&
           !o.code.startsWith("home_") &&
           !o.code.startsWith("spiritual_") &&
@@ -1057,6 +1063,11 @@ export default function QuickConsultationReply({
     setBusy(true);
     setError("");
     try {
+      const manualAnswersFor = (key: string) => Object.entries(manualSectionReplies)
+        .filter(([entryKey]) => entryKey === key || entryKey.startsWith(`manual:${key}:`))
+        .map(([, value]) => value.trim())
+        .filter(Boolean)
+        .join("\n\n");
       await post({
         mode: "write",
         questionReplies: drafts,
@@ -1071,12 +1082,12 @@ export default function QuickConsultationReply({
               ...baseRow,
               optionIds: rows.flatMap((row) => row.optionIds || []),
               phraseIds: rows.flatMap((row) => row.phraseIds || []),
-              answer: [answers.map((value, index) => `【嬰靈${index + 1}】\n${value}`).join("\n\n"), manualSectionReplies[baseKey]].map((value) => value?.trim()).filter(Boolean).join("\n\n"),
+              answer: [answers.map((value, index) => `【嬰靈${index + 1}】\n${value}`).join("\n\n"), ...Array.from({ length: count }, (_, index) => manualAnswersFor(index ? `${baseKey}:infant:${index}` : baseKey))].map((value) => value?.trim()).filter(Boolean).join("\n\n"),
               completed: answers.length > 0,
             }];
           }
           const row = sectionDrafts[baseKey] || { optionIds: [], phraseIds: [], answer: "", completed: false };
-          return [baseKey, { ...row, answer: [row.answer, manualSectionReplies[baseKey]].map((value) => value?.trim()).filter(Boolean).join("\n\n") }];
+          return [baseKey, { ...row, answer: [row.answer, manualAnswersFor(baseKey)].map((value) => value?.trim()).filter(Boolean).join("\n\n") }];
         })),
       });
       setWritten(true);
@@ -1100,20 +1111,21 @@ export default function QuickConsultationReply({
     sectionIsPending = Object.values(sectionPending).some(Boolean);
   const adviceFieldFor = (questionText: string, label: string, allowSectionFallback = false) => {
     const normalized = questionText.replace(/[？?。.!！\s]/g, "");
-    const adviceQuestion = data?.questions.find((entry) => {
+    const adviceQuestion = normalized.length >= 4 ? data?.questions.find((entry) => {
       const candidate = entry.question.replace(/[？?。.!！\s]/g, "");
       return candidate && (candidate.includes(normalized) || normalized.includes(candidate));
-    });
+    }) : undefined;
     if (!adviceQuestion) {
       if (!allowSectionFallback) return null;
+      const manualKey = `manual:${sectionKey}:${label}:${questionText}`;
       return (
         <label className="quickReplyInlineAdvice quickReplySectionManualReply">
           <b>阿嫂回覆</b>
           <textarea
-            value={manualSectionReplies[sectionKey] || ""}
+            value={manualSectionReplies[manualKey] || ""}
             placeholder="請輸入本項目的回覆"
             onChange={(event) => {
-              setManualSectionReplies((current) => ({ ...current, [sectionKey]: event.target.value }));
+              setManualSectionReplies((current) => ({ ...current, [manualKey]: event.target.value }));
               setWritten(false);
             }}
           />
@@ -1246,7 +1258,7 @@ export default function QuickConsultationReply({
                           ))}
                         </section>
                       )}
-                      {(
+                      {sectionTopic?.code !== "naming_result" && section.itemCode !== "infant-spirit" && (
                           <section className="quickReplyInputCard">
                             <h3>用戶填寫的內容</h3>
                             {section.itemCode === "overall-fortune" ? (
@@ -1309,7 +1321,7 @@ export default function QuickConsultationReply({
                                 );
                               const label = split >= 0 ? line.slice(0, split) : "補充內容";
                               const value = split >= 0 ? line.slice(split + 1) : line;
-                              const shouldAnswer = /^問題\d*$/.test(label) || /想瞭解/.test(label);
+                              const shouldAnswer = /^問題\d*$/.test(label) || /想瞭解|會不會|要不要|可不可以|能不能|是否|是不是|好不好|適不適合|該不該|怎麼辦|如何|為什麼|什麼時候|哪時候|嗎|呢|[？?]/.test(`${label}${value}`);
                               return (
                                 <div key={index} className={shouldAnswer ? "quickReplyInputQuestion" : ""}>
                                   <b>
@@ -1320,37 +1332,10 @@ export default function QuickConsultationReply({
                                 </div>
                               );
                               })}
-                              {!section.requestLines.some((line) => /^問題\d*：/.test(line) || /想瞭解/.test(line)) && adviceFieldFor("", "本項目", true)}
+                              {!section.requestLines.some((line) => /^問題\d*：/.test(line) || /想瞭解|會不會|要不要|可不可以|能不能|是否|是不是|好不好|適不適合|該不該|怎麼辦|如何|為什麼|什麼時候|哪時候|嗎|呢|[？?]/.test(line)) && adviceFieldFor("", "本項目", true)}
                             </>}
                           </section>
                         )}
-                      {section.itemCode === "infant-spirit" && (
-                        <section className="quickReplyInfantAccordions">
-                          <h3>嬰靈資料</h3>
-                          {Array.from({ length: infantRecordCount }, (_, index) => {
-                            const record = section.infantRecords?.[index];
-                            const key = index ? `${baseSectionKey}:infant:${index}` : baseSectionKey;
-                            const expanded = activeInfantIndex === index;
-                            const completed = Boolean(sectionDrafts[key]?.answer?.trim());
-                            return (
-                              <article className={expanded ? "expanded" : ""} key={key}>
-                                <button type="button" onClick={() => setActiveInfantBySection((current) => ({ ...current, [baseSectionKey]: expanded ? -1 : index }))}>
-                                  <b>寶寶資料 {index + 1}</b>
-                                  <span>{completed ? "✓ 已完成" : expanded ? "收合－" : "展開＋"}</span>
-                                </button>
-                                {expanded && (
-                                  <div>
-                                    <strong>媽媽填寫的流產資料</strong>
-                                    {(record?.lines?.length ? record.lines : ["這一筆沒有另外填寫日期、時辰或備註。"])
-                                      .map((line, lineIndex) => <p key={lineIndex}>{line}</p>)}
-                                    <small>請在下方替寶寶 {index + 1} 選擇完整的嬰靈資料。</small>
-                                  </div>
-                                )}
-                              </article>
-                            );
-                          })}
-                        </section>
-                      )}
                       <section className="quickReplyCategoryPicker quickReplySectionCategoryPicker">
                         <h3>【{section.label}】常用命理回覆</h3>
                         <p>先選分類，再複選多個答案。</p>
@@ -1378,16 +1363,6 @@ export default function QuickConsultationReply({
                       </section>
                       {sectionTopic?.code === "naming_result" && (
                         <section className="quickReplyNamingPanel">
-                          <div className="quickReplyNamingNeeds">
-                            <h3>客人的命名需求</h3>
-                            {section.requestLines?.length ? (
-                              section.requestLines.map((line, index) => (
-                                <p key={index}>{line}</p>
-                              ))
-                            ) : (
-                              <p>客人沒有另外填寫命名偏好。</p>
-                            )}
-                          </div>
                           <h3>請填寫六組名字與名字助力</h3>
                           {(namingRows[sectionKey] || defaultNamingRows()).map(
                             (row, index) => (
@@ -1458,15 +1433,50 @@ export default function QuickConsultationReply({
                         </section>
                       )}
                       {sectionTopic &&
-                        sectionTopic.code !== "naming_result" &&
-                        (section.itemCode !== "infant-spirit" || activeInfantIndex >= 0) && (
+                        sectionTopic.code !== "naming_result" && (
                           <section
-                            className={`quickReplyOptions quickReplyMultiOptions${sectionTopic.code === "overall" ? " quickReplyOverallOptions" : ""}`}
+                            className={`quickReplyOptions quickReplyMultiOptions${sectionTopic.code === "overall" ? " quickReplyOverallOptions" : ""}${section.itemCode === "infant-spirit" && activeInfantIndex < 0 ? " quickReplyInfantCollapsed" : ""}`}
                             onClick={togglePanel}
                           >
                             <h3>
                               {sectionTopic.icon} {sectionTopic.title}（可複選）
                             </h3>
+                            {section.itemCode === "infant-spirit" && (
+                              <div className="quickReplyInfantInlineRecords">
+                                {Array.from({ length: infantRecordCount }, (_, index) => {
+                                  const record = section.infantRecords?.[index];
+                                  const recordKey = index ? `${baseSectionKey}:infant:${index}` : baseSectionKey;
+                                  const expanded = activeInfantIndex === index;
+                                  return (
+                                    <article className={expanded ? "expanded" : ""} key={recordKey}>
+                                      <button
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          setActiveInfantBySection((current) => ({
+                                            ...current,
+                                            [baseSectionKey]: expanded ? -1 : index,
+                                          }));
+                                          setEditing(false);
+                                        }}
+                                      >
+                                        <b>寶寶資料 {index + 1}</b>
+                                        <span>{expanded ? "收合 −" : "展開 ＋"}</span>
+                                      </button>
+                                      {expanded && (
+                                        <div>
+                                          <strong>流產時間資料</strong>
+                                          {record?.lines?.length
+                                            ? record.lines.map((line, lineIndex) => <p key={lineIndex}>{line}</p>)
+                                            : <p>這一筆沒有填寫流產時間資料。</p>}
+                                          <small>以下選項與回覆都屬於這一位寶寶</small>
+                                        </div>
+                                      )}
+                                    </article>
+                                  );
+                                })}
+                              </div>
+                            )}
                             {[
                               "infant_spirit",
                               "deceased",
@@ -2486,7 +2496,7 @@ export default function QuickConsultationReply({
                                 </div>
                               </div>
                             )}
-                            {["overall", "health"].includes(sectionTopic?.code || "") &&
+                            {sectionTopic?.code === "overall" &&
                               (recentPositiveOptions.length > 0 || recentNegativeOptions.length > 0) && (
                               <div className="quickReplySpecialField quickReplyOverallRecent">
                                 <div className="quickReplySpecialHeading">
@@ -2531,7 +2541,7 @@ export default function QuickConsultationReply({
                                 )}
                               </div>
                             )}
-                            {["overall", "health"].includes(sectionTopic?.code || "") && bodyOptions.length > 0 && (
+                            {sectionTopic?.code === "overall" && bodyOptions.length > 0 && (
                               <div className="quickReplySpecialField quickReplyOverallBody">
                                 <div className="quickReplySpecialHeading">
                                   <span>⑥</span>
@@ -2562,6 +2572,37 @@ export default function QuickConsultationReply({
                                   ))}
                                 </div>
                               </div>
+                            )}
+                            {sectionTopic?.code === "health" && (
+                              <>
+                                <div className="quickReplySpecialField quickReplyHealthGroup">
+                                  <div className="quickReplySpecialHeading"><span>①</span><div><h4>身體狀況</h4></div></div>
+                                  <div className="quickReplySpecialChoices">
+                                    {[...bodyPositiveOptions, ...recentPositiveOptions].map((o) => (
+                                      <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
+                                        {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="quickReplySpecialField quickReplyHealthGroup">
+                                  <div className="quickReplySpecialHeading"><span>②</span><div><h4>需要留意</h4></div></div>
+                                  <h5 className="quickReplySubheading">上半身</h5>
+                                  <div className="quickReplySpecialChoices">
+                                    {upperBodyOptions.map((o) => <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>{sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}</button>)}
+                                  </div>
+                                  <h5 className="quickReplySubheading">下半身與全身</h5>
+                                  <div className="quickReplySpecialChoices">
+                                    {[...lowerBodyOptions, ...recentNegativeOptions, ...recentDetailOptions].map((o) => <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>{sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}</button>)}
+                                  </div>
+                                </div>
+                                <div className="quickReplySpecialField quickReplyHealthGroup">
+                                  <div className="quickReplySpecialHeading"><span>③</span><div><h4>建議</h4></div></div>
+                                  <div className="quickReplySpecialChoices">
+                                    {healthAdviceOptions.map((o) => <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>{sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}</button>)}
+                                  </div>
+                                </div>
+                              </>
                             )}
                             {sectionTopic?.code === "lawsuit" && lawsuitOptionGroups.map(([title, options], groupIndex) => (
                               <div className="quickReplySpecialField quickReplyLawsuitGroup" key={title}>
@@ -2693,6 +2734,20 @@ export default function QuickConsultationReply({
                                       </div>
                                     </div>
                                   )}
+                              </div>
+                            )}
+                            {sectionTopic.code === "love" && !isPersonalLove && relationshipAdviceOptions.length > 0 && (
+                              <div className="quickReplySpecialField quickReplyRelationshipAdvice">
+                                <div className="quickReplySpecialHeading">
+                                  <span>⑤</span><div><h4>建議相處</h4></div>
+                                </div>
+                                <div className="quickReplySpecialChoices">
+                                  {relationshipAdviceOptions.map((o) => (
+                                    <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
+                                      {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
                             )}
                             {(standardOptions.length > 0 ||

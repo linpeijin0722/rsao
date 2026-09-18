@@ -66,6 +66,24 @@ const loveBuiltInOptions = [
     sort_order: 304,
     is_active: true,
   },
+  ...[
+    ["relationship_advice_clear", "把需求說清楚"],
+    ["relationship_advice_listen", "先聽對方說完"],
+    ["relationship_advice_boundary", "守好自己的界線"],
+    ["relationship_advice_slow", "放慢相處節奏"],
+    ["relationship_advice_space", "給彼此適當空間"],
+    ["relationship_advice_conflict", "有問題就講清楚"],
+    ["relationship_advice_action", "看行動不只聽承諾"],
+    ["relationship_advice_future", "確認未來方向一致"],
+    ["relationship_advice_self", "不要一味委屈自己"],
+    ["relationship_advice_leave", "繼續下去會消耗自己，該斷則斷"],
+  ].map(([code, label], index) => ({
+    id: `virtual-${code.replaceAll("_", "-")}`,
+    code,
+    label,
+    sort_order: 360 + index,
+    is_active: true,
+  })),
 ];
 const loveBuiltInCopy: Record<string, string> = {
   self_personality_loyal: "個性忠厚，也很重感情。",
@@ -90,6 +108,16 @@ const loveBuiltInCopy: Record<string, string> = {
     "感情上可以放慢一點，多花時間觀察對方的個性與做事方式，確定彼此真的合適之後再往前，會比較穩定。",
   advice_care_for_self:
     "現階段可以先把自己的生活照顧好，讓心情和生活都穩定下來；當自己的狀態越來越好，也會更容易吸引到適合的人。",
+  relationship_advice_clear: "兩個人的需求要說清楚，不要讓對方一直猜。",
+  relationship_advice_listen: "先把對方的話聽完，再處理彼此的問題。",
+  relationship_advice_boundary: "相處可以體諒，但自己的界線要守好。",
+  relationship_advice_slow: "這段關係先放慢，不要急著把結果定下來。",
+  relationship_advice_space: "彼此留一點空間，關係反而會比較穩。",
+  relationship_advice_conflict: "有問題就講清楚，不要累積到最後一次爆開。",
+  relationship_advice_action: "接下來看對方怎麼做，不要只聽口頭承諾。",
+  relationship_advice_future: "要先確認兩個人對未來的方向是不是一致。",
+  relationship_advice_self: "不要為了留住這段關係，一直委屈自己。",
+  relationship_advice_leave: "繼續下去只會消耗自己，該斷就要斷。",
 };
 const infantBuiltInRows = [
   ["infant_bridge_stones", "玩石頭", "寶寶目前還在奈何橋底下，有時候會自己玩石頭。"],
@@ -442,10 +470,16 @@ const healthExtraRows = [
   ["recent_negative_health_exhaustion", "過度疲勞影響身體", "近期容易累過頭，休息不夠時身體的不舒服會更明顯。"],
   ["recent_negative_health_check", "需要安排檢查", "近期有需要安排檢查的狀況，先把原因確認清楚。"],
   ["recent_negative_health_recovery", "恢復期會比較久", "這次身體恢復需要比較長的時間，不能太快恢復原本的工作量。"],
+  ["health_advice_checkup", "按時追蹤檢查", "該做的檢查要按時完成。"],
+  ["health_advice_sleep", "固定睡眠時間", "睡眠時間要固定，不要長期熬夜。"],
+  ["health_advice_diet", "飲食清淡規律", "飲食要清淡、三餐要規律。"],
+  ["health_advice_medication", "按醫囑用藥", "藥物要照醫囑使用，不要自行停藥。"],
+  ["health_advice_rehab", "循序復健活動", "復健和活動要循序漸進。"],
+  ["health_advice_rest", "避免過度勞累", "最近不要硬撐，身體累了就要休息。"],
 ] as const;
 const healthBuiltInOptions = [
   ...overallBuiltInOptions.filter((option) =>
-    /^(body_|recent_positive_recovery|recent_negative_surgery|recent_detail_|recent_advice_)/.test(option.code),
+    /^(body_|recent_positive_recovery|recent_negative_surgery|recent_detail_)/.test(option.code),
   ),
   ...healthExtraRows.map(([code, label], index) => ({
     id: `virtual-${code.replaceAll("_", "-")}`, code, label, sort_order: 520 + index, is_active: true,
