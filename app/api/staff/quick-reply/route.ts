@@ -638,10 +638,23 @@ async function context(bookingNo: string, requestedDocumentId = "") {
       .flatMap((detail: any) =>
         asArray(detail.booking_consultation_answers).flatMap((answer: any) => {
           const profile = one(answer.consultation_profiles),
-            presentation = profilePresentation(profile, ownerNameForQuestions);
-          return asArray(answer.questions).map((question: any) => ({
+            presentation = profilePresentation(profile, ownerNameForQuestions),
+            itemCode = one(detail.booking_items)?.code || "",
+            extra = answer.extra_data || {},
+            overallFocusQuestionLabels: Record<string, string> = {
+              想換工作: "想換工作建議",
+              職涯迷惘: "職涯迷惘建議",
+              財務壓力: "財務壓力建議",
+            },
+            focuses = asArray(extra.overall_focuses).map(clean).filter(Boolean).length
+              ? asArray(extra.overall_focuses).map(clean).filter(Boolean)
+              : Object.keys(extra.overall_focus_details || {}),
+            questions = itemCode === "overall-fortune" && focuses.length
+              ? focuses.slice(0, 3).map((focus: string) => overallFocusQuestionLabels[focus] || `${focus}建議`)
+              : asArray(answer.questions);
+          return questions.map((question: any) => ({
             question: String(question || "").trim(),
-            itemCode: one(detail.booking_items)?.code || "",
+            itemCode,
             itemTitle: detail.item_title || "",
             profileName: clean(profile?.name),
             profileLines: presentation.profileLines,
@@ -1501,6 +1514,7 @@ export async function POST(request: NextRequest) {
             selection.optionId.startsWith("virtual-")
               ? {
                   id: selection.optionId,
+                  optionCode: selection.optionCode,
                   content:
                     loveBuiltInCopy[selection.optionCode] ||
                     overallBuiltInCopy[selection.optionCode] ||
@@ -1509,12 +1523,15 @@ export async function POST(request: NextRequest) {
                     spiritBuiltInCopy[selection.optionCode] ||
                     "",
                 }
-              : pick(
+              : (() => {
+                  const entry = pick(
                   (phrases || []).filter(
                     (entry: any) => entry.option_id === selection.optionId,
                   ),
                   previous,
-                ),
+                  );
+                  return entry ? { ...entry, optionCode: selection.optionCode } : null;
+                })(),
           )
           .filter((entry: any) => entry?.content) as any[],
         locationSelected = valid.some(
@@ -1731,6 +1748,26 @@ export async function POST(request: NextRequest) {
           combinedScripture,
         ].filter(Boolean),
         safeHeading = (label: string) => `\u2060【${label}】`,
+        overallChosenGroup = (prefixes: string[]) => chosen
+          .filter((entry: any) => prefixes.some((prefix) => String(entry.optionCode || "").startsWith(prefix)))
+          .map((entry: any) => render(entry.content))
+          .filter(Boolean)
+          .join(" "),
+        overallKnownPrefixes = ["status_overall_", "advice_overall_", "recent_", "body_"],
+        overallOther = chosen
+          .filter((entry: any) => !overallKnownPrefixes.some((prefix) => String(entry.optionCode || "").startsWith(prefix)))
+          .map((entry: any) => render(entry.content))
+          .filter(Boolean)
+          .join(" "),
+        overallAnswer = [
+          elementSentence ? `${safeHeading("本命格")}\n${elementSentence}` : "",
+          overallChosenGroup(["status_overall_"]) ? `${safeHeading("整體運勢")}\n${overallChosenGroup(["status_overall_"])}` : "",
+          deitySentence ? `${safeHeading("暗貴人")}\n${deitySentence}` : "",
+          overallChosenGroup(["advice_overall_"]) ? `${safeHeading("建議")}\n${overallChosenGroup(["advice_overall_"])}` : "",
+          overallChosenGroup(["recent_"]) ? `${safeHeading("最近狀況")}\n${overallChosenGroup(["recent_"])}` : "",
+          overallChosenGroup(["body_"]) ? `${safeHeading("身體狀況")}\n${overallChosenGroup(["body_"])}` : "",
+          overallOther ? `${safeHeading("其他補充")}\n${overallOther}` : "",
+        ].filter(Boolean).join("\n\n"),
         answer = personalLove
           ? [
               selfSentence ? `${safeHeading("本身的個性")}\n${selfSentence}` : "",
@@ -1744,7 +1781,9 @@ export async function POST(request: NextRequest) {
                 ? `${safeHeading("感情運")}\n${[romanceTimingSentence, divorceTimingSentence].filter(Boolean).join("\n")}${(romanceTimingSentence || divorceTimingSentence) && standardAnswerParts.length ? "\n\n" : ""}${standardAnswerParts.join(" ")}`
                 : "",
             ].filter(Boolean).join("\n\n")
-          : [selfSentence, partnerSentence, ...standardAnswerParts].filter(Boolean).join(" ");
+          : valid.some((selection) => selection.topicCode === "overall")
+            ? overallAnswer
+            : [selfSentence, partnerSentence, ...standardAnswerParts].filter(Boolean).join(" ");
       if (!answer)
         return NextResponse.json(
           { error: "這些選項目前沒有可用句子" },

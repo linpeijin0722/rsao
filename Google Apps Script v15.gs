@@ -86,7 +86,7 @@ function doPost(e) {
       } else if (mark.kind === "title") {
         editor.setBold(start, end, true).setFontSize(start, end, 20).setForegroundColor(start, end, "#6B3B24");
       } else if (mark.kind === "question") {
-        editor.setBold(start, end, true).setForegroundColor(start, end, "#000000");
+        editor.setBold(start, end, true).setFontSize(start, end, 12).setForegroundColor(start, end, "#000000");
       } else if (mark.kind === "answer") {
         editor.setBold(start, end, false).setFontSize(start, end, 12).setForegroundColor(start, end, "#1A59CC");
       } else if (mark.kind === "teacher") {

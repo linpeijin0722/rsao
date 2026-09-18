@@ -909,7 +909,19 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     add("您好，以下是您的諮詢結果");
     add("");
   }
-  questions.map(text).filter(Boolean).forEach((question: string, index: number) => {
+  const isOverallFortune = itemCode === "overall-fortune" || text(detail.item_title).includes("整體運勢");
+  const overallQuestionLabels: Record<string, string> = {
+    想換工作: "想換工作建議",
+    職涯迷惘: "職涯迷惘建議",
+    財務壓力: "財務壓力建議",
+  };
+  const selectedOverallFocuses = (Array.isArray(extra.overall_focuses)
+    ? extra.overall_focuses.map(text).filter(Boolean)
+    : Object.keys(extra.overall_focus_details || {}).filter(Boolean)).slice(0, 3);
+  const renderedQuestions = isOverallFortune && selectedOverallFocuses.length
+    ? selectedOverallFocuses.map((focus: string) => overallQuestionLabels[focus] || `${focus}建議`)
+    : questions.map(text).filter(Boolean);
+  renderedQuestions.forEach((question: string, index: number) => {
     add(`Q${index + 1}:${question}`, "question");
     add(`A${index + 1}:`, "answer");
     for (let line = 0; line < 4; line += 1) add("\u00a0", "answer");
@@ -917,7 +929,6 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   add("");
   const isPastLifePersonal = itemCode === "past-life-personal" || text(detail.item_title).includes("前世因果（個人）");
   const isPastLifeRelation = relation;
-  const isOverallFortune = itemCode === "overall-fortune" || text(detail.item_title).includes("整體運勢");
   if (isOverallFortune) {
     add("【整體建議】", "section");
     for (let index = 0; index < 5; index += 1) add("\u00a0", "teacher");
