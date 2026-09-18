@@ -524,6 +524,28 @@ const healthBuiltInOptions = [
 const healthBuiltInCopy = Object.fromEntries(
   healthExtraRows.map(([code, , content]) => [code, content]),
 ) as Record<string, string>;
+const dateResultBuiltInRows = [
+  ["date_judgment_best", "這個時間最適合", "這個時間最適合，可以優先安排。"],
+  ["date_judgment_good", "這個日子可以使用", "這個日子可以使用，照原定計畫進行即可。"],
+  ["date_judgment_adjust", "需要調整時辰", "日期可以用，但時辰需要再調整。"],
+  ["date_judgment_avoid", "這個日子要避開", "這個日子要避開，不建議安排重要事情。"],
+  ["date_support_business", "有利工作開張", "這個時間對工作、開張與事業推進有利。"],
+  ["date_support_relationship", "有利婚嫁感情", "這個時間對婚嫁、訂婚與感情安排有利。"],
+  ["date_support_home", "有利搬家入厝", "這個時間適合搬家、入厝與安頓新居。"],
+  ["date_support_contract", "有利簽約交易", "這個時間適合簽約、交易與處理重要文件。"],
+  ["date_support_medical", "有利手術生產", "這個時間對手術、生產與後續恢復較有利。"],
+  ["date_support_travel", "有利出行辦事", "這個時間適合出門辦事，過程會比較順。"],
+  ["date_notice_clash", "避開沖煞時段", "當天要避開沖煞的時段，不要勉強使用。"],
+  ["date_notice_early", "重要流程提早完成", "重要流程要提早完成，不要拖到太晚。"],
+  ["date_notice_delay", "流程不要延誤", "當天流程不要延誤，時間一過就不建議再進行。"],
+  ["date_notice_calm", "當天保持平和", "當天情緒要穩，不要爭吵或臨時改動。"],
+  ["date_notice_traffic", "預留交通時間", "當天要預留交通時間，避免趕路錯過時辰。"],
+  ["date_notice_simple", "儀式簡單莊重", "儀式保持簡單莊重，不用安排得太複雜。"],
+] as const;
+const dateResultBuiltInOptions = dateResultBuiltInRows.map(([code, label], index) => ({
+  id: `virtual-${code.replaceAll("_", "-")}`, code, label, sort_order: 100 + index, is_active: true,
+}));
+const dateResultBuiltInCopy = Object.fromEntries(dateResultBuiltInRows.map(([code, , content]) => [code, content])) as Record<string, string>;
 const lawsuitBuiltInRows = [
   ["lawsuit_attitude_continue", "對方會繼續追究", "這件事情對方還不會放掉，後面還會繼續處理，不會這麼快結束。"],
   ["lawsuit_attitude_step_back", "對方會退一步", "這件事情後面對方的態度會軟下來，不會一直強硬到底。"],
@@ -876,7 +898,12 @@ async function context(bookingNo: string, requestedDocumentId = "") {
         ? "尚未建立快速諮詢回覆資料表，請先執行本次提供的 Supabase SQL"
         : topicError.message,
     );
-  const normalizedTopics = (topics || []).map((topic: any) => {
+  const topicRows = [...(topics || [])];
+  if (!topicRows.some((topic: any) => topic.code === "date_result")) topicRows.push({
+    id: "virtual-date-result-topic", code: "date_result", title: "擇日／擇時", icon: "📅",
+    keywords: ["擇日", "擇時"], sort_order: 950, quick_reply_options: [],
+  } as any);
+  const normalizedTopics = topicRows.map((topic: any) => {
     const options: any[] = topic.code === "spiritual"
       ? []
       : asArray(topic.quick_reply_options).filter(
@@ -895,6 +922,8 @@ async function context(bookingNo: string, requestedDocumentId = "") {
             ? homeBuiltInOptions
             : topic.code === "spiritual"
               ? spiritualBuiltInOptions
+              : topic.code === "date_result"
+                ? dateResultBuiltInOptions
           : [];
     for (const option of builtIns)
       if (!options.some((entry: any) => entry.code === option.code))
@@ -1083,14 +1112,18 @@ async function context(bookingNo: string, requestedDocumentId = "") {
             .map((key) => renderInputValue(rows[key]) ? `${inputLabels[key]}：${renderInputValue(rows[key])}` : "")
             .filter(Boolean);
           const questions = asArray(extra.target_questions?.[targetId]).map(clean).filter(Boolean).map((value: string, index: number) => `問題${index + 1}：${value}`);
+          const compactTargetProfileLines = targetPresentation.profileLines.map((line: string) =>
+            line.replace(/^(?:姓名|農曆生日|居住地址)：/, ""),
+          );
           const lines = targetProfile
-            ? [`【對象：${clean(targetProfile.name) || "未命名"}】`, ...targetPresentation.profileLines, ...fields, ...questions]
+            ? [`【對象：${clean(targetProfile.name) || "未命名"}】`, ...compactTargetProfileLines, ...fields, ...questions]
             : [...fields, ...questions];
           return { targetId, targetProfile, lines };
         }),
         relationshipLines = relationshipTargets.flatMap((entry) => entry.lines),
         pregnancyLines = asArray(extra.pregnancy_losses).flatMap((loss: any, index: number) => {
           const values = [
+            renderInputValue(loss?.date) ? `日期：${renderInputValue(loss.date)}` : "",
             renderInputValue(loss?.lunar_date) ? `農曆日期：${renderInputValue(loss.lunar_date)}` : "",
             renderInputValue(loss?.shichen) ? `時辰：${renderInputValue(loss.shichen)}` : "",
             renderInputValue(loss?.notes) ? `備註：${renderInputValue(loss.notes)}` : "",
@@ -1100,6 +1133,7 @@ async function context(bookingNo: string, requestedDocumentId = "") {
         infantRecords = asArray(extra.pregnancy_losses).map((loss: any, index: number) => ({
           title: `嬰靈${index + 1}`,
           lines: [
+            renderInputValue(loss?.date) ? `日期：${renderInputValue(loss.date)}` : "",
             renderInputValue(loss?.lunar_date) ? `農曆日期：${renderInputValue(loss.lunar_date)}` : "",
             renderInputValue(loss?.shichen) ? `時辰：${renderInputValue(loss.shichen)}` : "",
             renderInputValue(loss?.notes) ? `備註：${renderInputValue(loss.notes)}` : "",
@@ -1115,7 +1149,8 @@ async function context(bookingNo: string, requestedDocumentId = "") {
             (entry: any) => entry.sub_item_title,
           ),
         ].filter(Boolean),
-        infantMultiple = itemCode === "infant-spirit" && /一位以上|兩位|二位|2位|含.*以上/.test(labels.join(" "));
+        infantMultiple = itemCode === "infant-spirit" && /一位以上|兩位|二位|2位|含.*以上/.test(labels.join(" ")),
+        dateResultCount = itemCode === "date-time-selection" && /六|6/.test(labels.join(" ")) ? 6 : 3;
       return labels.flatMap((label: string) => {
         const base = {
           label: String(label).replace(/[【】]/g, "").trim(),
@@ -1126,6 +1161,7 @@ async function context(bookingNo: string, requestedDocumentId = "") {
           profile,
           profileName: clean(profile?.name),
           infantMultiple,
+          dateResultCount,
           infantRecords,
           ...presentation,
         };
@@ -1431,6 +1467,7 @@ async function context(bookingNo: string, requestedDocumentId = "") {
         targetName: (meta as any).targetName || "",
         infantMultiple: (meta as any).infantMultiple === true,
         infantRecords: (meta as any).infantRecords || [],
+        dateResultCount: Number((meta as any).dateResultCount || 3),
         locationSubject:
           itemCode === "infant-spirit" ? "寶寶" : meta.locationSubject || "祂",
         genderPronoun: meta.genderPronoun || "祂",
@@ -1737,6 +1774,7 @@ export async function POST(request: NextRequest) {
                     lawsuitBuiltInCopy[selection.optionCode] ||
                     homeBuiltInCopy[selection.optionCode] ||
                     spiritualBuiltInCopy[selection.optionCode] ||
+                    dateResultBuiltInCopy[selection.optionCode] ||
                     spiritBuiltInCopy[selection.optionCode] ||
                     "",
                 }

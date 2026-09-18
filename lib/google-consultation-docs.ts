@@ -77,6 +77,19 @@ async function formatDocumentAfterCreation(documentId: string, token: string) {
       documentStyle: {
         marginHeader: { magnitude: 14.1732, unit: "PT" },
         marginFooter: { magnitude: 14.1732, unit: "PT" },
+        useCustomHeaderFooterMargins: true,
+      },
+      fields: "marginHeader,marginFooter,useCustomHeaderFooterMargins",
+    },
+  }, {
+    updateSectionStyle: {
+      range: {
+        startIndex: 1,
+        endIndex: Math.max(2, Number(document.body?.content?.at(-1)?.endIndex || 2) - 1),
+      },
+      sectionStyle: {
+        marginHeader: { magnitude: 14.1732, unit: "PT" },
+        marginFooter: { magnitude: 14.1732, unit: "PT" },
       },
       fields: "marginHeader,marginFooter",
     },

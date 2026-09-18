@@ -57,6 +57,7 @@ type Section = {
   targetName?: string;
   infantMultiple?: boolean;
   infantRecords?: { title: string; lines: string[] }[];
+  dateResultCount?: number;
   locationSubject: string;
   genderPronoun: string;
   isPet: boolean;
@@ -126,6 +127,7 @@ export default function QuickConsultationReply({
     [reincarnatedPlace, setReincarnatedPlace] = useState<Record<string, string>>({}),
     [reincarnatedAge, setReincarnatedAge] = useState<Record<string, string>>({}),
     [infantYears, setInfantYears] = useState<Record<string, string>>({}),
+    [dateResultRows, setDateResultRows] = useState<Record<string, { date: string; verdict: string }[]>>({}),
     [partner2Enabled, setPartner2Enabled] = useState<Record<string, boolean>>({}),
     [partner2Selections, setPartner2Selections] = useState<Record<string, string[]>>({}),
     [romanceAges, setRomanceAges] = useState<Record<string, string[]>>({}),
@@ -151,6 +153,8 @@ export default function QuickConsultationReply({
     [manualSectionReplies, setManualSectionReplies] = useState<Record<string, string>>({}),
     [activeInfantBySection, setActiveInfantBySection] = useState<Record<string, number>>({}),
     [sectionPending, setSectionPending] = useState<Record<string, boolean>>({}),
+    itemMenuRef = useRef<HTMLElement | null>(null),
+    itemDetailRef = useRef<HTMLDivElement | null>(null),
     [busy, setBusy] = useState(false),
     [written, setWritten] = useState(false),
     [editing, setEditing] = useState(false);
@@ -364,6 +368,9 @@ export default function QuickConsultationReply({
       ) || [],
     healthAdviceOptions =
       sectionTopic?.options.filter((o) => o.code.startsWith("health_advice_")) || [],
+    dateJudgmentOptions = sectionTopic?.options.filter((o) => o.code.startsWith("date_judgment_")) || [],
+    dateSupportOptions = sectionTopic?.options.filter((o) => o.code.startsWith("date_support_")) || [],
+    dateNoticeOptions = sectionTopic?.options.filter((o) => o.code.startsWith("date_notice_")) || [],
     bodyOptions =
       sectionTopic?.options.filter((o) => {
         if (!o.code.startsWith("body_")) return false;
@@ -457,6 +464,7 @@ export default function QuickConsultationReply({
           !o.code.startsWith("advice_") &&
           !o.code.startsWith("recent_") &&
           !o.code.startsWith("health_advice_") &&
+          !o.code.startsWith("date_") &&
           !o.code.startsWith("body_") &&
           !o.code.startsWith("home_") &&
           !o.code.startsWith("spiritual_") &&
@@ -706,16 +714,23 @@ export default function QuickConsultationReply({
       if (
         sectionRequestVersions.current[targetKey] === version &&
         sectionSelections.current[targetKey]?.join("|") === optionIds.join("|")
-      )
+      ) {
+        const dateLines = targetSection.itemCode === "date-time-selection"
+          ? (dateResultRows[targetKey] || [])
+              .map((row, index) => row.date.trim() ? `第${index + 1}組：${row.date.trim()}${row.verdict ? `｜${row.verdict}` : ""}` : "")
+              .filter(Boolean)
+              .join("\n")
+          : "";
         setSectionDrafts((c) => ({
           ...c,
           [targetKey]: {
             optionIds,
             phraseIds: x.phraseIds || [],
-            answer: x.answer || "",
+            answer: [dateLines, x.answer || ""].filter(Boolean).join("\n\n"),
             completed: true,
           },
         }));
+      }
       setEditing(false);
     } catch (e) {
       if (sectionRequestVersions.current[targetKey] === version)
@@ -1202,6 +1217,21 @@ export default function QuickConsultationReply({
     setEditing(false);
     setError("");
     setWritten(false);
+    window.requestAnimationFrame(() => itemDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
+  const applyDateResult = () => {
+    if (!section || section.itemCode !== "date-time-selection") return;
+    const dateLines = (dateResultRows[sectionKey] || [])
+      .map((row, index) => row.date.trim() ? `第${index + 1}組：${row.date.trim()}${row.verdict ? `｜${row.verdict}` : ""}` : "")
+      .filter(Boolean)
+      .join("\n");
+    if (!dateLines) return window.alert("請至少填寫一組日期與時間");
+    if (sectionDraft.optionIds.length) return void composeSection(sectionDraft.optionIds);
+    setSectionDrafts((current) => ({
+      ...current,
+      [sectionKey]: { ...sectionDraft, answer: dateLines, completed: true },
+    }));
+    setWritten(false);
   };
   const togglePanel = (event: any) => {
     const target = event.target as HTMLElement,
@@ -1254,7 +1284,7 @@ export default function QuickConsultationReply({
               {view === "section" && (
                 <>
                   {sections.length ? (
-                    <section className="quickReplyQuestions">
+                    <section className="quickReplyQuestions" ref={itemMenuRef}>
                       <h3>先點選要填寫的項目標籤</h3>
                       <div>
                         {sections.map((s, i) => {
@@ -1290,6 +1320,7 @@ export default function QuickConsultationReply({
                   )}
                   {section && (
                     <>
+                      <div ref={itemDetailRef} className="quickReplyItemAnchor" aria-hidden="true" />
                       {section.profileLines?.length > 0 && (
                         <section className="quickReplyProfileCard">
                           <h3>本項目諮詢者資料</h3>
@@ -1481,6 +1512,59 @@ export default function QuickConsultationReply({
                             <h3>
                               {sectionTopic.icon} {sectionTopic.title}（可複選）
                             </h3>
+                            {sectionTopic.code === "date_result" && (
+                              <div className="quickReplyDateResult">
+                                <h4>請填寫{section.dateResultCount === 6 ? "六" : "三"}組日期與時間</h4>
+                                <div className="quickReplyDateRows">
+                                  {Array.from({ length: section.dateResultCount || 3 }, (_, index) => {
+                                    const rows = dateResultRows[sectionKey] || [];
+                                    const row = rows[index] || { date: "", verdict: "" };
+                                    return (
+                                      <div key={index}>
+                                        <b>{index + 1}</b>
+                                        <input
+                                          type="datetime-local"
+                                          value={row.date}
+                                          onChange={(event) => setDateResultRows((current) => {
+                                            const next = [...(current[sectionKey] || [])];
+                                            next[index] = { ...row, date: event.target.value };
+                                            return { ...current, [sectionKey]: next };
+                                          })}
+                                        />
+                                        <select value={row.verdict} onChange={(event) => setDateResultRows((current) => {
+                                          const next = [...(current[sectionKey] || [])];
+                                          next[index] = { ...row, verdict: event.target.value };
+                                          return { ...current, [sectionKey]: next };
+                                        })}>
+                                          <option value="">請選擇判斷</option>
+                                          <option value="這個時間最適合">這個時間最適合</option>
+                                          <option value="這個日子可以使用">這個日子可以使用</option>
+                                          <option value="需要調整時辰">需要調整時辰</option>
+                                          <option value="這個日子要避開">這個日子要避開</option>
+                                        </select>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                {[
+                                  ["①", "整體判斷", dateJudgmentOptions],
+                                  ["②", "當日助力", dateSupportOptions],
+                                  ["③", "注意事項", dateNoticeOptions],
+                                ].map(([number, title, options]) => (
+                                  <section className="quickReplyDateGroup" key={String(title)}>
+                                    <h4><span>{String(number)}</span>{String(title)}</h4>
+                                    <div className="quickReplySpecialChoices">
+                                      {(options as Option[]).map((option) => (
+                                        <button key={option.id} className={sectionDraft.optionIds.includes(option.id) ? "selected" : ""} onClick={() => toggleOption(option.id)}>
+                                          {sectionDraft.optionIds.includes(option.id) && <span>✓</span>}{option.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </section>
+                                ))}
+                                <button className="quickReplyApplyDateResult" onClick={applyDateResult}>帶入擇日／擇時結果</button>
+                              </div>
+                            )}
                             {section.itemCode === "infant-spirit" && (
                               <div className="quickReplyInfantInlineRecords">
                                 {Array.from(
@@ -3115,6 +3199,15 @@ export default function QuickConsultationReply({
                     : written
                       ? "再次寫入更新"
                       : "確認寫入全部回答"}
+                </button>
+                <button
+                  type="button"
+                  className="quickReplyBackToItems"
+                  aria-label="回到最上方項目選單"
+                  title="回到項目選單"
+                  onClick={() => itemMenuRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                >
+                  ↑
                 </button>
                 {footerProfileLines.length > 0 && (
                   <div className="quickReplyFooterProfile" aria-label="本項目諮詢者資料">
