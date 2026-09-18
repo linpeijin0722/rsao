@@ -1278,6 +1278,19 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 .quickReplyFooterActions{display:grid!important;gap:5px!important;min-height:0!important;border-radius:0!important;font-size:inherit!important;cursor:default!important}
 .quickReplyFooterActions>a,.quickReplyFooterActions>.quickReplyCancel{display:flex;align-items:center;justify-content:center;min-height:34px!important;padding:6px 10px!important;border:0;border-radius:8px;font-size:12px!important;font-weight:900;white-space:nowrap;text-decoration:none}
 .quickReplyFooterActions>a{background:#168a54;color:#fff}.quickReplyFooterActions>.quickReplyCancel{background:#e2d9d3;color:#524640}
+.quickReplyInputCard>.quickReplyOverallInputGroups{display:grid;gap:22px;padding:2px 0 0!important;border-top:0!important}
+.quickReplyOverallInputGroup{min-width:0}
+.quickReplyOverallInputGroup>h4{margin:0 0 7px!important;padding-bottom:8px;border-bottom:1px solid #d6e2de;color:#fff;font-size:0;text-align:left}
+.quickReplyOverallInputGroup>h4::first-line{font-size:20px}
+.quickReplyOverallInputGroup>h4{display:block}
+.quickReplyOverallInputGroup>h4{width:fit-content;padding:6px 11px!important;border:0;border-radius:7px;background:#7b3048;color:#fff;font-size:20px!important;font-weight:900;line-height:1.2}
+.quickReplyOverallInputFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin-top:7px;border-top:1px solid #d6e2de}
+.quickReplyOverallInputFields>div{min-width:0;padding:11px 0 10px;border-bottom:1px solid #d6e2de}
+.quickReplyOverallInputFields>div:nth-child(odd){padding-right:20px}
+.quickReplyOverallInputFields>div:nth-child(even){padding-left:20px}
+.quickReplyOverallInputFields b{margin:0 0 5px!important;color:#8a3045!important;font-size:15px!important;font-weight:900!important}
+.quickReplyOverallInputFields p{margin:0!important;color:#25211f!important;font-size:16px!important;line-height:1.45!important;overflow-wrap:anywhere}
+@media(max-width:640px){.quickReplyOverallInputFields{grid-template-columns:1fr}.quickReplyOverallInputFields>div:nth-child(odd),.quickReplyOverallInputFields>div:nth-child(even){padding-left:0;padding-right:0}}
 @media(max-width:700px){.quickReplyBody>footer.quickReplyWriteBar{grid-template-columns:1fr!important}.quickReplyFooterProfile{grid-template-columns:1fr!important}.quickReplyWriteBar>.quickReplyWrite{min-height:50px!important}}
 .quickReplyReincarnatedDetails{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;padding:12px;border:1px solid #e1d4cb;border-radius:10px;background:#fffaf7}
 .quickReplyReincarnatedDetails label{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto!important;align-items:center!important;gap:5px!important;text-align:left}

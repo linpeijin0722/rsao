@@ -6,6 +6,24 @@ const asCodes = (value: unknown): string[] =>
     : value
       ? [String(value)]
       : [];
+const groupOverallRequestLines = (lines: string[]) => {
+  const groups: { title: string; fields: { label: string; value: string }[] }[] = [];
+  for (const line of lines || []) {
+    const heading = /^【(.+)】$/.exec(line);
+    if (heading) {
+      groups.push({ title: heading[1], fields: [] });
+      continue;
+    }
+    const split = line.indexOf("：");
+    const field = {
+      label: split >= 0 ? line.slice(0, split) : "補充內容",
+      value: split >= 0 ? line.slice(split + 1) : line,
+    };
+    if (!groups.length) groups.push({ title: "其他內容", fields: [] });
+    groups[groups.length - 1].fields.push(field);
+  }
+  return groups.filter((group) => group.fields.length);
+};
 type Option = { id: string; code: string; label: string };
 type Topic = { code: string; title: string; icon: string; options: Option[] };
 type Question = {
@@ -1138,7 +1156,23 @@ export default function QuickConsultationReply({
                         sectionTopic?.code !== "naming_result" && (
                           <section className="quickReplyInputCard">
                             <h3>用戶填寫的內容</h3>
-                            {section.requestLines.map((line, index) => {
+                            {section.itemCode === "overall-fortune" ? (
+                              <div className="quickReplyOverallInputGroups">
+                                {groupOverallRequestLines(section.requestLines).map((group) => (
+                                  <section key={group.title} className="quickReplyOverallInputGroup">
+                                    <h4>{group.title}</h4>
+                                    <div className="quickReplyOverallInputFields">
+                                      {group.fields.map((field, index) => (
+                                        <div key={`${group.title}-${index}`}>
+                                          <b>{field.label}</b>
+                                          <p>{field.value}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </section>
+                                ))}
+                              </div>
+                            ) : section.requestLines.map((line, index) => {
                               const split = line.indexOf("：");
                               const heading = /^【(.+)】$/.exec(line);
                               if (heading)
