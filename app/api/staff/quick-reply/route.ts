@@ -431,25 +431,52 @@ const overallBuiltInCopy: Record<string, string> = {
   body_positive_mobility: "筋骨活動穩定。",
   body_positive_circulation: "氣色與循環不錯。",
 };
-const healthBuiltInOptions = overallBuiltInOptions.filter((option) =>
-  /^(body_|recent_positive_recovery|recent_negative_(?:car|blood|surgery)|recent_detail_|recent_advice_)/.test(option.code),
-);
+const healthExtraRows = [
+  ["recent_positive_health_energy", "精神體力穩定", "近期精神跟體力都穩定，日常活動沒有太大問題。"],
+  ["recent_positive_health_sleep", "睡眠狀況穩定", "近期睡眠狀況穩定，休息後精神恢復得起來。"],
+  ["recent_positive_health_appetite", "食慾與消化正常", "近期食慾跟消化都正常，身體吸收狀況沒有問題。"],
+  ["recent_positive_health_mobility", "筋骨活動順暢", "近期筋骨活動順暢，走動跟日常活動都穩定。"],
+  ["recent_positive_health_recovery", "治療恢復順利", "目前治療後的恢復會順利，照進度休養就能慢慢穩定。"],
+  ["recent_negative_health_inflammation", "容易發炎或反覆不適", "近期身體容易發炎或同一個地方反覆不舒服。"],
+  ["recent_negative_health_chronic", "舊毛病容易復發", "近期舊毛病容易再出現，已經不舒服的地方不要拖。"],
+  ["recent_negative_health_exhaustion", "過度疲勞影響身體", "近期容易累過頭，休息不夠時身體的不舒服會更明顯。"],
+  ["recent_negative_health_check", "需要安排檢查", "近期有需要安排檢查的狀況，先把原因確認清楚。"],
+  ["recent_negative_health_recovery", "恢復期會比較久", "這次身體恢復需要比較長的時間，不能太快恢復原本的工作量。"],
+] as const;
+const healthBuiltInOptions = [
+  ...overallBuiltInOptions.filter((option) =>
+    /^(body_|recent_positive_recovery|recent_negative_surgery|recent_detail_|recent_advice_)/.test(option.code),
+  ),
+  ...healthExtraRows.map(([code, label], index) => ({
+    id: `virtual-${code.replaceAll("_", "-")}`, code, label, sort_order: 520 + index, is_active: true,
+  })),
+];
+const healthBuiltInCopy = Object.fromEntries(
+  healthExtraRows.map(([code, , content]) => [code, content]),
+) as Record<string, string>;
 const lawsuitBuiltInRows = [
   ["lawsuit_attitude_continue", "對方會繼續追究", "這件事情對方還不會放掉，後面還會繼續處理，不會這麼快結束。"],
   ["lawsuit_attitude_step_back", "對方會退一步", "這件事情後面對方的態度會軟下來，不會一直強硬到底。"],
+  ["lawsuit_attitude_repeated", "對方態度會反覆", "對方的態度還會反覆，一下願意談、一下又變強硬，先不要急著相信口頭承諾。"],
   ["lawsuit_settlement_talk", "雙方會談和解", "這件事情最後會往談和解的方向走，後面會有人出來談條件。"],
   ["lawsuit_settlement_slow", "不會這麼快和解", "現在還談不到一個雙方都能接受的結果，這件事情還要再拖一段時間。"],
   ["lawsuit_court_details", "開庭會被問細節", "下次開庭不會只是簡單問幾句，細節、經過、前後說法都會被問得比較仔細。"],
   ["lawsuit_evidence_opponent_gap", "對方說法有漏洞", "對方講的東西前後有些地方對不起來，細節會被拿出來看。"],
   ["lawsuit_court_speak_carefully", "自己說話要小心", "這場官司最怕自己講太多，尤其前後說法不能不一樣，該講的講清楚就好。"],
+  ["lawsuit_court_progress", "開庭後會有進度", "下一次開庭後事情會往前走，會有新的程序或明確的處理方向。"],
   ["lawsuit_evidence_key", "證據是關鍵", "這件事情最後不是靠誰講得大聲，證據才是關鍵，手上的資料一定要整理好。"],
   ["lawsuit_support_tiring", "一個人處理會比較累", "現在一個人處理這件事情，後面會越來越繁瑣，光靠自己會比較吃力。"],
   ["lawsuit_support_help", "有人會幫忙", "後面會有人出手幫忙，可能是熟人提供意見，也可能有人幫忙處理細節。"],
   ["lawsuit_support_professional", "需要找專業人士", "這件事情牽涉的細節比較多，不適合完全自己摸索，法律上的部分該問專業就要問。"],
+  ["lawsuit_support_family", "家人會出手協助", "後面家人會出手幫忙，至少有人能一起討論、整理資料或陪同處理。"],
+  ["lawsuit_time_short_not_end", "短期不會結束", "這件事情短期內還不會結束，後面還有程序要走。"],
+  ["lawsuit_time_next_progress", "下次之後有進度", "下一次開庭或調解之後會有明顯進度，不會一直停在現在。"],
+  ["lawsuit_time_delayed", "時間容易往後延", "原本預期的時間容易往後延，結果不會那麼快定下來。"],
   ["lawsuit_injury_attitude_continue", "傷害案件：對方還在追究", "這件事情對方現在還沒有要放手，後面還會繼續追。"],
   ["lawsuit_injury_settlement_terms", "傷害案件：雙方會談條件", "後面會談到賠償、條件這些事情，不會只是一直僵著。"],
   ["lawsuit_injury_settlement_possible", "傷害案件：和解有機會", "後面確實會走到談和解這一步。"],
   ["lawsuit_injury_settlement_amount", "傷害案件：和解金額會拉鋸", "真正卡住的不是要不要談，是條件跟金額談不攏。"],
+  ["lawsuit_injury_settlement_agree", "傷害案件：條件最後能談成", "前面雖然會拉鋸，但最後條件還是能談到雙方可以接受。"],
   ["lawsuit_injury_evidence_key", "傷害案件：證據很重要", "這件事情最後還是要看證據，口頭講法不能當全部。"],
   ["lawsuit_injury_evidence_review", "傷害案件：對方說法會被檢視", "對方講的內容後面會被一項一項拿出來看。"],
   ["lawsuit_injury_court_speak", "傷害案件：自己不能亂講", "開庭前後說法一定要一致，不要想到什麼就補什麼。"],
@@ -751,6 +778,21 @@ async function context(bookingNo: string, requestedDocumentId = "") {
       ),
     }));
   }
+  if (questionMeta.length > questionSlots.length) {
+    for (let index = questionSlots.length; index < questionMeta.length; index += 1) {
+      questionSlots.push({
+        slotIndex: index,
+        questionNumber: index + 1,
+        question: questionMeta[index]?.question || `問題${index + 1}`,
+        answer: "",
+        itemCode: questionMeta[index]?.itemCode || "",
+        itemTitle: questionMeta[index]?.itemTitle || "",
+        profileName: questionMeta[index]?.profileName || "",
+        profileLines: questionMeta[index]?.profileLines || [],
+        manualOnly: false,
+      } as any);
+    }
+  }
   const { data: topics, error: topicError } = await db
     .from("quick_reply_topics")
     .select(
@@ -962,7 +1004,7 @@ async function context(bookingNo: string, requestedDocumentId = "") {
           }).filter(Boolean);
           return content.length ? [`【${focus}】`, ...content] : [];
         }).filter(Boolean),
-        relationshipLines = Object.entries(extra.relationship_details || {}).flatMap(([targetId, rawRows]) => {
+        relationshipTargets = Object.entries(extra.relationship_details || {}).map(([targetId, rawRows]) => {
           const rows = rawRows && typeof rawRows === "object" ? rawRows as Record<string, unknown> : {};
           const participant = asArray(answer?.booking_answer_participants).find((entry: any) => String(entry.profile_id) === String(targetId));
           const targetProfile = one(participant?.consultation_profiles);
@@ -971,10 +1013,12 @@ async function context(bookingNo: string, requestedDocumentId = "") {
             .map((key) => renderInputValue(rows[key]) ? `${inputLabels[key]}：${renderInputValue(rows[key])}` : "")
             .filter(Boolean);
           const questions = asArray(extra.target_questions?.[targetId]).map(clean).filter(Boolean).map((value: string, index: number) => `問題${index + 1}：${value}`);
-          return targetProfile
+          const lines = targetProfile
             ? [`【對象：${clean(targetProfile.name) || "未命名"}】`, ...targetPresentation.profileLines, ...fields, ...questions]
             : [...fields, ...questions];
+          return { targetId, targetProfile, lines };
         }),
+        relationshipLines = relationshipTargets.flatMap((entry) => entry.lines),
         pregnancyLines = asArray(extra.pregnancy_losses).flatMap((loss: any, index: number) => {
           const values = [
             renderInputValue(loss?.lunar_date) ? `農曆日期：${renderInputValue(loss.lunar_date)}` : "",
@@ -992,20 +1036,35 @@ async function context(bookingNo: string, requestedDocumentId = "") {
           ...asArray(detail.booking_detail_sub_items).map(
             (entry: any) => entry.sub_item_title,
           ),
-        ].filter(Boolean);
-      return labels.map((label: string) => ({
-        label: String(label)
-          .replace(/[【】]/g, "")
-          .trim(),
-        detailId: detail.id,
-        itemId: detail.item_id,
-        profileId: answer?.profile_id,
-        itemCode,
-        profile,
-        profileName: clean(profile?.name),
-        requestLines,
-        ...presentation,
-      }));
+        ].filter(Boolean),
+        infantMultiple = itemCode === "infant-spirit" && /一位以上|兩位|二位|2位|含.*以上/.test(labels.join(" "));
+      return labels.flatMap((label: string) => {
+        const base = {
+          label: String(label).replace(/[【】]/g, "").trim(),
+          detailId: detail.id,
+          itemId: detail.item_id,
+          profileId: answer?.profile_id,
+          itemCode,
+          profile,
+          profileName: clean(profile?.name),
+          infantMultiple,
+          ...presentation,
+        };
+        if (itemCode === "marriage-bazi" && relationshipTargets.length) {
+          return relationshipTargets.map((target) => {
+            const targetProfile = target.targetProfile;
+            const targetName = clean(targetProfile?.name) || "未命名對象";
+            const targetGender = clean(targetProfile?.gender);
+            const targetRelation = clean(targetProfile?.relationship_detail || targetProfile?.relationship);
+            return {
+              ...base,
+              targetDisplay: `對象：${targetName}${targetGender ? `／${targetGender}` : ""}${targetRelation ? `（${targetRelation}）` : ""}`,
+              requestLines: target.lines,
+            };
+          });
+        }
+        return [{ ...base, requestLines }];
+      });
     });
   questionSlots = questionSlots.map((slot: any) => {
     const matching = sectionMeta.find((entry: any) =>
@@ -1288,6 +1347,8 @@ async function context(bookingNo: string, requestedDocumentId = "") {
         profileName: meta.profileName || "",
         profileLines: meta.profileLines || [],
         requestLines: meta.requestLines || [],
+        targetDisplay: (meta as any).targetDisplay || "",
+        infantMultiple: (meta as any).infantMultiple === true,
         locationSubject:
           itemCode === "infant-spirit" ? "寶寶" : meta.locationSubject || "祂",
         genderPronoun: meta.genderPronoun || "祂",
@@ -1590,6 +1651,7 @@ export async function POST(request: NextRequest) {
                   content:
                     loveBuiltInCopy[selection.optionCode] ||
                     overallBuiltInCopy[selection.optionCode] ||
+                    healthBuiltInCopy[selection.optionCode] ||
                     lawsuitBuiltInCopy[selection.optionCode] ||
                     homeBuiltInCopy[selection.optionCode] ||
                     spiritualBuiltInCopy[selection.optionCode] ||

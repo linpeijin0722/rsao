@@ -53,6 +53,8 @@ type Section = {
   profileName: string;
   profileLines: string[];
   requestLines: string[];
+  targetDisplay?: string;
+  infantMultiple?: boolean;
   locationSubject: string;
   genderPronoun: string;
   isPet: boolean;
@@ -144,6 +146,8 @@ export default function QuickConsultationReply({
     [sectionDrafts, setSectionDrafts] = useState<Record<string, SectionDraft>>(
       {},
     ),
+    [manualSectionReplies, setManualSectionReplies] = useState<Record<string, string>>({}),
+    [infantSavedAnswers, setInfantSavedAnswers] = useState<Record<string, string[]>>({}),
     [sectionPending, setSectionPending] = useState<Record<string, boolean>>({}),
     [busy, setBusy] = useState(false),
     [written, setWritten] = useState(false),
@@ -371,17 +375,12 @@ export default function QuickConsultationReply({
     upperBodyOptions = sortedBodyConcerns.filter((o) => !lowerBodyCodes.has(o.code)),
     lowerBodyOptions = sortedBodyConcerns.filter((o) => lowerBodyCodes.has(o.code)),
     lawsuitOptionGroups = [
-      ["對方態度", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_attitude_")) || []],
-      ["證據", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_evidence_")) || []],
-      ["開庭", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_court_")) || []],
-      ["和解", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_settlement_")) || []],
-      ["後續協助", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_support_")) || []],
-      ["傷害案件－對方態度", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_injury_attitude_")) || []],
-      ["傷害案件－證據", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_injury_evidence_")) || []],
-      ["傷害案件－開庭", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_injury_court_")) || []],
-      ["傷害案件－和解", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_injury_settlement_")) || []],
-      ["傷害案件－後續協助", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_injury_support_")) || []],
-      ["傷害案件－時間", sectionTopic?.options.filter((o) => o.code.startsWith("lawsuit_injury_time_")) || []],
+      ["對方態度", sectionTopic?.options.filter((o) => /^lawsuit_(?:injury_)?attitude_/.test(o.code)) || []],
+      ["證據", sectionTopic?.options.filter((o) => /^lawsuit_(?:injury_)?evidence_/.test(o.code)) || []],
+      ["開庭", sectionTopic?.options.filter((o) => /^lawsuit_(?:injury_)?court_/.test(o.code)) || []],
+      ["和解", sectionTopic?.options.filter((o) => /^lawsuit_(?:injury_)?settlement_/.test(o.code)) || []],
+      ["後續協助", sectionTopic?.options.filter((o) => /^lawsuit_(?:injury_)?support_/.test(o.code)) || []],
+      ["時間", sectionTopic?.options.filter((o) => /^lawsuit_(?:injury_)?time_/.test(o.code)) || []],
     ].filter(([, options]) => (options as Option[]).length) as [string, Option[]][],
     homeConditionOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_condition_")) || [],
     homeImpactOptions = sectionTopic?.options.filter((o) => o.code.startsWith("home_impact_")) || [],
@@ -1026,13 +1025,29 @@ export default function QuickConsultationReply({
       return;
     }
     if (!hasAnswer) return;
+    const incompleteInfant = sections.find((entry) => {
+      if (!entry.infantMultiple) return false;
+      const key = String(entry.slotIndex);
+      const count = (infantSavedAnswers[key]?.length || 0) + (sectionDrafts[key]?.answer?.trim() ? 1 : 0);
+      return count < 2;
+    });
+    if (incompleteInfant && !window.confirm("這筆預約是一位以上的嬰靈，目前只填寫一位嬰靈資料，請確認是否仍要送出？")) return;
     setBusy(true);
     setError("");
     try {
       await post({
         mode: "write",
         questionReplies: drafts,
-        sectionReplies: sectionDrafts,
+        sectionReplies: Object.fromEntries(Object.entries(sectionDrafts).map(([key, row]) => {
+          const infantAnswers = [...(infantSavedAnswers[key] || []), row.answer].map((value) => value?.trim()).filter(Boolean);
+          const generatedAnswer = infantAnswers.length > 1
+            ? infantAnswers.map((value, index) => `【嬰靈${index + 1}】\n${value}`).join("\n\n")
+            : infantAnswers[0] || "";
+          return [key, {
+            ...row,
+            answer: [generatedAnswer, manualSectionReplies[key]].map((value) => value?.trim()).filter(Boolean).join("\n\n"),
+          }];
+        })),
       });
       setWritten(true);
       setEditing(false);
@@ -1047,23 +1062,39 @@ export default function QuickConsultationReply({
   }
   const hasAnswer =
       Object.values(drafts).some((r) => r.answer?.trim()) ||
-      Object.values(sectionDrafts).some((r) => r.answer?.trim()),
+      Object.values(sectionDrafts).some((r) => r.answer?.trim()) ||
+      Object.values(manualSectionReplies).some((value) => value.trim()) ||
+      Object.values(infantSavedAnswers).some((values) => values.some((value) => value.trim())),
     hasPending = Object.values(sectionDrafts).some(
       (r) => r.optionIds?.length && !r.answer?.trim(),
     ),
     sectionIsPending = Object.values(sectionPending).some(Boolean);
-  const adviceFieldFor = (questionText: string, label: string) => {
+  const adviceFieldFor = (questionText: string, label: string, allowSectionFallback = false) => {
     const normalized = questionText.replace(/[？?。.!！\s]/g, "");
     const adviceQuestion = data?.questions.find((entry) => {
       const candidate = entry.question.replace(/[？?。.!！\s]/g, "");
       return candidate && (candidate.includes(normalized) || normalized.includes(candidate));
     });
-    if (!adviceQuestion) return null;
+    if (!adviceQuestion) {
+      if (!allowSectionFallback) return null;
+      return (
+        <label className="quickReplyInlineAdvice quickReplySectionManualReply">
+          <b>阿嫂回覆</b>
+          <textarea
+            value={manualSectionReplies[sectionKey] || ""}
+            placeholder="請輸入本項目的回覆"
+            onChange={(event) => {
+              setManualSectionReplies((current) => ({ ...current, [sectionKey]: event.target.value }));
+              setWritten(false);
+            }}
+          />
+        </label>
+      );
+    }
     const key = String(adviceQuestion.slotIndex);
     return (
       <label className="quickReplyInlineAdvice">
-        <b>阿嫂建議</b>
-        <span>【</span>
+        <b>阿嫂回覆</b>
         <textarea
           value={drafts[key]?.answer || ""}
           placeholder={`請填寫「${label}」的回答`}
@@ -1081,7 +1112,6 @@ export default function QuickConsultationReply({
             setWritten(false);
           }}
         />
-        <span>】</span>
       </label>
     );
   };
@@ -1090,6 +1120,19 @@ export default function QuickConsultationReply({
     kind === "section" ? setActiveSection(index) : setActiveQuestion(index);
     setEditing(false);
     setError("");
+    setWritten(false);
+  };
+  const addInfantEntry = () => {
+    if (!section?.infantMultiple) return;
+    if (sectionIsPending) return window.alert("目前內容仍在產生，請稍後再新增嬰靈資料");
+    const answer = sectionDraft.answer?.trim();
+    if (!answer) return window.alert("請先完成目前這一位嬰靈的選項，再新增下一位");
+    setInfantSavedAnswers((current) => ({ ...current, [sectionKey]: [...(current[sectionKey] || []), answer] }));
+    sectionSelections.current[sectionKey] = [];
+    setSectionDrafts((current) => ({ ...current, [sectionKey]: { optionIds: [], phraseIds: [], answer: "", completed: false } }));
+    setLocationMode((current) => ({ ...current, [sectionKey]: "" }));
+    setLocationHall((current) => ({ ...current, [sectionKey]: "" }));
+    setInfantYears((current) => ({ ...current, [sectionKey]: "" }));
     setWritten(false);
   };
   const togglePanel = (event: any) => {
@@ -1157,7 +1200,7 @@ export default function QuickConsultationReply({
                               onClick={() => pickTarget("section", i)}
                             >
                               <span>{done ? "✓" : "項目"}</span>
-                              <b>【{s.label}】</b>
+                              <b>【{s.label}】{s.targetDisplay && <em className="quickReplyTargetDisplay">　{s.targetDisplay}</em>}</b>
                               <small>
                                 {done
                                   ? "已完成回答"
@@ -1185,24 +1228,9 @@ export default function QuickConsultationReply({
                           ))}
                         </section>
                       )}
-                      {section.requestLines?.length > 0 &&
-                        sectionTopic?.code !== "naming_result" && (
+                      {(
                           <section className="quickReplyInputCard">
                             <h3>用戶填寫的內容</h3>
-                            {section.itemCode === "lawsuit-benefactor" && (() => {
-                              const values = Object.fromEntries(section.requestLines.map((line) => {
-                                const split = line.indexOf("：");
-                                return split >= 0 ? [line.slice(0, split), line.slice(split + 1)] : [line, ""];
-                              }));
-                              return (
-                                <div className="quickReplyLawsuitSummary">
-                                  <b>⚖️ 官司：{values["官司或糾紛類型"] || "待確認"}</b>
-                                  <span>下次開庭：{values["下次開庭或調解日期"] || "尚未填寫"}</span>
-                                  <span>目前：{values["目前訴訟進度"] || "尚未填寫"}</span>
-                                  <span>協助：{values["目前是否有專業人士或他人協助"] || "尚未填寫"}</span>
-                                </div>
-                              );
-                            })()}
                             {section.itemCode === "overall-fortune" ? (
                               <div className="quickReplyOverallInputGroups">
                                 {groupOverallRequestLines(section.requestLines).map((group, groupIndex) => {
@@ -1224,10 +1252,9 @@ export default function QuickConsultationReply({
                                           </div>
                                         ))}
                                       </div>
-                                      {adviceQuestion && (
+                                      {adviceQuestion ? (
                                         <label className="quickReplyOverallAdviceInput">
-                                          <b>阿嫂建議</b>
-                                          <span>【</span>
+                                          <b>阿嫂回覆</b>
                                           <textarea
                                             value={drafts[adviceKey]?.answer || ""}
                                             placeholder={`請填寫${group.title}的回答`}
@@ -1245,14 +1272,15 @@ export default function QuickConsultationReply({
                                               setWritten(false);
                                             }}
                                           />
-                                          <span>】</span>
                                         </label>
-                                      )}
+                                      ) : adviceFieldFor("", group.title, true)}
                                     </section>
                                   );
                                 })}
+                                {!groupOverallRequestLines(section.requestLines).length && adviceFieldFor("", "本項目", true)}
                               </div>
-                            ) : section.requestLines.map((line, index) => {
+                            ) : <>
+                              {section.requestLines.map((line, index) => {
                               const split = line.indexOf("：");
                               const heading = /^【(.+)】$/.exec(line);
                               if (heading)
@@ -1270,10 +1298,12 @@ export default function QuickConsultationReply({
                                     {label}
                                   </b>
                                   <p>{value}</p>
-                                  {shouldAnswer && adviceFieldFor(value, label)}
+                                  {shouldAnswer && adviceFieldFor(value, label, true)}
                                 </div>
                               );
-                            })}
+                              })}
+                              {!section.requestLines.some((line) => /^問題\d*：/.test(line) || /想瞭解/.test(line)) && adviceFieldFor("", "本項目", true)}
+                            </>}
                           </section>
                         )}
                       <section className="quickReplyCategoryPicker quickReplySectionCategoryPicker">
@@ -1301,6 +1331,13 @@ export default function QuickConsultationReply({
                           ))}
                         </div>
                       </section>
+                      {section.infantMultiple && (
+                        <section className="quickReplyInfantEntries">
+                          {(infantSavedAnswers[sectionKey] || []).map((_, index) => <span key={index}>✓ 嬰靈{index + 1}資料已完成</span>)}
+                          <button type="button" onClick={addInfantEntry}>＋新增嬰靈資料</button>
+                          <small>完成目前這一位的選項後再新增，下面會清空並帶出同一套選項供下一位填寫。</small>
+                        </section>
+                      )}
                       {sectionTopic?.code === "naming_result" && (
                         <section className="quickReplyNamingPanel">
                           <div className="quickReplyNamingNeeds">
