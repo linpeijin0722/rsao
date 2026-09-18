@@ -1082,14 +1082,6 @@ export default function QuickConsultationReply({
         ) : (
           data && (
             <div className="quickReplyBody">
-              <nav className="quickReplyModeTabs">
-                <button
-                  className={view === "section" ? "active" : ""}
-                  onClick={() => setView("section")}
-                >
-                  項目標籤回覆
-                </button>
-              </nav>
               {data.previousSummaries?.length > 0 && (
                 <section className="quickReplyPreviousSummary">
                   <h3>最近一次諮詢摘要</h3>
@@ -1152,19 +1144,54 @@ export default function QuickConsultationReply({
                             <h3>用戶填寫的內容</h3>
                             {section.itemCode === "overall-fortune" ? (
                               <div className="quickReplyOverallInputGroups">
-                                {groupOverallRequestLines(section.requestLines).map((group) => (
-                                  <section key={group.title} className="quickReplyOverallInputGroup">
-                                    <h4>{group.title}</h4>
-                                    <div className="quickReplyOverallInputFields">
-                                      {group.fields.map((field, index) => (
-                                        <div key={`${group.title}-${index}`}>
-                                          <b>{field.label}</b>
-                                          <p>{field.value}</p>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </section>
-                                ))}
+                                {groupOverallRequestLines(section.requestLines).map((group) => {
+                                  const adviceQuestion = data.questions.find(
+                                    (entry) =>
+                                      entry.itemCode === "overall-fortune" &&
+                                      (entry.question === `${group.title}建議` ||
+                                        entry.question.startsWith(group.title)),
+                                  );
+                                  const adviceKey = adviceQuestion
+                                    ? String(adviceQuestion.slotIndex)
+                                    : "";
+                                  return (
+                                    <section key={group.title} className="quickReplyOverallInputGroup">
+                                      <h4>{group.title}</h4>
+                                      <div className="quickReplyOverallInputFields">
+                                        {group.fields.map((field, index) => (
+                                          <div key={`${group.title}-${index}`}>
+                                            <b>{field.label}</b>
+                                            <p>{field.value}</p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      {adviceQuestion && (
+                                        <label className="quickReplyOverallAdviceInput">
+                                          <b>阿嫂建議</b>
+                                          <span>【</span>
+                                          <textarea
+                                            value={drafts[adviceKey]?.answer || ""}
+                                            placeholder={`請填寫${group.title}的回答`}
+                                            onChange={(event) => {
+                                              const answer = event.target.value;
+                                              setDrafts((current) => ({
+                                                ...current,
+                                                [adviceKey]: {
+                                                  selections: current[adviceKey]?.selections || {},
+                                                  phraseIds: current[adviceKey]?.phraseIds || [],
+                                                  answer,
+                                                  completed: Boolean(answer.trim()),
+                                                },
+                                              }));
+                                              setWritten(false);
+                                            }}
+                                          />
+                                          <span>】</span>
+                                        </label>
+                                      )}
+                                    </section>
+                                  );
+                                })}
                               </div>
                             ) : section.requestLines.map((line, index) => {
                               const split = line.indexOf("：");
