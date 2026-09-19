@@ -542,6 +542,12 @@ const dateResultBuiltInRows = [
   ["date_notice_calm", "當天保持平和", "當天情緒要穩，不要爭吵或臨時改動。"],
   ["date_notice_traffic", "預留交通時間", "當天要預留交通時間，避免趕路錯過時辰。"],
   ["date_notice_simple", "儀式簡單莊重", "儀式保持簡單莊重，不用安排得太複雜。"],
+  ["date_notice_documents", "文件資料先備齊", "相關文件與資料要先準備完整，當天不要臨時補件。"],
+  ["date_notice_weather", "先確認天候狀況", "安排前先確認天候狀況，遇到明顯變化就提早調整。"],
+  ["date_notice_people", "重要人員先確認", "重要人員要事先確認時間，不要到當天才臨時聯絡。"],
+  ["date_notice_backup", "預留備用方案", "當天要預留備用方案，臨時有變化時才不會亂掉。"],
+  ["date_notice_rest", "前一天充分休息", "前一天要充分休息，當天精神穩定，事情才會做得順。"],
+  ["date_notice_check", "出發前再次確認", "出發前把時間、地點和攜帶物品再確認一次。"],
 ] as const;
 const dateResultBuiltInOptions = dateResultBuiltInRows.map(([code, label], index) => ({
   id: `virtual-${code.replaceAll("_", "-")}`, code, label, sort_order: 100 + index, is_active: true,

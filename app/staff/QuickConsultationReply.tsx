@@ -1245,7 +1245,7 @@ export default function QuickConsultationReply({
       .map((row, index) => row.date.trim() ? `第${index + 1}組：${row.date.trim()}${row.verdict ? `｜${row.verdict}` : ""}` : "")
       .filter(Boolean)
       .join("\n");
-    if (!dateLines) return window.alert("請至少填寫一組日期與時間");
+    if (!dateLines) return window.alert("請至少填寫一組日期");
     if (sectionDraft.optionIds.length) return void composeSection(sectionDraft.optionIds);
     setSectionDrafts((current) => ({
       ...current,
@@ -1277,6 +1277,7 @@ export default function QuickConsultationReply({
               </p>
             )}
           </div>
+          {standalone && data?.documentUrl && <a className="quickReplyReturnDocument" href={data.documentUrl}>返回諮詢單</a>}
           {!standalone && <button onClick={onClose}>×</button>}
         </header>
         {loading ? (
@@ -1534,7 +1535,7 @@ export default function QuickConsultationReply({
                             </h3>
                             {sectionTopic.code === "date_result" && (
                               <div className="quickReplyDateResult">
-                                <h4>請填寫{section.dateResultCount === 6 ? "六" : "三"}組日期與時間</h4>
+                                <h4>請填寫{section.dateResultCount === 6 ? "六" : "三"}組日期</h4>
                                 <div className="quickReplyDateRows">
                                   {Array.from({ length: section.dateResultCount || 3 }, (_, index) => {
                                     const rows = dateResultRows[sectionKey] || [];
@@ -1543,7 +1544,8 @@ export default function QuickConsultationReply({
                                       <div key={index}>
                                         <b>{index + 1}</b>
                                         <input
-                                          type="datetime-local"
+                                          type="text"
+                                          placeholder="請輸入日期，例如：10月8日"
                                           value={row.date}
                                           onChange={(event) => setDateResultRows((current) => {
                                             const next = [...(current[sectionKey] || [])];
@@ -1551,26 +1553,20 @@ export default function QuickConsultationReply({
                                             return { ...current, [sectionKey]: next };
                                           })}
                                         />
-                                        <select value={row.verdict} onChange={(event) => setDateResultRows((current) => {
+                                        <input type="text" list="date-verdict-options" placeholder="請輸入判斷" value={row.verdict} onChange={(event) => setDateResultRows((current) => {
                                           const next = [...(current[sectionKey] || [])];
                                           next[index] = { ...row, verdict: event.target.value };
                                           return { ...current, [sectionKey]: next };
-                                        })}>
-                                          <option value="">請選擇判斷</option>
-                                          <option value="這個時間最適合">這個時間最適合</option>
-                                          <option value="這個日子可以使用">這個日子可以使用</option>
-                                          <option value="需要調整時辰">需要調整時辰</option>
-                                          <option value="這個日子要避開">這個日子要避開</option>
-                                        </select>
+                                        })} />
                                       </div>
                                     );
                                   })}
                                 </div>
-                                {[
-                                  ["①", "整體判斷", dateJudgmentOptions],
-                                  ["②", "當日助力", dateSupportOptions],
-                                  ["③", "注意事項", dateNoticeOptions],
-                                ].map(([number, title, options]) => (
+                                <datalist id="date-verdict-options">
+                                  <option value="這個時間最適合"/><option value="這個日子可以使用"/><option value="需要調整時辰"/><option value="這個日子要避開"/>
+                                  <option value="這個日期最適合"/><option value="這個日期可優先安排"/><option value="這個日期普通可用"/><option value="這個日期需要更換"/><option value="上午安排比較適合"/><option value="下午安排比較適合"/>
+                                </datalist>
+                                {[["①", "注意事項", dateNoticeOptions]].map(([number, title, options]) => (
                                   <section className="quickReplyDateGroup" key={String(title)}>
                                     <h4><span>{String(number)}</span>{String(title)}</h4>
                                     <div className="quickReplySpecialChoices">

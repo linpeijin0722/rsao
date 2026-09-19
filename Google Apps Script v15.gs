@@ -1,4 +1,4 @@
-const SCRIPT_VERSION = "2026-09-19-v28";
+const SCRIPT_VERSION = "2026-09-19-v29";
 const RETURN_BUTTON_ANCHOR = "\u200B";
 const RETURN_BUTTON_ALT_TITLE = "RSAO_CONSULTATION_RETURN_BUTTON";
 
@@ -147,7 +147,9 @@ function doPost(e) {
       );
     }
 
+    var documentEndIndex = Math.max(2, body.editAsText().getText().length + 1);
     doc.saveAndClose();
+    setDocumentPageMargins_(documentId, documentEndIndex);
     var createdFile = DriveApp.getFileById(doc.getId());
     createdFile.moveTo(folder);
     if (payload.serviceAccountEmail) {
@@ -207,6 +209,44 @@ function insertDocumentWarning_(body, warning) {
     .setFontSize(0, warning.length - 1, 17.25)
     .setForegroundColor(0, warning.length - 1, "#FFFA6A")
     .setBackgroundColor(0, warning.length - 1, "#CC0000");
+}
+
+function setDocumentPageMargins_(documentId, endIndex) {
+  var halfCentimeter = 14.1732;
+  var requests = [
+    {
+      updateDocumentStyle: {
+        documentStyle: {
+          marginTop: { magnitude: halfCentimeter, unit: "PT" },
+          marginBottom: { magnitude: halfCentimeter, unit: "PT" },
+          marginHeader: { magnitude: halfCentimeter, unit: "PT" },
+          marginFooter: { magnitude: halfCentimeter, unit: "PT" },
+          useCustomHeaderFooterMargins: true
+        },
+        fields: "marginTop,marginBottom,marginHeader,marginFooter,useCustomHeaderFooterMargins"
+      }
+    },
+    {
+      updateSectionStyle: {
+        range: { startIndex: 1, endIndex: Math.max(2, Number(endIndex || 2)) },
+        sectionStyle: {
+          marginHeader: { magnitude: halfCentimeter, unit: "PT" },
+          marginFooter: { magnitude: halfCentimeter, unit: "PT" }
+        },
+        fields: "marginHeader,marginFooter"
+      }
+    }
+  ];
+  var response = UrlFetchApp.fetch("https://docs.googleapis.com/v1/documents/" + encodeURIComponent(documentId) + ":batchUpdate", {
+    method: "post",
+    contentType: "application/json",
+    headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() },
+    payload: JSON.stringify({ requests: requests }),
+    muteHttpExceptions: true
+  });
+  if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) {
+    throw new Error("頁首與頁尾距離設定失敗：" + response.getContentText());
+  }
 }
 
 function escapeRegExp_(value) {
