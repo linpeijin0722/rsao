@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 export default function Complete() {
   const [order, setOrder] = useState("");
-  const lineUrl = process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL || "";
+  const lineUrl = process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL || "https://line.me/R/ti/p/@405unxzn";
   useEffect(() => {
     setOrder(new URLSearchParams(location.search).get("order") || "");
     if (!lineUrl) return;

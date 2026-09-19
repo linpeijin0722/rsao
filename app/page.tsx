@@ -2,7 +2,8 @@
 import liff from "@line/liff";
 import { addCalendarDays } from "@/lib/video-booking-window";
 import { useEffect, useMemo, useState } from "react";
-const bookingLiffId = "2010145548-jmc9lP5o";
+const bookingLiffId = process.env.NEXT_PUBLIC_LIFF_ID || "2010145124-UZiPJzKi";
+const officialLineUrl = process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL || "https://line.me/R/ti/p/@405unxzn";
 type Method = {
   id: string;
   code: "video" | "text";
@@ -128,9 +129,7 @@ export default function Page() {
           await liff.init({liffId});
           const url=new URL(location.href);
           if(!liff.isInClient()){
-            const officialAccountUrl=process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL;
-            if(!officialAccountUrl)throw Error("系統尚未設定 LINE 官方帳號連結");
-            location.replace(officialAccountUrl);
+            location.replace(officialLineUrl);
             return;
           }
           sessionStorage.setItem("lin_a_sao_verified_liff_entry","1");
@@ -413,8 +412,7 @@ export default function Page() {
       if (!liffId) throw Error("尚未設定 LIFF ID");
       await liff.init({ liffId });
       if (!liff.isInClient() || sessionStorage.getItem("lin_a_sao_verified_liff_entry") !== "1") {
-        const officialAccountUrl = process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL;
-        if (officialAccountUrl) location.replace(officialAccountUrl);
+        location.replace(officialLineUrl);
         throw Error("請從 LINE 官方帳號圖文選單重新進入預約頁面。");
       }
       const bookingPayload = {
@@ -506,7 +504,7 @@ export default function Page() {
     return (
       <main className="loginGate">
         <p>{auth === "loading" ? "正在確認 LINE 登入…" : error}</p>
-        {auth === "friend-required"&&<a className="addLineFriend" href={process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL||"https://line.me/"}>前往加入／解除封鎖</a>}
+        {auth === "friend-required"&&<a className="addLineFriend" href={officialLineUrl}>前往加入／解除封鎖</a>}
       </main>
     );
   return (
