@@ -1,4 +1,4 @@
-const SCRIPT_VERSION = "2026-09-19-v29";
+const SCRIPT_VERSION = "2026-09-19-v30";
 const RETURN_BUTTON_ANCHOR = "\u200B";
 const RETURN_BUTTON_ALT_TITLE = "RSAO_CONSULTATION_RETURN_BUTTON";
 
@@ -13,6 +13,9 @@ function doGet() {
  * WEBHOOK_SECRET = 與 Vercel GOOGLE_APPS_SCRIPT_SECRET 完全相同的密碼
  */
 function doPost(e) {
+  var recoveryDoc = null;
+  var recoveryFolder = null;
+  var recoveryTitle = "";
   try {
     const payload = JSON.parse(e.postData.contents || "{}");
     const expected = PropertiesService.getScriptProperties().getProperty("WEBHOOK_SECRET");
@@ -53,6 +56,9 @@ function doPost(e) {
     }
 
     const doc = DocumentApp.create(finalTitle);
+    recoveryDoc = doc;
+    recoveryFolder = folder;
+    recoveryTitle = finalTitle;
     const body = doc.getBody();
     body.setText(payload.content);
     // 上下各 0.5 公分；左右維持原本 1 公分。
@@ -147,9 +153,7 @@ function doPost(e) {
       );
     }
 
-    var documentEndIndex = Math.max(2, body.editAsText().getText().length + 1);
     doc.saveAndClose();
-    setDocumentPageMargins_(documentId, documentEndIndex);
     var createdFile = DriveApp.getFileById(doc.getId());
     createdFile.moveTo(folder);
     if (payload.serviceAccountEmail) {
@@ -193,6 +197,22 @@ function doPost(e) {
       warnings: entrypointWarnings,
     })).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
+    if (recoveryDoc) {
+      try {
+        recoveryDoc.saveAndClose();
+        var recoveryFile = DriveApp.getFileById(recoveryDoc.getId());
+        if (recoveryFolder) recoveryFile.moveTo(recoveryFolder);
+        return ContentService.createTextOutput(JSON.stringify({
+          ok: true,
+          version: SCRIPT_VERSION,
+          documentId: recoveryDoc.getId(),
+          documentUrl: recoveryDoc.getUrl(),
+          documentTitle: recoveryTitle || recoveryFile.getName(),
+          entrypointsReady: false,
+          warnings: ["附加功能失敗，但諮詢單已優先建立：" + String(error.message || error)]
+        })).setMimeType(ContentService.MimeType.JSON);
+      } catch (recoveryError) {}
+    }
     return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(error.message || error) }))
       .setMimeType(ContentService.MimeType.JSON);
   }
