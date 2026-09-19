@@ -1533,12 +1533,16 @@ async function context(bookingNo: string, requestedDocumentId = "") {
   const questionReplies = Object.fromEntries(
     questionSlots.map((slot) => {
       const existing = savedReplies[String(slot.slotIndex)] || {};
+      const savedAnswer = clean(existing.answer);
+      const documentAnswer = clean(slot.answer);
+      const safeSavedAnswer = /^(?:Q\d+\s*[:：]|【)/u.test(savedAnswer) ? "" : savedAnswer;
+      const safeDocumentAnswer = /^(?:Q\d+\s*[:：]|【)/u.test(documentAnswer) ? "" : documentAnswer;
       return [
         String(slot.slotIndex),
         {
           selections: existing.selections || {},
           phraseIds: existing.phraseIds || [],
-          answer: existing.answer || slot.answer || "",
+          answer: safeSavedAnswer || safeDocumentAnswer,
           completed: existing.completed === true,
         },
       ];
@@ -2188,11 +2192,11 @@ export async function POST(request: NextRequest) {
         answers,
       );
     const pastLifeOverviewAnswers = data.sectionSlots
-      .filter((slot: any) => slot.itemCode === "past-life-personal")
+      .filter((slot: any) => slot.itemCode.startsWith("past-life-"))
       .map((slot: any) => sectionAnswers[String(slot.slotIndex)] || "")
       .filter(Boolean);
     const regularSectionAnswers = Object.fromEntries(
-      Object.entries(sectionAnswers).filter(([index]) => data.sectionSlots[Number(index)]?.itemCode !== "past-life-personal"),
+      Object.entries(sectionAnswers).filter(([index]) => !data.sectionSlots[Number(index)]?.itemCode.startsWith("past-life-")),
     );
     if (Object.keys(regularSectionAnswers).length)
       await upsertQuickConsultationSectionReplies(

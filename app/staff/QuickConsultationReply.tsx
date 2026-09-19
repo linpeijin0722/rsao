@@ -1151,11 +1151,13 @@ export default function QuickConsultationReply({
       (r) => r.optionIds?.length && !r.answer?.trim(),
     ),
     sectionIsPending = Object.values(sectionPending).some(Boolean);
-  const adviceFieldFor = (questionText: string, label: string, allowSectionFallback = false) => {
+  const adviceFieldFor = (questionText: string, label: string, allowSectionFallback = false, scope?: { itemCode?: string; profileName?: string }) => {
     const normalized = questionText.replace(/[？?。.!！\s]/g, "");
-    const adviceQuestion = normalized.length >= 4 ? data?.questions.find((entry) => {
+    const targetItemCode = scope?.itemCode || section?.itemCode || "";
+    const targetProfileName = scope?.profileName || section?.profileName || "";
+    const adviceQuestion = normalized.length >= 2 ? data?.questions.find((entry) => {
       const candidate = entry.question.replace(/[？?。.!！\s]/g, "");
-      return candidate && (candidate.includes(normalized) || normalized.includes(candidate));
+      return candidate === normalized && (!targetItemCode || entry.itemCode === targetItemCode) && (!targetProfileName || entry.profileName === targetProfileName);
     }) : undefined;
     if (!adviceQuestion) {
       if (!allowSectionFallback) return null;
@@ -1164,6 +1166,7 @@ export default function QuickConsultationReply({
         <label className="quickReplyInlineAdvice quickReplySectionManualReply">
           <b>阿嫂回覆</b>
           <textarea
+            rows={1}
             value={manualSectionReplies[manualKey] || ""}
             placeholder="請輸入本項目的回覆"
             onChange={(event) => {
@@ -1179,6 +1182,7 @@ export default function QuickConsultationReply({
       <label className="quickReplyInlineAdvice">
         <b>阿嫂回覆</b>
         <textarea
+          rows={1}
           value={drafts[key]?.answer || ""}
           placeholder={`請填寫「${label}」的回答`}
           onChange={(event) => {
@@ -2947,7 +2951,7 @@ export default function QuickConsultationReply({
                         )}
                       <section className="quickReplyPreview">
                         <div>
-                          <h3>{section.itemCode === "past-life-personal" ? "綜觀今生" : `【${section.label}】回覆預覽`}</h3>
+                          <h3>{section.itemCode.startsWith("past-life-") ? "綜觀今生" : `【${section.label}】回覆預覽`}</h3>
                           {sectionDraft.answer && (
                             <span>{editing ? "直接修改中" : "可繼續複選"}</span>
                           )}
@@ -3060,7 +3064,7 @@ export default function QuickConsultationReply({
                               <div key={index} className={shouldAnswer ? "quickReplyInputQuestion" : ""}>
                                 <b>{label}</b>
                                 <p>{value}</p>
-                                {shouldAnswer && adviceFieldFor(value, label)}
+                                {shouldAnswer && adviceFieldFor(value, label, false, { itemCode: question.itemCode, profileName: question.profileName })}
                               </div>
                             );
                           })}
@@ -3126,7 +3130,7 @@ export default function QuickConsultationReply({
                       )}
                       <section className="quickReplyPreview">
                         <div>
-                          <h3>{question.itemCode === "past-life-personal" ? "綜觀今生" : question.itemCode.startsWith("past-life-") ? `${questionGroup?.title} 回覆` : `Q${question.questionNumber} 回覆預覽`}</h3>
+                          <h3>{question.itemCode.startsWith("past-life-") ? "綜觀今生" : `Q${question.questionNumber} 回覆預覽`}</h3>
                         </div>
                         {editing || question.manualOnly ? (
                           <textarea
