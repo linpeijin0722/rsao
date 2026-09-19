@@ -15,6 +15,10 @@ create table if not exists public.booking_items (
   is_active boolean not null default true, sort_order integer not null default 0,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
+-- 若先前執行在中途失敗，booking_items 可能已由較新的結構建立、但缺少
+-- 初版安裝資料所需的欄位。先補回此暫時欄位，002 升級檔之後會安全移除。
+alter table public.booking_items
+  add column if not exists consultation_method_id uuid references public.consultation_methods(id) on delete cascade;
 create table if not exists public.sub_items (
   id uuid primary key default gen_random_uuid(), item_id uuid not null references public.booking_items(id) on delete cascade,
   title text not null, description text, price integer not null check (price >= 0), is_active boolean not null default true,

@@ -23,7 +23,7 @@ export async function GET() {
     .order("created_at", { ascending: false }), db
     .from("consultation_profiles")
     .select("id,customer_id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data")
-    .order("name", { ascending: true }),db.from("booking_system_settings").select("payment_mode,bank_name,bank_code,bank_account,active_bank_account_id,gateway_disabled_until,gateway_failure_reason").eq("id",true).maybeSingle(),db.from("payment_bank_accounts").select("id,label,bank_name,bank_code,account_number,account_name,note,created_at").order("created_at")]);
+    .order("name", { ascending: true }),db.from("booking_system_settings").select("payment_mode,bank_account_key,gateway_disabled_until,gateway_failure_reason").eq("id",true).maybeSingle(),Promise.resolve({data:[{id:"cathay",label:"國泰世華常用帳號",bank_name:"國泰世華",bank_code:"013",branch_name:"營業部",account_number:"218700524294",account_name:"林珮均",note:""},{id:"esun",label:"玉山銀行公司帳號",bank_name:"玉山銀行",bank_code:"808",branch_name:"林口分行",account_number:"0886940043636",account_name:"林阿嫂有限公司",note:""}]})]);
   if (error || customerError || profileError)
     return NextResponse.json({ error: error?.message || customerError?.message || profileError?.message }, { status: 500 });
   const bookings:any[]=(data||[]) as any[];
@@ -63,21 +63,8 @@ export async function POST(request: NextRequest) {
     const {error}=await adminSupabase().from("booking_system_settings").upsert({id:true,payment_mode:mode,updated_at:new Date().toISOString()});
     if(error)return NextResponse.json({error:error.message},{status:500});return NextResponse.json({ok:true,mode});
   }
-  if(action==="save_bank_account"){
-    const record={label:String(body.account?.label||"").trim(),bank_name:String(body.account?.bank_name||"").trim(),bank_code:String(body.account?.bank_code||"").replace(/\D/g,"").trim(),account_number:String(body.account?.account_number||"").replace(/\s/g,"").trim(),account_name:String(body.account?.account_name||"").trim(),note:String(body.account?.note||"").trim(),updated_at:new Date().toISOString()};
-    if(!record.label||!record.bank_name||!/^\d{3}$/.test(record.bank_code)||!record.account_number||!record.account_name)return NextResponse.json({error:"請完整填寫帳號名稱、銀行、3碼代碼、帳號及戶名"},{status:400});
-    const db=adminSupabase(),id=String(body.account?.id||"");
-    const result=id?await db.from("payment_bank_accounts").update(record).eq("id",id).select().single():await db.from("payment_bank_accounts").insert(record).select().single();
-    if(result.error)return NextResponse.json({error:result.error.message},{status:500});return NextResponse.json({ok:true,account:result.data});
-  }
   if(action==="select_bank_account"){
-    const id=String(body.accountId||""),db=adminSupabase(),{data:account}=await db.from("payment_bank_accounts").select("id").eq("id",id).maybeSingle();
-    if(!account)return NextResponse.json({error:"找不到這組收款帳號"},{status:404});const {error}=await db.from("booking_system_settings").update({active_bank_account_id:id,updated_at:new Date().toISOString()}).eq("id",true);
-    if(error)return NextResponse.json({error:error.message},{status:500});return NextResponse.json({ok:true});
-  }
-  if(action==="delete_bank_account"){
-    const id=String(body.accountId||""),db=adminSupabase(),{data:settings}=await db.from("booking_system_settings").select("active_bank_account_id").eq("id",true).single();
-    if(settings?.active_bank_account_id===id)return NextResponse.json({error:"目前使用中的帳號不能刪除，請先切換其他帳號"},{status:400});const {error}=await db.from("payment_bank_accounts").delete().eq("id",id);
+    const id=String(body.accountId||"");if(!["cathay","esun"].includes(id))return NextResponse.json({error:"找不到這組收款帳號"},{status:404});const {error}=await adminSupabase().from("booking_system_settings").update({bank_account_key:id,updated_at:new Date().toISOString()}).eq("id",true);
     if(error)return NextResponse.json({error:error.message},{status:500});return NextResponse.json({ok:true});
   }
   if (action === "create_manual_booking") {
