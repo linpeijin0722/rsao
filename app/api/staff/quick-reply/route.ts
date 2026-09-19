@@ -889,8 +889,16 @@ async function context(bookingNo: string, requestedDocumentId = "") {
   const documentQuestionSlots = await getQuickReplyQuestionSlots(documentDetail.google_document_id);
   let questionSlots = questionMeta.map((meta: any, index: number) => {
     const normalized = clean(meta.question).replace(/[？?。.!！\s]/g, "");
-    const documentSlot = documentQuestionSlots.find((slot) => slot.question.replace(/[？?。.!！\s]/g, "") === normalized);
-    return { slotIndex: index, questionNumber: index + 1, question: meta.question, answer: documentSlot?.answer || "", itemCode: meta.itemCode || "", itemTitle: meta.itemTitle || "", profileName: meta.profileName || "", profileLines: meta.profileLines || [], manualOnly: true };
+    // 文件中的相同題目可能出現在不同對象頁面；只允許相同順序且題目相符的內容回填，
+    // 避免用 Array.find() 把第一位對象的 A1 誤帶到其他對象。
+    const documentSlot = documentQuestionSlots[index];
+    const answer = documentSlot?.question.replace(/[？?。.!！\s]/g, "") === normalized
+      ? documentSlot.answer || ""
+      : "";
+    const previousSameGroup = questionMeta.slice(0, index).filter((entry: any) =>
+      entry.itemCode === meta.itemCode && entry.profileName === meta.profileName,
+    ).length;
+    return { slotIndex: index, questionNumber: previousSameGroup + 1, question: meta.question, answer, itemCode: meta.itemCode || "", itemTitle: meta.itemTitle || "", profileName: meta.profileName || "", profileLines: meta.profileLines || [], manualOnly: true };
   });
   if (!questionSlots.length) questionSlots = documentQuestionSlots.map((slot, index) => ({ ...slot, itemCode: "", itemTitle: "", profileName: "", profileLines: [], manualOnly: true }));
   if (!questionSlots.length) {
@@ -1157,7 +1165,12 @@ async function context(bookingNo: string, requestedDocumentId = "") {
           }).filter(Boolean);
           return content.length ? [`【${focus}】`, ...content] : [];
         }).filter(Boolean),
-        relationshipTargets = Object.entries(extra.relationship_details || {}).map(([targetId, rawRows]) => {
+        relationshipTargetIds = Array.from(new Set([
+          ...Object.keys(extra.relationship_details || {}),
+          ...Object.keys(extra.target_questions || {}),
+        ])),
+        relationshipTargets = relationshipTargetIds.map((targetId) => {
+          const rawRows = extra.relationship_details?.[targetId] || {};
           const rows = rawRows && typeof rawRows === "object" ? rawRows as Record<string, unknown> : {};
           const participant = asArray(answer?.booking_answer_participants).find((entry: any) => String(entry.profile_id) === String(targetId));
           const targetProfile = one(participant?.consultation_profiles);
@@ -1205,7 +1218,8 @@ async function context(bookingNo: string, requestedDocumentId = "") {
         ].filter(Boolean),
         infantMultiple = itemCode === "infant-spirit" && /一位以上|兩位|二位|2位|含.*以上/.test(labels.join(" ")),
         dateResultCount = itemCode === "date-time-selection" && /六|6/.test(labels.join(" ")) ? 6 : 3;
-      return labels.flatMap((label: string) => {
+      const effectiveLabels = itemCode.startsWith("past-life-") ? labels.slice(0, 1) : labels;
+      return effectiveLabels.flatMap((label: string) => {
         const base = {
           label: String(label).replace(/[【】]/g, "").trim(),
           detailId: detail.id,
@@ -1219,7 +1233,7 @@ async function context(bookingNo: string, requestedDocumentId = "") {
           infantRecords,
           ...presentation,
         };
-        if (itemCode === "marriage-bazi" && relationshipTargets.length) {
+        if (["marriage-bazi", "past-life-relationship"].includes(itemCode) && relationshipTargets.length) {
           return relationshipTargets.map((target) => {
             const targetProfile = target.targetProfile;
             const targetName = clean(targetProfile?.name) || "未命名對象";
@@ -1537,6 +1551,34 @@ async function context(bookingNo: string, requestedDocumentId = "") {
       };
     })
     .filter(Boolean) as any[];
+  // 前世因果的頁面內還有「前世／綜觀今生」等子標題，不能把這些 Google
+  // 文件子標題當成預約項目。這類項目直接以預約資料為準建立清單，才能穩定得到
+  // 一個個人項目與每位關係對象各一個項目。
+  const nonPastLifeSectionSlots = sectionSlots.filter((slot: any) => !String(slot.itemCode || "").startsWith("past-life-"));
+  const pastLifeSectionSlots = sectionMeta
+    .filter((meta: any) => String(meta.itemCode || "").startsWith("past-life-"))
+    .map((meta: any, index: number) => ({
+      slotIndex: rawSectionSlots.length + index,
+      label: meta.itemCode === "past-life-personal" ? "前世因果（個人）" : "前世因果（與他人前世關係）",
+      answer: "",
+      itemCode: meta.itemCode,
+      profileName: meta.profileName || "",
+      profileLines: meta.profileLines || [],
+      requestLines: meta.requestLines || [],
+      targetDisplay: meta.itemCode === "past-life-relationship"
+        ? (meta.targetDisplay || `對象：${meta.targetName || "未命名"}`)
+        : "",
+      targetName: meta.targetName || "",
+      infantMultiple: false,
+      infantRecords: [],
+      dateResultCount: 3,
+      locationSubject: "祂",
+      genderPronoun: "祂",
+      isPet: false,
+      previousLocation: null,
+      manualOnly: false,
+    }));
+  sectionSlots.splice(0, sectionSlots.length, ...nonPastLifeSectionSlots, ...pastLifeSectionSlots);
   const recommendedBySection = Object.fromEntries(
     sectionSlots.map((slot) => [
       String(slot.slotIndex),
@@ -2099,7 +2141,7 @@ export async function POST(request: NextRequest) {
         selectedSection = data.sectionSlots.find((slot: any) => Number(slot.slotIndex) === Number(body.sectionSlotIndex)),
         pastGroup = (prefix: string) => chosen.filter((entry: any) => String(entry.optionCode || "").startsWith(prefix)).map((entry: any) => render(entry.content)).filter(Boolean).join(" "),
         pastOverviewParts = chosen.filter((entry: any) => String(entry.optionCode || "").startsWith("past_overview_")).map((entry: any) => render(entry.content)).filter(Boolean),
-        pastOverview = Array.from({ length: Math.ceil(pastOverviewParts.length / 3) }, (_, index) => pastOverviewParts.slice(index * 3, index * 3 + 3).join(" ")).join("\n\n"),
+        pastOverview = Array.from({ length: Math.ceil(pastOverviewParts.length / 3) }, (_, index) => pastOverviewParts.slice(index * 3, index * 3 + 3).join(" ")).join("\n"),
         pastConsultant = pastGroup("past_consultant_"),
         pastTarget = pastGroup("past_target_"),
         pastRelationship = pastGroup("past_relationship_"),
@@ -2206,7 +2248,7 @@ export async function POST(request: NextRequest) {
         ),
         ...Object.entries(sectionReplies).map(
           ([index, row]: any) =>
-            `【${data.sectionSlots[Number(index)]?.label || "項目"}】${row.answer}`,
+            `【${data.sectionSlots.find((slot: any) => String(slot.slotIndex) === String(index))?.label || "項目"}】${row.answer}`,
         ),
       ].join("\n");
     const record = {
@@ -2256,7 +2298,9 @@ export async function POST(request: NextRequest) {
       .map((slot: any) => sectionAnswers[String(slot.slotIndex)] || "")
       .filter(Boolean);
     const regularSectionAnswers = Object.fromEntries(
-      Object.entries(sectionAnswers).filter(([index]) => !data.sectionSlots[Number(index)]?.itemCode.startsWith("past-life-")),
+      Object.entries(sectionAnswers).filter(([index]) =>
+        !String(data.sectionSlots.find((slot: any) => String(slot.slotIndex) === String(index))?.itemCode || "").startsWith("past-life-"),
+      ),
     );
     if (Object.keys(regularSectionAnswers).length)
       await upsertQuickConsultationSectionReplies(

@@ -1,4 +1,4 @@
-const SCRIPT_VERSION = "2026-09-19-v30";
+const SCRIPT_VERSION = "2026-09-19-v31";
 const RETURN_BUTTON_ANCHOR = "\u200B";
 const RETURN_BUTTON_ALT_TITLE = "RSAO_CONSULTATION_RETURN_BUTTON";
 
@@ -294,6 +294,7 @@ function insertConsultationLinksIntoBody_(body, quickReplyUrl, returnUrl, quickL
   var quickEnd = quickLabel.length - 1;
   var returnStart = quickLabel.length + divider.length;
   styled.setBold(0, quickEnd, true).setFontSize(0, quickEnd, 15).setForegroundColor(0, quickEnd, "#ffffff").setBackgroundColor(0, quickEnd, "#8a3045").setLinkUrl(0, quickEnd, quickReplyUrl);
+  styled.setBold(quickLabel.length, returnStart - 1, false).setFontSize(quickLabel.length, returnStart - 1, 15).setForegroundColor(quickLabel.length, returnStart - 1, "#000000").setBackgroundColor(quickLabel.length, returnStart - 1, "#ffffff");
   styled.setBold(returnStart, content.length - 1, true).setFontSize(returnStart, content.length - 1, 15).setForegroundColor(returnStart, content.length - 1, "#ffffff").setBackgroundColor(returnStart, content.length - 1, "#2f8054").setLinkUrl(returnStart, content.length - 1, returnUrl);
 }
 

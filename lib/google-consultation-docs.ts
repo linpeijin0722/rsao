@@ -10,7 +10,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-09-19-v30";
+const requiredAppsScriptVersion = "2026-09-19-v31";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -340,6 +340,7 @@ async function insertQuickReplyLink(documentId: string, bookingNo: string, reque
   const linkUrl = `${origin}/staff/quick-reply?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}&token=${encodeURIComponent(replyToken)}`;
   const returnUrl = `${origin}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}`;
   const inserted = `${quickLabel}${divider}${returnLabel}\n`;
+  const dividerStart = 1 + quickLabel.length;
   const returnStart = 1 + quickLabel.length + divider.length;
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
     method: "POST",
@@ -352,6 +353,12 @@ async function insertQuickReplyLink(documentId: string, bookingNo: string, reque
         backgroundColor: { color: { rgbColor: { red: 0.541, green: 0.188, blue: 0.271 } } },
         link: { url: linkUrl },
       }, fields: "bold,fontSize,foregroundColor,backgroundColor,link" } },
+      { updateTextStyle: { range: { startIndex: dividerStart, endIndex: returnStart }, textStyle: {
+        bold: false,
+        fontSize: { magnitude: 15, unit: "PT" },
+        foregroundColor: { color: { rgbColor: { red: 0, green: 0, blue: 0 } } },
+        backgroundColor: { color: { rgbColor: { red: 1, green: 1, blue: 1 } } },
+      }, fields: "bold,fontSize,foregroundColor,backgroundColor" } },
       { updateTextStyle: { range: { startIndex: returnStart, endIndex: returnStart + returnLabel.length }, textStyle: {
         bold: true,
         fontSize: { magnitude: 15, unit: "PT" },
@@ -683,7 +690,11 @@ export async function upsertQuickConsultationSectionReplies(documentId:string,an
 }
 
 export async function upsertPastLifeOverviewReplies(documentId:string,answers:string[]) {
-  const values=answers.map(normalizeConsultationReturnText).filter(Boolean);
+  const values=answers.map(value=>{
+    const normalized=normalizeConsultationReturnText(value);
+    const overview=normalized.match(/【綜觀今生】\s*\n?([\s\S]*?)(?=\n【[^】]+】|$)/)?.[1] || normalized;
+    return overview.replace(/\n{2,}/g,"\n").trim();
+  }).filter(Boolean);
   if(!documentId||!values.length)return;
   const token=await accessToken();
   const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
@@ -1032,7 +1043,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     add("");
     add("如果要姻緣比較順利，", "teacher");
   }
-  const sections = isPastLifeRelation ? ["【前前世】", "【前世】", "【綜觀今生】"] : !isPastLifePersonal ? [] : /前三世|三世/.test(subTitle)
+  const sections = isPastLifeRelation ? ["【前前世】", "【前世】", "【綜觀今生】", "【兩人相處建議】"] : !isPastLifePersonal ? [] : /前三世|三世/.test(subTitle)
     ? ["【前前前世】", "【前前世】", "【前世】", "【綜觀今生】"]
     : /前兩世|二世/.test(subTitle)
       ? ["【前前世】", "【前世】", "【綜觀今生】"]
