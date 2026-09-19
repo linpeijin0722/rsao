@@ -1,4 +1,4 @@
-const SCRIPT_VERSION = "2026-09-17-v27";
+const SCRIPT_VERSION = "2026-09-19-v28";
 const RETURN_BUTTON_ANCHOR = "\u200B";
 const RETURN_BUTTON_ALT_TITLE = "RSAO_CONSULTATION_RETURN_BUTTON";
 
@@ -137,17 +137,14 @@ function doPost(e) {
     var quickReplyUrl = String(payload.quickReplyUrl || "").replace("__DOCUMENT_ID__", encodeURIComponent(documentId));
     var returnUrl = String(payload.returnUrl || "").replace("__DOCUMENT_ID__", encodeURIComponent(documentId));
     var entrypointWarnings = [];
-    if (quickReplyUrl) {
-      insertQuickReplyIntoBody_(body, quickReplyUrl, payload.quickReplyLabel || "✦ 點這裡建立諮詢回覆");
-    }
-    if (payload.returnImageUrl && returnUrl) {
-      try {
-        insertReturnButtonIntoBody_(body, payload.returnImageUrl, returnUrl);
-      } catch (returnButtonError) {
-        // 圖片下載失敗時仍建立可點擊的文字入口，不能讓整份諮詢單建立失敗。
-        insertReturnTextLinkIntoBody_(body, returnUrl);
-        entrypointWarnings.push("回傳按鈕圖片建立失敗，已改用文字連結：" + String(returnButtonError.message || returnButtonError));
-      }
+    if (quickReplyUrl && returnUrl) {
+      insertConsultationLinksIntoBody_(
+        body,
+        quickReplyUrl,
+        returnUrl,
+        payload.quickReplyLabel || "✦ 阿嫂點此快速回覆",
+        payload.returnLabel || "✦回傳諮詢結果"
+      );
     }
 
     doc.saveAndClose();
@@ -190,7 +187,7 @@ function doPost(e) {
       documentId: doc.getId(),
       documentUrl: doc.getUrl(),
       documentTitle: finalTitle,
-      entrypointsReady: Boolean(payload.quickReplyUrl && payload.returnImageUrl && payload.returnUrl),
+      entrypointsReady: Boolean(payload.quickReplyUrl && payload.returnUrl),
       warnings: entrypointWarnings,
     })).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
@@ -224,6 +221,20 @@ function insertQuickReplyIntoBody_(body, linkUrl, label) {
   var styled = paragraph.editAsText();
   styled.setLinkUrl(linkUrl);
   styled.setBold(true).setFontSize(18).setForegroundColor("#ffffff").setBackgroundColor("#8a3045");
+}
+
+function insertConsultationLinksIntoBody_(body, quickReplyUrl, returnUrl, quickLabel, returnLabel) {
+  var divider = "｜";
+  var content = quickLabel + divider + returnLabel;
+  if (body.getText().indexOf(quickLabel) >= 0) return;
+  var paragraph = body.insertParagraph(0, content);
+  paragraph.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+  paragraph.setSpacingBefore(4).setSpacingAfter(8).setLineSpacing(1);
+  var styled = paragraph.editAsText();
+  var quickEnd = quickLabel.length - 1;
+  var returnStart = quickLabel.length + divider.length;
+  styled.setBold(0, quickEnd, true).setFontSize(0, quickEnd, 15).setForegroundColor(0, quickEnd, "#ffffff").setBackgroundColor(0, quickEnd, "#8a3045").setLinkUrl(0, quickEnd, quickReplyUrl);
+  styled.setBold(returnStart, content.length - 1, true).setFontSize(returnStart, content.length - 1, 15).setForegroundColor(returnStart, content.length - 1, "#ffffff").setBackgroundColor(returnStart, content.length - 1, "#2f8054").setLinkUrl(returnStart, content.length - 1, returnUrl);
 }
 
 function insertReturnButtonIntoBody_(body, imageUrl, returnUrl) {

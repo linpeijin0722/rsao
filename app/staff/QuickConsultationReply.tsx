@@ -2951,7 +2951,7 @@ export default function QuickConsultationReply({
                         )}
                       <section className="quickReplyPreview">
                         <div>
-                          <h3>【{section.label}】回覆預覽</h3>
+                          <h3>{section.itemCode === "past-life-personal" ? "綜觀今生" : `【${section.label}】回覆預覽`}</h3>
                           {sectionDraft.answer && (
                             <span>{editing ? "直接修改中" : "可繼續複選"}</span>
                           )}
@@ -3049,14 +3049,6 @@ export default function QuickConsultationReply({
                           ))}
                         </section>
                       )}
-                      {questionGroup && question.itemCode.startsWith("past-life-") && (
-                        <section className="quickReplyPastLifeQuestions">
-                          <h3>{questionGroup.title}</h3>
-                          {questionGroup.questions.map((entry, index) => (
-                            <p key={entry.slotIndex}><b>Q{index + 1}</b><span>{entry.question}</span></p>
-                          ))}
-                        </section>
-                      )}
                       {question.requestLines?.length > 0 && (
                         <section className="quickReplyInputCard">
                           <h3>用戶填寫的內容</h3>
@@ -3065,10 +3057,14 @@ export default function QuickConsultationReply({
                             const heading = /^【(.+)】$/.exec(line);
                             if (heading)
                               return <div key={index} className="quickReplyInputGroupHeading"><b>{heading[1]}</b></div>;
+                            const label = split >= 0 ? line.slice(0, split) : "補充內容";
+                            const value = split >= 0 ? line.slice(split + 1) : line;
+                            const shouldAnswer = /^問題\d*$/.test(label) || /想瞭解|會不會|要不要|可不可以|能不能|是否|是不是|好不好|適不適合|該不該|怎麼辦|如何|為什麼|什麼時候|哪時候|嗎|呢|[？?]/.test(`${label}${value}`);
                             return (
-                              <div key={index}>
-                                <b>{split >= 0 ? line.slice(0, split) : "補充內容"}</b>
-                                <p>{split >= 0 ? line.slice(split + 1) : line}</p>
+                              <div key={index} className={shouldAnswer ? "quickReplyInputQuestion" : ""}>
+                                <b>{label}</b>
+                                <p>{value}</p>
+                                {shouldAnswer && adviceFieldFor(value, label)}
                               </div>
                             );
                           })}
@@ -3134,7 +3130,7 @@ export default function QuickConsultationReply({
                       )}
                       <section className="quickReplyPreview">
                         <div>
-                          <h3>{question.itemCode.startsWith("past-life-") ? `${questionGroup?.title} 回覆` : `Q${question.questionNumber} 回覆預覽`}</h3>
+                          <h3>{question.itemCode === "past-life-personal" ? "綜觀今生" : question.itemCode.startsWith("past-life-") ? `${questionGroup?.title} 回覆` : `Q${question.questionNumber} 回覆預覽`}</h3>
                         </div>
                         {editing || question.manualOnly ? (
                           <textarea

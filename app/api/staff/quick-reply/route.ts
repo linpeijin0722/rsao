@@ -10,6 +10,7 @@ import {
   getQuickReplyQuestionSlots,
   getQuickReplySectionSlots,
   normalizeConsultationReturnText,
+  upsertPastLifeOverviewReplies,
   upsertQuickConsultationQuestionReplies,
   upsertQuickConsultationSectionReplies,
 } from "@/lib/google-consultation-docs";
@@ -2180,10 +2181,22 @@ export async function POST(request: NextRequest) {
         data.documentDetail.google_document_id,
         answers,
       );
-    if (Object.keys(sectionAnswers).length)
+    const pastLifeOverviewAnswers = data.sectionSlots
+      .filter((slot: any) => slot.itemCode === "past-life-personal")
+      .map((slot: any) => sectionAnswers[String(slot.slotIndex)] || "")
+      .filter(Boolean);
+    const regularSectionAnswers = Object.fromEntries(
+      Object.entries(sectionAnswers).filter(([index]) => data.sectionSlots[Number(index)]?.itemCode !== "past-life-personal"),
+    );
+    if (Object.keys(regularSectionAnswers).length)
       await upsertQuickConsultationSectionReplies(
         data.documentDetail.google_document_id,
-        sectionAnswers,
+        regularSectionAnswers,
+      );
+    if (pastLifeOverviewAnswers.length)
+      await upsertPastLifeOverviewReplies(
+        data.documentDetail.google_document_id,
+        pastLifeOverviewAnswers,
       );
     return NextResponse.json({
       ok: true,

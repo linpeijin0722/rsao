@@ -10,7 +10,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-09-17-v27";
+const requiredAppsScriptVersion = "2026-09-19-v28";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -682,6 +682,26 @@ export async function upsertQuickConsultationSectionReplies(documentId:string,an
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
 
+export async function upsertPastLifeOverviewReplies(documentId:string,answers:string[]) {
+  const values=answers.map(normalizeConsultationReturnText).filter(Boolean);
+  if(!documentId||!values.length)return;
+  const token=await accessToken();
+  const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
+  const {plain,documentIndexAt}=indexedDocumentText(document);
+  const matches=Array.from(plain.matchAll(/(?:^|\n)【綜觀今生】[^\n]*\n/g));
+  const slots=matches.slice(0,values.length).map((match,index)=>{
+    const startOffset=(match.index||0)+match[0].length,rest=plain.slice(startOffset),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:Math.max(startOffset,plain.replace(/\n$/," ").length);
+    return{value:values[index],startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset)};
+  }).sort((a,b)=>b.startIndex-a.startIndex);
+  const requests:any[]=[];
+  for(const slot of slots){
+    if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
+    requests.push({insertText:{location:{index:slot.startIndex},text:`${slot.value}\n`}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+  }
+  if(requests.length)await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
+}
+
 const fieldLabels: Record<string, string> = {
   relationship_status: "目前關係狀態", relationship_duration: "這段關係多久了？",
   main_event: "這次最想解決的事件？", relationship_goal: "你最希望達成的目標？",
@@ -1246,8 +1266,8 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
       secret: appsScriptSecret, expectedVersion: requiredAppsScriptVersion, folderId, serviceAccountEmail: email,
       title: fileTitle, bookingNo, content, marks, images, createMode,
       quickReplyUrl: requestOrigin ? `${requestOrigin.replace(/\/$/, "")}/staff/quick-reply?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent("__DOCUMENT_ID__")}` : "",
-      quickReplyLabel: "✦ 點這裡建立諮詢回覆",
-      returnImageUrl: requestOrigin ? `${requestOrigin.replace(/\/$/, "")}/consultation-return-button.png` : "",
+      quickReplyLabel: "✦ 阿嫂點此快速回覆",
+      returnLabel: "✦回傳諮詢結果",
       returnUrl: requestOrigin ? `${requestOrigin.replace(/\/$/, "")}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent("__DOCUMENT_ID__")}` : "",
       cancelledWarning: isCancelledOrRefunded,
       previousDocumentIds: force ? existingDetails.map((detail: any) => detail.google_document_id).filter(Boolean) : [],
