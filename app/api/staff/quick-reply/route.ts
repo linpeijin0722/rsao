@@ -563,7 +563,7 @@ const pastLifeBuiltInRows = [
   ["past_overview_perfection", "追求完美", "做事情追求完美，也很在意別人的肯定。"],
   ["past_overview_stubborn", "容易偏執計較", "有時候會偏執，也會有計較心，容易鑽牛角尖。"],
   ["past_overview_money", "本身有財", "本身有財，但是錢財比較容易來去，會有財務波動。"],
-  ["past_overview_invest", "適合短期投資", "可以投資或代理，但是適合短期操作，不要戀戰。"],
+  ["past_overview_invest", "適合短期投資", "可以投資或代理，但是適合短期操作，不要戀棧。"],
   ["past_overview_dispute", "留意是非官非", "做事情要小心謹慎，容易遇到是非、官非或不必要的耗損。"],
   ["past_overview_tired", "做事勞心費力", "做事情比較勞心費力，煩心的事情也會比較多。"],
   ["past_overview_kind", "本性善良有外緣", "本性善良，有外緣也有能力，關鍵時刻會有人願意幫忙。"],
@@ -866,7 +866,13 @@ async function context(bookingNo: string, requestedDocumentId = "") {
               ? focuses.slice(0, 3).map((focus: string) => overallFocusQuestionLabels[focus] || `${focus}建議`)
               : asArray(answer.questions);
           if (itemCode === "past-life-relationship" && Object.keys(extra.target_questions || {}).length) {
-            return Object.entries(extra.target_questions || {}).flatMap(([targetId, values]) => {
+            const participants = asArray(answer.booking_answer_participants).slice().sort((a: any, b: any) => Number(a.position || 0) - Number(b.position || 0));
+            const orderedTargetIds = [
+              ...participants.map((entry: any) => String(entry.profile_id)),
+              ...Object.keys(extra.target_questions || {}),
+            ].filter((targetId, index, all) => all.indexOf(targetId) === index && Object.prototype.hasOwnProperty.call(extra.target_questions || {}, targetId));
+            return orderedTargetIds.flatMap((targetId) => {
+              const values = extra.target_questions?.[targetId];
               const participant = asArray(answer.booking_answer_participants).find((entry: any) => String(entry.profile_id) === String(targetId));
               const targetProfile = one(participant?.consultation_profiles);
               const targetPresentation = profilePresentation(targetProfile, ownerNameForQuestions);
@@ -1166,9 +1172,13 @@ async function context(bookingNo: string, requestedDocumentId = "") {
           return content.length ? [`【${focus}】`, ...content] : [];
         }).filter(Boolean),
         relationshipTargetIds = Array.from(new Set([
+          ...asArray(answer?.booking_answer_participants).slice().sort((a: any, b: any) => Number(a.position || 0) - Number(b.position || 0)).map((entry: any) => String(entry.profile_id)),
           ...Object.keys(extra.relationship_details || {}),
           ...Object.keys(extra.target_questions || {}),
-        ])),
+        ])).filter((targetId) =>
+          Object.prototype.hasOwnProperty.call(extra.relationship_details || {}, targetId) ||
+          Object.prototype.hasOwnProperty.call(extra.target_questions || {}, targetId),
+        ),
         relationshipTargets = relationshipTargetIds.map((targetId) => {
           const rawRows = extra.relationship_details?.[targetId] || {};
           const rows = rawRows && typeof rawRows === "object" ? rawRows as Record<string, unknown> : {};
@@ -1622,7 +1632,8 @@ async function context(bookingNo: string, requestedDocumentId = "") {
       : {};
   const questionReplies = Object.fromEntries(
     questionSlots.map((slot) => {
-      const existing = savedReplies[String(slot.slotIndex)] || {};
+      const rawExisting = savedReplies[String(slot.slotIndex)] || {};
+      const existing = slot.itemCode === "past-life-relationship" && rawExisting.profileName !== slot.profileName ? {} : rawExisting;
       const savedAnswer = clean(existing.answer);
       const documentAnswer = clean(slot.answer);
       const safeSavedAnswer = /^(?:Q\d+\s*[:：]|【)/u.test(savedAnswer) ? "" : savedAnswer;
@@ -1647,7 +1658,8 @@ async function context(bookingNo: string, requestedDocumentId = "") {
   );
   const sectionReplies = Object.fromEntries(
     sectionSlots.map((slot) => {
-      const existing = savedSections[String(slot.slotIndex)] || {},
+      const rawExisting = savedSections[String(slot.slotIndex)] || {},
+        existing = slot.itemCode === "past-life-relationship" && rawExisting.targetName !== slot.targetName ? {} : rawExisting,
         expected = String(
           recommendedBySection[String(slot.slotIndex)]?.[0] || "",
         ),
@@ -2212,6 +2224,7 @@ export async function POST(request: NextRequest) {
         phraseIds: asArray(row.phraseIds).map(String),
         answer,
         completed: row.completed === true,
+        profileName: slot.profileName || "",
       };
       answers[String(slot.slotIndex)] = answer;
     }
@@ -2230,6 +2243,7 @@ export async function POST(request: NextRequest) {
         phraseIds: asArray(row.phraseIds).map(String),
         answer,
         completed: row.completed === true,
+        targetName: slot.targetName || "",
       };
       sectionAnswers[String(slot.slotIndex)] = answer;
     }

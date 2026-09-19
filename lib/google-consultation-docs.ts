@@ -10,7 +10,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-09-19-v31";
+const requiredAppsScriptVersion = "2026-09-19-v32";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -335,18 +335,20 @@ async function insertQuickReplyLink(documentId: string, bookingNo: string, reque
   const quickLabel = "✦ 阿嫂點此快速回覆";
   const divider = "｜";
   const returnLabel = "✦回傳諮詢結果";
-  if (documentPlainText(document).includes(quickLabel)) return;
+  const existingText = indexedDocumentText(document);
+  const existingOffset = existingText.plain.indexOf(quickLabel);
   const replyToken=makeQuickReplyToken(bookingNo,documentId);
   const linkUrl = `${origin}/staff/quick-reply?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}&token=${encodeURIComponent(replyToken)}`;
   const returnUrl = `${origin}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}`;
   const inserted = `${quickLabel}${divider}${returnLabel}\n`;
-  const dividerStart = 1 + quickLabel.length;
-  const returnStart = 1 + quickLabel.length + divider.length;
+  const textStart = existingOffset >= 0 ? existingText.documentIndexAt(existingOffset) : 1;
+  const dividerStart = textStart + quickLabel.length;
+  const returnStart = textStart + quickLabel.length + divider.length;
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
     method: "POST",
     body: JSON.stringify({ requests: [
-      { insertText: { location: { index: 1 }, text: inserted } },
-      { updateTextStyle: { range: { startIndex: 1, endIndex: 1 + quickLabel.length }, textStyle: {
+      ...(existingOffset >= 0 ? [] : [{ insertText: { location: { index: 1 }, text: inserted } }]),
+      { updateTextStyle: { range: { startIndex: textStart, endIndex: textStart + quickLabel.length }, textStyle: {
         bold: true,
         fontSize: { magnitude: 15, unit: "PT" },
         foregroundColor: { color: { rgbColor: { red: 1, green: 1, blue: 1 } } },
@@ -366,7 +368,7 @@ async function insertQuickReplyLink(documentId: string, bookingNo: string, reque
         backgroundColor: { color: { rgbColor: { red: 0.184, green: 0.502, blue: 0.329 } } },
         link: { url: returnUrl },
       }, fields: "bold,fontSize,foregroundColor,backgroundColor,link" } },
-      { updateParagraphStyle: { range: { startIndex: 1, endIndex: 1 + inserted.length }, paragraphStyle: {
+      { updateParagraphStyle: { range: { startIndex: textStart, endIndex: textStart + inserted.length }, paragraphStyle: {
         alignment: "CENTER",
         spaceAbove: { magnitude: 4, unit: "PT" },
         spaceBelow: { magnitude: 8, unit: "PT" },
