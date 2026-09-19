@@ -202,6 +202,9 @@ export default function Staff() {
     [paymentActions,setPaymentActions]=useState<any>(null),
     [paymentActionBusy,setPaymentActionBusy]=useState(false),
     [paymentSettings,setPaymentSettings]=useState<any>(null),
+    [bankAccounts,setBankAccounts]=useState<any[]>([]),
+    [bankEditorOpen,setBankEditorOpen]=useState(false),
+    [bankForm,setBankForm]=useState<any>({label:"",bank_name:"",bank_code:"",account_number:"",account_name:"",note:""}),
     [quickReplyTarget,setQuickReplyTarget]=useState<{bookingNo:string;documentId:string}|null>(null),
     [excludeVideoBase,setExcludeVideoBase]=useState(false),
     [profileCopyToast,setProfileCopyToast]=useState("");
@@ -215,6 +218,22 @@ export default function Staff() {
       }
     }
     return response;
+  }
+  async function changePaymentMode(mode:string){
+    const labels:any={bank_transfer:"銀行轉帳",auto:"自動判斷",newebpay:"藍新金流"};
+    if(!confirm(`確定要將目前付款方式切換為「${labels[mode]}」嗎？`))return;
+    const r=await staffPost({action:"set_payment_mode",mode}),j=await r.json();if(!r.ok)return alert(j.error);setPaymentSettings((current:any)=>({...current,payment_mode:mode}));
+  }
+  async function selectBankAccount(account:any){
+    if(account.id===paymentSettings?.active_bank_account_id)return;
+    if(!confirm(`確定要切換成「${account.label}」嗎？\n${account.bank_name}（${account.bank_code}）\n戶名：${account.account_name}\n帳號末五碼：${String(account.account_number).slice(-5)}`))return;
+    const r=await staffPost({action:"select_bank_account",accountId:account.id}),j=await r.json();if(!r.ok)return alert(j.error);await load();
+  }
+  async function saveBankAccount(){
+    const r=await staffPost({action:"save_bank_account",account:bankForm}),j=await r.json();if(!r.ok)return alert(j.error);setBankEditorOpen(false);setBankForm({label:"",bank_name:"",bank_code:"",account_number:"",account_name:"",note:""});await load();
+  }
+  async function deleteBankAccount(account:any){
+    if(!confirm(`確定要刪除「${account.label}」嗎？`))return;const r=await staffPost({action:"delete_bank_account",accountId:account.id}),j=await r.json();if(!r.ok)return alert(j.error);await load();
   }
   async function openLineAdminFromProfile(customer:any) {
     const name=String(customer?.line_display_name||"").trim();
@@ -302,7 +321,7 @@ export default function Staff() {
   async function load() {
     const r = await fetch("/api/staff/bookings"),
       j = await r.json();
-    if(r.ok){setRows(j.bookings);setManualCustomers(j.customers||[]);setCustomerProfiles(j.consultationProfiles||[]);setPaymentSettings(j.paymentSettings||null)}else setError(j.error);
+    if(r.ok){setRows(j.bookings);setManualCustomers(j.customers||[]);setCustomerProfiles(j.consultationProfiles||[]);setPaymentSettings(j.paymentSettings||null);setBankAccounts(j.bankAccounts||[])}else setError(j.error);
   }
   useEffect(() => {
     const saved=localStorage.getItem("lin_a_sao_staff_password");if(saved){setPassword(saved);setRememberPassword(true)}
@@ -673,7 +692,8 @@ export default function Staff() {
   return (
     <main className={`staffPage returned-edit-${returnedEditMode}`}>
       <div className="staffPageHeading"><h1>預約工作後台</h1><div className="staffHeadingActions"><a className="lineAdminButton" href="https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/" target="_blank" rel="noreferrer">官方LINE後台</a><a className="videoCalendarButton" href={(()=>{const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(new Date());const year=parts.find((part)=>part.type==="year")?.value||String(new Date().getFullYear());const month=parts.find((part)=>part.type==="month")?.value||String(new Date().getMonth()+1);return `https://calendar.google.com/calendar/u/4/r/month/${year}/${Number(month)}/1`;})()} target="_blank" rel="noreferrer" aria-label="開啟本月視訊諮詢 Google 行事曆">視訊諮詢行事曆</a><button className="manualBookingEntry" onClick={()=>setManualOpen(true)}>＋ 手動建立預約</button></div></div>
-      {paymentSettings&&<section className="staffPaymentModeBar"><b>目前付款方式</b><select value={paymentSettings.payment_mode||"bank_transfer"} onChange={async e=>{const mode=e.target.value,r=await staffPost({action:"set_payment_mode",mode}),j=await r.json();if(!r.ok)return alert(j.error);setPaymentSettings((current:any)=>({...current,payment_mode:mode}))}}><option value="bank_transfer">銀行轉帳（目前建議）</option><option value="auto">自動判斷</option><option value="newebpay">強制藍新</option></select><small>銀行：國泰世華 013　帳號：218700524294</small></section>}
+      {paymentSettings&&<section className="staffPaymentControl"><header><div><small>收款設定</small><h2>目前付款方式</h2></div><strong>{paymentSettings.payment_mode==="bank_transfer"?"銀行轉帳":paymentSettings.payment_mode==="auto"?"自動判斷":"藍新金流"}</strong></header><div className="paymentModeChoices">{[["bank_transfer","銀行轉帳"],["auto","自動判斷"],["newebpay","藍新金流"]].map(([value,label])=><button key={value} className={paymentSettings.payment_mode===value?"active":""} onClick={()=>void changePaymentMode(value)}>{label}</button>)}</div><div className="bankAccountManager"><div className="bankAccountManagerTitle"><div><h3>常用收款帳號</h3><p>選定的帳號會自動顯示在用戶付款頁。</p></div><button onClick={()=>{setBankForm({label:"",bank_name:"",bank_code:"",account_number:"",account_name:"",note:""});setBankEditorOpen(true)}}>＋ 新增帳號</button></div><div className="bankAccountList">{bankAccounts.map(account=><article key={account.id} className={account.id===paymentSettings.active_bank_account_id?"active":""}><div><b>{account.label}</b>{account.id===paymentSettings.active_bank_account_id&&<em>目前使用</em>}<p>{account.bank_name}（{account.bank_code}）　{account.account_number}</p><p>戶名：{account.account_name}{account.note?`　備註：${account.note}`:""}</p></div><div><button onClick={()=>void selectBankAccount(account)} disabled={account.id===paymentSettings.active_bank_account_id}>選用</button><button onClick={()=>{setBankForm(account);setBankEditorOpen(true)}}>編輯</button><button className="delete" onClick={()=>void deleteBankAccount(account)}>刪除</button></div></article>)}</div></div></section>}
+      {bankEditorOpen&&<div className="modalBackdrop priorityModal" onClick={()=>setBankEditorOpen(false)}><div className="modal bankAccountEditor" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setBankEditorOpen(false)}>×</button><h2>{bankForm.id?"編輯收款帳號":"新增常用帳號"}</h2><div><label>帳號名稱<input value={bankForm.label||""} onChange={e=>setBankForm({...bankForm,label:e.target.value})} placeholder="例如：珮均常用帳號"/></label><label>銀行名稱<input value={bankForm.bank_name||""} onChange={e=>setBankForm({...bankForm,bank_name:e.target.value})} placeholder="例如：國泰世華"/></label><label>銀行代碼<input inputMode="numeric" maxLength={3} value={bankForm.bank_code||""} onChange={e=>setBankForm({...bankForm,bank_code:e.target.value.replace(/\D/g,"")})} placeholder="013"/></label><label>銀行帳號<input inputMode="numeric" value={bankForm.account_number||""} onChange={e=>setBankForm({...bankForm,account_number:e.target.value.replace(/\s/g,"")})}/></label><label>戶名<input value={bankForm.account_name||""} onChange={e=>setBankForm({...bankForm,account_name:e.target.value})}/></label><label>備註<input value={bankForm.note||""} onChange={e=>setBankForm({...bankForm,note:e.target.value})} placeholder="例如：媽媽的帳號"/></label></div><button className="bankAccountSave" onClick={()=>void saveBankAccount()}>儲存帳號</button></div></div>}
       {profileCopyToast&&<div className="profileCopyToast" role="status">✓ {profileCopyToast}</div>}
       {error && <div className="error">{error}</div>}
       <section className="staffBookingSection videoBookingSection">
