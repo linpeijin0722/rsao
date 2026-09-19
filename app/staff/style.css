@@ -372,6 +372,9 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 .quickReplySpiritualDetail{display:grid;gap:7px;padding:13px;border:1px solid #dfd0c5;border-radius:11px;background:#fffaf7;text-align:left}
 .quickReplySpiritualDetail b{color:#7b3048;font-size:16px}
 .quickReplySpiritualDetail textarea{width:100%;min-height:62px;box-sizing:border-box;padding:10px 12px;border:1px solid #d8c8bf;border-radius:9px;background:#fff;color:#292320;font:inherit;font-size:16px;line-height:1.45;resize:vertical}
+.returnResultPreview textarea{height:min(68vh,720px)!important;min-height:520px!important;resize:vertical!important}
+.quickReplyPreview textarea{height:min(58vh,640px)!important;min-height:430px!important;resize:vertical!important}
+@media(max-width:700px){.returnResultPreview textarea{height:62vh!important;min-height:420px!important}.quickReplyPreview textarea{height:55vh!important;min-height:380px!important}}
 .quickReplyCustomDeity{display:grid!important;grid-template-columns:1fr auto!important;gap:9px!important}
 .quickReplyCustomDeity input{min-height:48px;padding:0 13px;border:1px solid #cdbeb5;border-radius:9px;background:#fff;font-size:16px}
 .quickReplyCustomDeity button{min-height:48px;padding:0 17px;border:0;border-radius:9px;background:#244f47;color:#fff;font-size:16px;font-weight:900}

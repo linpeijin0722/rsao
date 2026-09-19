@@ -763,11 +763,11 @@ export async function upsertPastLifeOverviewReplies(documentId:string,answers:{a
   const values=answers.map(entry=>{
     const normalized=normalizeConsultationReturnText(entry.answer).replace(/\u2060/g,"");
     const extract=(heading:string)=>{
-      const marker=`【${heading}】`,markerIndex=normalized.indexOf(marker);
+      const markers=[`【${heading}】`,`＊${heading}`,`*${heading}`],marker=markers.find(value=>normalized.includes(value))||"",markerIndex=marker?normalized.indexOf(marker):-1;
       if(markerIndex<0)return heading==="綜觀今生"?normalized:"";
       const contentStart=markerIndex+marker.length;
       const remaining=normalized.slice(contentStart).replace(/^\s*\n?/,"");
-      const nextHeading=remaining.search(/\n【[^】]+】/);
+      const nextHeading=remaining.search(/\n(?:【[^】]+】|[＊*][^\n]+)/);
       return (nextHeading>=0?remaining.slice(0,nextHeading):remaining).trim();
     };
     const overview=extract("綜觀今生"),advice=extract("兩人相處建議");

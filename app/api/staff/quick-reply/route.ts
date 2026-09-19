@@ -2172,7 +2172,7 @@ export async function POST(request: NextRequest) {
           combinedHelp,
           combinedScripture,
         ].filter(Boolean),
-        safeHeading = (label: string) => `\u2060【${label}】`,
+        safeHeading = (label: string) => `＊${label}`,
         overallChosenGroup = (prefixes: string[]) => chosen
           .filter((entry: any) => prefixes.some((prefix) => String(entry.optionCode || "").startsWith(prefix)))
           .map((entry: any) => render(entry.content))
