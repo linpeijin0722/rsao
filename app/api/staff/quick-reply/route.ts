@@ -1512,12 +1512,18 @@ async function context(bookingNo: string, requestedDocumentId = "") {
           : null;
       return {
         ...slot,
-        label: meta.label,
+        label: itemCode === "past-life-personal"
+          ? "前世因果（個人）"
+          : itemCode === "past-life-relationship"
+            ? "前世因果（與他人前世關係）"
+            : meta.label,
         itemCode,
         profileName: meta.profileName || "",
         profileLines: meta.profileLines || [],
         requestLines: meta.requestLines || [],
-        targetDisplay: (meta as any).targetDisplay || "",
+        targetDisplay: itemCode === "past-life-relationship"
+          ? ((meta as any).targetDisplay || `對象：${(meta as any).targetName || meta.profileName || "未命名"}`)
+          : (meta as any).targetDisplay || "",
         targetName: (meta as any).targetName || "",
         infantMultiple: (meta as any).infantMultiple === true,
         infantRecords: (meta as any).infantRecords || [],
@@ -1877,6 +1883,7 @@ export async function POST(request: NextRequest) {
         worshipDeities = asArray(body.worshipDeities).map(clean).filter(Boolean),
         visitTarget = clean(body.visitTarget) || (clean(body.locationSubject) === "寶寶" ? "父母" : "親友"),
         customVisitReason = clean(body.customVisitReason),
+        shortPersonName = (value: string) => /^[\u3400-\u9fff]{2,4}$/u.test(value) && value.length > 2 ? value.slice(1) : value,
         vary = (value: string) => {
           const variants: [[RegExp, string, string]] | any = [
             [/(目前)/g, "目前", "現在"],
@@ -1900,6 +1907,8 @@ export async function POST(request: NextRequest) {
               .replaceAll("{visitTarget}", visitTarget)
               .replaceAll("{infantYears}", infantYears || "一段時間")
               .replaceAll("{customVisitReason}", customVisitReason)
+              .replaceAll("{selfName}", shortPersonName(clean(body.selfName) || "本人"))
+              .replaceAll("{partnerName}", shortPersonName(clean(body.partnerName) || "對方"))
               .trim(),
           ),
         combinedHelp = combineLotusIngot
@@ -2098,9 +2107,7 @@ export async function POST(request: NextRequest) {
           ? pastOverview
           : [
               pastOverview ? `${safeHeading("綜觀今生")}\n${pastOverview}` : "",
-              pastConsultant ? `${safeHeading("諮詢者的個性")}\n${pastConsultant}` : "",
-              pastTarget ? `${safeHeading("對象的個性")}\n${pastTarget}` : "",
-              pastRelationship ? `${safeHeading("兩人相處建議")}\n${pastRelationship}` : "",
+              pastConsultant || pastTarget || pastRelationship ? `${safeHeading("兩人相處建議")}\n${[pastConsultant, pastTarget, pastRelationship].filter(Boolean).join(" ")}` : "",
             ].filter(Boolean).join("\n\n"),
         healthAnswer = chosen
           .map((entry: any) => render(entry.content).replace(/[。；;]+$/u, ""))
