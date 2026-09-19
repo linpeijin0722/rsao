@@ -397,6 +397,7 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 .quickReplyInputCard>div:first-of-type{border-top:0}
 .quickReplyInputCard b{display:block;margin-bottom:4px;color:#6f3045;font-size:15px}
 .quickReplyInputCard p{margin:0;color:#342f2d;font-size:17px;line-height:1.65;white-space:pre-wrap}
+.quickReplyInputCard>.quickReplyPlainProfileLine{padding:1px 0;border:0}.quickReplyPlainProfileLine p{color:#211f1e!important;font-weight:400!important;line-height:1.45!important}
 @media(max-width:700px){.quickReplyBackdrop.standalone{padding:0;background:#fff}.quickReplyBackdrop.standalone .quickReplyPanel{border-radius:0}.quickReplyInputCard{padding:14px}.quickReplyReturnDocument{right:10px;min-height:30px;padding:5px 8px;font-size:11px}.quickReplyPanel>header>div{padding-left:0;padding-right:88px}}
 
 .quickReplyPreviousSummary{padding:15px 17px;border:2px solid #d9b8a8;border-radius:13px;background:#fff8f3}

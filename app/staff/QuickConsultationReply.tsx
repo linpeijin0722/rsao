@@ -1414,6 +1414,8 @@ export default function QuickConsultationReply({
                               </div>
                             ) : <>
                               {section.requestLines.map((line, index) => {
+                              if (section.itemCode === "past-life-relationship" && section.profileLines.includes(line))
+                                return <div key={index} className="quickReplyPlainProfileLine"><p>{line}</p></div>;
                               const split = line.indexOf("：");
                               const heading = /^【(.+)】$/.exec(line);
                               if (heading)
@@ -3068,6 +3070,8 @@ export default function QuickConsultationReply({
                         <section className="quickReplyInputCard">
                           <h3>用戶填寫的內容</h3>
                           {question.requestLines.map((line, index) => {
+                            if (question.itemCode === "past-life-relationship" && question.profileLines.includes(line))
+                              return <div key={index} className="quickReplyPlainProfileLine"><p>{line}</p></div>;
                             const split = line.indexOf("：");
                             const heading = /^【(.+)】$/.exec(line);
                             if (heading)

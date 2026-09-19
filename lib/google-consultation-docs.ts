@@ -693,17 +693,23 @@ export async function upsertPastLifeOverviewReplies(documentId:string,answers:st
   const values=answers.map(value=>{
     const normalized=normalizeConsultationReturnText(value);
     const overview=normalized.match(/【綜觀今生】\s*\n?([\s\S]*?)(?=\n【[^】]+】|$)/)?.[1] || normalized;
-    return overview.replace(/\n{2,}/g,"\n").trim();
-  }).filter(Boolean);
-  if(!documentId||!values.length)return;
+    const advice=normalized.match(/【兩人相處建議】\s*\n?([\s\S]*?)(?=\n【[^】]+】|$)/)?.[1] || "";
+    return {overview:overview.replace(/\n{2,}/g,"\n").trim(),advice:advice.replace(/\n{2,}/g,"\n").trim()};
+  });
+  if(!documentId||!values.some(value=>value.overview||value.advice))return;
   const token=await accessToken();
   const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
   const {plain,documentIndexAt}=indexedDocumentText(document);
-  const matches=Array.from(plain.matchAll(/(?:^|\n)【綜觀今生】[^\n]*\n/g));
-  const slots=matches.slice(0,values.length).map((match,index)=>{
-    const startOffset=(match.index||0)+match[0].length,rest=plain.slice(startOffset),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:Math.max(startOffset,plain.replace(/\n$/," ").length);
-    return{value:values[index],startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset)};
-  }).sort((a,b)=>b.startIndex-a.startIndex);
+  const headingSlots=(heading:string,key:"overview"|"advice")=>{
+    const escaped=heading.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+    const matches=Array.from(plain.matchAll(new RegExp(`(?:^|\\n)【${escaped}】[^\\n]*\\n`,"g")));
+    return matches.slice(0,values.length).map((match,index)=>{
+      const value=values[index]?.[key]||"";
+      const startOffset=(match.index||0)+match[0].length,rest=plain.slice(startOffset),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:Math.max(startOffset,plain.replace(/\n$/," ").length);
+      return{value,startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset)};
+    }).filter(slot=>slot.value);
+  };
+  const slots=[...headingSlots("綜觀今生","overview"),...headingSlots("兩人相處建議","advice")].sort((a,b)=>b.startIndex-a.startIndex);
   const requests:any[]=[];
   for(const slot of slots){
     if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});

@@ -1239,11 +1239,18 @@ async function context(bookingNo: string, requestedDocumentId = "") {
             const targetName = clean(targetProfile?.name) || "未命名對象";
             const targetGender = clean(targetProfile?.gender);
             const targetRelation = clean(targetProfile?.relationship_detail || targetProfile?.relationship);
+            const targetPresentation = profilePresentation(targetProfile, ownerName);
+            const compactTargetProfileLines = targetPresentation.profileLines.map((line: string) =>
+              line.replace(/^(?:姓名|農曆生日|居住地址)：/, ""),
+            );
             return {
               ...base,
+              ...targetPresentation,
+              profileName: targetName,
+              profileLines: compactTargetProfileLines,
               targetName,
               targetDisplay: `對象：${targetName}${targetGender ? `／${targetGender}` : ""}${targetRelation ? `（${targetRelation}）` : ""}`,
-              requestLines: target.lines,
+              requestLines: [...compactTargetProfileLines, ...target.lines.filter((line: string) => !/^【對象：/.test(line) && !targetPresentation.profileLines.some((profileLine: string) => profileLine.replace(/^(?:姓名|農曆生日|居住地址)：/, "") === line))],
             };
           });
         }
@@ -2295,8 +2302,7 @@ export async function POST(request: NextRequest) {
       );
     const pastLifeOverviewAnswers = data.sectionSlots
       .filter((slot: any) => slot.itemCode.startsWith("past-life-"))
-      .map((slot: any) => sectionAnswers[String(slot.slotIndex)] || "")
-      .filter(Boolean);
+      .map((slot: any) => sectionAnswers[String(slot.slotIndex)] || "");
     const regularSectionAnswers = Object.fromEntries(
       Object.entries(sectionAnswers).filter(([index]) =>
         !String(data.sectionSlots.find((slot: any) => String(slot.slotIndex) === String(index))?.itemCode || "").startsWith("past-life-"),
@@ -2307,7 +2313,7 @@ export async function POST(request: NextRequest) {
         data.documentDetail.google_document_id,
         regularSectionAnswers,
       );
-    if (pastLifeOverviewAnswers.length)
+    if (pastLifeOverviewAnswers.some(Boolean))
       await upsertPastLifeOverviewReplies(
         data.documentDetail.google_document_id,
         pastLifeOverviewAnswers,
