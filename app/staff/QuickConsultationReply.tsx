@@ -371,6 +371,12 @@ export default function QuickConsultationReply({
     dateJudgmentOptions = sectionTopic?.options.filter((o) => o.code.startsWith("date_judgment_")) || [],
     dateSupportOptions = sectionTopic?.options.filter((o) => o.code.startsWith("date_support_")) || [],
     dateNoticeOptions = sectionTopic?.options.filter((o) => o.code.startsWith("date_notice_")) || [],
+    pastLifeOptionGroups = [
+      ["綜觀今生", sectionTopic?.options.filter((o) => o.code.startsWith("past_overview_")) || []],
+      ["諮詢者的個性", sectionTopic?.options.filter((o) => o.code.startsWith("past_consultant_")) || []],
+      ["對象的個性", sectionTopic?.options.filter((o) => o.code.startsWith("past_target_")) || []],
+      ["兩人相處建議", sectionTopic?.options.filter((o) => o.code.startsWith("past_relationship_")) || []],
+    ].filter(([title, options]) => (section?.itemCode === "past-life-personal" ? title === "綜觀今生" : true) && (options as Option[]).length) as [string, Option[]][],
     bodyOptions =
       sectionTopic?.options.filter((o) => {
         if (!o.code.startsWith("body_")) return false;
@@ -465,6 +471,7 @@ export default function QuickConsultationReply({
           !o.code.startsWith("recent_") &&
           !o.code.startsWith("health_advice_") &&
           !o.code.startsWith("date_") &&
+          !o.code.startsWith("past_") &&
           !o.code.startsWith("body_") &&
           !o.code.startsWith("home_") &&
           !o.code.startsWith("spiritual_") &&
@@ -2733,6 +2740,14 @@ export default function QuickConsultationReply({
                                       {o.label.replace(/^傷害案件：/, "")}
                                     </button>
                                   ))}
+                                </div>
+                              </div>
+                            ))}
+                            {sectionTopic?.code === "past_life" && pastLifeOptionGroups.map(([title, options], groupIndex) => (
+                              <div className="quickReplySpecialField quickReplyPastLifeGroup" key={title}>
+                                <div className="quickReplySpecialHeading"><span>{groupIndex + 1}</span><div><h4>{title}</h4></div></div>
+                                <div className="quickReplySpecialChoices">
+                                  {options.map((o) => <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>{sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}</button>)}
                                 </div>
                               </div>
                             ))}

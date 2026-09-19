@@ -553,6 +553,39 @@ const dateResultBuiltInOptions = dateResultBuiltInRows.map(([code, label], index
   id: `virtual-${code.replaceAll("_", "-")}`, code, label, sort_order: 100 + index, is_active: true,
 }));
 const dateResultBuiltInCopy = Object.fromEntries(dateResultBuiltInRows.map(([code, , content]) => [code, content])) as Record<string, string>;
+const pastLifeBuiltInRows = [
+  ["past_overview_smart", "聰明敏銳", "聰明敏銳，心思縝密，做事情有條理，也有分析能力。"],
+  ["past_overview_righteous", "熱情正直", "本性熱情正直，遇到事情敢承擔，也有創造能力。"],
+  ["past_overview_leader", "喜歡主導", "性格喜歡主導，有自信，也會察言觀色。"],
+  ["past_overview_proud", "有傲氣又好面子", "本身有傲氣，也會好面子，處理事情容易比較主觀。"],
+  ["past_overview_sensitive", "敏感多愁", "心思細膩，容易神經過敏或多愁善感，情緒會放在心裡。"],
+  ["past_overview_suspicious", "容易多疑", "遇到事情容易多疑，也會反覆分析別人的想法。"],
+  ["past_overview_perfection", "追求完美", "做事情追求完美，也很在意別人的肯定。"],
+  ["past_overview_stubborn", "容易偏執計較", "有時候會偏執，也會有計較心，容易鑽牛角尖。"],
+  ["past_overview_money", "本身有財", "本身有財，但是錢財比較容易來去，會有財務波動。"],
+  ["past_overview_invest", "適合短期投資", "可以投資或代理，但是適合短期操作，不要戀戰。"],
+  ["past_overview_dispute", "留意是非官非", "做事情要小心謹慎，容易遇到是非、官非或不必要的耗損。"],
+  ["past_overview_tired", "做事勞心費力", "做事情比較勞心費力，煩心的事情也會比較多。"],
+  ["past_overview_kind", "本性善良有外緣", "本性善良，有外緣也有能力，關鍵時刻會有人願意幫忙。"],
+  ["past_overview_blessing", "多布施增加福德", "有能力要多布施，能增加福德與貴人運的助力。"],
+  ["past_overview_temple", "多走大廟宮廟", "有空可以多走大廟或宮廟，遇到事情比較容易化解。"],
+  ["past_consultant_direct", "熱情直率", "{selfName}的個性比較熱情直率，能冷靜分析，也喜歡把道理講清楚。"],
+  ["past_consultant_perfect", "追求完美與肯定", "{selfName}喜歡追求完美，也很在意別人的肯定。"],
+  ["past_consultant_worry", "多疑容易計較", "{selfName}容易多疑或過度計較，遇到事情會鑽牛角尖。"],
+  ["past_consultant_kind", "善良有能力", "{selfName}本性善良，有能力，也懂得察言觀色。"],
+  ["past_target_confident", "有自信與領導力", "{partnerName}有自信、有領導力，做事情喜歡掌控全局。"],
+  ["past_target_proud", "好面子較主觀", "{partnerName}比較好面子，作風威嚴，有時候會太主觀。"],
+  ["past_target_sensitive", "心思細膩敏感", "{partnerName}心思細膩，也容易敏感，很多事情會放在心裡。"],
+  ["past_target_reason", "冷靜理性", "{partnerName}能冷靜分析，重視道理與實際結果。"],
+  ["past_relationship_communicate", "主導權要溝通", "兩個人容易因為理念或主導權產生摩擦，一定要把話講清楚。"],
+  ["past_relationship_stepback", "彼此適度退讓", "相處時要適度退讓，不要每件事情都爭輸贏。"],
+  ["past_relationship_boundary", "界線要說清楚", "兩個人的界線與責任要先說清楚，後面才不容易互相埋怨。"],
+  ["past_relationship_stop", "避免情緒對立", "有情緒時先停一下，不要硬碰硬，否則很容易對立或意見分歧。"],
+  ["past_relationship_support", "多肯定少批評", "兩個人要多肯定對方、少用批評的方式溝通，關係才會順。"],
+  ["past_relationship_distance", "保留相處空間", "彼此要保留適當的相處空間，不要把對方管得太緊。"],
+] as const;
+const pastLifeBuiltInOptions = pastLifeBuiltInRows.map(([code, label], index) => ({ id: `virtual-${code.replaceAll("_", "-")}`, code, label, sort_order: 1100 + index, is_active: true }));
+const pastLifeBuiltInCopy = Object.fromEntries(pastLifeBuiltInRows.map(([code, , content]) => [code, content])) as Record<string, string>;
 const lawsuitBuiltInRows = [
   ["lawsuit_attitude_continue", "對方會繼續追究", "這件事情對方還不會放掉，後面還會繼續處理，不會這麼快結束。"],
   ["lawsuit_attitude_step_back", "對方會退一步", "這件事情後面對方的態度會軟下來，不會一直強硬到底。"],
@@ -853,18 +886,13 @@ async function context(bookingNo: string, requestedDocumentId = "") {
         }),
       )
       .filter((entry: any) => entry.question);
-  let questionSlots = (
-    await getQuickReplyQuestionSlots(documentDetail.google_document_id)
-  ).map((slot, index) => ({
-    ...slot,
-    itemCode: questionMeta[index]?.itemCode || "",
-    itemTitle: questionMeta[index]?.itemTitle || "",
-    profileName: questionMeta[index]?.profileName || "",
-    profileLines: questionMeta[index]?.profileLines || [],
-    manualOnly: String(questionMeta[index]?.itemCode || "").startsWith(
-      "past-life-",
-    ),
-  }));
+  const documentQuestionSlots = await getQuickReplyQuestionSlots(documentDetail.google_document_id);
+  let questionSlots = questionMeta.map((meta: any, index: number) => {
+    const normalized = clean(meta.question).replace(/[？?。.!！\s]/g, "");
+    const documentSlot = documentQuestionSlots.find((slot) => slot.question.replace(/[？?。.!！\s]/g, "") === normalized);
+    return { slotIndex: index, questionNumber: index + 1, question: meta.question, answer: documentSlot?.answer || "", itemCode: meta.itemCode || "", itemTitle: meta.itemTitle || "", profileName: meta.profileName || "", profileLines: meta.profileLines || [], manualOnly: true };
+  });
+  if (!questionSlots.length) questionSlots = documentQuestionSlots.map((slot, index) => ({ ...slot, itemCode: "", itemTitle: "", profileName: "", profileLines: [], manualOnly: true }));
   if (!questionSlots.length) {
     const fallback = details
       .flatMap((detail: any) =>
@@ -921,6 +949,10 @@ async function context(bookingNo: string, requestedDocumentId = "") {
     id: "virtual-date-result-topic", code: "date_result", title: "擇日／擇時", icon: "📅",
     keywords: ["擇日", "擇時"], sort_order: 950, quick_reply_options: [],
   } as any);
+  if (!topicRows.some((topic: any) => topic.code === "past_life")) topicRows.push({
+    id: "virtual-past-life-topic", code: "past_life", title: "前世因果", icon: "☯",
+    keywords: ["前世", "綜觀今生"], sort_order: 960, quick_reply_options: [],
+  } as any);
   const normalizedTopics = topicRows.map((topic: any) => {
     const options: any[] = topic.code === "spiritual"
       ? []
@@ -942,6 +974,8 @@ async function context(bookingNo: string, requestedDocumentId = "") {
               ? spiritualBuiltInOptions
               : topic.code === "date_result"
                 ? dateResultBuiltInOptions
+              : topic.code === "past_life"
+                ? pastLifeBuiltInOptions
           : [];
     for (const option of builtIns)
       if (!options.some((entry: any) => entry.code === option.code))
@@ -999,6 +1033,8 @@ async function context(bookingNo: string, requestedDocumentId = "") {
     "lawsuit-benefactor": "lawsuit",
     naming: "naming_result",
     "date-time-selection": "date_result",
+    "past-life-personal": "past_life",
+    "past-life-relationship": "past_life",
   };
   const recommendedByQuestion = Object.fromEntries(
     questionSlots.map((slot) => {
@@ -1491,8 +1527,7 @@ async function context(bookingNo: string, requestedDocumentId = "") {
         genderPronoun: meta.genderPronoun || "祂",
         isPet: itemCode === "deceased-pet",
         previousLocation,
-        manualOnly:
-          itemCode.startsWith("past-life-") || /前世|綜觀今生/.test(meta.label),
+        manualOnly: false,
       };
     })
     .filter(Boolean) as any[];
@@ -1797,6 +1832,7 @@ export async function POST(request: NextRequest) {
                     homeBuiltInCopy[selection.optionCode] ||
                     spiritualBuiltInCopy[selection.optionCode] ||
                     dateResultBuiltInCopy[selection.optionCode] ||
+                    pastLifeBuiltInCopy[selection.optionCode] ||
                     spiritBuiltInCopy[selection.optionCode] ||
                     "",
                 }
@@ -2051,11 +2087,28 @@ export async function POST(request: NextRequest) {
           overallRecent ? `${safeHeading("最近狀況")}\n${overallRecent}` : "",
           overallAdvice ? `${safeHeading("建議")}\n${overallAdvice}` : "",
         ].filter(Boolean).join("\n\n"),
+        selectedSection = data.sectionSlots.find((slot: any) => Number(slot.slotIndex) === Number(body.sectionSlotIndex)),
+        pastGroup = (prefix: string) => chosen.filter((entry: any) => String(entry.optionCode || "").startsWith(prefix)).map((entry: any) => render(entry.content)).filter(Boolean).join(" "),
+        pastOverviewParts = chosen.filter((entry: any) => String(entry.optionCode || "").startsWith("past_overview_")).map((entry: any) => render(entry.content)).filter(Boolean),
+        pastOverview = Array.from({ length: Math.ceil(pastOverviewParts.length / 3) }, (_, index) => pastOverviewParts.slice(index * 3, index * 3 + 3).join(" ")).join("\n\n"),
+        pastConsultant = pastGroup("past_consultant_"),
+        pastTarget = pastGroup("past_target_"),
+        pastRelationship = pastGroup("past_relationship_"),
+        pastLifeAnswer = selectedSection?.itemCode === "past-life-personal"
+          ? pastOverview
+          : [
+              pastOverview ? `${safeHeading("綜觀今生")}\n${pastOverview}` : "",
+              pastConsultant ? `${safeHeading("諮詢者的個性")}\n${pastConsultant}` : "",
+              pastTarget ? `${safeHeading("對象的個性")}\n${pastTarget}` : "",
+              pastRelationship ? `${safeHeading("兩人相處建議")}\n${pastRelationship}` : "",
+            ].filter(Boolean).join("\n\n"),
         healthAnswer = chosen
           .map((entry: any) => render(entry.content).replace(/[。；;]+$/u, ""))
           .filter(Boolean)
           .join("、") + (chosen.length ? "。" : ""),
-        answer = loveFormat
+        answer = valid.some((selection) => selection.topicCode === "past_life")
+          ? pastLifeAnswer
+          : loveFormat
           ? [
               selfSentence ? `${safeHeading("本身的個性")}\n${selfSentence}` : "",
               partnerSentence || partner2Sentence
