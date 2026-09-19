@@ -2226,7 +2226,10 @@ export async function POST(request: NextRequest) {
         completed: row.completed === true,
         profileName: slot.profileName || "",
       };
-      answers[String(slot.slotIndex)] = answer;
+      // 文件中已有相同答案時不要重複刪除、重寫。Google Docs 不允許刪除
+      // 段落末端的保留換行，重寫相同 A1/A2 會讓後續「綜觀今生」整批中止。
+      if (normalizeConsultationReturnText(String(slot.answer || "")) !== answer)
+        answers[String(slot.slotIndex)] = answer;
     }
     const incomingSections =
         body.sectionReplies && typeof body.sectionReplies === "object"

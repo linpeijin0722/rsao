@@ -726,8 +726,12 @@ export async function upsertPastLifeOverviewReplies(documentId:string,answers:{a
       const afterHeading=page.start+headingOffset+marker.length;
       const newlineOffset=plain.indexOf("\n",afterHeading);
       const startOffset=newlineOffset>=0&&newlineOffset<page.end?newlineOffset+1:afterHeading;
-      const rest=plain.slice(startOffset,page.end),boundary=rest.search(/\n\s*(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:page.end;
-      slots.push({value,key,targetName:entry.targetName,startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset)});
+      const rest=plain.slice(startOffset,page.end),boundary=rest.search(/\n\s*(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),rawExisting=boundary>=0?rest.slice(0,boundary):rest;
+      // 保留 Google Docs 每個段落／區段最後的換行字元。空白教師輸入區不必刪除，
+      // 直接在其前方插入；有舊內容時也只刪到最後一個可見字元。
+      const removableExisting=rawExisting.replace(/[\s\u00a0\u200b]+$/u,"");
+      const endOffset=startOffset+removableExisting.length;
+      slots.push({value,key,targetName:entry.targetName,startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset),shouldDelete:removableExisting.replace(/[\s\u00a0\u200b]/gu,"").length>0});
     }
   }
   const missingOverview=values.find(entry=>entry.overview&&!slots.some(slot=>slot.key==="overview"&&slot.targetName===entry.targetName));
@@ -735,7 +739,7 @@ export async function upsertPastLifeOverviewReplies(documentId:string,answers:{a
   slots.sort((a,b)=>b.startIndex-a.startIndex);
   const requests:any[]=[];
   for(const slot of slots){
-    if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
+    if(slot.shouldDelete&&slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
     requests.push({insertText:{location:{index:slot.startIndex},text:`${slot.value}\n`}});
     requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
   }
