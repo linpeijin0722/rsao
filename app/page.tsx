@@ -474,6 +474,10 @@ export default function Page() {
           }),
           paymentResult = await paymentResponse.json();
         if (!paymentResponse.ok) throw Error(paymentResult.error);
+        if(paymentResult.mode==="bank_transfer"){
+          location.href=`/pay?order=${encodeURIComponent(j.booking.booking_no)}`;
+          return;
+        }
         const form = document.createElement("form");
         form.method = "POST";
         form.action = paymentResult.action;

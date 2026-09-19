@@ -3,12 +3,15 @@ import { cookies } from "next/headers";
 import { verifyLineSession } from "@/lib/line-session";
 import { adminSupabase } from "@/lib/supabase";
 import { encryptTradeInfo, newebpayConfig, newebpayMerchantOrderNo, tradeSha } from "@/lib/newebpay";
+import { paymentSettings } from "@/lib/payment-mode";
 
 export async function POST(request: NextRequest) {
   try {
     const lineUid = verifyLineSession((await cookies()).get("line_session")?.value);
     if (!lineUid)
       return NextResponse.json({ error: "LINE 登入已失效" }, { status: 401 });
+    const payment=await paymentSettings();
+    if(payment.effective_mode==="bank_transfer")return NextResponse.json({mode:"bank_transfer"});
     const { bookingNo } = await request.json();
     const db = adminSupabase();
     const { data: customer } = await db
@@ -48,6 +51,7 @@ export async function POST(request: NextRequest) {
       config.hashIv,
     );
     return NextResponse.json({
+      mode:"newebpay",
       action: config.gateway,
       fields: {
         MerchantID: config.merchantId,
@@ -57,6 +61,24 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    // In auto mode, a server-side gateway initialization failure temporarily
+    // falls back to bank transfer. The timeout lets the site retry NewebPay
+    // automatically after the transient failure has had time to clear.
+    try {
+      const db = adminSupabase();
+      const disabledUntil = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      await db
+        .from("booking_system_settings")
+        .update({
+          gateway_disabled_until: disabledUntil,
+          gateway_failure_reason:
+            error instanceof Error ? error.message.slice(0, 500) : "無法啟動藍新付款",
+        })
+        .eq("id", true)
+        .eq("payment_mode", "auto");
+    } catch {
+      // Preserve the original payment error even if recording the fallback fails.
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "無法啟動藍新付款" },
       { status: 500 },

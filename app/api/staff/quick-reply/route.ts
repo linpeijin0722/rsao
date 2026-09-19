@@ -2256,7 +2256,7 @@ export async function POST(request: NextRequest) {
         ok: true,
         // 快速回覆內容內的分類一律使用星號；【】保留給 Google 諮詢單
         // 原本的正式段落標題，兩者不會在預覽中混在一起。
-        answer: answer.replace(/【([^】\n]+)】/gu, "＊$1"),
+        answer: answer.replace(/【([^】\n]+)】/gu, "＊$1").replace(/ /g, ""),
         phraseIds: [...chosen, ...selfPhrases, ...partnerPhrases, ...partner2Phrases].map(
           (entry) => entry.id,
         ),

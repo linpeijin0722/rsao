@@ -1,73 +1,13 @@
 "use client";
-
-import { useEffect, useState } from "react";
-
-const expiryText = (value: string) =>
-  new Date(value).toLocaleString("zh-TW", {
-    timeZone: "Asia/Taipei",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
-export default function PayPage() {
-  const [booking, setBooking] = useState<any>(null);
-  const [error, setError] = useState("");
-  const order = typeof window === "undefined" ? "" : new URLSearchParams(location.search).get("order") || "";
-
-  async function forward() {
-    setError("");
-    const response = await fetch("/api/newebpay", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ bookingNo: order }),
-    });
-    const result = await response.json();
-    if (!response.ok) return setError(result.error || "無法前往付款");
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = result.action;
-    Object.entries(result.fields as Record<string, string>).forEach(([name, value]) => {
-      const input = document.createElement("input");
-      input.type = "hidden";
-      input.name = name;
-      input.value = value;
-      form.appendChild(input);
-    });
-    document.body.appendChild(form);
-    form.submit();
-  }
-
-  useEffect(() => {
-    if (!order) {
-      setError("缺少訂單編號");
-      return;
-    }
-    fetch("/api/my-bookings")
-      .then(async (response) => {
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || "讀取訂單失敗");
-        const found = result.bookings?.find((item: any) => item.booking_no === order);
-        if (!found) throw new Error("找不到這筆訂單");
-        setBooking(found);
-        if (found.status === "cancelled" || found.payment_status === "failed") return;
-        window.setTimeout(() => void forward(), 1400);
-      })
-      .catch((reason) => setError(reason instanceof Error ? reason.message : "讀取訂單失敗"));
-  }, [order]);
-
-  const invalid = booking && (booking.status === "cancelled" || booking.payment_status === "failed");
-  return (
-    <main className="payForward">
-      <section>
-        <h1>正在前往藍新付款</h1>
-        {booking && !invalid && <p>跳轉付款頁面中…請稍後</p>}
-        {!booking && !error && <p>正在確認訂單，請稍候…</p>}
-        {invalid && <p className="payError">此筆訂單已失效，請重新預約。</p>}
-        {error && <p className="payError">{error}</p>}
-      </section>
-    </main>
-  );
+import { useEffect,useState } from "react";
+export default function PayPage(){
+  const order=typeof window==="undefined"?"":new URLSearchParams(location.search).get("order")||"";
+  const [data,setData]=useState<any>(null),[error,setError]=useState(""),[sent,setSent]=useState(false),[last5,setLast5]=useState(""),[amount,setAmount]=useState(""),[transferTime,setTransferTime]=useState("");
+  useEffect(()=>{if(!order){setError("缺少訂單編號");return}fetch(`/api/bank-transfer?bookingNo=${encodeURIComponent(order)}`).then(async r=>{const j=await r.json();if(!r.ok)throw Error(j.error);setData(j);setAmount(String(j.booking.total_price));if(j.booking.transfer_status==="reported")setSent(true)}).catch(e=>setError(e.message))},[order]);
+  async function startGateway(){const r=await fetch("/api/newebpay",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({bookingNo:order})}),j=await r.json();if(!r.ok)return setError(j.error);if(j.mode==="bank_transfer")return;const form=document.createElement("form");form.method="POST";form.action=j.action;Object.entries(j.fields as Record<string,string>).forEach(([name,value])=>{const input=document.createElement("input");input.type="hidden";input.name=name;input.value=value;form.appendChild(input)});document.body.appendChild(form);form.submit()}
+  useEffect(()=>{if(data?.settings?.effective_mode==="newebpay")void startGateway()},[data]);
+  async function submit(){setError("");const r=await fetch("/api/bank-transfer",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({bookingNo:order,last5,amount:Number(amount),transferTime})}),j=await r.json();if(!r.ok)return setError(j.error);setSent(true)}
+  if(!data)return <main className="payForward"><section><h1>確認付款方式</h1><p>{error||"正在讀取訂單…"}</p></section></main>;
+  if(data.settings.effective_mode==="newebpay")return <main className="payForward"><section><h1>正在前往藍新付款</h1><p>跳轉付款頁面中…請稍後</p>{error&&<p className="payError">{error}</p>}</section></main>;
+  return <main className="bankTransferPage"><section className="bankTransferCard"><span>臨時付款方式</span><h1>使用台灣銀行帳戶轉帳</h1><p>藍新金流仍在審核中，目前請先完成銀行轉帳。我們核對銀行入帳後，訂單才會正式標記為已付款。</p><div className="bankAccountBox"><small>應付金額</small><strong>NT$ {Number(data.booking.total_price).toLocaleString("zh-TW")}</strong><small>收款銀行</small><b>{data.settings.bank_name}（{data.settings.bank_code}）</b><small>銀行帳號</small><b>{data.settings.bank_account}</b><button onClick={()=>navigator.clipboard.writeText(data.settings.bank_account)}>複製帳號</button></div>{sent?<div className="transferReported"><b>✓ 已收到轉帳回報</b><p>我們會依照末五碼、金額與轉帳時間核對銀行入帳，確認後將透過 LINE 通知。</p></div>:<div className="transferForm"><label>轉出帳號末五碼<input inputMode="numeric" maxLength={5} value={last5} onChange={e=>setLast5(e.target.value.replace(/\D/g,""))} placeholder="請輸入5位數字"/></label><label>實際轉帳金額<input inputMode="numeric" value={amount} onChange={e=>setAmount(e.target.value.replace(/\D/g,""))}/></label><label>轉帳時間<input type="datetime-local" value={transferTime} onChange={e=>setTransferTime(e.target.value)}/></label>{error&&<p className="payError">{error}</p>}<button onClick={()=>void submit()}>我已完成轉帳，送出末五碼</button></div>}</section></main>;
 }

@@ -49,6 +49,7 @@ export default function Mine() {
       }),
       j = await r.json();
     if (!r.ok) return setError(j.error);
+    if(j.mode==="bank_transfer")return location.href=`/pay?order=${encodeURIComponent(no)}`;
     const form = document.createElement("form");
     form.method = "POST";
     form.action = j.action;
