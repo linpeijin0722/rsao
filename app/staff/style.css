@@ -367,6 +367,11 @@ button.manualUserSelect img,button.manualUserSelect .avatarFallback{display:bloc
 .quickReplySpecialChoices button{min-height:50px!important;border:1px solid #d3c5bc!important;border-radius:10px!important;background:#fff!important;color:#403632!important;font-size:17px!important;font-weight:900!important}
 .quickReplySpecialChoices button.selected{border:2px solid #a91436!important;background:#fff0f4!important;color:#8e1532!important}
 .quickReplyFiveElements{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+.quickReplyElementAccentTitle{margin:12px 0 7px;color:#6b463c;font-size:15px;text-align:left}
+.quickReplyElementAccent{padding-top:0!important}
+.quickReplySpiritualDetail{display:grid;gap:7px;padding:13px;border:1px solid #dfd0c5;border-radius:11px;background:#fffaf7;text-align:left}
+.quickReplySpiritualDetail b{color:#7b3048;font-size:16px}
+.quickReplySpiritualDetail textarea{width:100%;min-height:62px;box-sizing:border-box;padding:10px 12px;border:1px solid #d8c8bf;border-radius:9px;background:#fff;color:#292320;font:inherit;font-size:16px;line-height:1.45;resize:vertical}
 .quickReplyCustomDeity{display:grid!important;grid-template-columns:1fr auto!important;gap:9px!important}
 .quickReplyCustomDeity input{min-height:48px;padding:0 13px;border:1px solid #cdbeb5;border-radius:9px;background:#fff;font-size:16px}
 .quickReplyCustomDeity button{min-height:48px;padding:0 17px;border:0;border-radius:9px;background:#244f47;color:#fff;font-size:16px;font-weight:900}

@@ -546,9 +546,31 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
   return matches.map((match, idx) => {
     const segmentStart = match.index || 0;
     const segmentEnd = idx + 1 < matches.length ? (matches[idx + 1].index || body.length) : body.length;
-    const segment = normalizeConsultationReturnText(body.slice(segmentStart, segmentEnd));
+    let segment = normalizeConsultationReturnText(body.slice(segmentStart, segmentEnd));
     const afterMarker = segment.slice(match[0].length).replace(/^\s+/, "");
     const firstLine = afterMarker.split("\n").map((line) => line.trim()).find(Boolean) || `項目 ${idx + 1}`;
+    const lines = segment.split("\n"), manualRows: { question: string; answer: string }[] = [];
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+      const manual = /^阿嫂回覆\s*[:：]\s*(.+)$/u.exec(lines[lineIndex].trim());
+      if (!manual) continue;
+      const previous = lines.slice(0, lineIndex).map((line, index) => ({ line: line.trim(), index })).filter((entry) => entry.line);
+      const valueRow = previous.at(-1), labelRow = previous.at(-2);
+      const fallbackQuestion = firstLine.replace(/^【|】$/g, "");
+      const question = labelRow && !/^(姓名|農曆生日|居住地址|訂單編號)\s*[:：]/u.test(labelRow.line)
+        ? labelRow.line.replace(/[：:]$/u, "")
+        : fallbackQuestion;
+      manualRows.push({ question, answer: manual[1].trim() });
+      lines[lineIndex] = "";
+    }
+    if (manualRows.length) {
+      const maxQuestion = Math.max(0, ...Array.from(segment.matchAll(/(?:^|\n)Q(\d+)\s*[:：]/g)).map((entry) => Number(entry[1])));
+      const appended = manualRows.map((row, rowIndex) => `Q${maxQuestion + rowIndex + 1}:${row.question}\nA${maxQuestion + rowIndex + 1}:${row.answer}`).join("\n\n");
+      segment = lines.join("\n");
+      const tagOffset = segment.search(/【[^】\n]+】/u);
+      segment = tagOffset >= 0
+        ? `${segment.slice(0, tagOffset).replace(/\s+$/u, "")}\n\n${appended}\n\n${segment.slice(tagOffset)}`
+        : `${segment.replace(/\s+$/u, "")}\n\n${appended}`;
+    }
     let startOffset = -1;
     if (idx === 0) startOffset = segment.indexOf("您好，以下是您的諮詢結果");
     if (startOffset < 0) {
@@ -563,6 +585,52 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
     const content = normalizeConsultationReturnText(segment.slice(startOffset));
     return { index: idx + 1, itemTitle: firstLine, content };
   });
+}
+
+export type QuickReplyManualReply = {
+  answer:string; label:string; question:string; itemCode:string; itemLabel:string; targetName:string; profileName:string;
+};
+
+export async function upsertQuickConsultationManualReplies(documentId:string,entries:QuickReplyManualReply[]) {
+  const values=entries.map(entry=>({...entry,answer:normalizeConsultationReturnText(entry.answer)})).filter(entry=>entry.answer);
+  if(!documentId||!values.length)return;
+  const token=await accessToken();
+  const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
+  const {plain,documentIndexAt}=indexedDocumentText(document);
+  const pageStarts=Array.from(plain.matchAll(/(?:^|\n)項目\s*\d+[^\n]*/g)).map(match=>(match.index||0)+(match[0].startsWith("\n")?1:0));
+  const pages=pageStarts.map((start,index)=>({start,end:pageStarts[index+1]??plain.length,text:plain.slice(start,pageStarts[index+1]??plain.length)}));
+  const writes:any[]=[];
+  for(const entry of values){
+    const page=pages.find(candidate=>entry.targetName&&candidate.text.includes(entry.targetName)&&candidate.text.includes(entry.itemLabel))
+      || pages.find(candidate=>entry.profileName&&candidate.text.includes(entry.profileName)&&candidate.text.includes(entry.itemLabel))
+      || pages.find(candidate=>candidate.text.includes(entry.itemLabel))
+      || pages.find(candidate=>entry.targetName&&candidate.text.includes(entry.targetName));
+    if(!page)throw new Error(`找不到「${entry.itemLabel||entry.label}」的諮詢單頁面`);
+    let insertOffset=-1;
+    if(entry.label&&entry.label!=="本項目"){
+      const labelOffset=page.text.indexOf(entry.label);
+      if(labelOffset>=0){
+        const firstNewline=page.text.indexOf("\n",labelOffset),secondNewline=firstNewline>=0?page.text.indexOf("\n",firstNewline+1):-1;
+        insertOffset=page.start+(secondNewline>=0?secondNewline+1:firstNewline>=0?firstNewline+1:labelOffset+entry.label.length);
+      }
+    }
+    if(insertOffset<0){
+      const headingOffset=page.text.search(/【[^】\n]+】/u);
+      insertOffset=headingOffset>=0?page.start+headingOffset:page.end;
+    }
+    const following=plain.slice(insertOffset,page.end),existing=/^阿嫂回覆\s*[:：][^\n]*/u.exec(following);
+    const inserted=`阿嫂回覆：${entry.answer}\n`;
+    writes.push({startOffset:insertOffset,endOffset:existing?insertOffset+existing[0].length:insertOffset,text:inserted});
+  }
+  writes.sort((a,b)=>b.startOffset-a.startOffset);
+  const requests:any[]=[];
+  for(const write of writes){
+    const startIndex=documentIndexAt(write.startOffset),endIndex=documentIndexAt(write.endOffset);
+    if(endIndex>startIndex)requests.push({deleteContentRange:{range:{startIndex,endIndex}}});
+    requests.push({insertText:{location:{index:startIndex},text:write.text}});
+    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+write.text.trimEnd().length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+  }
+  if(requests.length)await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
 
 const QUICK_REPLY_HEADING = "【阿嫂回答】";
@@ -1034,7 +1102,9 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   renderedQuestions.forEach((question: string, index: number) => {
     add(`Q${index + 1}:${question}`, "question");
     add(`A${index + 1}:`, "answer");
-    for (let line = 0; line < 4; line += 1) add("\u00a0", "answer");
+    // A1/A2 本身已經是一行可直接填寫的回答區；只再保留一個空白段落，
+    // 避免建立文件時每題固定撐出四行空白，讓手機與電腦版都更緊湊。
+    add("\u00a0", "answer");
   });
   add("");
   const isPastLifePersonal = itemCode === "past-life-personal" || text(detail.item_title).includes("前世因果（個人）");
@@ -1084,7 +1154,9 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   sections.forEach((heading) => {
     add(heading, "section");
     if (isPastLifeRelation && heading === sections[0] && targetProfile?.name) add(`${text(targetProfile.name)}是`, "teacher");
-    add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher");
+    // 快速回覆可直接將內容寫入標題下一行，無須預留四個空白段落。
+    // 留一行仍方便阿嫂在 Google 文件內手動補充。
+    add("\u00a0", "teacher");
   });
   if (itemCode === "date-time-selection" || title.includes("擇日")) {
     add("【擇日建議】", "section");

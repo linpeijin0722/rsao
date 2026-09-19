@@ -12,6 +12,7 @@ import {
   normalizeConsultationReturnText,
   upsertPastLifeOverviewReplies,
   upsertQuickConsultationQuestionReplies,
+  upsertQuickConsultationManualReplies,
   upsertQuickConsultationSectionReplies,
 } from "@/lib/google-consultation-docs";
 
@@ -1712,6 +1713,8 @@ async function context(bookingNo: string, requestedDocumentId = "") {
             : asArray(existing.phraseIds).map(String),
           answer: contaminated ? "" : existing.answer || slot.answer || "",
           completed: contaminated ? false : existing.completed === true,
+          accentElementIds: contaminated ? [] : asArray(existing.accentElementIds).map(String),
+          spiritualDetail: contaminated ? "" : clean(existing.spiritualDetail),
         },
       ];
     }),
@@ -1895,6 +1898,8 @@ export async function POST(request: NextRequest) {
         elementRows = valid.filter((selection) =>
           selection.optionCode.startsWith("element_"),
         ),
+        accentElementIds = new Set(asArray(body.accentElementIds).map(String)),
+        accentElementRows = valid.filter((selection) => accentElementIds.has(selection.optionId)),
         deityRelationRows = valid.filter((selection) =>
           selection.optionCode.startsWith("deity_relation_"),
         ),
@@ -2105,7 +2110,8 @@ export async function POST(request: NextRequest) {
         divorceTimingSentence = divorceAges.length
           ? `而離婚或離異的高風險年齡則要特別注意：${divorceAges.map((age) => `${age}歲`).join("、")}。`
           : "";
-      const elementLabels = elementRows.map((row) => row.optionLabel),
+      const elementLabels = elementRows.filter((row) => !accentElementIds.has(row.optionId)).map((row) => row.optionLabel),
+        accentElementLabels = accentElementRows.map((row) => row.optionLabel),
         elementTraits: Record<string, string> = {
           金: "做事果斷，對專業和細節有要求",
           木: "想法多、有成長力，遇到事情願意往前試",
@@ -2114,7 +2120,7 @@ export async function POST(request: NextRequest) {
           土: "個性穩定、責任感重，做事情比較踏實",
         },
         elementSentence = elementLabels.length
-          ? `本命格屬${elementLabels.join("帶")}（個性${elementLabels
+          ? `本命格屬${elementLabels.join("、")}${accentElementLabels.length ? `，帶一點${accentElementLabels.join("、")}` : ""}（個性${[...elementLabels, ...accentElementLabels]
               .map((label) => elementTraits[label])
               .filter(Boolean)
               .join("，")}）。`
@@ -2154,12 +2160,15 @@ export async function POST(request: NextRequest) {
           : uniqueWorshipDeities.length
             ? `有空可以多拜${uniqueWorshipDeities.join("、")}，對自己會有最直接的助力。`
             : "",
+        spiritualDetail = clean(body.spiritualDetail),
+        spiritualDetailSentence = spiritualDetail ? `${spiritualDetail.replace(/[。！？!?]+$/u, "")}。` : "",
         standardAnswerParts = [
           locationSentence,
           elementSentence,
           deitySentence,
           meetSentence,
           ...chosen.map((entry) => render(entry.content)),
+          spiritualDetailSentence,
           combinedHelp,
           combinedScripture,
         ].filter(Boolean),
@@ -2190,11 +2199,23 @@ export async function POST(request: NextRequest) {
           overallAdvice ? `${safeHeading("建議")}\n${overallAdvice}` : "",
         ].filter(Boolean).join("\n\n"),
         selectedSection = data.sectionSlots.find((slot: any) => Number(slot.slotIndex) === Number(body.sectionSlotIndex)),
+        pastPersonalityGroup = (prefix: string, personName: string) => {
+          const rows = chosen.filter((entry: any) => String(entry.optionCode || "").startsWith(prefix));
+          const positives = rows.filter((entry: any) => String(entry.optionCode || "").includes("_pro_"));
+          const concerns = rows.filter((entry: any) => String(entry.optionCode || "").includes("_con_"));
+          const shortName = shortPersonName(personName || "本人");
+          return [...positives, ...concerns].map((entry: any, index: number) => {
+            let value = render(entry.content);
+            if (index > 0 && value.startsWith(shortName)) value = value.slice(shortName.length).trim();
+            if (positives.length && index === positives.length && !/^(但是|不過|然而)/u.test(value)) value = `但是${value}`;
+            return value;
+          }).filter(Boolean).join(" ");
+        },
         pastGroup = (prefix: string) => chosen.filter((entry: any) => String(entry.optionCode || "").startsWith(prefix)).map((entry: any) => render(entry.content)).filter(Boolean).join(" "),
         pastOverviewParts = chosen.filter((entry: any) => String(entry.optionCode || "").startsWith("past_overview_")).map((entry: any) => render(entry.content)).filter(Boolean),
         pastOverview = Array.from({ length: Math.ceil(pastOverviewParts.length / 3) }, (_, index) => pastOverviewParts.slice(index * 3, index * 3 + 3).join(" ")).join("\n"),
-        pastConsultant = pastGroup("past_consultant_"),
-        pastTarget = pastGroup("past_target_"),
+        pastConsultant = pastPersonalityGroup("past_consultant_", clean(body.selfName) || "本人"),
+        pastTarget = pastPersonalityGroup("past_target_", clean(body.partnerName) || "對方"),
         pastRelationship = pastGroup("past_relationship_"),
         pastLifeAnswer = selectedSection?.itemCode === "past-life-personal"
           ? pastOverview
@@ -2269,6 +2290,13 @@ export async function POST(request: NextRequest) {
           : {},
       sectionReplies: Record<string, any> = { ...(data.sectionReplies || {}) },
       sectionAnswers: Record<string, string> = {};
+    const manualReplies:any[] = asArray(body.manualReplies).map((entry:any)=>{
+      const slot=data.sectionSlots.find((candidate:any)=>Number(candidate.slotIndex)===Number(entry.sectionSlotIndex));
+      return slot?{
+        answer:clean(entry.answer),label:clean(entry.label),question:clean(entry.question),itemCode:slot.itemCode||"",
+        itemLabel:slot.label||"",targetName:slot.targetName||"",profileName:slot.profileName||"",
+      }:null;
+    }).filter((entry:any)=>entry?.answer);
     for (const slot of data.sectionSlots) {
       const row = incomingSections[String(slot.slotIndex)] || {},
         answer = normalizeConsultationReturnText(String(row.answer || ""));
@@ -2279,10 +2307,12 @@ export async function POST(request: NextRequest) {
         answer,
         completed: row.completed === true,
         targetName: slot.targetName || "",
+        accentElementIds: asArray(row.accentElementIds).map(String),
+        spiritualDetail: clean(row.spiritualDetail),
       };
       sectionAnswers[String(slot.slotIndex)] = answer;
     }
-    if (!Object.keys(answers).length && !Object.keys(sectionAnswers).length)
+    if (!Object.keys(answers).length && !Object.keys(sectionAnswers).length && !manualReplies.length)
       return NextResponse.json(
         { error: "至少要完成一個回答" },
         { status: 400 },
@@ -2371,6 +2401,11 @@ export async function POST(request: NextRequest) {
       await upsertPastLifeOverviewReplies(
         data.documentDetail.google_document_id,
         pastLifeOverviewAnswers,
+      );
+    if (manualReplies.length)
+      await upsertQuickConsultationManualReplies(
+        data.documentDetail.google_document_id,
+        manualReplies,
       );
     return NextResponse.json({
       ok: true,

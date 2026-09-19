@@ -74,6 +74,8 @@ type SectionDraft = {
   phraseIds: string[];
   answer: string;
   completed?: boolean;
+  accentElementIds?: string[];
+  spiritualDetail?: string;
 };
 type ReplyData = {
   bookingNo: string;
@@ -133,6 +135,8 @@ export default function QuickConsultationReply({
     [romanceAges, setRomanceAges] = useState<Record<string, string[]>>({}),
     [divorceAges, setDivorceAges] = useState<Record<string, string[]>>({}),
     [customDeity, setCustomDeity] = useState<Record<string, string>>({}),
+    [elementAccentSelections, setElementAccentSelections] = useState<Record<string, string[]>>({}),
+    [spiritualDetails, setSpiritualDetails] = useState<Record<string, string>>({}),
     [worshipDeities, setWorshipDeities] = useState<Record<string, string[]>>({}),
     [namingRows, setNamingRows] = useState<
       Record<string, { name: string; aid: string; custom: string }[]>
@@ -161,6 +165,8 @@ export default function QuickConsultationReply({
   const sectionTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>(
       {},
     ),
+    consultantWarningShown = useRef(false),
+    elementAccentSelectionsRef = useRef<Record<string, string[]>>({}),
     sectionSelections = useRef<Record<string, string[]>>({}),
     sectionRequestVersions = useRef<Record<string, number>>({}),
     deceasedDetails = useRef<
@@ -185,6 +191,10 @@ export default function QuickConsultationReply({
         setAccessToken(x.accessToken || initialAccessToken);
         setDrafts(x.questionReplies || {});
         setSectionDrafts(x.sectionReplies || {});
+        const savedAccents = Object.fromEntries(Object.entries(x.sectionReplies || {}).map(([key, value]) => [key, (value as SectionDraft).accentElementIds || []]));
+        elementAccentSelectionsRef.current = savedAccents;
+        setElementAccentSelections(savedAccents);
+        setSpiritualDetails(Object.fromEntries(Object.entries(x.sectionReplies || {}).map(([key, value]) => [key, (value as SectionDraft).spiritualDetail || ""])));
         sectionSelections.current = Object.fromEntries(
           Object.entries(x.sectionReplies || {}).map(([key, value]) => [
             key,
@@ -735,8 +745,10 @@ export default function QuickConsultationReply({
       const x = await post({
         mode: "compose_section",
         sectionSlotIndex: Number(targetSection.slotIndex),
-        optionIds: Array.from(new Set([...optionIds, ...partner2Ids])),
+        optionIds: Array.from(new Set([...optionIds, ...partner2Ids, ...(elementAccentSelectionsRef.current[targetKey] || [])])),
         partner2OptionIds: partner2Ids,
+        accentElementIds: elementAccentSelectionsRef.current[targetKey] || [],
+        spiritualDetail: spiritualDetails[targetKey] || "",
         locationMode: mode,
         customLocation,
         reincarnatedAs: reincarnatedAs[targetKey] || "",
@@ -794,6 +806,8 @@ export default function QuickConsultationReply({
             phraseIds: x.phraseIds || [],
             answer: [dateLines, x.answer || ""].filter(Boolean).join("\n\n"),
             completed: true,
+            accentElementIds: elementAccentSelectionsRef.current[targetKey] || [],
+            spiritualDetail: spiritualDetails[targetKey] || "",
           },
         }));
       }
@@ -861,7 +875,8 @@ export default function QuickConsultationReply({
     const current =
         sectionSelections.current[sectionKey] || sectionDraft.optionIds,
       selectedOption = pastLifeTopicOptions.find((option) => option.id === id);
-    if (!current.includes(id) && selectedOption?.code.startsWith("past_consultant_") && consultantSelectedElsewhere) {
+    if (!current.includes(id) && selectedOption?.code.startsWith("past_consultant_") && consultantSelectedElsewhere && !consultantWarningShown.current) {
+      consultantWarningShown.current = true;
       const message = `「諮詢者的個性」已在「與${consultantSelectedElsewhere.targetName || "其他對象"}的前世關係」中選擇過。\n\n仍要在這個項目選擇嗎？`;
       if (!window.confirm(message)) return;
     }
@@ -885,6 +900,13 @@ export default function QuickConsultationReply({
       return;
     }
     scheduleSectionCompose(next);
+  }
+  function toggleElementAccent(id: string) {
+    const current = elementAccentSelectionsRef.current[sectionKey] || [],
+      next = current.includes(id) ? current.filter((value) => value !== id) : [...current, id];
+    elementAccentSelectionsRef.current = { ...elementAccentSelectionsRef.current, [sectionKey]: next };
+    setElementAccentSelections((values) => ({ ...values, [sectionKey]: next }));
+    if (sectionDraft.optionIds.length) void composeSection(sectionDraft.optionIds);
   }
   function toggleWorshipDeity(label: string) {
     const current = effectiveWorshipDeities,
@@ -1157,14 +1179,21 @@ export default function QuickConsultationReply({
     setBusy(true);
     setError("");
     try {
-      const manualAnswersFor = (key: string) => Object.entries(manualSectionReplies)
-        .filter(([entryKey]) => entryKey === key || entryKey.startsWith(`manual:${key}:`))
-        .map(([, value]) => value.trim())
-        .filter(Boolean)
-        .join("\n\n");
       await post({
         mode: "write",
         questionReplies: drafts,
+        manualReplies: Object.entries(manualSectionReplies).flatMap(([entryKey, value]) => {
+          const answer = value.trim();
+          if (!answer || !entryKey.startsWith("manual:")) return [];
+          const matchingSection = sections
+            .map((entry) => String(entry.slotIndex))
+            .sort((a, b) => b.length - a.length)
+            .find((key) => entryKey.startsWith(`manual:${key}:`));
+          if (!matchingSection) return [];
+          const rawRemainder = entryKey.slice(`manual:${matchingSection}:`.length),
+            remainder = rawRemainder.replace(/^infant:\d+:/, ""), split = remainder.indexOf(":");
+          return [{ sectionSlotIndex: Number(matchingSection), label: split >= 0 ? remainder.slice(0, split) : remainder, question: split >= 0 ? remainder.slice(split + 1) : remainder, answer }];
+        }),
         sectionReplies: Object.fromEntries(sections.map((entry) => {
           const baseKey = String(entry.slotIndex);
           if (entry.itemCode === "infant-spirit") {
@@ -1176,12 +1205,12 @@ export default function QuickConsultationReply({
               ...baseRow,
               optionIds: rows.flatMap((row) => row.optionIds || []),
               phraseIds: rows.flatMap((row) => row.phraseIds || []),
-              answer: [answers.map((value, index) => `【嬰靈${index + 1}】\n${value}`).join("\n\n"), ...Array.from({ length: count }, (_, index) => manualAnswersFor(index ? `${baseKey}:infant:${index}` : baseKey))].map((value) => value?.trim()).filter(Boolean).join("\n\n"),
+              answer: answers.map((value, index) => `【嬰靈${index + 1}】\n${value}`).join("\n\n"),
               completed: answers.length > 0,
             }];
           }
           const row = sectionDrafts[baseKey] || { optionIds: [], phraseIds: [], answer: "", completed: false };
-          return [baseKey, { ...row, answer: [row.answer, manualAnswersFor(baseKey)].map((value) => value?.trim()).filter(Boolean).join("\n\n") }];
+          return [baseKey, row];
         })),
       });
       setWritten(true);
@@ -2470,6 +2499,23 @@ export default function QuickConsultationReply({
                                     </button>
                                   ))}
                                 </div>
+                                {String(title) === "目前干擾程度" && spiritualLevelOptions.some((option) =>
+                                  option.code !== "spiritual_level_none" && sectionDraft.optionIds.includes(option.id),
+                                ) && (
+                                  <label className="quickReplySpiritualDetail">
+                                    <b>是誰？在哪裡遇到的？</b>
+                                    <textarea
+                                      rows={2}
+                                      value={spiritualDetails[sectionKey] || ""}
+                                      placeholder="例如：有兩男一女，是從醫院跟回來的"
+                                      onChange={(event) => {
+                                        setSpiritualDetails((current) => ({ ...current, [sectionKey]: event.target.value }));
+                                        setWritten(false);
+                                      }}
+                                      onBlur={() => sectionDraft.optionIds.length && void composeSection(sectionDraft.optionIds)}
+                                    />
+                                  </label>
+                                )}
                               </div>
                             ))}
                             {statusOptions.length > 0 && (
@@ -2581,6 +2627,19 @@ export default function QuickConsultationReply({
                                       {sectionDraft.optionIds.includes(
                                         o.id,
                                       ) && <span>✓</span>}
+                                      {o.label}
+                                    </button>
+                                  ))}
+                                </div>
+                                <h5 className="quickReplyElementAccentTitle">帶一點什麼</h5>
+                                <div className="quickReplySpecialChoices quickReplyFiveElements quickReplyElementAccent">
+                                  {elementOptions.map((o) => (
+                                    <button
+                                      key={`accent-${o.id}`}
+                                      className={(elementAccentSelections[sectionKey] || []).includes(o.id) ? "selected" : ""}
+                                      onClick={() => toggleElementAccent(o.id)}
+                                    >
+                                      {(elementAccentSelections[sectionKey] || []).includes(o.id) && <span>✓</span>}
                                       {o.label}
                                     </button>
                                   ))}
