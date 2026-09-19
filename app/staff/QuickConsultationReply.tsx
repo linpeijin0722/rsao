@@ -1205,7 +1205,7 @@ export default function QuickConsultationReply({
               ...baseRow,
               optionIds: rows.flatMap((row) => row.optionIds || []),
               phraseIds: rows.flatMap((row) => row.phraseIds || []),
-              answer: answers.map((value, index) => `【嬰靈${index + 1}】\n${value}`).join("\n\n"),
+              answer: answers.map((value, index) => `＊嬰靈${index + 1}\n${value}`).join("\n\n"),
               completed: answers.length > 0,
             }];
           }
@@ -1245,7 +1245,7 @@ export default function QuickConsultationReply({
     const normalized = questionText.replace(/[？?。.!！\s]/g, "");
     const targetItemCode = scope?.itemCode || section?.itemCode || "";
     const targetProfileName = scope?.profileName || section?.profileName || "";
-    const adviceQuestion = normalized.length >= 2 ? data?.questions.find((entry) => {
+    const adviceQuestion = !allowSectionFallback && normalized.length >= 2 ? data?.questions.find((entry) => {
       const candidate = entry.question.replace(/[？?。.!！\s]/g, "");
       return candidate === normalized && (!targetItemCode || entry.itemCode === targetItemCode) && (!targetProfileName || entry.profileName === targetProfileName);
     }) : undefined;
@@ -1449,14 +1449,8 @@ export default function QuickConsultationReply({
                             <h3>{section.requestLines.length ? "用戶填寫的內容" : "用戶無填寫內容"}</h3>
                             {section.itemCode === "overall-fortune" ? (
                               <div className="quickReplyOverallInputGroups">
-                                {groupOverallRequestLines(section.requestLines).map((group, groupIndex) => {
-                                  const adviceQuestion =
-                                    data.questions.find((entry) =>
-                                      entry.question.includes(group.title),
-                                    ) || data.questions[groupIndex];
-                                  const adviceKey = adviceQuestion
-                                    ? String(adviceQuestion.slotIndex)
-                                    : "";
+                                {groupOverallRequestLines(section.requestLines).map((group) => {
+                                  const replyField = group.fields.at(-1);
                                   return (
                                     <section key={group.title} className="quickReplyOverallInputGroup">
                                       <h4>{group.title}</h4>
@@ -1468,28 +1462,7 @@ export default function QuickConsultationReply({
                                           </div>
                                         ))}
                                       </div>
-                                      {adviceQuestion ? (
-                                        <label className="quickReplyOverallAdviceInput">
-                                          <b>阿嫂回覆</b>
-                                          <textarea
-                                            value={drafts[adviceKey]?.answer || ""}
-                                            placeholder={`請填寫${group.title}的回答`}
-                                            onChange={(event) => {
-                                              const answer = event.target.value;
-                                              setDrafts((current) => ({
-                                                ...current,
-                                                [adviceKey]: {
-                                                  selections: current[adviceKey]?.selections || {},
-                                                  phraseIds: current[adviceKey]?.phraseIds || [],
-                                                  answer,
-                                                  completed: Boolean(answer.trim()),
-                                                },
-                                              }));
-                                              setWritten(false);
-                                            }}
-                                          />
-                                        </label>
-                                      ) : adviceFieldFor("", group.title, true)}
+                                      {adviceFieldFor(replyField?.value || "", replyField?.label || group.title, true)}
                                     </section>
                                   );
                                 })}

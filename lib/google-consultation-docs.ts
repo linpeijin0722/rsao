@@ -607,8 +607,18 @@ export async function upsertQuickConsultationManualReplies(documentId:string,ent
       || pages.find(candidate=>entry.targetName&&candidate.text.includes(entry.targetName));
     if(!page)throw new Error(`找不到「${entry.itemLabel||entry.label}」的諮詢單頁面`);
     let insertOffset=-1;
+    // 畫面欄位名稱與 Google 文件中的題目偶爾不同；用戶實際填寫的文字
+    // 才是最穩定的定位點，因此優先寫在該內容的正下方。
+    if(entry.question){
+      const labelOffset=entry.label?page.text.indexOf(entry.label):-1;
+      const valueOffset=page.text.indexOf(entry.question,Math.max(0,labelOffset));
+      if(valueOffset>=0){
+        const valueNewline=page.text.indexOf("\n",valueOffset+entry.question.length);
+        insertOffset=page.start+(valueNewline>=0?valueNewline+1:valueOffset+entry.question.length);
+      }
+    }
     if(entry.label&&entry.label!=="本項目"){
-      const labelOffset=page.text.indexOf(entry.label);
+      const labelOffset=insertOffset<0?page.text.indexOf(entry.label):-1;
       if(labelOffset>=0){
         const firstNewline=page.text.indexOf("\n",labelOffset),secondNewline=firstNewline>=0?page.text.indexOf("\n",firstNewline+1):-1;
         insertOffset=page.start+(secondNewline>=0?secondNewline+1:firstNewline>=0?firstNewline+1:labelOffset+entry.label.length);
