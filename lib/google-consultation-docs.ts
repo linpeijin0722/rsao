@@ -693,33 +693,45 @@ export async function upsertQuickConsultationSectionReplies(documentId:string,an
 
 export async function upsertPastLifeOverviewReplies(documentId:string,answers:{answer:string;itemCode:string;targetName:string;profileName:string}[]) {
   const values=answers.map(entry=>{
-    const normalized=normalizeConsultationReturnText(entry.answer);
-    const overview=normalized.match(/【綜觀今生】\s*\n?([\s\S]*?)(?=\n\u2060?【[^】]+】|$)/)?.[1] || normalized;
-    const advice=normalized.match(/【兩人相處建議】\s*\n?([\s\S]*?)(?=\n\u2060?【[^】]+】|$)/)?.[1] || "";
+    const normalized=normalizeConsultationReturnText(entry.answer).replace(/\u2060/g,"");
+    const extract=(heading:string)=>{
+      const marker=`【${heading}】`,markerIndex=normalized.indexOf(marker);
+      if(markerIndex<0)return heading==="綜觀今生"?normalized:"";
+      const contentStart=markerIndex+marker.length;
+      const remaining=normalized.slice(contentStart).replace(/^\s*\n?/,"");
+      const nextHeading=remaining.search(/\n【[^】]+】/);
+      return (nextHeading>=0?remaining.slice(0,nextHeading):remaining).trim();
+    };
+    const overview=extract("綜觀今生"),advice=extract("兩人相處建議");
     return {...entry,overview:overview.replace(/\n{2,}/g,"\n").trim(),advice:advice.replace(/\n{2,}/g,"\n").trim()};
   });
   if(!documentId||!values.some(value=>value.overview||value.advice))return;
   const token=await accessToken();
   const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
   const {plain,documentIndexAt}=indexedDocumentText(document);
-  const pageStarts=Array.from(plain.matchAll(/(?:^|\n)項目\s*\d+[^\n]*\n/g)).map(match=>match.index||0);
+  const pageStarts=Array.from(plain.matchAll(/(?:^|\n)項目\s*\d+[^\n]*/g)).map(match=>(match.index||0)+(match[0].startsWith("\n")?1:0));
   const pages=pageStarts.map((start,index)=>({start,end:pageStarts[index+1]??plain.length,text:plain.slice(start,pageStarts[index+1]??plain.length)}));
   const slots:any[]=[];
-  for(const entry of values){
+  for(const [entryIndex,entry] of values.entries()){
     if(!entry.overview&&!entry.advice)continue;
     const page=pages.find(candidate=>entry.itemCode==="past-life-relationship"
       ? candidate.text.includes("前世因果（與他人前世關係）")&&candidate.text.includes(entry.targetName)
-      : candidate.text.includes("前世因果（個人）"));
+      : candidate.text.includes("前世因果（個人）")) || pages[entryIndex];
     if(!page)continue;
     for(const [heading,key] of [["綜觀今生","overview"],["兩人相處建議","advice"]] as const){
       const value=entry[key];
       if(!value)continue;
-      const match=new RegExp(`(?:^|\\n)【${heading}】[^\\n]*\\n`).exec(page.text);
-      if(!match)continue;
-      const startOffset=page.start+(match.index||0)+match[0].length,rest=plain.slice(startOffset,page.end),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:page.end;
-      slots.push({value,startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset)});
+      const marker=`【${heading}】`,headingOffset=page.text.indexOf(marker);
+      if(headingOffset<0)continue;
+      const afterHeading=page.start+headingOffset+marker.length;
+      const newlineOffset=plain.indexOf("\n",afterHeading);
+      const startOffset=newlineOffset>=0&&newlineOffset<page.end?newlineOffset+1:afterHeading;
+      const rest=plain.slice(startOffset,page.end),boundary=rest.search(/\n\s*(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:page.end;
+      slots.push({value,key,targetName:entry.targetName,startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset)});
     }
   }
+  const missingOverview=values.find(entry=>entry.overview&&!slots.some(slot=>slot.key==="overview"&&slot.targetName===entry.targetName));
+  if(missingOverview)throw new Error(`找不到${missingOverview.targetName||"個人項目"}頁面的【綜觀今生】寫入位置`);
   slots.sort((a,b)=>b.startIndex-a.startIndex);
   const requests:any[]=[];
   for(const slot of slots){

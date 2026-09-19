@@ -1144,7 +1144,16 @@ export default function QuickConsultationReply({
       const consultationDocumentUrl = data?.documentUrl ||
         `https://docs.google.com/document/d/${documentId}/edit`;
       // 寫入成功後固定回到同一份諮詢單，讓阿嫂可以立刻繼續編輯。
-      window.location.replace(consultationDocumentUrl);
+      const returnLink = document.createElement("a");
+      returnLink.href = consultationDocumentUrl;
+      returnLink.target = "_self";
+      returnLink.rel = "noopener";
+      document.body.appendChild(returnLink);
+      returnLink.click();
+      window.setTimeout(() => {
+        try { window.top!.location.href = consultationDocumentUrl; }
+        catch { window.location.href = consultationDocumentUrl; }
+      }, 150);
     } catch (e) {
       setError(e instanceof Error ? e.message : "寫入失敗，內容已保留");
       setBusy(false);
