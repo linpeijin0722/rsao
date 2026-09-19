@@ -825,6 +825,17 @@ async function context(bookingNo: string, requestedDocumentId = "") {
             questions = itemCode === "overall-fortune" && focuses.length
               ? focuses.slice(0, 3).map((focus: string) => overallFocusQuestionLabels[focus] || `${focus}建議`)
               : asArray(answer.questions);
+          if (itemCode === "past-life-relationship" && Object.keys(extra.target_questions || {}).length) {
+            return Object.entries(extra.target_questions || {}).flatMap(([targetId, values]) => {
+              const participant = asArray(answer.booking_answer_participants).find((entry: any) => String(entry.profile_id) === String(targetId));
+              const targetProfile = one(participant?.consultation_profiles);
+              const targetPresentation = profilePresentation(targetProfile, ownerNameForQuestions);
+              return asArray(values).map((question: any) => ({
+                question: String(question || "").trim(), itemCode, itemTitle: detail.item_title || "",
+                profileName: clean(targetProfile?.name) || "對方", profileLines: targetPresentation.profileLines,
+              }));
+            });
+          }
           return questions.map((question: any) => ({
             question: String(question || "").trim(),
             itemCode,
@@ -1817,7 +1828,7 @@ export async function POST(request: NextRequest) {
         pronoun = clean(body.genderPronoun) || "祂",
         deity = clean(body.customDeity) || "神佛",
         worshipDeities = asArray(body.worshipDeities).map(clean).filter(Boolean),
-        visitTarget = clean(body.visitTarget) || "親友",
+        visitTarget = clean(body.visitTarget) || (clean(body.locationSubject) === "寶寶" ? "父母" : "親友"),
         customVisitReason = clean(body.customVisitReason),
         vary = (value: string) => {
           const variants: [[RegExp, string, string]] | any = [
@@ -2029,6 +2040,10 @@ export async function POST(request: NextRequest) {
           overallRecent ? `${safeHeading("最近狀況")}\n${overallRecent}` : "",
           overallAdvice ? `${safeHeading("建議")}\n${overallAdvice}` : "",
         ].filter(Boolean).join("\n\n"),
+        healthAnswer = chosen
+          .map((entry: any) => render(entry.content).replace(/[。；;]+$/u, ""))
+          .filter(Boolean)
+          .join("、") + (chosen.length ? "。" : ""),
         answer = loveFormat
           ? [
               selfSentence ? `${safeHeading("本身的個性")}\n${selfSentence}` : "",
@@ -2044,6 +2059,8 @@ export async function POST(request: NextRequest) {
             ].filter(Boolean).join("\n\n")
           : valid.some((selection) => selection.topicCode === "overall")
             ? overallAnswer
+            : valid.some((selection) => selection.topicCode === "health")
+              ? healthAnswer
             : [selfSentence, partnerSentence, ...standardAnswerParts].filter(Boolean).join(" ");
       if (!answer)
         return NextResponse.json(

@@ -509,7 +509,27 @@ export default function QuickConsultationReply({
     };
   })();
   const deceasedLayout = ["deceased", "infant_spirit"].includes(sectionTopic?.code || "");
-  const question = data?.questions[activeQuestion],
+  const questionGroups = useMemo(() => {
+      const groups: { key: string; title: string; questions: Question[] }[] = [];
+      for (const entry of data?.questions || []) {
+        const isPastLife = entry.itemCode.startsWith("past-life-");
+        const key = isPastLife ? `${entry.itemCode}:${entry.profileName || entry.itemTitle}` : `question:${entry.slotIndex}`;
+        const existing = groups.find((group) => group.key === key);
+        if (existing) {
+          existing.questions.push(entry);
+          continue;
+        }
+        const title = entry.itemCode === "past-life-personal"
+          ? "前世因果（個人）｜前三世概略說明+今生個性特質"
+          : entry.itemCode.startsWith("past-life-")
+            ? `前世因果（與他人前世關係）｜${entry.profileName || "對方"}`
+            : entry.itemTitle;
+        groups.push({ key, title, questions: [entry] });
+      }
+      return groups;
+    }, [data?.questions]),
+    questionGroup = questionGroups[activeQuestion],
+    question = questionGroup?.questions[0],
     questionKey = String(question?.slotIndex ?? 0),
     draft = drafts[questionKey] || {
       selections: {},
@@ -579,7 +599,7 @@ export default function QuickConsultationReply({
     deceasedDetail = deceasedDetails.current[sectionKey] || {
       deity: "趙聖帝君",
       customDeity: "",
-      visitTarget: "親友",
+      visitTarget: sectionTopic?.code === "infant_spirit" ? "父母" : "親友",
       customVisitReason: "",
     },
     selectedVisitCode =
@@ -698,7 +718,7 @@ export default function QuickConsultationReply({
                 optionIds.includes(option.id),
               )
               .map((option) => option.label)),
-        visitTarget: deceasedDetails.current[targetKey]?.visitTarget || "親友",
+        visitTarget: deceasedDetails.current[targetKey]?.visitTarget || (targetSection.itemCode === "infant-spirit" ? "父母" : "親友"),
         customVisitReason:
           deceasedDetails.current[targetKey]?.customVisitReason || "",
         locationSubject: targetSection.locationSubject,
@@ -853,7 +873,7 @@ export default function QuickConsultationReply({
     const current = deceasedDetails.current[sectionKey] || {
       deity: "趙聖帝君",
       customDeity: "",
-      visitTarget: "親友",
+      visitTarget: sectionTopic?.code === "infant_spirit" ? "父母" : "親友",
       customVisitReason: "",
     };
     deceasedDetails.current[sectionKey] = { ...current, [field]: value };
@@ -870,7 +890,7 @@ export default function QuickConsultationReply({
     const current = deceasedDetails.current[sectionKey] || {
       deity: "趙聖帝君",
       customDeity: "",
-      visitTarget: "親友",
+      visitTarget: sectionTopic?.code === "infant_spirit" ? "父母" : "親友",
       customVisitReason: "",
     };
     const values = current[field].split("、").filter(Boolean),
@@ -1331,7 +1351,7 @@ export default function QuickConsultationReply({
                       )}
                       {sectionTopic?.code !== "naming_result" && section.itemCode !== "infant-spirit" && (
                           <section className="quickReplyInputCard">
-                            <h3>用戶填寫的內容</h3>
+                            <h3>{section.requestLines.length ? "用戶填寫的內容" : "用戶無填寫內容"}</h3>
                             {section.itemCode === "overall-fortune" ? (
                               <div className="quickReplyOverallInputGroups">
                                 {groupOverallRequestLines(section.requestLines).map((group, groupIndex) => {
@@ -2992,19 +3012,20 @@ export default function QuickConsultationReply({
                   <section className="quickReplyQuestions">
                     <h3>先點選要回答的問題</h3>
                     <div>
-                      {data.questions.map((q, i) => {
-                        const done =
-                          drafts[String(q.slotIndex)]?.completed === true;
-                        return (
-                          <button
-                            key={q.slotIndex}
+                        {questionGroups.map((group, i) => {
+                          const q = group.questions[0];
+                          const done =
+                            drafts[String(q.slotIndex)]?.completed === true;
+                          return (
+                            <button
+                              key={group.key}
                             className={i === activeQuestion ? "selected" : ""}
                             onClick={() => pickTarget("question", i)}
-                          >
-                            <span>{done ? "✓" : `Q${q.questionNumber}`}</span>
-                            <b>
-                              <em>{q.itemTitle}</em>
-                              {q.question}
+                            >
+                              <span>{done ? "✓" : group.questions.length > 1 ? group.questions.length : `Q${q.questionNumber}`}</span>
+                              <b>
+                                <em>{group.title}</em>
+                                {group.questions.length > 1 ? `${group.questions.length} 個問題` : q.question}
                             </b>
                             <small>
                               {done
@@ -3025,6 +3046,14 @@ export default function QuickConsultationReply({
                           <h3>本項目諮詢者資料</h3>
                           {question.profileLines.map((line, index) => (
                             <p key={index}>{line}</p>
+                          ))}
+                        </section>
+                      )}
+                      {questionGroup && question.itemCode.startsWith("past-life-") && (
+                        <section className="quickReplyPastLifeQuestions">
+                          <h3>{questionGroup.title}</h3>
+                          {questionGroup.questions.map((entry, index) => (
+                            <p key={entry.slotIndex}><b>Q{index + 1}</b><span>{entry.question}</span></p>
                           ))}
                         </section>
                       )}
@@ -3105,7 +3134,7 @@ export default function QuickConsultationReply({
                       )}
                       <section className="quickReplyPreview">
                         <div>
-                          <h3>Q{question.questionNumber} 回覆預覽</h3>
+                          <h3>{question.itemCode.startsWith("past-life-") ? `${questionGroup?.title} 回覆` : `Q${question.questionNumber} 回覆預覽`}</h3>
                         </div>
                         {editing || question.manualOnly ? (
                           <textarea

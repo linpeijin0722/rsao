@@ -7,10 +7,27 @@ export async function confirmPayment(fields: Record<string, string>, site: strin
   const { bookingNoFromTradeNo } = await import("@/lib/ecpay");
   const bookingNo = bookingNoFromTradeNo(fields.MerchantTradeNo || "");
   if (!bookingNo) return "";
+  return confirmBookingPayment(
+    bookingNo,
+    String(fields.PaymentType || "").toLowerCase().includes("linepay") ? "line_pay" : String(fields.PaymentType || "").toLowerCase().includes("credit") ? "credit_card" : "transfer",
+    site,
+  );
+}
+
+export async function confirmNewebPayment(bookingNo: string, paymentType: string, site: string) {
+  if (!bookingNo) return "";
+  return confirmBookingPayment(
+    bookingNo,
+    paymentType.toLowerCase().includes("credit") ? "credit_card" : "transfer",
+    site,
+  );
+}
+
+async function confirmBookingPayment(bookingNo: string, paymentMethod: string, site: string) {
   const db = adminSupabase();
   await db.from("bookings").update({
     payment_status: "paid",
-    payment_method: String(fields.PaymentType || "").toLowerCase().includes("linepay") ? "line_pay" : String(fields.PaymentType || "").toLowerCase().includes("credit") ? "credit_card" : "transfer",
+    payment_method: paymentMethod,
     status: "confirmed",
     paid_at: new Date().toISOString(),
   }).eq("booking_no", bookingNo).in("status", ["pending_payment", "confirmed"]);

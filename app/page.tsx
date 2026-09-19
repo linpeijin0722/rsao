@@ -467,7 +467,7 @@ export default function Page() {
         console.error("待付款 Flex 發送失敗",error);
       }
       {
-        const paymentResponse = await fetch("/api/ecpay", {
+        const paymentResponse = await fetch("/api/newebpay", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ bookingNo: j.booking.booking_no }),

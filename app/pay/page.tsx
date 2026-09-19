@@ -19,7 +19,7 @@ export default function PayPage() {
 
   async function forward() {
     setError("");
-    const response = await fetch("/api/ecpay", {
+    const response = await fetch("/api/newebpay", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ bookingNo: order }),
@@ -62,7 +62,7 @@ export default function PayPage() {
   return (
     <main className="payForward">
       <section>
-        <h1>正在前往綠界付款</h1>
+        <h1>正在前往藍新付款</h1>
         {booking && !invalid && <p>跳轉付款頁面中…請稍後</p>}
         {!booking && !error && <p>正在確認訂單，請稍候…</p>}
         {invalid && <p className="payError">此筆訂單已失效，請重新預約。</p>}

@@ -42,7 +42,7 @@ export default function Mine() {
     void load();
   }, []);
   async function pay(no: string) {
-    const r = await fetch("/api/ecpay", {
+    const r = await fetch("/api/newebpay", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ bookingNo: no }),

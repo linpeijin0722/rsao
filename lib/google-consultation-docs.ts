@@ -325,13 +325,6 @@ async function normalizeDocumentHeaderAndFooter(documentId: string, bookingNo: s
         documentId, bookingNo, error: error instanceof Error ? error.message : String(error),
       });
     }
-    try {
-      await insertConsultationReturnButton(documentId, bookingNo, requestOrigin, token);
-    } catch (error) {
-      console.error("[consultation-doc] 回傳諮詢結果圖片按鈕建立失敗", {
-        documentId, bookingNo, error: error instanceof Error ? error.message : String(error),
-      });
-    }
   }
 }
 
@@ -339,21 +332,32 @@ async function insertQuickReplyLink(documentId: string, bookingNo: string, reque
   const origin = requestOrigin.replace(/\/$/, "");
   if (!/^https:\/\//i.test(origin)) throw new Error("建立諮詢回覆連結需要 HTTPS 網址");
   const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
-  const label = "✦ 點這裡建立諮詢回覆";
-  if (documentPlainText(document).includes(label)) return;
+  const quickLabel = "✦ 阿嫂點此快速回覆";
+  const divider = "｜";
+  const returnLabel = "✦回傳諮詢結果";
+  if (documentPlainText(document).includes(quickLabel)) return;
   const replyToken=makeQuickReplyToken(bookingNo,documentId);
   const linkUrl = `${origin}/staff/quick-reply?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}&token=${encodeURIComponent(replyToken)}`;
-  const inserted = `${label}\n`;
+  const returnUrl = `${origin}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}`;
+  const inserted = `${quickLabel}${divider}${returnLabel}\n`;
+  const returnStart = 1 + quickLabel.length + divider.length;
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
     method: "POST",
     body: JSON.stringify({ requests: [
       { insertText: { location: { index: 1 }, text: inserted } },
-      { updateTextStyle: { range: { startIndex: 1, endIndex: 1 + label.length }, textStyle: {
+      { updateTextStyle: { range: { startIndex: 1, endIndex: 1 + quickLabel.length }, textStyle: {
         bold: true,
         fontSize: { magnitude: 15, unit: "PT" },
         foregroundColor: { color: { rgbColor: { red: 1, green: 1, blue: 1 } } },
         backgroundColor: { color: { rgbColor: { red: 0.541, green: 0.188, blue: 0.271 } } },
         link: { url: linkUrl },
+      }, fields: "bold,fontSize,foregroundColor,backgroundColor,link" } },
+      { updateTextStyle: { range: { startIndex: returnStart, endIndex: returnStart + returnLabel.length }, textStyle: {
+        bold: true,
+        fontSize: { magnitude: 15, unit: "PT" },
+        foregroundColor: { color: { rgbColor: { red: 1, green: 1, blue: 1 } } },
+        backgroundColor: { color: { rgbColor: { red: 0.184, green: 0.502, blue: 0.329 } } },
+        link: { url: returnUrl },
       }, fields: "bold,fontSize,foregroundColor,backgroundColor,link" } },
       { updateParagraphStyle: { range: { startIndex: 1, endIndex: 1 + inserted.length }, paragraphStyle: {
         alignment: "CENTER",
@@ -418,7 +422,36 @@ function returnedTimeLabel(value: string) {
 export async function markConsultationResultReturned(documentId: string, requestOrigin: string, returnedAt: string, bookingNo: string) {
   const origin = requestOrigin.replace(/\/$/, "");
   const returnUrl = `${origin}/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}`;
-  await updatePositionedReturnButton({ documentId, imageUrl: `${origin}/consultation-returned-button.png`, returnUrl, returnedAt: returnedTimeLabel(returnedAt).replace(/^上次回傳時間：/, "") });
+  const token = await accessToken();
+  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const { plain, documentIndexAt } = indexedDocumentText(document);
+  const pendingLabel = "✦回傳諮詢結果";
+  const completedLabel = "✦已回傳諮詢結果";
+  const sourceStart = plain.includes(pendingLabel) ? plain.indexOf(pendingLabel) : plain.indexOf(completedLabel);
+  if (sourceStart < 0) return;
+  const lineEnd = plain.indexOf("\n", sourceStart);
+  const sourceEnd = lineEnd < 0 ? sourceStart + (plain.includes(pendingLabel) ? pendingLabel.length : completedLabel.length) : lineEnd;
+  const timeText = returnedTimeLabel(returnedAt).replace(/^上次回傳時間：/, "");
+  const replacement = `${completedLabel} ${timeText}`;
+  const startIndex = documentIndexAt(sourceStart);
+  await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
+    method: "POST",
+    body: JSON.stringify({ requests: [
+      { deleteContentRange: { range: { startIndex, endIndex: documentIndexAt(sourceEnd) } } },
+      { insertText: { location: { index: startIndex }, text: replacement } },
+      { updateTextStyle: { range: { startIndex, endIndex: startIndex + completedLabel.length }, textStyle: {
+        bold: true, fontSize: { magnitude: 15, unit: "PT" },
+        foregroundColor: { color: { rgbColor: { red: 1, green: 1, blue: 1 } } },
+        backgroundColor: { color: { rgbColor: { red: 0.184, green: 0.502, blue: 0.329 } } },
+        link: { url: returnUrl },
+      }, fields: "bold,fontSize,foregroundColor,backgroundColor,link" } },
+      { updateTextStyle: { range: { startIndex: startIndex + completedLabel.length + 1, endIndex: startIndex + replacement.length }, textStyle: {
+        bold: false, fontSize: { magnitude: 11, unit: "PT" },
+        foregroundColor: { color: { rgbColor: { red: 0.45, green: 0.45, blue: 0.45 } } },
+        backgroundColor: { color: { rgbColor: { red: 1, green: 1, blue: 1 } } },
+      }, fields: "bold,fontSize,foregroundColor,backgroundColor" } },
+    ] }),
+  });
 }
 
 export async function moveConsultationDocumentToReturnedFolder(documentId: string) {
