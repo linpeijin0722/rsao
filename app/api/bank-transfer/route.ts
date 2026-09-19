@@ -17,10 +17,11 @@ export async function GET(request:NextRequest){
 export async function POST(request:NextRequest){
   try{
     const lineUid=verifyLineSession((await cookies()).get("line_session")?.value);if(!lineUid)return NextResponse.json({error:"LINE 登入已失效"},{status:401});
-    const body=await request.json(),last5=String(body.last5||"").trim(),amount=Number(body.amount),transferTime=new Date(String(body.transferTime||""));
+    const body=await request.json(),last5=String(body.last5||"").trim(),amount=Number(body.amount),transferDate=String(body.transferDate||"").trim(),transferTime=new Date(`${transferDate}T12:00:00+08:00`);
     if(!/^\d{5}$/.test(last5))return NextResponse.json({error:"請輸入轉出帳號末五碼"},{status:400});
     if(!Number.isFinite(amount)||amount<=0)return NextResponse.json({error:"請輸入實際轉帳金額"},{status:400});
-    if(Number.isNaN(transferTime.getTime()))return NextResponse.json({error:"請輸入轉帳時間"},{status:400});
+    const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(transferDate)||Number.isNaN(transferTime.getTime())||transferDate>today)return NextResponse.json({error:"請選擇正確的轉帳日期"},{status:400});
     const db=adminSupabase(),{data:customer}=await db.from("customers").select("id").eq("line_user_id",lineUid).single();
     const {data:booking}=await db.from("bookings").select("id,total_price,payment_status,status").eq("booking_no",String(body.bookingNo||"")).eq("customer_id",customer?.id||"").single();
     if(!booking)return NextResponse.json({error:"找不到這筆訂單"},{status:404});if(booking.payment_status==="paid")return NextResponse.json({error:"此訂單已付款"},{status:400});
