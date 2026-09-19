@@ -371,12 +371,51 @@ export default function QuickConsultationReply({
     dateJudgmentOptions = sectionTopic?.options.filter((o) => o.code.startsWith("date_judgment_")) || [],
     dateSupportOptions = sectionTopic?.options.filter((o) => o.code.startsWith("date_support_")) || [],
     dateNoticeOptions = sectionTopic?.options.filter((o) => o.code.startsWith("date_notice_")) || [],
+    pastLifeTopicOptions = sectionTopic?.options || [],
     pastLifeOptionGroups = [
-      [`綜觀今生${section?.itemCode === "past-life-relationship" && section.targetName ? `：${section.targetName}` : ""}`, sectionTopic?.options.filter((o) => o.code.startsWith("past_overview_")) || []],
-      [`諮詢者的個性${section?.itemCode === "past-life-relationship" ? `：${data?.customerName || "本人"}` : ""}`, sectionTopic?.options.filter((o) => o.code.startsWith("past_consultant_")) || []],
-      [`對象的個性${section?.itemCode === "past-life-relationship" ? `：${section.targetName || "對象"}` : ""}`, sectionTopic?.options.filter((o) => o.code.startsWith("past_target_")) || []],
-      [`兩人相處建議${section?.itemCode === "past-life-relationship" ? `：${data?.customerName || "本人"}與${section.targetName || "對象"}` : ""}`, sectionTopic?.options.filter((o) => o.code.startsWith("past_relationship_")) || []],
-    ].filter(([title, options]) => (section?.itemCode === "past-life-personal" ? title === "綜觀今生" : true) && (options as Option[]).length) as [string, Option[]][],
+      {
+        key: "overview",
+        title: `綜觀今生${section?.itemCode === "past-life-relationship" && section.targetName ? `：${section.targetName}` : ""}`,
+        subgroups: [
+          ["個性與人生走向", pastLifeTopicOptions.filter((o) => o.code.startsWith("past_overview_") && !["past_overview_blessing", "past_overview_temple"].includes(o.code))],
+          ["建議", pastLifeTopicOptions.filter((o) => ["past_overview_blessing", "past_overview_temple"].includes(o.code))],
+        ],
+      },
+      {
+        key: "consultant",
+        title: `諮詢者的個性：${data?.customerName || "本人"}`,
+        subgroups: [
+          ["優點", pastLifeTopicOptions.filter((o) => o.code.startsWith("past_consultant_pro_"))],
+          ["需要留意的地方", pastLifeTopicOptions.filter((o) => o.code.startsWith("past_consultant_con_"))],
+        ],
+      },
+      {
+        key: "target",
+        title: `對象的個性：${section?.targetName || "對象"}`,
+        subgroups: [
+          ["優點", pastLifeTopicOptions.filter((o) => o.code.startsWith("past_target_pro_"))],
+          ["需要留意的地方", pastLifeTopicOptions.filter((o) => o.code.startsWith("past_target_con_"))],
+        ],
+      },
+      {
+        key: "relationship",
+        title: `兩人相處建議：${data?.customerName || "本人"}與${section?.targetName || "對象"}`,
+        subgroups: [
+          ["溝通與衝突", pastLifeTopicOptions.filter((o) => ["past_relationship_communicate", "past_relationship_stop", "past_relationship_support", "past_relationship_listen", "past_relationship_calm", "past_relationship_no_cold"].includes(o.code))],
+          ["界線與相處", pastLifeTopicOptions.filter((o) => ["past_relationship_boundary", "past_relationship_distance", "past_relationship_respect", "past_relationship_responsibility", "past_relationship_stepback"].includes(o.code))],
+          ["維繫關係", pastLifeTopicOptions.filter((o) => ["past_relationship_appreciate", "past_relationship_trust", "past_relationship_goal", "past_relationship_time", "past_relationship_decide"].includes(o.code))],
+        ],
+      },
+    ].filter((group) =>
+      (section?.itemCode !== "past-life-personal" || group.key === "overview") &&
+      group.subgroups.some(([, options]) => (options as Option[]).length),
+    ) as { key: string; title: string; subgroups: [string, Option[]][] }[],
+    consultantSelectedElsewhere = section?.itemCode === "past-life-relationship"
+      ? sections.find((candidate) => candidate.itemCode === "past-life-relationship" && candidate.slotIndex !== section.slotIndex &&
+          (sectionDrafts[String(candidate.slotIndex)]?.optionIds || []).some((id) =>
+            pastLifeTopicOptions.find((option) => option.id === id)?.code.startsWith("past_consultant_"),
+          ))
+      : undefined,
     bodyOptions =
       sectionTopic?.options.filter((o) => {
         if (!o.code.startsWith("body_")) return false;
@@ -730,7 +769,7 @@ export default function QuickConsultationReply({
           deceasedDetails.current[targetKey]?.customVisitReason || "",
         locationSubject: targetSection.locationSubject,
         genderPronoun: targetSection.genderPronoun,
-        selfName: targetSection.profileName || data?.customerName || "",
+        selfName: data?.customerName || targetSection.profileName || "",
         partnerName: targetSection.targetName || targetSection.profileName || "",
         personalLove: targetIsPersonalLove,
         loveFormat: targetSection.itemCode === "personal-romance" || targetSection.itemCode === "marriage-bazi",
@@ -821,6 +860,12 @@ export default function QuickConsultationReply({
   function toggleOption(id: string) {
     const current =
         sectionSelections.current[sectionKey] || sectionDraft.optionIds,
+      selectedOption = pastLifeTopicOptions.find((option) => option.id === id);
+    if (!current.includes(id) && selectedOption?.code.startsWith("past_consultant_") && consultantSelectedElsewhere) {
+      const message = `「諮詢者的個性」已在「與${consultantSelectedElsewhere.targetName || "其他對象"}的前世關係」中選擇過。\n\n仍要在這個項目選擇嗎？`;
+      if (!window.confirm(message)) return;
+    }
+    const
       next = current.includes(id)
         ? current.filter((x) => x !== id)
         : [...current, id];
@@ -2754,12 +2799,25 @@ export default function QuickConsultationReply({
                                 </div>
                               </div>
                             ))}
-                            {sectionTopic?.code === "past_life" && pastLifeOptionGroups.map(([title, options], groupIndex) => (
-                              <div className="quickReplySpecialField quickReplyPastLifeGroup" key={title}>
-                                <div className="quickReplySpecialHeading"><span>{groupIndex + 1}</span><div><h4>{title}</h4></div></div>
-                                <div className="quickReplySpecialChoices">
-                                  {options.map((o) => <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>{sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}</button>)}
+                            {sectionTopic?.code === "past_life" && pastLifeOptionGroups.map((group, groupIndex) => (
+                              <div className="quickReplySpecialField quickReplyPastLifeGroup" key={group.key}>
+                                <div className="quickReplySpecialHeading">
+                                  <span>{groupIndex + 1}</span>
+                                  <div>
+                                    <h4>{group.title}</h4>
+                                    {group.key === "consultant" && consultantSelectedElsewhere && (
+                                      <small className="quickReplyPastLifeNotice">已在「與{consultantSelectedElsewhere.targetName || "其他對象"}的前世關係」中選擇過</small>
+                                    )}
+                                  </div>
                                 </div>
+                                {group.subgroups.map(([subtitle, options]) => (
+                                  <div className="quickReplyPastLifeSubgroup" key={subtitle}>
+                                    <h5>{subtitle}</h5>
+                                    <div className="quickReplySpecialChoices">
+                                      {options.map((o) => <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>{sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}</button>)}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             ))}
                             {buddhistOptions.length > 0 && (
