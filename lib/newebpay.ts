@@ -38,3 +38,16 @@ export function tradeSha(tradeInfo: string, key: string, iv: string) {
     .digest("hex")
     .toUpperCase();
 }
+
+/** 藍新只接受英數字與底線；本站預約編號中的連字號必須先轉換。 */
+export function newebpayMerchantOrderNo(bookingNo: string) {
+  const value = bookingNo.trim().replace(/-/g, "_").replace(/[^A-Za-z0-9_]/g, "");
+  if (!value || value.length > 30)
+    throw new Error("訂單編號無法轉換成藍新接受的格式");
+  return value;
+}
+
+/** 將藍新回傳的商店訂單編號還原成本站預約編號。 */
+export function bookingNoFromNewebpayOrderNo(merchantOrderNo: string) {
+  return merchantOrderNo.trim().replace(/_/g, "-");
+}

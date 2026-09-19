@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { decryptTradeInfo, newebpayConfig, tradeSha } from "@/lib/newebpay";
+import { bookingNoFromNewebpayOrderNo, decryptTradeInfo, newebpayConfig, tradeSha } from "@/lib/newebpay";
 import { confirmNewebPayment } from "@/lib/payment-confirm";
 
 export async function POST(request: NextRequest) {
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     const bookingNo = payload?.Result?.MerchantOrderNo;
     if (payload?.Status === "SUCCESS" && bookingNo) {
       await confirmNewebPayment(
-        String(bookingNo),
+        bookingNoFromNewebpayOrderNo(String(bookingNo)),
         String(payload?.Result?.PaymentType || ""),
         process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin,
       );

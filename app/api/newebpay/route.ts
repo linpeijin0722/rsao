@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyLineSession } from "@/lib/line-session";
 import { adminSupabase } from "@/lib/supabase";
-import { encryptTradeInfo, newebpayConfig, tradeSha } from "@/lib/newebpay";
+import { encryptTradeInfo, newebpayConfig, newebpayMerchantOrderNo, tradeSha } from "@/lib/newebpay";
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       RespondType: "JSON",
       TimeStamp: String(Math.floor(Date.now() / 1000)),
       Version: "2.0",
-      MerchantOrderNo: booking.booking_no,
+      MerchantOrderNo: newebpayMerchantOrderNo(booking.booking_no),
       Amt: String(booking.total_price),
       ItemDesc: "林阿嫂線上諮詢預約",
       ReturnURL: `${origin}/api/newebpay/return`,
