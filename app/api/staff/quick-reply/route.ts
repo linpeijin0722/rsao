@@ -2316,7 +2316,12 @@ export async function POST(request: NextRequest) {
       );
     const pastLifeOverviewAnswers = data.sectionSlots
       .filter((slot: any) => slot.itemCode.startsWith("past-life-"))
-      .map((slot: any) => sectionAnswers[String(slot.slotIndex)] || "");
+      .map((slot: any) => ({
+        answer: sectionAnswers[String(slot.slotIndex)] || "",
+        itemCode: slot.itemCode,
+        targetName: slot.targetName || "",
+        profileName: slot.profileName || "",
+      }));
     const regularSectionAnswers = Object.fromEntries(
       Object.entries(sectionAnswers).filter(([index]) =>
         !String(data.sectionSlots.find((slot: any) => String(slot.slotIndex) === String(index))?.itemCode || "").startsWith("past-life-"),
@@ -2327,7 +2332,7 @@ export async function POST(request: NextRequest) {
         data.documentDetail.google_document_id,
         regularSectionAnswers,
       );
-    if (pastLifeOverviewAnswers.some(Boolean))
+    if (pastLifeOverviewAnswers.some((entry: any) => entry.answer))
       await upsertPastLifeOverviewReplies(
         data.documentDetail.google_document_id,
         pastLifeOverviewAnswers,

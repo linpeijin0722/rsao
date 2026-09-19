@@ -372,10 +372,10 @@ export default function QuickConsultationReply({
     dateSupportOptions = sectionTopic?.options.filter((o) => o.code.startsWith("date_support_")) || [],
     dateNoticeOptions = sectionTopic?.options.filter((o) => o.code.startsWith("date_notice_")) || [],
     pastLifeOptionGroups = [
-      ["綜觀今生", sectionTopic?.options.filter((o) => o.code.startsWith("past_overview_")) || []],
-      ["諮詢者的個性", sectionTopic?.options.filter((o) => o.code.startsWith("past_consultant_")) || []],
-      ["對象的個性", sectionTopic?.options.filter((o) => o.code.startsWith("past_target_")) || []],
-      ["兩人相處建議", sectionTopic?.options.filter((o) => o.code.startsWith("past_relationship_")) || []],
+      [`綜觀今生${section?.itemCode === "past-life-relationship" && section.targetName ? `：${section.targetName}` : ""}`, sectionTopic?.options.filter((o) => o.code.startsWith("past_overview_")) || []],
+      [`諮詢者的個性${section?.itemCode === "past-life-relationship" ? `：${data?.customerName || "本人"}` : ""}`, sectionTopic?.options.filter((o) => o.code.startsWith("past_consultant_")) || []],
+      [`對象的個性${section?.itemCode === "past-life-relationship" ? `：${section.targetName || "對象"}` : ""}`, sectionTopic?.options.filter((o) => o.code.startsWith("past_target_")) || []],
+      [`兩人相處建議${section?.itemCode === "past-life-relationship" ? `：${data?.customerName || "本人"}與${section.targetName || "對象"}` : ""}`, sectionTopic?.options.filter((o) => o.code.startsWith("past_relationship_")) || []],
     ].filter(([title, options]) => (section?.itemCode === "past-life-personal" ? title === "綜觀今生" : true) && (options as Option[]).length) as [string, Option[]][],
     bodyOptions =
       sectionTopic?.options.filter((o) => {
@@ -1141,10 +1141,10 @@ export default function QuickConsultationReply({
       });
       setWritten(true);
       setEditing(false);
-      window.location.assign(
-        data?.documentUrl ||
-          `https://docs.google.com/document/d/${documentId}/edit`,
-      );
+      const consultationDocumentUrl = data?.documentUrl ||
+        `https://docs.google.com/document/d/${documentId}/edit`;
+      // 寫入成功後固定回到同一份諮詢單，讓阿嫂可以立刻繼續編輯。
+      window.location.replace(consultationDocumentUrl);
     } catch (e) {
       setError(e instanceof Error ? e.message : "寫入失敗，內容已保留");
       setBusy(false);
