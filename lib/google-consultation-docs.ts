@@ -736,7 +736,10 @@ export async function upsertQuickConsultationQuestionReplies(documentId:string,a
   const slots=Array.from(plain.matchAll(answerPattern)).map((match,slotIndex)=>{
     const whole=match[0],leading=whole.startsWith("\n")?1:0,colonOffset=whole.search(/[:：]/),value=normalizeConsultationReturnText(String(answers[String(slotIndex)]||""));
     const lineOffset=(match.index||0)+leading,startOffset=(match.index||0)+colonOffset+1,endOffset=(match.index||0)+whole.length;
-    return {slotIndex,value,startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset),lineStart:documentIndexAt(lineOffset)};
+    const beforeAnswer=plain.slice(0,lineOffset),staleMatch=/(?:^|\n)(阿嫂回覆\s*[:：][^\n]*)\n(?:[ \t\u00a0]*\n)*$/u.exec(beforeAnswer);
+    const staleTextOffset=staleMatch?beforeAnswer.lastIndexOf(staleMatch[1]): -1;
+    const staleManual=staleTextOffset>=0?{startIndex:documentIndexAt(staleTextOffset),endIndex:documentIndexAt(staleTextOffset+staleMatch![1].length)}:null;
+    return {slotIndex,value,startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset),lineStart:documentIndexAt(lineOffset),staleManual};
   }).filter(slot=>slot.value).sort((a,b)=>b.startIndex-a.startIndex);
   if(!slots.length)throw new Error("找不到可寫入的 A1、A2 回答位置");
   const requests:any[]=[];
@@ -744,6 +747,9 @@ export async function upsertQuickConsultationQuestionReplies(documentId:string,a
     if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
     requests.push({insertText:{location:{index:slot.startIndex},text:slot.value}});
     requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+    // 舊版曾把已有 Qn 的回答誤寫成「阿嫂回覆：」。先完成 An 更新，
+    // 再刪除前一行的舊文字，避免舊、新答案同時留在文件中。
+    if(slot.staleManual&&slot.staleManual.endIndex>slot.staleManual.startIndex)requests.push({deleteContentRange:{range:slot.staleManual}});
   }
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }

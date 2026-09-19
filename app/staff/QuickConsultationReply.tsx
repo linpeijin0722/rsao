@@ -1245,7 +1245,9 @@ export default function QuickConsultationReply({
     const normalized = questionText.replace(/[？?。.!！\s]/g, "");
     const targetItemCode = scope?.itemCode || section?.itemCode || "";
     const targetProfileName = scope?.profileName || section?.profileName || "";
-    const adviceQuestion = !allowSectionFallback && normalized.length >= 2 ? data?.questions.find((entry) => {
+    // 只要能對到既有 Qn，就直接更新 An；完全找不到 Qn 時，才建立
+    // 「阿嫂回覆：」的自由回覆，交由回傳流程接續編成新的 Q&A。
+    const adviceQuestion = normalized.length >= 2 ? data?.questions.find((entry) => {
       const candidate = entry.question.replace(/[？?。.!！\s]/g, "");
       return candidate === normalized && (!targetItemCode || entry.itemCode === targetItemCode) && (!targetProfileName || entry.profileName === targetProfileName);
     }) : undefined;
