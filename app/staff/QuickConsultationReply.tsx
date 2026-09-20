@@ -77,6 +77,25 @@ type SectionDraft = {
   accentElementIds?: string[];
   spiritualDetail?: string;
 };
+type DateResultRow = {
+  date: string;
+  verdict: string;
+  timeChoice: string;
+  timeVerdict: string;
+};
+const emptyDateResultRow = (): DateResultRow => ({
+  date: "",
+  verdict: "",
+  timeChoice: "",
+  timeVerdict: "",
+});
+const dateResultLine = (row: DateResultRow, index: number) => {
+  if (!row.date.trim()) return "";
+  const time = row.timeChoice
+    ? `｜${row.timeVerdict === "避開" ? "避開時辰" : "推薦時辰"}：${row.timeChoice}${row.timeVerdict ? `（${row.timeVerdict}）` : ""}`
+    : "";
+  return `第${index + 1}組：${row.date.trim()}${row.verdict ? `｜${row.verdict}` : ""}${time}`;
+};
 type ReplyData = {
   bookingNo: string;
   customerName: string;
@@ -129,7 +148,7 @@ export default function QuickConsultationReply({
     [reincarnatedPlace, setReincarnatedPlace] = useState<Record<string, string>>({}),
     [reincarnatedAge, setReincarnatedAge] = useState<Record<string, string>>({}),
     [infantYears, setInfantYears] = useState<Record<string, string>>({}),
-    [dateResultRows, setDateResultRows] = useState<Record<string, { date: string; verdict: string }[]>>({}),
+    [dateResultRows, setDateResultRows] = useState<Record<string, DateResultRow[]>>({}),
     [partner2Enabled, setPartner2Enabled] = useState<Record<string, boolean>>({}),
     [partner2Selections, setPartner2Selections] = useState<Record<string, string[]>>({}),
     [romanceAges, setRomanceAges] = useState<Record<string, string[]>>({}),
@@ -795,7 +814,7 @@ export default function QuickConsultationReply({
       ) {
         const dateLines = targetSection.itemCode === "date-time-selection"
           ? (dateResultRows[targetKey] || [])
-              .map((row, index) => row.date.trim() ? `第${index + 1}組：${row.date.trim()}${row.verdict ? `｜${row.verdict}` : ""}` : "")
+              .map(dateResultLine)
               .filter(Boolean)
               .join("\n")
           : "";
@@ -1339,7 +1358,7 @@ export default function QuickConsultationReply({
   const applyDateResult = () => {
     if (!section || section.itemCode !== "date-time-selection") return;
     const dateLines = (dateResultRows[sectionKey] || [])
-      .map((row, index) => row.date.trim() ? `第${index + 1}組：${row.date.trim()}${row.verdict ? `｜${row.verdict}` : ""}` : "")
+      .map(dateResultLine)
       .filter(Boolean)
       .join("\n");
     if (!dateLines) return window.alert("請至少填寫一組日期");
@@ -1607,30 +1626,38 @@ export default function QuickConsultationReply({
                             </h3>
                             {sectionTopic.code === "date_result" && (
                               <div className="quickReplyDateResult">
-                                <h4>請填寫{section.dateResultCount === 6 ? "六" : "三"}組日期</h4>
+                                <div className="quickReplyDateHeading">
+                                  <span>良辰吉日</span>
+                                  <div>
+                                    <h4>請填寫{section.dateResultCount === 6 ? "六" : "三"}組日期</h4>
+                                    <p>每一組可分別判斷日期，並指定推薦或應避開的時辰。</p>
+                                  </div>
+                                </div>
                                 <div className="quickReplyDateRows">
                                   {Array.from({ length: section.dateResultCount || 3 }, (_, index) => {
                                     const rows = dateResultRows[sectionKey] || [];
-                                    const row = rows[index] || { date: "", verdict: "" };
+                                    const row = rows[index] || emptyDateResultRow();
+                                    const updateRow = (changes: Partial<DateResultRow>) => setDateResultRows((current) => {
+                                      const next = [...(current[sectionKey] || [])];
+                                      next[index] = { ...emptyDateResultRow(), ...row, ...changes };
+                                      return { ...current, [sectionKey]: next };
+                                    });
                                     return (
-                                      <div key={index}>
-                                        <b>{index + 1}</b>
-                                        <input
-                                          type="text"
-                                          placeholder="請輸入日期，例如：10月8日"
-                                          value={row.date}
-                                          onChange={(event) => setDateResultRows((current) => {
-                                            const next = [...(current[sectionKey] || [])];
-                                            next[index] = { ...row, date: event.target.value };
-                                            return { ...current, [sectionKey]: next };
-                                          })}
-                                        />
-                                        <input type="text" list="date-verdict-options" placeholder="請輸入判斷" value={row.verdict} onChange={(event) => setDateResultRows((current) => {
-                                          const next = [...(current[sectionKey] || [])];
-                                          next[index] = { ...row, verdict: event.target.value };
-                                          return { ...current, [sectionKey]: next };
-                                        })} />
-                                      </div>
+                                      <article className="quickReplyDateCard" key={index}>
+                                        <header><b>{index + 1}</b><strong>第 {index + 1} 組</strong></header>
+                                        <div className="quickReplyDateMainFields">
+                                          <label><span>日期</span><input type="text" placeholder="例如：10月8日" value={row.date} onChange={(event) => updateRow({ date: event.target.value })}/></label>
+                                          <label><span>日期判斷</span><input type="text" list="date-verdict-options" placeholder="選擇或自行輸入" value={row.verdict} onChange={(event) => updateRow({ verdict: event.target.value })}/></label>
+                                        </div>
+                                        <div className="quickReplyDateTimeFields">
+                                          <div className="quickReplyDateTimeTitle"><span>時</span><div><strong>推薦／避開時辰</strong><small>可選上午、下午或傳統時辰</small></div></div>
+                                          <label><span>時段</span><select value={row.timeChoice} onChange={(event) => updateRow({ timeChoice: event.target.value })}>
+                                            <option value="">不指定時辰</option><option>上午</option><option>下午</option>
+                                            <option>子時（23:00–01:00）</option><option>丑時（01:00–03:00）</option><option>寅時（03:00–05:00）</option><option>卯時（05:00–07:00）</option><option>辰時（07:00–09:00）</option><option>巳時（09:00–11:00）</option><option>午時（11:00–13:00）</option><option>未時（13:00–15:00）</option><option>申時（15:00–17:00）</option><option>酉時（17:00–19:00）</option><option>戌時（19:00–21:00）</option><option>亥時（21:00–23:00）</option>
+                                          </select></label>
+                                          <label><span>吉凶</span><select value={row.timeVerdict} disabled={!row.timeChoice} onChange={(event) => updateRow({ timeVerdict: event.target.value })}><option value="">請選擇</option><option>吉時</option><option>可用</option><option>避開</option></select></label>
+                                        </div>
+                                      </article>
                                     );
                                   })}
                                 </div>
@@ -2999,7 +3026,7 @@ export default function QuickConsultationReply({
                                 </div>
                               </div>
                             )}
-                            {(standardOptions.length > 0 ||
+                            {sectionTopic.code !== "date_result" && (standardOptions.length > 0 ||
                               remainingLoveOtherOptions.length > 0) && (
                               <div className="quickReplySpecialField quickReplyOtherField">
                                 <div className="quickReplySpecialHeading">
