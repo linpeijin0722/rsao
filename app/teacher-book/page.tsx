@@ -28,7 +28,7 @@ export default function TeacherBookPage() {
           <p>老師的書購買通路如下，您可以選擇方便的平台前往查看。</p>
         </div>
 
-        <nav className="teacherBookStores" aria-label="書籍購買通路">
+        <div className="teacherBookStores" role="navigation" aria-label="書籍購買通路">
           {stores.map((store, index) => (
             <a href={store.url} target="_blank" rel="noopener noreferrer" key={store.name}>
               <span className="teacherBookStoreNumber">{String(index + 1).padStart(2, "0")}</span>
@@ -39,12 +39,12 @@ export default function TeacherBookPage() {
               <span className="teacherBookArrow" aria-hidden="true">前往 →</span>
             </a>
           ))}
-        </nav>
+        </div>
 
-        <footer className="teacherBookFooter">
+        <div className="teacherBookFooter">
           <p>請以各購書平台顯示的庫存與售價為準</p>
           <strong>謝謝您的支持</strong>
-        </footer>
+        </div>
       </section>
     </main>
   );
