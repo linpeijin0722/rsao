@@ -21,10 +21,15 @@ function scheduleLabel(date:string,time:string){
   const week=get("weekday").replace("週","").replace("星期","");
   return `${get("month")}/${get("day")}(${week})${get("dayPeriod")}${get("hour")}:${get("minute")}`;
 }
+function defaultPolishStyle(title:string){
+  if(/擇日|擇時|運勢|流年/.test(title))return "folk";
+  if(/前世|嬰靈|過世|往生|寵物|感情|合婚|健康|身體/.test(title))return "caring";
+  return "warm";
+}
 
 export default function ConsultationReturnPage(){
   const defaults=useMemo(taipeiDefaults,[]);
-  const [data,setData]=useState<Preview|null>(null),[error,setError]=useState(""),[loading,setLoading]=useState(true),[active,setActive]=useState(0),[selected,setSelected]=useState<number[]>([]),[choiceOpen,setChoiceOpen]=useState(false),[scheduleOpen,setScheduleOpen]=useState(false),[confirmMode,setConfirmMode]=useState<SendMode|null>(null),[editConfirm,setEditConfirm]=useState(false),[skipConfirm,setSkipConfirm]=useState(false),[skipCarousel,setSkipCarousel]=useState(false),[editing,setEditing]=useState(false),[drafts,setDrafts]=useState<Record<number,string>>({}),[sending,setSending]=useState(false),[completed,setCompleted]=useState<SendMode|null>(null),[scheduleDateValue,setScheduleDateValue]=useState(defaults.date),[scheduleTimeValue,setScheduleTimeValue]=useState(defaults.time);
+  const [data,setData]=useState<Preview|null>(null),[error,setError]=useState(""),[loading,setLoading]=useState(true),[active,setActive]=useState(0),[selected,setSelected]=useState<number[]>([]),[choiceOpen,setChoiceOpen]=useState(false),[scheduleOpen,setScheduleOpen]=useState(false),[confirmMode,setConfirmMode]=useState<SendMode|null>(null),[editConfirm,setEditConfirm]=useState(false),[skipConfirm,setSkipConfirm]=useState(false),[skipCarousel,setSkipCarousel]=useState(false),[editing,setEditing]=useState(false),[drafts,setDrafts]=useState<Record<number,string>>({}),[sending,setSending]=useState(false),[completed,setCompleted]=useState<SendMode|null>(null),[scheduleDateValue,setScheduleDateValue]=useState(defaults.date),[scheduleTimeValue,setScheduleTimeValue]=useState(defaults.time),[polishing,setPolishing]=useState(false),[polishStyles,setPolishStyles]=useState<Record<number,string>>({});
   const editorRef=useRef<HTMLTextAreaElement|null>(null);
   const selectedSet=useMemo(()=>new Set(selected),[selected]);
   const selectedItems=useMemo(()=>data?.items.filter(entry=>selectedSet.has(entry.index))||[],[data,selectedSet]);
@@ -57,6 +62,19 @@ export default function ConsultationReturnPage(){
       setConfirmMode(null);setCompleted(mode);
     }catch(err){alert(err instanceof Error?err.message:"回傳失敗")}finally{setSending(false)}
   }
+  async function polishCurrent(){
+    if(!item||polishing)return;
+    const content=drafts[item.index]??item.content;
+    const style=polishStyles[item.index]||defaultPolishStyle(item.itemTitle);
+    setPolishing(true);
+    try{
+      const response=await fetch("/api/staff/consultation-return/polish",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({itemTitle:item.itemTitle,content,style})});
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.error||"AI 潤飾失敗");
+      setDrafts(current=>({...current,[item.index]:normalizeDraft(result.polished)}));
+      setEditing(false);
+    }catch(err){alert(err instanceof Error?err.message:"AI 潤飾失敗")}finally{setPolishing(false)}
+  }
 
   if(loading)return <main className="returnResultPage"><div className="returnResultCard returnResultStatus">正在讀取 Google 諮詢單…</div></main>;
   if(error)return <main className="returnResultPage"><div className="returnResultCard returnResultStatus"><h1>無法開啟回傳頁面</h1><p>{error}</p><a href="/staff">回預約後台</a></div></main>;
@@ -65,7 +83,7 @@ export default function ConsultationReturnPage(){
   return <main className="returnResultPage"><h1 className="returnResultPageTitle">回傳諮詢結果</h1><section className="returnResultCard">
     <header className="returnResultHeader"><div className="returnResultCustomerRow"><button className="returnResultLineProfile" onClick={()=>void openLineCustomer()} title="開啟 LINE 後台並複製 LINE 名稱">{data.linePictureUrl?<img src={data.linePictureUrl} alt="LINE 頭像"/>:<span>LINE</span>}<b>{data.lineDisplayName||"LINE 用戶"}</b></button><div className="returnResultIdentity"><h1>{data.customerName}</h1><p>訂單編號：{data.bookingNo}</p></div></div><a className="returnResultEditLink" href={data.documentUrl}>返回 Google 文件編輯</a></header>
     {completed?<div className="returnResultSuccess"><div>{completed==="scheduled"?"◷":"✓"}</div><h2>{completed==="scheduled"?"諮詢結果已完成排程":"諮詢結果已回傳 LINE"}</h2><p>{completed==="scheduled"?`訊息將於 ${scheduledLabel} 自動傳送。`:"已完成傳送。你可以回 Google 文件繼續編輯。"}</p><a href={data.documentUrl}>返回 Google 文件</a></div>:<><div className="returnResultSelect"><div className="returnResultSelectHeading"><b>選擇要回傳的項目</b><span><button onClick={()=>setSelected(data.items.map(entry=>entry.index))}>全部選取</button><button onClick={()=>setSelected([])}>全部取消</button></span></div><div>{data.items.map(entry=><label key={entry.index} className={selectedSet.has(entry.index)?"selected":""}><input type="checkbox" checked={selectedSet.has(entry.index)} onChange={()=>toggle(entry.index)}/><span>{entry.index}</span><strong>{entry.itemTitle}</strong></label>)}</div></div>
-      {item&&<><div className="returnResultPager"><button disabled={active===0} onClick={()=>{setEditing(false);setActive(value=>Math.max(0,value-1))}}>‹</button><div><small>預覽 {active+1} / {selectedItems.length}</small><h2>項目 {item.index}｜{item.itemTitle}</h2></div><button disabled={active===selectedItems.length-1} onClick={()=>{setEditing(false);setActive(value=>Math.min(selectedItems.length-1,value+1))}}>›</button></div><article className="returnResultPreview" tabIndex={0} onDoubleClick={()=>!editing&&setEditConfirm(true)}><div className="returnResultPreviewTitle"><span>LINE 將回傳以下內容</span><em>{editing?"編輯中，點框外完成":"按 Enter 可編輯"}</em></div>{editing?<textarea ref={editorRef} value={drafts[item.index]??item.content} onChange={event=>setDrafts(current=>({...current,[item.index]:event.target.value}))} onBlur={()=>{setDrafts(current=>({...current,[item.index]:normalizeDraft(current[item.index]??item.content)}));setEditing(false)}}/>:<pre>{drafts[item.index]??item.content}</pre>}</article></>}
+      {item&&<><div className="returnResultPager"><button disabled={active===0} onClick={()=>{setEditing(false);setActive(value=>Math.max(0,value-1))}}>‹</button><div><small>預覽 {active+1} / {selectedItems.length}</small><h2>項目 {item.index}｜{item.itemTitle}</h2></div><button disabled={active===selectedItems.length-1} onClick={()=>{setEditing(false);setActive(value=>Math.min(selectedItems.length-1,value+1))}}>›</button></div><article className="returnResultPreview" tabIndex={0} onDoubleClick={()=>!editing&&setEditConfirm(true)}><div className="returnResultPreviewTitle"><span>LINE 將回傳以下內容</span><div className="returnResultPolishTools" onDoubleClick={event=>event.stopPropagation()}><label>潤飾語法<select value={polishStyles[item.index]||defaultPolishStyle(item.itemTitle)} onChange={event=>setPolishStyles(current=>({...current,[item.index]:event.target.value}))}><option value="warm">溫和親切</option><option value="direct">清楚直接</option><option value="folk">民俗命理</option><option value="concise">精簡重點</option><option value="caring">安撫關懷</option><option value="auto">依項目自動</option></select></label><button type="button" disabled={polishing} onClick={()=>void polishCurrent()} title="快速 AI 潤飾">{polishing?"潤飾中…":"✦ AI 潤飾"}</button></div><em>{editing?"編輯中，點框外完成":"按 Enter 可編輯"}</em></div>{editing?<textarea ref={editorRef} value={drafts[item.index]??item.content} onChange={event=>setDrafts(current=>({...current,[item.index]:event.target.value}))} onBlur={()=>{setDrafts(current=>({...current,[item.index]:normalizeDraft(current[item.index]??item.content)}));setEditing(false)}}/>:<pre>{drafts[item.index]??item.content}</pre>}</article></>}
       <footer className="returnResultFooter"><button className={`skipCarouselButton ${skipCarousel?"selected":""}`} onClick={()=>skipCarousel?setSkipCarousel(false):setSkipConfirm(true)}><span>{skipCarousel?"✓ 這次不回傳輪播訊息":"這次不要回傳輪播訊息"}</span>{skipCarousel&&<small>已勾選，只傳送文字結果</small>}</button><button className="returnSendButton" disabled={!selected.length} onClick={()=>setChoiceOpen(true)}><span>確認傳送（{selected.length} 項）</span>{returnedTime&&<small>上次回傳時間：{returnedTime}</small>}</button></footer></>}
   </section>
   {editConfirm&&<div className="returnConfirmBackdrop" onClick={()=>setEditConfirm(false)}><div className="returnConfirmModal returnEditConfirm" onClick={event=>event.stopPropagation()}><span>編輯確認</span><h2>確定要編輯這項回傳內容？</h2><p>編輯後，LINE 將傳送你修改過的版本，不會改動原本的 Google 文件。</p><div className="returnConfirmActions"><button onClick={()=>setEditConfirm(false)}>取消</button><button onClick={()=>{setEditConfirm(false);setEditing(true)}}>開始編輯</button></div></div></div>}

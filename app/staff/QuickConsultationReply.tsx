@@ -80,21 +80,14 @@ type SectionDraft = {
 type DateResultRow = {
   date: string;
   verdict: string;
-  timeChoice: string;
-  timeVerdict: string;
 };
 const emptyDateResultRow = (): DateResultRow => ({
   date: "",
   verdict: "",
-  timeChoice: "",
-  timeVerdict: "",
 });
 const dateResultLine = (row: DateResultRow, index: number) => {
   if (!row.date.trim()) return "";
-  const time = row.timeChoice
-    ? `｜${row.timeVerdict === "避開" ? "避開時辰" : "推薦時辰"}：${row.timeChoice}${row.timeVerdict ? `（${row.timeVerdict}）` : ""}`
-    : "";
-  return `第${index + 1}組：${row.date.trim()}${row.verdict ? `｜${row.verdict}` : ""}${time}`;
+  return `第${index + 1}組：${row.date.trim()}${row.verdict ? `｜${row.verdict}` : ""}`;
 };
 type ReplyData = {
   bookingNo: string;
@@ -149,6 +142,7 @@ export default function QuickConsultationReply({
     [reincarnatedAge, setReincarnatedAge] = useState<Record<string, string>>({}),
     [infantYears, setInfantYears] = useState<Record<string, string>>({}),
     [dateResultRows, setDateResultRows] = useState<Record<string, DateResultRow[]>>({}),
+    [dateTimeSupplements, setDateTimeSupplements] = useState<Record<string, { timeChoice: string; timeVerdict: string }>>({}),
     [partner2Enabled, setPartner2Enabled] = useState<Record<string, boolean>>({}),
     [partner2Selections, setPartner2Selections] = useState<Record<string, string[]>>({}),
     [romanceAges, setRomanceAges] = useState<Record<string, string[]>>({}),
@@ -818,12 +812,15 @@ export default function QuickConsultationReply({
               .filter(Boolean)
               .join("\n")
           : "";
+        const timeSupplement = targetSection.itemCode === "date-time-selection" && dateTimeSupplements[targetKey]?.timeChoice
+          ? `${dateTimeSupplements[targetKey].timeVerdict === "避開" ? "避開時辰" : "推薦時辰"}：${dateTimeSupplements[targetKey].timeChoice}${dateTimeSupplements[targetKey].timeVerdict ? `（${dateTimeSupplements[targetKey].timeVerdict}）` : ""}`
+          : "";
         setSectionDrafts((c) => ({
           ...c,
           [targetKey]: {
             optionIds,
             phraseIds: x.phraseIds || [],
-            answer: [dateLines, x.answer || ""].filter(Boolean).join("\n\n"),
+            answer: [dateLines, timeSupplement, x.answer || ""].filter(Boolean).join("\n\n"),
             completed: true,
             accentElementIds: elementAccentSelectionsRef.current[targetKey] || [],
             spiritualDetail: spiritualDetails[targetKey] || "",
@@ -1362,10 +1359,14 @@ export default function QuickConsultationReply({
       .filter(Boolean)
       .join("\n");
     if (!dateLines) return window.alert("請至少填寫一組日期");
+    const supplement = dateTimeSupplements[sectionKey];
+    const timeLine = supplement?.timeChoice
+      ? `${supplement.timeVerdict === "避開" ? "避開時辰" : "推薦時辰"}：${supplement.timeChoice}${supplement.timeVerdict ? `（${supplement.timeVerdict}）` : ""}`
+      : "";
     if (sectionDraft.optionIds.length) return void composeSection(sectionDraft.optionIds);
     setSectionDrafts((current) => ({
       ...current,
-      [sectionKey]: { ...sectionDraft, answer: dateLines, completed: true },
+      [sectionKey]: { ...sectionDraft, answer: [dateLines, timeLine].filter(Boolean).join("\n\n"), completed: true },
     }));
     setWritten(false);
   };
@@ -1647,24 +1648,24 @@ export default function QuickConsultationReply({
                                         <header><b>{index + 1}</b><strong>第 {index + 1} 組</strong></header>
                                         <div className="quickReplyDateMainFields">
                                           <label><span>日期</span><input type="text" placeholder="例如：10月8日" value={row.date} onChange={(event) => updateRow({ date: event.target.value })}/></label>
-                                          <label><span>日期判斷</span><input type="text" list="date-verdict-options" placeholder="選擇或自行輸入" value={row.verdict} onChange={(event) => updateRow({ verdict: event.target.value })}/></label>
-                                        </div>
-                                        <div className="quickReplyDateTimeFields">
-                                          <div className="quickReplyDateTimeTitle"><span>時</span><div><strong>推薦／避開時辰</strong><small>可選上午、下午或傳統時辰</small></div></div>
-                                          <label><span>時段</span><select value={row.timeChoice} onChange={(event) => updateRow({ timeChoice: event.target.value })}>
-                                            <option value="">不指定時辰</option><option>上午</option><option>下午</option>
-                                            <option>子時（23:00–01:00）</option><option>丑時（01:00–03:00）</option><option>寅時（03:00–05:00）</option><option>卯時（05:00–07:00）</option><option>辰時（07:00–09:00）</option><option>巳時（09:00–11:00）</option><option>午時（11:00–13:00）</option><option>未時（13:00–15:00）</option><option>申時（15:00–17:00）</option><option>酉時（17:00–19:00）</option><option>戌時（19:00–21:00）</option><option>亥時（21:00–23:00）</option>
+                                          <label><span>日期判斷</span><select value={row.verdict} onChange={(event) => updateRow({ verdict: event.target.value })}>
+                                            <option value="">請選擇判斷</option><option>這個時間最適合</option><option>這個日子可以使用</option><option>需要調整時辰</option><option>這個日子要避開</option><option>這個日期可優先安排</option><option>這個日期普通可用</option><option>這個日期需要更換</option><option>上午安排比較適合</option><option>下午安排比較適合</option>
                                           </select></label>
-                                          <label><span>吉凶</span><select value={row.timeVerdict} disabled={!row.timeChoice} onChange={(event) => updateRow({ timeVerdict: event.target.value })}><option value="">請選擇</option><option>吉時</option><option>可用</option><option>避開</option></select></label>
                                         </div>
                                       </article>
                                     );
                                   })}
                                 </div>
-                                <datalist id="date-verdict-options">
-                                  <option value="這個時間最適合"/><option value="這個日子可以使用"/><option value="需要調整時辰"/><option value="這個日子要避開"/>
-                                  <option value="這個日期最適合"/><option value="這個日期可優先安排"/><option value="這個日期普通可用"/><option value="這個日期需要更換"/><option value="上午安排比較適合"/><option value="下午安排比較適合"/>
-                                </datalist>
+                                <section className="quickReplyDateTimeSupplement">
+                                  <div className="quickReplyDateTimeTitle"><span>時</span><div><strong>推薦／避開時辰</strong><small>額外補充，可選上午、下午或傳統時辰</small></div></div>
+                                  <div className="quickReplyDateTimeFields">
+                                    <label><span>時段</span><select value={dateTimeSupplements[sectionKey]?.timeChoice || ""} onChange={(event) => setDateTimeSupplements((current) => ({ ...current, [sectionKey]: { timeChoice: event.target.value, timeVerdict: current[sectionKey]?.timeVerdict || "" } }))}>
+                                      <option value="">不指定時辰</option><option>上午</option><option>下午</option>
+                                      <option>子時（23:00–01:00）</option><option>丑時（01:00–03:00）</option><option>寅時（03:00–05:00）</option><option>卯時（05:00–07:00）</option><option>辰時（07:00–09:00）</option><option>巳時（09:00–11:00）</option><option>午時（11:00–13:00）</option><option>未時（13:00–15:00）</option><option>申時（15:00–17:00）</option><option>酉時（17:00–19:00）</option><option>戌時（19:00–21:00）</option><option>亥時（21:00–23:00）</option>
+                                    </select></label>
+                                    <label><span>判斷</span><select value={dateTimeSupplements[sectionKey]?.timeVerdict || ""} disabled={!dateTimeSupplements[sectionKey]?.timeChoice} onChange={(event) => setDateTimeSupplements((current) => ({ ...current, [sectionKey]: { timeChoice: current[sectionKey]?.timeChoice || "", timeVerdict: event.target.value } }))}><option value="">請選擇</option><option>吉時</option><option>可用</option><option>避開</option></select></label>
+                                  </div>
+                                </section>
                                 {[["①", "注意事項", dateNoticeOptions]].map(([number, title, options]) => (
                                   <section className="quickReplyDateGroup" key={String(title)}>
                                     <h4><span>{String(number)}</span>{String(title)}</h4>
