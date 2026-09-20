@@ -16,9 +16,9 @@ insert into public.sub_items(item_id,code,title,description,price,is_default,is_
 select i.id,v.code,v.title,v.description,v.price,v.is_default,true,v.sort_order
 from public.booking_items i
 join (values
- ('one-past-life','前世因果（個人）｜前一世概略說明+今生個性特質','前一世概略說明＋今生個性特質',1500,true,10),
- ('two-past-lives','前世因果（個人）｜前二世概略說明+今生個性特質','前二世概略說明＋今生個性特質',2100,false,20),
- ('three-past-lives','前世因果（個人）｜前三世概略說明+今生個性特質','前三世概略說明＋今生個性特質',3000,false,30)
+ ('one-past-life','前一世概略說明+今生個性特質','前一世概略說明＋今生個性特質',1500,true,10),
+ ('two-past-lives','前二世概略說明+今生個性特質','前二世概略說明＋今生個性特質',2100,false,20),
+ ('three-past-lives','前三世概略說明+今生個性特質','前三世概略說明＋今生個性特質',3000,false,30)
 ) as v(code,title,description,price,is_default,sort_order) on true
 where i.code='past-life-personal'
 on conflict(item_id,code) where code is not null do update set
@@ -67,8 +67,8 @@ insert into public.sub_items(item_id,code,title,description,price,is_default,is_
 select i.id,v.code,v.title,v.description,v.price,v.is_default,true,v.sort_order
 from public.booking_items i
 join (values
- ('one-group','一組（三個日期）','提供一組，共三個日期。',1200,true,10),
- ('two-groups','兩組（六個日期）','提供兩組，共六個日期。',2400,false,20)
+ ('one-group','一組（提供三個時間）','提供一組，共三個時間。',1200,true,10),
+ ('two-groups','兩組（提供六個時間）','提供兩組，共六個時間。',2400,false,20)
 ) as v(code,title,description,price,is_default,sort_order) on true
 where i.code='date-time-selection'
 on conflict(item_id,code) where code is not null do update set
@@ -91,10 +91,10 @@ insert into public.sub_items(item_id,code,title,description,price,is_default,is_
 select i.id,v.code,v.title,v.description,v.price,v.is_default,true,v.sort_order
 from public.booking_items i
 join (values
- ('personal-romance','個人感情運','查看個人桃花、正緣時機及感情發展。',800,true,10),
- ('one-couple','只看一對','分析自己與一位對象的感情及婚姻緣分。',1200,false,20),
- ('one-extra-person','加看一位對象','比較自己與兩位對象的感情緣分。',1800,false,30),
- ('two-extra-people','加看兩位對象','比較自己與三位對象的感情緣分。',2400,false,40)
+ ('personal-romance','個人感情運（僅看自己）','查看個人桃花、正緣時機及感情發展。',800,true,10),
+ ('one-couple','雙人關係與緣份（看1位對象）','分析自己與一位對象的感情及婚姻緣分。',1200,false,20),
+ ('one-extra-person','多對象比較緣份（看2位對象）','比較自己與兩位對象的感情緣分。',1800,false,30),
+ ('two-extra-people','多對象比較緣份（看3位對象）','比較自己與三位對象的感情緣分。',2400,false,40)
 ) as v(code,title,description,price,is_default,sort_order) on true
 where i.code='marriage-bazi'
 on conflict(item_id,code) where code is not null do update set
@@ -110,6 +110,40 @@ on conflict(code) where code is not null do update set
  title=excluded.title,description=excluded.description,price=excluded.price,
  allow_quantity=excluded.allow_quantity,option_mode=excluded.option_mode,
  is_active=true,sort_order=excluded.sort_order;
+
+-- 與他人前世關係：依對象人數計價。
+update public.booking_items
+set price=3000, option_mode='single_required', is_active=true, sort_order=20
+where code='past-life-relationship';
+
+update public.sub_items s set is_active=false
+from public.booking_items i
+where s.item_id=i.id and i.code='past-life-relationship';
+
+insert into public.sub_items(item_id,code,title,description,price,is_default,is_active,sort_order)
+select i.id,v.code,v.title,v.title,v.price,v.is_default,true,v.sort_order
+from public.booking_items i
+join (values
+ ('one-person','基本：你與一位對象的前世關係',3000,true,10),
+ ('two-people','＋加購：你與兩位對象的前世關係',4500,false,20),
+ ('three-people','＋加購：你與三位對象的前世關係',6000,false,30)
+) as v(code,title,price,is_default,sort_order) on true
+where i.code='past-life-relationship'
+on conflict(item_id,code) where code is not null do update set
+ title=excluded.title,description=excluded.description,price=excluded.price,
+ is_default=excluded.is_default,is_active=true,sort_order=excluded.sort_order;
+
+-- 整體運勢正式價格。
+update public.booking_items set price=1800 where code='overall-fortune';
+
+-- 嬰靈正式選項名稱。
+update public.sub_items s
+set title=case when s.code='one' then '一位嬰靈' else '兩位嬰靈（含）以上' end,
+    description=case when s.code='one' then '一位嬰靈' else '兩位嬰靈（含）以上' end,
+    price=case when s.code='one' then 700 else 1400 end,
+    is_active=true
+from public.booking_items i
+where s.item_id=i.id and i.code='infant-spirit' and s.code in ('one','two-or-more');
 
 select pg_notify('pgrst','reload schema');
 commit;
