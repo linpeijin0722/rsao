@@ -103,6 +103,53 @@ export async function writeExternalConsultationReply(documentId: string, answer:
   await upsertQuickConsultationReply(documentId, answer);
 }
 
+const externalResultCode = (label: string) => {
+  const value = text(label).replace(/\s+/g, "");
+  if (/合八字|雙人關係|合婚|婚姻/.test(value)) return "marriage-bazi";
+  if (/個人感情|感情運勢|感情運/.test(value)) return "personal-romance";
+  if (/擇日|擇時/.test(value)) return "date-time-selection";
+  if (/前世.*他人|與他人前世/.test(value)) return "past-life-relationship";
+  if (/前世/.test(value)) return "past-life-personal";
+  if (/嬰靈/.test(value)) return "infant-spirit";
+  if (/過世寵物|往生寵物/.test(value)) return "deceased-pet";
+  if (/過世|往生|亡者|親人/.test(value)) return "deceased-relative";
+  if (/整體運勢|流年運勢|整體建議/.test(value)) return "overall-fortune";
+  if (/身體健康|健康/.test(value)) return "health";
+  if (/靈擾|卡陰|靈體/.test(value)) return "spiritual-interference";
+  if (/居家|風水|陽宅/.test(value)) return "home-energy";
+  if (/官司|訴訟|貴人/.test(value)) return "lawsuit-benefactor";
+  if (/命名|改名|公司名/.test(value)) return "naming";
+  return "";
+};
+
+export async function detectExternalConsultationResults(documentId: string) {
+  await assertExternalConsultationDocument(documentId);
+  const slots = await getQuickReplySectionSlots(documentId);
+  return slots.map(slot => ({ slotIndex: slot.slotIndex, label: slot.label, itemCode: externalResultCode(slot.label) })).filter(slot => slot.itemCode);
+}
+
+export async function syncExternalQuickWriteButtons(site: string) {
+  const documents = await listExternalConsultationDocuments();
+  const token = await accessToken();
+  const marker = "✦ 阿嫂點此快速寫單";
+  let updated = 0;
+  for (const file of documents) {
+    const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(file.id)}`, token);
+    const { plain, documentIndexAt } = indexedDocumentText(document);
+    const existingOffset = plain.indexOf(marker);
+    const startIndex = existingOffset >= 0 ? documentIndexAt(existingOffset) : 1;
+    const link = `${site.replace(/\/$/, "")}/staff/external-quick-write?documentId=${encodeURIComponent(file.id)}`;
+    const requests:any[] = [];
+    if (existingOffset < 0) requests.push({ insertText: { location: { index: 1 }, text: `${marker}\n` } });
+    requests.push({ updateTextStyle: { range: { startIndex, endIndex: startIndex + marker.length }, textStyle: {
+      bold: true, fontSize: { magnitude: 12, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: .54, green: .19, blue: .27 } } }, link: { url: link },
+    }, fields: "bold,fontSize,foregroundColor,link" } });
+    await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(file.id)}:batchUpdate`, token, { method: "POST", body: JSON.stringify({ requests }) });
+    updated += 1;
+  }
+  return { updated, total: documents.length };
+}
+
 function collectSegmentIds(sourceDocument: any, kind: "Header" | "Footer") {
   const sectionStyles = (sourceDocument.body?.content || [])
     .map((block: any) => block.sectionBreak?.sectionStyle)
