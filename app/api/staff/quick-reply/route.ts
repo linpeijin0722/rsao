@@ -10,6 +10,7 @@ import {
   getQuickReplyQuestionSlots,
   getQuickReplySectionSlots,
   normalizeConsultationReturnText,
+  refreshConsultationDocumentFormatting,
   upsertPastLifeOverviewReplies,
   upsertQuickConsultationQuestionReplies,
   upsertQuickConsultationManualReplies,
@@ -2420,6 +2421,9 @@ export async function POST(request: NextRequest) {
         data.documentDetail.google_document_id,
         manualReplies,
       );
+    await refreshConsultationDocumentFormatting(
+      data.documentDetail.google_document_id,
+    );
     return NextResponse.json({
       ok: true,
       written: true,

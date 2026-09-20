@@ -123,7 +123,7 @@ async function formatDocumentAfterCreation(documentId: string, token: string) {
       updateTextStyle: {
         range: { startIndex: locateBodyOffset(videoHeaderOffset), endIndex: locateBodyOffset(videoHeaderOffset + videoHeader[0].length) },
         textStyle: {
-          foregroundColor: { color: { rgbColor: { red: 0.541, green: 0.188, blue: 0.282 } } },
+          foregroundColor: { color: { rgbColor: { red: 0.651, green: 0.169, blue: 0.345 } } },
           fontSize: { magnitude: 20, unit: "PT" },
           bold: true,
         },
@@ -138,7 +138,7 @@ async function formatDocumentAfterCreation(documentId: string, token: string) {
           endIndex: locateBodyOffset(finalCharacterOffset + 1),
         },
         textStyle: {
-          foregroundColor: { color: { rgbColor: { red: 0.541, green: 0.188, blue: 0.282 } } },
+          foregroundColor: { color: { rgbColor: { red: 0.651, green: 0.169, blue: 0.345 } } },
           fontSize: { magnitude: 20, unit: "PT" },
           bold: true,
         },
@@ -172,6 +172,13 @@ async function formatDocumentAfterCreation(documentId: string, token: string) {
   }
 
   // 頁首頁尾由 Apps Script 建立；Docs API 不再修改頁首，避免建立／重建頁首失敗阻斷最後的空白頁清理。
+}
+
+// 既有文件在寫入諮詢回答後也重新套用標題格式，避免 Google 文件延續舊格式，
+// 尤其確保「30分鐘」最後的「鐘」仍為玫紅色、粗體、20 PT。
+export async function refreshConsultationDocumentFormatting(documentId: string) {
+  const token = await accessToken();
+  await formatDocumentAfterCreation(documentId, token);
 }
 
 function lastVisibleBodyIndex(document: any) {
