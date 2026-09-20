@@ -170,6 +170,31 @@ export default function Page() {
           try{await liff.init({liffId});if(liff.isLoggedIn()){const friendship=await liff.getFriendship();return friendship.friendFlag}}catch{}
           return fallback;
         };
+        // 切換正式 LINE Provider 後，舊站台 Cookie 可能仍保存測試 Provider 的
+        // userId。從 LIFF 開啟時一律先以目前 LIFF 的 access token 更新工作階段，
+        // 避免舊 Cookie 被優先採用而誤判為尚未加入正式官方帳號。
+        if (bookingLiffId && liff.isLoggedIn()) {
+          const accessToken = liff.getAccessToken();
+          if (accessToken) {
+            const authResponse = await fetch("/api/line/auth", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ accessToken }),
+              }),
+              authProfile = await authResponse.json();
+            if (!authResponse.ok) throw Error(authProfile.error || "LINE 登入失效");
+            if (!(await hasOfficialAccountFriendship(Boolean(authProfile.isFriend)))) {
+              setError("請先加入 LINE 官方帳號好友；若曾封鎖，請先解除封鎖後再進行預約。");
+              setAuth("friend-required");
+              return;
+            }
+            setProfile(authProfile);
+            if (!(await requirePrimaryProfile())) return;
+            remember(authProfile);
+            setAuth("ready");
+            return;
+          }
+        }
         const sessionResponse=await fetch("/api/line/session",{cache:"no-store"});
         if (sessionResponse.ok) {
           const sessionProfile = await sessionResponse.json();
