@@ -8,7 +8,6 @@ async function authorized() {
 }
 
 export async function GET(request: NextRequest) {
-  if (!(await authorized())) return NextResponse.json({ error: "未登入" }, { status: 401 });
   try {
     const documentId = request.nextUrl.searchParams.get("documentId") || "";
     if (documentId) return NextResponse.json({ ok: true, answer: await getExternalConsultationReply(documentId), detected: await detectExternalConsultationResults(documentId) });

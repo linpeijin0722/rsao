@@ -1774,8 +1774,6 @@ export async function GET(request: NextRequest) {
       externalItemCode = request.nextUrl.searchParams.get("externalItemCode") || "",
       externalSlotIndex = Number(request.nextUrl.searchParams.get("externalSlotIndex") ?? -1),
       data = await context(bookingNo, documentId, externalItemCode, externalSlotIndex);
-    if (externalItemCode && !admin)
-      return NextResponse.json({ error: "未登入" }, { status: 401 });
     if (!admin && token && !isQuickReplyToken(token, bookingNo, documentId))
       return NextResponse.json({ error: "連結驗證失敗" }, { status: 401 });
     const accessToken = makeQuickReplyToken(bookingNo, documentId);
