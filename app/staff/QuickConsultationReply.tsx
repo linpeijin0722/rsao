@@ -116,6 +116,7 @@ export default function QuickConsultationReply({
   initialAccessToken = "",
   externalItemCode = "",
   externalSlotIndex = -1,
+  embedded = false,
 }: {
   bookingNo: string;
   documentId: string;
@@ -124,6 +125,7 @@ export default function QuickConsultationReply({
   initialAccessToken?: string;
   externalItemCode?: string;
   externalSlotIndex?: number;
+  embedded?: boolean;
 }) {
   const emptyNames = () =>
     Array.from({ length: 6 }, () => ({ name: "", aid: "未選擇", custom: "未選擇" }));
@@ -1389,7 +1391,7 @@ export default function QuickConsultationReply({
     card.classList.toggle("expanded");
   };
   return (
-    <div className={`quickReplyBackdrop${standalone ? " standalone" : ""}`}>
+    <div className={`quickReplyBackdrop${standalone ? " standalone" : ""}${embedded ? " embedded" : ""}`}>
       <section className="quickReplyPanel" role="dialog" aria-modal="true">
         <header>
           <div>

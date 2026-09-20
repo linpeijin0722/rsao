@@ -10,12 +10,14 @@ import {
   getQuickReplyQuestionSlots,
   getQuickReplySectionSlots,
   getExternalConsultationReply,
+  detectExternalConsultationResults,
   normalizeConsultationReturnText,
   refreshConsultationDocumentFormatting,
   upsertPastLifeOverviewReplies,
   upsertQuickConsultationQuestionReplies,
   upsertQuickConsultationManualReplies,
   upsertQuickConsultationSectionReplies,
+  upsertExternalConsultationSectionReplies,
 } from "@/lib/google-consultation-docs";
 
 const one = (value: any) => (Array.isArray(value) ? value[0] : value);
@@ -866,7 +868,8 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
   let booking:any,error:any=null;
   if(external){
     await getExternalConsultationReply(requestedDocumentId);
-    booking={id:`external-${requestedDocumentId}`,customer_id:null,booking_no:"外部諮詢單",customers:{full_name:"外部諮詢單"},booking_details:[{id:`external-${requestedDocumentId}`,item_id:null,created_at:"",item_title:externalTitles[externalItemCode]||"外部諮詢",google_document_id:requestedDocumentId,google_document_url:`https://docs.google.com/document/d/${requestedDocumentId}/edit`,booking_items:{code:externalItemCode},booking_detail_sub_items:[],booking_consultation_answers:[{profile_id:null,questions:[],extra_data:{},consultation_profiles:null,booking_answer_participants:[]}]}]};
+    const detected=(await detectExternalConsultationResults(requestedDocumentId)).find(entry=>entry.slotIndex===externalSlotIndex),parseProfile=(lines:string[],id:string)=>{const first=String(lines[0]||""),parts=first.split("／"),tail=parts.slice(1).join("／"),relation=tail.match(/（([^）]+)）/)?.[1]||"";return{id,profile_type:"person",name:parts[0]?.trim()||"",gender:tail.includes("女")?"女":tail.includes("男")?"男":"",relationship_detail:relation,lunar_birth_text:String(lines[1]||"").replace(/^農曆生日：/u,""),address:String(lines[2]||"").replace(/^居住地址：/u,"")}},selfProfile=parseProfile(detected?.consultantLines||[],"external-self"),targetProfile=parseProfile(detected?.targetLines||[],"external-target"),hasTarget=Boolean(targetProfile.name),answer={profile_id:selfProfile.id,questions:[],extra_data:hasTarget?{relationship_details:{[targetProfile.id]:{}}}:{},consultation_profiles:selfProfile,booking_answer_participants:hasTarget?[{position:1,profile_id:targetProfile.id,consultation_profiles:targetProfile}]:[]},itemTitle=detected?.label||externalTitles[externalItemCode]||"外部諮詢";
+    booking={id:`external-${requestedDocumentId}`,customer_id:null,booking_no:"外部諮詢單",customers:{full_name:selfProfile.name||"外部諮詢單"},booking_details:[{id:`external-${requestedDocumentId}`,item_id:null,created_at:"",item_title:itemTitle,google_document_id:requestedDocumentId,google_document_url:`https://docs.google.com/document/d/${requestedDocumentId}/edit`,booking_items:{code:externalItemCode},booking_detail_sub_items:[],booking_consultation_answers:[answer]}]};
   }else{
     const result = await db
     .from("bookings")
@@ -2409,7 +2412,10 @@ export async function POST(request: NextRequest) {
         data.documentDetail.google_document_id,
         answers,
       );
-    const pastLifeOverviewAnswers = data.sectionSlots
+    if (data.external) {
+      await upsertExternalConsultationSectionReplies(data.documentDetail.google_document_id, sectionAnswers);
+    }
+    const pastLifeOverviewAnswers = data.external ? [] : data.sectionSlots
       .filter((slot: any) => slot.itemCode.startsWith("past-life-"))
       .map((slot: any) => ({
         answer: sectionAnswers[String(slot.slotIndex)] || "",
@@ -2422,7 +2428,7 @@ export async function POST(request: NextRequest) {
         !String(data.sectionSlots.find((slot: any) => String(slot.slotIndex) === String(index))?.itemCode || "").startsWith("past-life-"),
       ),
     );
-    if (Object.keys(regularSectionAnswers).length)
+    if (!data.external && Object.keys(regularSectionAnswers).length)
       await upsertQuickConsultationSectionReplies(
         data.documentDetail.google_document_id,
         regularSectionAnswers,
@@ -2432,12 +2438,12 @@ export async function POST(request: NextRequest) {
         data.documentDetail.google_document_id,
         pastLifeOverviewAnswers,
       );
-    if (manualReplies.length)
+    if (!data.external && manualReplies.length)
       await upsertQuickConsultationManualReplies(
         data.documentDetail.google_document_id,
         manualReplies,
       );
-    await refreshConsultationDocumentFormatting(
+    if (!data.external) await refreshConsultationDocumentFormatting(
       data.documentDetail.google_document_id,
     );
     return NextResponse.json({

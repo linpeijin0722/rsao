@@ -125,7 +125,39 @@ const externalResultCode = (label: string) => {
 export async function detectExternalConsultationResults(documentId: string) {
   await assertExternalConsultationDocument(documentId);
   const slots = await getQuickReplySectionSlots(documentId);
-  return slots.map(slot => ({ slotIndex: slot.slotIndex, label: slot.label, itemCode: externalResultCode(slot.label) })).filter(slot => slot.itemCode);
+  return slots.map(slot => {
+    const lines = slot.answer.split("\n").map(value => value.trim()).filter(Boolean);
+    const profileAt = (start: number) => lines.slice(start, start + 3).filter(line => /(?:／(?:男|女)|農曆生日：|居住地址：)/u.test(line));
+    const firstPerson = lines.findIndex(line => /／(?:男|女)(?:（[^)]*）)?$/u.test(line));
+    const targetHeading = lines.findIndex(line => /^(?:【)?對象資料(?:】)?$/u.test(line));
+    return {
+      slotIndex: slot.slotIndex,
+      label: slot.label,
+      itemCode: externalResultCode(slot.label),
+      consultantLines: firstPerson >= 0 ? profileAt(firstPerson) : [],
+      targetLines: targetHeading >= 0 ? profileAt(targetHeading + 1) : [],
+    };
+  }).filter(slot => slot.itemCode);
+}
+
+export async function upsertExternalConsultationSectionReplies(documentId:string,answers:Record<string,string>) {
+  await assertExternalConsultationDocument(documentId);
+  const token=await accessToken(),document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
+  const {plain,documentIndexAt}=indexedDocumentText(document),headingPattern=/(?:^|\n)【([^】\n]+)】[^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset),matches=Array.from(scopedPlain.matchAll(headingPattern));
+  const requests:any[]=[];
+  for(const [key,raw] of Object.entries(answers)){
+    const slotIndex=Number(key),match=matches[slotIndex],value=normalizeConsultationReturnText(raw);if(!match||!value)continue;
+    const blockStart=baseOffset+(match.index||0)+match[0].length,rest=plain.slice(blockStart),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),blockEnd=boundary>=0?blockStart+boundary:Math.max(blockStart,plain.replace(/\n$/,"").length);
+    const block=plain.slice(blockStart,blockEnd),addresses=Array.from(block.matchAll(/(?:^|\n)居住地址：[^\n]*/g));
+    let resultStart=blockStart;
+    if(addresses.length){const last=addresses[addresses.length-1],lineEnd=(last.index||0)+last[0].length;resultStart=blockStart+lineEnd+(block[lineEnd]==="\n"?1:0)}
+    const startIndex=documentIndexAt(resultStart),endIndex=documentIndexAt(blockEnd);
+    if(endIndex>startIndex)requests.push({deleteContentRange:{range:{startIndex,endIndex}}});
+    const inserted=`${value}\n`;
+    requests.push({insertText:{location:{index:startIndex},text:inserted}});
+    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+  }
+  if(requests.length)await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
 
 function collectSegmentIds(sourceDocument: any, kind: "Header" | "Footer") {
