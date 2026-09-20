@@ -125,10 +125,10 @@ const externalResultCode = (label: string) => {
 export async function detectExternalConsultationResults(documentId: string) {
   await assertExternalConsultationDocument(documentId);
   const slots = await getQuickReplySectionSlots(documentId);
-  return slots.map(slot => {
+  const candidates = slots.map(slot => {
     const lines = slot.answer.split("\n").map(value => value.trim()).filter(Boolean);
     const profileAt = (start: number) => lines.slice(start, start + 3).filter(line => /(?:／(?:男|女)|農曆生日：|居住地址：)/u.test(line));
-    const firstPerson = lines.findIndex(line => /／(?:男|女)(?:（[^)]*）)?$/u.test(line));
+    const firstPerson = lines.findIndex(line => /／(?:男|女)(?:\s|（|$)/u.test(line));
     const targetHeading = lines.findIndex(line => /^(?:【)?對象資料(?:】)?$/u.test(line));
     return {
       slotIndex: slot.slotIndex,
@@ -136,8 +136,18 @@ export async function detectExternalConsultationResults(documentId: string) {
       itemCode: externalResultCode(slot.label),
       consultantLines: firstPerson >= 0 ? profileAt(firstPerson) : [],
       targetLines: targetHeading >= 0 ? profileAt(targetHeading + 1) : [],
+      profileImmediatelyBelowHeading: firstPerson === 0,
     };
   }).filter(slot => slot.itemCode);
+  // 舊文件會把「流年運勢、整體建議」等內部小標題也寫成【】。
+  // 同一實際項目只留一筆，並優先採用標題正下方就是「姓名／男、女」的主項目。
+  const byItemCode = new Map<string, (typeof candidates)[number]>();
+  for (const candidate of candidates) {
+    const previous = byItemCode.get(candidate.itemCode);
+    if (!previous || (!previous.profileImmediatelyBelowHeading && candidate.profileImmediatelyBelowHeading))
+      byItemCode.set(candidate.itemCode, candidate);
+  }
+  return Array.from(byItemCode.values()).map(({ profileImmediatelyBelowHeading: _profileImmediatelyBelowHeading, ...candidate }) => candidate);
 }
 
 export async function upsertExternalConsultationSectionReplies(documentId:string,answers:Record<string,string>) {
