@@ -1429,7 +1429,7 @@ export default function QuickConsultationReply({
               )}
               {view === "section" && (
                 <>
-                  {sections.length ? (
+                  {!embedded && (sections.length ? (
                     <section className="quickReplyQuestions" ref={itemMenuRef}>
                       <h3>先點選要填寫的項目標籤</h3>
                       <div>
@@ -1463,7 +1463,7 @@ export default function QuickConsultationReply({
                     <div className="quickReplyStatus">
                       這份文件沒有可套用句庫的項目標籤。
                     </div>
-                  )}
+                  ))}
                   {section && (
                     <>
                       <div ref={itemDetailRef} className="quickReplyItemAnchor" aria-hidden="true" />
@@ -1475,7 +1475,7 @@ export default function QuickConsultationReply({
                           ))}
                         </section>
                       )}
-                      {sectionTopic?.code !== "naming_result" && section.itemCode !== "infant-spirit" && (
+                      {sectionTopic?.code !== "naming_result" && section.itemCode !== "infant-spirit" && (!embedded || section.requestLines.length > 0) && (
                           <section className="quickReplyInputCard">
                             <h3>{section.requestLines.length ? "用戶填寫的內容" : "用戶無填寫內容"}</h3>
                             {section.itemCode === "overall-fortune" ? (
