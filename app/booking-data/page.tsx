@@ -244,7 +244,7 @@ export default function BookingData() {
     [missingItems, setMissingItems] = useState<string[]>([]),
     [loading, setLoading] = useState(true);
   async function restoreLineLogin() {
-    const liffId = process.env.NEXT_PUBLIC_LIFF_ID || "2010145124-UZiPJzKi";
+    const liffId = process.env.NEXT_PUBLIC_LIFF_ID || "2011674988-QKCQBn9L";
     if (!liffId) return false;
     await liff.init({ liffId });
     if (!liff.isLoggedIn()) {
@@ -261,7 +261,7 @@ export default function BookingData() {
     return response.ok;
   }
   function prepareLiff() {
-    const liffId = process.env.NEXT_PUBLIC_LIFF_ID || "2010145124-UZiPJzKi";
+    const liffId = process.env.NEXT_PUBLIC_LIFF_ID || "2011674988-QKCQBn9L";
     if (!liffId) return Promise.reject(new Error("尚未設定 LIFF ID"));
     if (!liffReadyRef.current) {
       liffReadyRef.current = liff.init({ liffId }).catch((error) => {

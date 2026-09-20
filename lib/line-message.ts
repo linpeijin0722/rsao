@@ -86,7 +86,7 @@ export async function pushDataReceivedCarousel(userId: string, site: string) {
   );
 }
 const statusColors={pending:{background:"#FDECEC",text:"#C94040",label:"待付款"},paid:{background:"#EBFBF9",text:"#168A54",label:"已付款"},data_required:{background:"#FDECEC",text:"#C94040",label:"請填寫諮詢者資料"},changed:{background:"#F1F1F1",text:"#444444",label:"預約已變更"},cancelled:{background:"#EEEEEE",text:"#666666",label:"預約已取消"}} as const;
-const bookingLiffId = process.env.NEXT_PUBLIC_LIFF_ID || "2010145124-UZiPJzKi";
+const bookingLiffId = process.env.NEXT_PUBLIC_LIFF_ID || "2011674988-QKCQBn9L";
 export const liffPageUrl = (path: string, params?: URLSearchParams) =>
   `https://liff.line.me/${bookingLiffId}${path}${params?.size ? `?${params}` : ""}`;
 export const liffBookingDataUrl = (bookingNo: string, refill = false) =>

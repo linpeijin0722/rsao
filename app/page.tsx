@@ -2,7 +2,7 @@
 import liff from "@line/liff";
 import { addCalendarDays } from "@/lib/video-booking-window";
 import { useEffect, useMemo, useState } from "react";
-const bookingLiffId = process.env.NEXT_PUBLIC_LIFF_ID || "2010145124-UZiPJzKi";
+const bookingLiffId = process.env.NEXT_PUBLIC_LIFF_ID || "2011674988-QKCQBn9L";
 const officialLineUrl = process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL || "https://line.me/R/ti/p/@405unxzn";
 type Method = {
   id: string;
