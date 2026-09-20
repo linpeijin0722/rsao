@@ -115,6 +115,7 @@ export default function QuickConsultationReply({
   standalone = false,
   initialAccessToken = "",
   externalItemCode = "",
+  externalSlotIndex = -1,
 }: {
   bookingNo: string;
   documentId: string;
@@ -122,6 +123,7 @@ export default function QuickConsultationReply({
   standalone?: boolean;
   initialAccessToken?: string;
   externalItemCode?: string;
+  externalSlotIndex?: number;
 }) {
   const emptyNames = () =>
     Array.from({ length: 6 }, () => ({ name: "", aid: "未選擇", custom: "未選擇" }));
@@ -197,7 +199,7 @@ export default function QuickConsultationReply({
     >({});
   useEffect(() => {
     fetch(
-      `/api/staff/quick-reply?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}&token=${encodeURIComponent(initialAccessToken)}&externalItemCode=${encodeURIComponent(externalItemCode)}`,
+      `/api/staff/quick-reply?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}&token=${encodeURIComponent(initialAccessToken)}&externalItemCode=${encodeURIComponent(externalItemCode)}&externalSlotIndex=${encodeURIComponent(String(externalSlotIndex))}`,
     )
       .then(async (r) => {
         const x = await r.json();
@@ -242,7 +244,7 @@ export default function QuickConsultationReply({
       .catch((e) => setError(e instanceof Error ? e.message : "讀取失敗"))
       .finally(() => setLoading(false));
     return () => Object.values(sectionTimers.current).forEach(clearTimeout);
-  }, [bookingNo, documentId, initialAccessToken, externalItemCode]);
+  }, [bookingNo, documentId, initialAccessToken, externalItemCode, externalSlotIndex]);
   const topicMap = useMemo(
       () => new Map((data?.topics || []).map((t) => [t.code, t])),
       [data],
@@ -693,6 +695,7 @@ export default function QuickConsultationReply({
           documentId,
           accessToken,
           externalItemCode,
+          externalSlotIndex,
           ...payload,
         }),
       }),

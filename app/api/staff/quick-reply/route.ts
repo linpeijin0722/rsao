@@ -859,7 +859,7 @@ const profilePresentation = (profile: any, ownerName: string) => {
   };
 };
 
-async function context(bookingNo: string, requestedDocumentId = "", externalItemCode = "") {
+async function context(bookingNo: string, requestedDocumentId = "", externalItemCode = "", externalSlotIndex = -1) {
   const db = adminSupabase();
   const external = Boolean(externalItemCode && requestedDocumentId);
   const externalTitles:Record<string,string>={"overall-fortune":"整體運勢","personal-romance":"感情運勢","marriage-bazi":"感情運勢","health":"身體健康","date-time-selection":"擇日／擇時","past-life-personal":"前世因果（個人）","past-life-relationship":"與他人前世關係","infant-spirit":"嬰靈","deceased-relative":"過世親人","deceased-pet":"過世寵物","spiritual-interference":"靈擾／卡陰","home-energy":"居家風水","lawsuit-benefactor":"官司／貴人","naming":"命名"};
@@ -1521,9 +1521,8 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
               candidate.text === entry.text,
           ) === index,
       );
-  const rawSectionSlots = await getQuickReplySectionSlots(
-      documentDetail.google_document_id,
-    ),
+  const allRawSectionSlots = await getQuickReplySectionSlots(documentDetail.google_document_id),
+    rawSectionSlots = external && externalSlotIndex >= 0 ? allRawSectionSlots.filter(slot => slot.slotIndex === externalSlotIndex) : allRawSectionSlots,
     usedMeta = new Set<number>();
   const sectionSlots = rawSectionSlots
     .map((slot) => {
@@ -1770,7 +1769,8 @@ export async function GET(request: NextRequest) {
       token = request.nextUrl.searchParams.get("token") || "",
       admin = isAdminSession((await cookies()).get("admin_session")?.value),
       externalItemCode = request.nextUrl.searchParams.get("externalItemCode") || "",
-      data = await context(bookingNo, documentId, externalItemCode);
+      externalSlotIndex = Number(request.nextUrl.searchParams.get("externalSlotIndex") ?? -1),
+      data = await context(bookingNo, documentId, externalItemCode, externalSlotIndex);
     if (externalItemCode && !admin)
       return NextResponse.json({ error: "未登入" }, { status: 401 });
     if (!admin && token && !isQuickReplyToken(token, bookingNo, documentId))
@@ -1813,6 +1813,7 @@ export async function POST(request: NextRequest) {
         String(body.bookingNo || ""),
         String(body.documentId || ""),
         String(body.externalItemCode || ""),
+        Number(body.externalSlotIndex ?? -1),
       );
     const admin = isAdminSession((await cookies()).get("admin_session")?.value);
     if (
