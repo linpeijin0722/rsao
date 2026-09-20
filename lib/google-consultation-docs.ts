@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { makeQuickReplyToken } from "@/lib/quick-reply-token";
 
 const folderId = "1pihxwGH-FJtWPiCAwBcSvs65L603HVu-";
-const returnedFolderId = process.env.GOOGLE_DRIVE_RETURNED_FOLDER_ID || "18zRTeG1bAmWDCev0LJLslpo5LC7frYhX";
+const returnedFolderId = process.env.GOOGLE_DRIVE_RETURNED_FOLDER_ID || "1HMRq4GScXbSsqSwT4ssSDQHKktS29R8K";
 const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || "";
 const privateKey = (process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || "").replace(/\\n/g, "\n");
 const appsScriptSetting = (process.env.GOOGLE_APPS_SCRIPT_WEB_APP_URL || "").trim();
@@ -53,6 +53,54 @@ async function google(url: string, token: string, init: RequestInit = {}) {
   const result = await response.json();
   if (!response.ok) throw new Error(result.error?.message || "Google API 操作失敗");
   return result;
+}
+
+export type ExternalConsultationDocument = {
+  id: string;
+  name: string;
+  modifiedTime: string;
+  webViewLink: string;
+};
+
+export async function listExternalConsultationDocuments(): Promise<ExternalConsultationDocument[]> {
+  const token = await accessToken();
+  const query = `'${folderId}' in parents and mimeType='application/vnd.google-apps.document' and trashed=false`;
+  const params = new URLSearchParams({
+    q: query,
+    fields: "files(id,name,modifiedTime,webViewLink)",
+    orderBy: "modifiedTime desc",
+    pageSize: "100",
+    supportsAllDrives: "true",
+    includeItemsFromAllDrives: "true",
+  });
+  const result = await google(`https://www.googleapis.com/drive/v3/files?${params}`, token);
+  return (Array.isArray(result.files) ? result.files : []).map((file: any) => ({
+    id: String(file.id || ""),
+    name: String(file.name || "未命名諮詢單"),
+    modifiedTime: String(file.modifiedTime || ""),
+    webViewLink: String(file.webViewLink || `https://docs.google.com/document/d/${file.id}/edit`),
+  }));
+}
+
+async function assertExternalConsultationDocument(documentId: string) {
+  if (!documentId) throw new Error("缺少 Google 文件 ID");
+  const token = await accessToken();
+  const file = await google(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(documentId)}?fields=id,mimeType,parents,trashed&supportsAllDrives=true`,
+    token,
+  );
+  if (file.trashed || file.mimeType !== "application/vnd.google-apps.document" || !Array.isArray(file.parents) || !file.parents.includes(folderId))
+    throw new Error("這份文件不在外部諮詢單資料夾內");
+}
+
+export async function getExternalConsultationReply(documentId: string) {
+  await assertExternalConsultationDocument(documentId);
+  return getQuickConsultationReplyFromDocument(documentId);
+}
+
+export async function writeExternalConsultationReply(documentId: string, answer: string) {
+  await assertExternalConsultationDocument(documentId);
+  await upsertQuickConsultationReply(documentId, answer);
 }
 
 function collectSegmentIds(sourceDocument: any, kind: "Header" | "Footer") {
