@@ -18,9 +18,6 @@ export default function TeacherBookPage() {
     <main className="teacherBookPage">
       <section className="teacherBookCard">
         <header className="teacherBookHeader">
-          <div className="teacherBookIcon" aria-hidden="true">
-            <span>書</span>
-          </div>
           <div>
             <p>林阿嫂老師</p>
             <h1>老師的書</h1>
@@ -28,11 +25,7 @@ export default function TeacherBookPage() {
         </header>
 
         <div className="teacherBookIntro">
-          <span aria-hidden="true">✦</span>
-          <div>
-            <h2>親切提醒</h2>
-            <p>老師的書購買通路如下，您可以選擇方便的平台前往查看。</p>
-          </div>
+          <p>老師的書購買通路如下，您可以選擇方便的平台前往查看。</p>
         </div>
 
         <nav className="teacherBookStores" aria-label="書籍購買通路">
@@ -49,9 +42,8 @@ export default function TeacherBookPage() {
         </nav>
 
         <footer className="teacherBookFooter">
-          <span aria-hidden="true">❦</span>
-          <p>謝謝您的支持</p>
-          <small>請以各購書平台顯示的庫存與售價為準</small>
+          <p>請以各購書平台顯示的庫存與售價為準</p>
+          <strong>謝謝您的支持</strong>
         </footer>
       </section>
     </main>
