@@ -1525,6 +1525,11 @@ async function context(bookingNo: string, requestedDocumentId = "") {
           (entry: any, index: number) =>
             !usedMeta.has(index) && entry.itemCode === "overall-fortune",
         );
+      if (metaIndex < 0 && /擇日|擇時/.test(slot.label))
+        metaIndex = sectionMeta.findIndex(
+          (entry: any, index: number) =>
+            !usedMeta.has(index) && entry.itemCode === "date-time-selection",
+        );
       if (metaIndex < 0)
         metaIndex = sectionMeta.findIndex(
           (entry: any, index: number) =>
@@ -1574,12 +1579,18 @@ async function context(bookingNo: string, requestedDocumentId = "") {
               rank: location.rank,
             }
           : null;
+      const relatedLabels = sectionMeta
+        .filter((entry: any) => entry.detailId === meta.detailId)
+        .map((entry: any) => String(entry.label || "").trim())
+        .filter((value: string, index: number, all: string[]) => value && all.indexOf(value) === index);
       return {
         ...slot,
         label: itemCode === "past-life-personal"
           ? "前世因果（個人）"
           : itemCode === "past-life-relationship"
             ? "前世因果（與他人前世關係）"
+            : itemCode === "date-time-selection"
+              ? relatedLabels.join("｜") || "擇日／擇時"
             : meta.label,
         itemCode,
         profileName: meta.profileName || "",

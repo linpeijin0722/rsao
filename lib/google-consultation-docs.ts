@@ -123,7 +123,22 @@ async function formatDocumentAfterCreation(documentId: string, token: string) {
       updateTextStyle: {
         range: { startIndex: locateBodyOffset(videoHeaderOffset), endIndex: locateBodyOffset(videoHeaderOffset + videoHeader[0].length) },
         textStyle: {
-          foregroundColor: { color: { rgbColor: { red: 0.8, green: 0, blue: 0 } } },
+          foregroundColor: { color: { rgbColor: { red: 0.541, green: 0.188, blue: 0.282 } } },
+          fontSize: { magnitude: 20, unit: "PT" },
+          bold: true,
+        },
+        fields: "foregroundColor,fontSize,bold",
+      },
+    });
+    const finalCharacterOffset = videoHeaderOffset + videoHeader[0].length - 1;
+    requests.push({
+      updateTextStyle: {
+        range: {
+          startIndex: locateBodyOffset(finalCharacterOffset),
+          endIndex: locateBodyOffset(finalCharacterOffset + 1),
+        },
+        textStyle: {
+          foregroundColor: { color: { rgbColor: { red: 0.541, green: 0.188, blue: 0.282 } } },
           fontSize: { magnitude: 20, unit: "PT" },
           bold: true,
         },

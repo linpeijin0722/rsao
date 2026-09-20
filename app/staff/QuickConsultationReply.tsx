@@ -576,7 +576,7 @@ export default function QuickConsultationReply({
           continue;
         }
         const title = entry.itemCode === "past-life-personal"
-          ? "前世因果（個人）｜前三世概略說明+今生個性特質"
+          ? entry.itemTitle || "前世因果（個人）"
           : entry.itemCode.startsWith("past-life-")
             ? `前世因果（與他人前世關係）｜${entry.profileName || "對方"}`
             : entry.itemTitle;
@@ -1214,6 +1214,7 @@ export default function QuickConsultationReply({
         })),
       });
       setWritten(true);
+      if (data?.documentUrl) window.location.assign(data.documentUrl);
       setEditing(false);
       const consultationDocumentUrl = data?.documentUrl ||
         `https://docs.google.com/document/d/${documentId}/edit`;
