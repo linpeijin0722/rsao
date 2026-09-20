@@ -339,7 +339,8 @@ export default function Page() {
     });
     setModalItem(null);
     setError("");
-    if (modalItem.code === "overall-fortune") {
+    if (modalItem.code === "overall-fortune" && !healthWarned) {
+      setHealthWarned(true);
       setAlertMessage("此項目已包含身體健康。");
     }
   }
@@ -366,7 +367,10 @@ export default function Page() {
     }
     if (item.code === "overall-fortune") {
       changeBase(item, 1);
-      setAlertMessage("此項目已包含身體健康。");
+      if (!healthWarned) {
+        setHealthWarned(true);
+        setAlertMessage("此項目已包含身體健康。");
+      }
       return;
     }
     changeBase(item, 1);
