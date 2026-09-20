@@ -9,6 +9,7 @@ import { adminSupabase } from "@/lib/supabase";
 import {
   getQuickReplyQuestionSlots,
   getQuickReplySectionSlots,
+  getExternalConsultationReply,
   normalizeConsultationReturnText,
   refreshConsultationDocumentFormatting,
   upsertPastLifeOverviewReplies,
@@ -858,15 +859,24 @@ const profilePresentation = (profile: any, ownerName: string) => {
   };
 };
 
-async function context(bookingNo: string, requestedDocumentId = "") {
+async function context(bookingNo: string, requestedDocumentId = "", externalItemCode = "") {
   const db = adminSupabase();
-  const { data: booking, error } = await db
+  const external = Boolean(externalItemCode && requestedDocumentId);
+  const externalTitles:Record<string,string>={"overall-fortune":"整體運勢","personal-romance":"感情運勢","marriage-bazi":"感情運勢","health":"身體健康","date-time-selection":"擇日／擇時","past-life-personal":"前世因果（個人）","past-life-relationship":"與他人前世關係","infant-spirit":"嬰靈","deceased-relative":"過世親人","deceased-pet":"過世寵物","spiritual-interference":"靈擾／卡陰","home-energy":"居家風水","lawsuit-benefactor":"官司／貴人","naming":"命名"};
+  let booking:any,error:any=null;
+  if(external){
+    await getExternalConsultationReply(requestedDocumentId);
+    booking={id:`external-${requestedDocumentId}`,customer_id:null,booking_no:"外部諮詢單",customers:{full_name:"外部諮詢單"},booking_details:[{id:`external-${requestedDocumentId}`,item_id:null,created_at:"",item_title:externalTitles[externalItemCode]||"外部諮詢",google_document_id:requestedDocumentId,google_document_url:`https://docs.google.com/document/d/${requestedDocumentId}/edit`,booking_items:{code:externalItemCode},booking_detail_sub_items:[],booking_consultation_answers:[{profile_id:null,questions:[],extra_data:{},consultation_profiles:null,booking_answer_participants:[]}]}]};
+  }else{
+    const result = await db
     .from("bookings")
     .select(
       "id,customer_id,booking_no,customers(line_display_name,full_name),booking_details(id,item_id,created_at,item_title,google_document_id,google_document_url,booking_items(code),booking_detail_sub_items(sub_item_title),booking_consultation_answers(profile_id,questions,extra_data,consultation_profiles(*),booking_answer_participants(position,profile_id,consultation_profiles(*))))",
     )
     .eq("booking_no", bookingNo)
     .single();
+    booking=result.data;error=result.error;
+  }
   if (error || !booking) throw new Error("找不到這筆預約");
   const details = asArray(booking.booking_details).sort((a: any, b: any) =>
     String(a.created_at).localeCompare(String(b.created_at)),
@@ -940,7 +950,7 @@ async function context(bookingNo: string, requestedDocumentId = "") {
     ).length;
     return { slotIndex: index, questionNumber: previousSameGroup + 1, question: meta.question, answer, itemCode: meta.itemCode || "", itemTitle: meta.itemTitle || "", profileName: meta.profileName || "", profileLines: meta.profileLines || [], manualOnly: true };
   });
-  if (!questionSlots.length) questionSlots = documentQuestionSlots.map((slot, index) => ({ ...slot, itemCode: "", itemTitle: "", profileName: "", profileLines: [], manualOnly: true }));
+  if (!questionSlots.length) questionSlots = documentQuestionSlots.map((slot, index) => ({ ...slot, itemCode: externalItemCode, itemTitle: externalTitles[externalItemCode]||"", profileName: "", profileLines: [], manualOnly: !external }));
   if (!questionSlots.length) {
     const fallback = details
       .flatMap((detail: any) =>
@@ -1656,11 +1666,9 @@ async function context(bookingNo: string, requestedDocumentId = "") {
           ].filter(Boolean),
     ]),
   );
-  const { data: saved, error: savedError } = await db
-    .from("booking_quick_replies")
-    .select("question_replies,section_replies,updated_at")
-    .eq("booking_id", booking.id)
-    .maybeSingle();
+  const { data: saved, error: savedError } = external
+    ? {data:null,error:null}
+    : await db.from("booking_quick_replies").select("question_replies,section_replies,updated_at").eq("booking_id", booking.id).maybeSingle();
   if (savedError)
     throw new Error(
       savedError.message.includes("question_replies")
@@ -1745,6 +1753,7 @@ async function context(bookingNo: string, requestedDocumentId = "") {
     sectionReplies,
     previousSummaries,
     updatedAt: saved?.updated_at || null,
+    external,
   };
 }
 
@@ -1760,7 +1769,10 @@ export async function GET(request: NextRequest) {
       documentId = request.nextUrl.searchParams.get("documentId") || "",
       token = request.nextUrl.searchParams.get("token") || "",
       admin = isAdminSession((await cookies()).get("admin_session")?.value),
-      data = await context(bookingNo, documentId);
+      externalItemCode = request.nextUrl.searchParams.get("externalItemCode") || "",
+      data = await context(bookingNo, documentId, externalItemCode);
+    if (externalItemCode && !admin)
+      return NextResponse.json({ error: "未登入" }, { status: 401 });
     if (!admin && token && !isQuickReplyToken(token, bookingNo, documentId))
       return NextResponse.json({ error: "連結驗證失敗" }, { status: 401 });
     const accessToken = makeQuickReplyToken(bookingNo, documentId);
@@ -1800,6 +1812,7 @@ export async function POST(request: NextRequest) {
       data = await context(
         String(body.bookingNo || ""),
         String(body.documentId || ""),
+        String(body.externalItemCode || ""),
       );
     const admin = isAdminSession((await cookies()).get("admin_session")?.value);
     if (
@@ -2384,10 +2397,12 @@ export async function POST(request: NextRequest) {
         `https://docs.google.com/document/d/${data.documentDetail.google_document_id}/edit`,
       updated_at: new Date().toISOString(),
     };
-    const { error: saveError } = await data.db
-      .from("booking_quick_replies")
-      .upsert(record, { onConflict: "booking_id" });
-    if (saveError) throw new Error(saveError.message);
+    if (!data.external) {
+      const { error: saveError } = await data.db
+        .from("booking_quick_replies")
+        .upsert(record, { onConflict: "booking_id" });
+      if (saveError) throw new Error(saveError.message);
+    }
     if (Object.keys(answers).length)
       await upsertQuickConsultationQuestionReplies(
         data.documentDetail.google_document_id,
