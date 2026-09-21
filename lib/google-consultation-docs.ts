@@ -122,6 +122,32 @@ const externalResultCode = (label: string) => {
   return "";
 };
 
+// 表單區只能把真正的「項目標題」當成分段點。舊做法使用關鍵字模糊
+// 判斷，會把「農曆往生日期」誤認為「過世親人」的新標題，導致資料被截斷。
+const externalFormHeadingCode = (label: string) => {
+  const value = text(label).replace(/[【】\s]/g, "");
+  const headings: Record<string, string> = {
+    "合八字": "marriage-bazi",
+    "雙人關係與緣份": "marriage-bazi",
+    "前世因果－與他人前世關係": "past-life-relationship",
+    "前世因果-與他人前世關係": "past-life-relationship",
+    "前世因果－個人｜前一世概略說明＋今生個性特質": "past-life-personal",
+    "前世因果－個人｜前兩世概略說明＋今生個性特質": "past-life-personal",
+    "前世因果－個人｜前三世概略說明＋今生個性特質": "past-life-personal",
+    "外靈干擾": "spiritual-interference",
+    "過世親人": "deceased-relative",
+    "過世寵物": "deceased-pet",
+    "無緣孩子": "infant-spirit",
+    "整體運勢": "overall-fortune",
+    "個人感情運": "personal-romance",
+    "擇日／擇時": "date-time-selection",
+    "擇日/擇時": "date-time-selection",
+    "陽宅": "home-energy",
+    "官司": "lawsuit-benefactor",
+  };
+  return headings[value] || "";
+};
+
 export async function detectExternalConsultationResults(documentId: string) {
   await assertExternalConsultationDocument(documentId);
   const slots = await getQuickReplySectionSlots(documentId);
@@ -134,11 +160,11 @@ export async function detectExternalConsultationResults(documentId: string) {
   const isPersonLine = (value: string) => /／(?:男|女)(?:\s|（|$)/u.test(value);
   const isProfileLine = (value: string) => isPersonLine(value) || /^(?:農曆生日|居住地址|生前居住地址|農曆往生日期)：/u.test(value);
   for (let index = 0; index < formLines.length; index += 1) {
-    const itemCode = externalResultCode(formLines[index]);
+    const itemCode = externalFormHeadingCode(formLines[index]);
     if (!itemCode || formLines[index].length > 40) continue;
     let end = formLines.length;
     for (let cursor = index + 1; cursor < formLines.length; cursor += 1) {
-      if (externalResultCode(formLines[cursor]) && formLines[cursor].length <= 40) { end = cursor; break; }
+      if (externalFormHeadingCode(formLines[cursor])) { end = cursor; break; }
     }
     const block = formLines.slice(index + 1, end), targetAt = block.findIndex(line => /^(?:【)?對象資料(?:】)?$/u.test(line));
     const consultantSource = targetAt >= 0 ? block.slice(0, targetAt) : block;

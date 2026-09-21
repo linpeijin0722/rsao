@@ -878,10 +878,12 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
   const db = adminSupabase();
   const external = Boolean(externalItemCode && requestedDocumentId);
   const externalTitles:Record<string,string>={"overall-fortune":"整體運勢","personal-romance":"感情運勢","marriage-bazi":"感情運勢","health":"身體健康","date-time-selection":"擇日／擇時","past-life-personal":"前世因果（個人）","past-life-relationship":"與他人前世關係","infant-spirit":"嬰靈","deceased-relative":"過世親人","deceased-pet":"過世寵物","spiritual-interference":"靈擾／卡陰","home-energy":"居家風水","lawsuit-benefactor":"官司／貴人","naming":"命名"};
+  let externalDetected: Awaited<ReturnType<typeof detectExternalConsultationResults>>[number] | undefined;
   let booking:any,error:any=null;
   if(external){
     await getExternalConsultationReply(requestedDocumentId);
-    const detected=(await detectExternalConsultationResults(requestedDocumentId)).find(entry=>entry.slotIndex===externalSlotIndex),parseProfile=(lines:string[],id:string)=>{const first=String(lines[0]||""),parts=first.split("／"),tail=parts.slice(1).join("／"),relation=tail.match(/（([^）]+)）/)?.[1]||"",lunarLine=lines.find(line=>/^農曆生日：/u.test(line))||"",addressLine=lines.find(line=>/^(?:居住地址|生前居住地址)：/u.test(line))||"";return{id,profile_type:"person",name:parts[0]?.trim()||"",gender:tail.includes("女")?"女":tail.includes("男")?"男":"",relationship_detail:relation,lunar_birth_text:lunarLine.replace(/^農曆生日：/u,""),address:addressLine.replace(/^(?:居住地址|生前居住地址)：/u,""),_externalProfileLines:lines}},selfProfile=parseProfile(detected?.consultantLines||[],"external-self"),targetProfile=parseProfile(detected?.targetLines||[],"external-target"),hasTarget=Boolean(targetProfile.name),answer={profile_id:selfProfile.id,questions:[],extra_data:hasTarget?{relationship_details:{[targetProfile.id]:{}}}:{},consultation_profiles:selfProfile,booking_answer_participants:hasTarget?[{position:1,profile_id:targetProfile.id,consultation_profiles:targetProfile}]:[]},itemTitle=detected?.label||externalTitles[externalItemCode]||"外部諮詢";
+    externalDetected=(await detectExternalConsultationResults(requestedDocumentId)).find(entry=>entry.slotIndex===externalSlotIndex);
+    const detected=externalDetected,parseProfile=(lines:string[],id:string)=>{const first=String(lines[0]||""),parts=first.split("／"),tail=parts.slice(1).join("／"),relation=tail.match(/（([^）]+)）/)?.[1]||"",lunarLine=lines.find(line=>/^農曆生日：/u.test(line))||"",addressLine=lines.find(line=>/^(?:居住地址|生前居住地址)：/u.test(line))||"";return{id,profile_type:"person",name:parts[0]?.trim()||"",gender:tail.includes("女")?"女":tail.includes("男")?"男":"",relationship_detail:relation,lunar_birth_text:lunarLine.replace(/^農曆生日：/u,""),address:addressLine.replace(/^(?:居住地址|生前居住地址)：/u,""),_externalProfileLines:lines}},selfProfile=parseProfile(detected?.consultantLines||[],"external-self"),targetProfile=parseProfile(detected?.targetLines||[],"external-target"),hasTarget=Boolean(targetProfile.name),answer={profile_id:selfProfile.id,questions:[],extra_data:hasTarget?{relationship_details:{[targetProfile.id]:{}}}:{},consultation_profiles:selfProfile,booking_answer_participants:hasTarget?[{position:1,profile_id:targetProfile.id,consultation_profiles:targetProfile}]:[]},itemTitle=detected?.label||externalTitles[externalItemCode]||"外部諮詢";
     booking={id:`external-${requestedDocumentId}`,customer_id:null,booking_no:"外部諮詢單",customers:{full_name:selfProfile.name||"外部諮詢單"},booking_details:[{id:`external-${requestedDocumentId}`,item_id:null,created_at:"",item_title:itemTitle,google_document_id:requestedDocumentId,google_document_url:`https://docs.google.com/document/d/${requestedDocumentId}/edit`,booking_items:{code:externalItemCode},booking_detail_sub_items:[],booking_consultation_answers:[answer]}]};
   }else{
     const result = await db
@@ -1205,9 +1207,16 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
     sectionMeta = details.flatMap((detail: any) => {
       const answer = one(detail.booking_consultation_answers),
         profile = one(answer?.consultation_profiles),
-        presentation = profilePresentation(profile, ownerName),
-        extra = answer?.extra_data || {},
         itemCode = one(detail.booking_items)?.code || "",
+        presentation = external && externalDetected?.consultantLines?.length
+          ? {
+              profileLines: externalDetected.consultantLines,
+              locationSubject: externalDetected.consultantLines[0]?.split("／")[0] || "祂",
+              genderPronoun: externalDetected.consultantLines[0]?.includes("／女") ? "她" : externalDetected.consultantLines[0]?.includes("／男") ? "他" : "祂",
+              isPet: itemCode === "deceased-pet",
+            }
+          : profilePresentation(profile, ownerName),
+        extra = answer?.extra_data || {},
         healthQuestion = renderInputValue(extra.treatment_question || extra.treatment_question_other),
         healthPlanned = renderInputValue(extra.major_treatment_planned),
         healthTreatmentLines = itemCode === "health" && (healthPlanned || healthQuestion)

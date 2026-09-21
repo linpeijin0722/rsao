@@ -25,6 +25,11 @@ const groupOverallRequestLines = (lines: string[]) => {
   return groups.filter((group) => group.fields.length);
 };
 type Option = { id: string; code: string; label: string };
+const overallWorkFallbackOptions: Option[] = [
+  ...[["work_missing_wood", "缺木"], ["work_missing_fire", "缺火"], ["work_missing_earth", "缺土"], ["work_missing_metal", "缺金"], ["work_missing_water", "缺水"], ["work_missing_none", "五行沒有明顯缺少"]],
+  ...[["work_status_management", "目前是管理職"], ["work_status_manage_ability", "本身有管理能力"], ["work_status_lead_people", "適合帶人"], ["work_status_manage_regions", "適合管理更多區域"], ["work_status_high_management", "適合往高階主管發展"], ["work_status_continue", "目前工作可以繼續做"], ["work_status_stay_company", "適合留在公司發展"], ["work_status_avoid_changes", "不適合頻繁更換工作"]],
+  ...[["work_goal_continue", "想繼續目前工作"], ["work_goal_promotion", "想爭取升職"], ["work_goal_high_management", "想往高階主管發展"], ["work_goal_start_business", "想自己創業"], ["work_goal_partnership", "想與人合夥"], ["work_goal_network_business", "想靠人脈或介紹做生意"], ["work_goal_professional_business", "想靠專業或技術創業"]],
+].map(([code, label]) => ({ id: `virtual-${code.replaceAll("_", "-")}`, code, label }));
 type Topic = { code: string; title: string; icon: string; options: Option[] };
 type Question = {
   slotIndex: number;
@@ -379,9 +384,12 @@ export default function QuickConsultationReply({
           ? o.code.startsWith("advice_overall_")
           : o.code.startsWith("advice_"),
       ) || [],
-    workMissingOptions = sectionTopic?.options.filter((o) => o.code.startsWith("work_missing_")) || [],
-    workStatusOptions = sectionTopic?.options.filter((o) => o.code.startsWith("work_status_")) || [],
-    workGoalOptions = sectionTopic?.options.filter((o) => o.code.startsWith("work_goal_")) || [],
+    workOptionSource = sectionTopic?.code === "overall"
+      ? Array.from(new Map([...(sectionTopic.options || []), ...overallWorkFallbackOptions].map((option) => [option.code, option])).values())
+      : [],
+    workMissingOptions = workOptionSource.filter((o) => o.code.startsWith("work_missing_")),
+    workStatusOptions = workOptionSource.filter((o) => o.code.startsWith("work_status_")),
+    workGoalOptions = workOptionSource.filter((o) => o.code.startsWith("work_goal_")),
     recentPositiveOptions =
       sectionTopic?.options.filter((o) =>
         o.code.startsWith("recent_positive_"),
