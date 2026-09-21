@@ -32,9 +32,17 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const mode = body.mode === "scheduled" ? "scheduled" : "immediate";
+    const confirmedVersions = Array.isArray(body.confirmedVersions) ? body.confirmedVersions.map((entry: any) => ({
+      index: Number(entry?.index), versionId: String(entry?.versionId || ""), versionLabel: String(entry?.versionLabel || ""), content: String(entry?.content || "").trim(),
+    })).filter((entry: any) => Number.isFinite(entry.index) && entry.content) : [];
+    if (!confirmedVersions.length) return NextResponse.json({ error: "缺少已確認的傳送版本，請重新開啟最後確認畫面" }, { status: 400 });
+    if (new Set(confirmedVersions.map((entry: any) => entry.index)).size !== confirmedVersions.length)
+      return NextResponse.json({ error: "確認版本重複，為避免傳錯內容，本次未傳送" }, { status: 400 });
     const prepared = await prepareConsultationReturn({
       bookingNo: String(body.bookingNo || ""), documentId: String(body.documentId || ""),
-      selectedIndexes: body.selectedIndexes, editedItems: body.editedItems, skipCarousel: body.skipCarousel === true,
+      selectedIndexes: confirmedVersions.map((entry: any) => entry.index),
+      editedItems: Object.fromEntries(confirmedVersions.map((entry: any) => [entry.index, entry.content])),
+      skipCarousel: body.skipCarousel === true,
     });
     if (mode === "scheduled") {
       const scheduledFor = new Date(String(body.scheduledAt || ""));
