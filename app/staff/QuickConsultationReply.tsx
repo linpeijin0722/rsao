@@ -379,6 +379,9 @@ export default function QuickConsultationReply({
           ? o.code.startsWith("advice_overall_")
           : o.code.startsWith("advice_"),
       ) || [],
+    workMissingOptions = sectionTopic?.options.filter((o) => o.code.startsWith("work_missing_")) || [],
+    workStatusOptions = sectionTopic?.options.filter((o) => o.code.startsWith("work_status_")) || [],
+    workGoalOptions = sectionTopic?.options.filter((o) => o.code.startsWith("work_goal_")) || [],
     recentPositiveOptions =
       sectionTopic?.options.filter((o) =>
         o.code.startsWith("recent_positive_"),
@@ -541,6 +544,7 @@ export default function QuickConsultationReply({
           !o.code.startsWith("date_") &&
           !o.code.startsWith("past_") &&
           !o.code.startsWith("body_") &&
+          !o.code.startsWith("work_") &&
           !o.code.startsWith("home_") &&
           !o.code.startsWith("spiritual_") &&
           !o.code.startsWith("element_") &&
@@ -898,16 +902,22 @@ export default function QuickConsultationReply({
   function toggleOption(id: string) {
     const current =
         sectionSelections.current[sectionKey] || sectionDraft.optionIds,
-      selectedOption = pastLifeTopicOptions.find((option) => option.id === id);
+      selectedOption = pastLifeTopicOptions.find((option) => option.id === id),
+      currentOption = sectionTopic?.options.find((option) => option.id === id);
     if (!current.includes(id) && selectedOption?.code.startsWith("past_consultant_") && consultantSelectedElsewhere && !consultantWarningShown.current) {
       consultantWarningShown.current = true;
       const message = `「諮詢者的個性」已在「與${consultantSelectedElsewhere.targetName || "其他對象"}的前世關係」中選擇過。\n\n仍要在這個項目選擇嗎？`;
       if (!window.confirm(message)) return;
     }
-    const
-      next = current.includes(id)
+    let next = current.includes(id)
         ? current.filter((x) => x !== id)
         : [...current, id];
+    if (!current.includes(id) && currentOption?.code.startsWith("work_missing_")) {
+      const missingIds = new Set(workMissingOptions.map((option) => option.id));
+      next = current.filter((value) => !missingIds.has(value) || (currentOption.code !== "work_missing_none" && value !== workMissingOptions.find((option) => option.code === "work_missing_none")?.id));
+      if (currentOption.code === "work_missing_none") next = next.filter((value) => !missingIds.has(value));
+      next.push(id);
+    }
     sectionSelections.current[sectionKey] = next;
     setSectionDrafts((c) => ({
       ...c,
@@ -2746,11 +2756,43 @@ export default function QuickConsultationReply({
                                 </div>
                               </div>
                             )}
+                            {sectionTopic?.code === "overall" && (workMissingOptions.length > 0 || workStatusOptions.length > 0 || workGoalOptions.length > 0) && (
+                              <div className="quickReplySpecialField quickReplyOverallWorkAdvice">
+                                <div className="quickReplySpecialHeading">
+                                  <span>⑤</span>
+                                  <div><h4>工作建議</h4><p>依照本命格、目前工作與想問的方向，自動組合完整建議。</p></div>
+                                </div>
+                                <h5 className="quickReplySubheading">命格缺少（可複選）</h5>
+                                <div className="quickReplySpecialChoices quickReplyWorkMissingChoices">
+                                  {workMissingOptions.map((o) => (
+                                    <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
+                                      {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
+                                    </button>
+                                  ))}
+                                </div>
+                                <h5 className="quickReplySubheading">目前工作狀況（可複選）</h5>
+                                <div className="quickReplySpecialChoices">
+                                  {workStatusOptions.map((o) => (
+                                    <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
+                                      {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
+                                    </button>
+                                  ))}
+                                </div>
+                                <h5 className="quickReplySubheading">目前想問的方向（可複選）</h5>
+                                <div className="quickReplySpecialChoices">
+                                  {workGoalOptions.map((o) => (
+                                    <button key={o.id} className={sectionDraft.optionIds.includes(o.id) ? "selected" : ""} onClick={() => toggleOption(o.id)}>
+                                      {sectionDraft.optionIds.includes(o.id) && <span>✓</span>}{o.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                             {sectionTopic?.code === "overall" &&
                               (recentPositiveOptions.length > 0 || recentNegativeOptions.length > 0) && (
                               <div className="quickReplySpecialField quickReplyOverallRecent">
                                 <div className="quickReplySpecialHeading">
-                                  <span>⑤</span>
+                                  <span>⑥</span>
                                   <div><h4>最近狀況</h4></div>
                                 </div>
                                 <h5 className="quickReplySubheading">正面狀況（可複選）</h5>
@@ -2794,7 +2836,7 @@ export default function QuickConsultationReply({
                             {sectionTopic?.code === "overall" && bodyOptions.length > 0 && (
                               <div className="quickReplySpecialField quickReplyOverallBody">
                                 <div className="quickReplySpecialHeading">
-                                  <span>⑥</span>
+                                  <span>⑦</span>
                                   <div><h4>身體狀況</h4></div>
                                 </div>
                                 <h5 className="quickReplySubheading">本身狀況不錯（可複選）</h5>

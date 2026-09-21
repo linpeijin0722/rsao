@@ -186,6 +186,9 @@ const spiritBuiltInCopy = Object.fromEntries(
   [...infantBuiltInRows, ...meritBuiltInRows].map(([code, , content]) => [code, content]),
 ) as Record<string, string>;
 const overallBuiltInOptions = [
+  ...[
+    ["element_wood", "木"], ["element_fire", "火"], ["element_earth", "土"], ["element_metal", "金"], ["element_water", "水"],
+  ].map(([code, label], index) => ({ id: `virtual-${code.replaceAll("_", "-")}`, code, label, sort_order: 1 + index, is_active: true })),
   {
     id: "virtual-deity-wangmu",
     code: "deity_wangmu",
@@ -340,6 +343,11 @@ const overallBuiltInOptions = [
     sort_order: 206,
     is_active: true,
   },
+  ...[
+    ["work_missing_wood", "缺木"], ["work_missing_fire", "缺火"], ["work_missing_earth", "缺土"], ["work_missing_metal", "缺金"], ["work_missing_water", "缺水"], ["work_missing_none", "五行沒有明顯缺少"],
+    ["work_status_management", "目前是管理職"], ["work_status_manage_ability", "本身有管理能力"], ["work_status_lead_people", "適合帶人"], ["work_status_manage_regions", "適合管理更多區域"], ["work_status_high_management", "適合往高階主管發展"], ["work_status_continue", "目前工作可以繼續做"], ["work_status_stay_company", "適合留在公司發展"], ["work_status_avoid_changes", "不適合頻繁更換工作"],
+    ["work_goal_continue", "想繼續目前工作"], ["work_goal_promotion", "想爭取升職"], ["work_goal_high_management", "想往高階主管發展"], ["work_goal_start_business", "想自己創業"], ["work_goal_partnership", "想與人合夥"], ["work_goal_network_business", "想靠人脈或介紹做生意"], ["work_goal_professional_business", "想靠專業或技術創業"],
+  ].map(([code, label], index) => ({ id: `virtual-${code.replaceAll("_", "-")}`, code, label, sort_order: 230 + index, is_active: true })),
   ...[
     ["recent_positive_windfall", "有偏財運"],
     ["recent_positive_support", "有貴人相助"],
@@ -1930,6 +1938,7 @@ export async function POST(request: NextRequest) {
         elementRows = valid.filter((selection) =>
           selection.optionCode.startsWith("element_"),
         ),
+        workRows = valid.filter((selection) => selection.optionCode.startsWith("work_")),
         accentElementIds = new Set(asArray(body.accentElementIds).map(String)),
         accentElementRows = valid.filter((selection) => accentElementIds.has(selection.optionId)),
         deityRelationRows = valid.filter((selection) =>
@@ -2144,6 +2153,7 @@ export async function POST(request: NextRequest) {
           : "";
       const elementLabels = elementRows.filter((row) => !accentElementIds.has(row.optionId)).map((row) => row.optionLabel),
         accentElementLabels = accentElementRows.map((row) => row.optionLabel),
+        missingElementLabels = workRows.filter((row) => row.optionCode.startsWith("work_missing_") && row.optionCode !== "work_missing_none").map((row) => row.optionLabel.replace(/^缺/u, "")),
         elementTraits: Record<string, string> = {
           金: "做事果斷，對專業和細節有要求",
           木: "想法多、有成長力，遇到事情願意往前試",
@@ -2155,8 +2165,8 @@ export async function POST(request: NextRequest) {
           ? `本命格屬${elementLabels.join("、")}${accentElementLabels.length ? `，帶一點${accentElementLabels.join("、")}` : ""}（個性${[...elementLabels, ...accentElementLabels]
               .map((label) => elementTraits[label])
               .filter(Boolean)
-              .join("，")}）。`
-          : "";
+              .join("，")}）。${missingElementLabels.length ? `\n命格缺${missingElementLabels.join("、")}。` : ""}`
+          : missingElementLabels.length ? `命格缺${missingElementLabels.join("、")}。` : "";
       const deityLabels = [
           ...deityRows.map((row) => row.optionLabel),
           ...clean(body.customDeity)
@@ -2210,7 +2220,7 @@ export async function POST(request: NextRequest) {
           .map((entry: any) => render(entry.content))
           .filter(Boolean)
           .join(" "),
-        overallKnownPrefixes = ["status_overall_", "advice_overall_", "recent_", "body_"],
+        overallKnownPrefixes = ["status_overall_", "advice_overall_", "recent_", "body_", "work_"],
         overallOther = chosen
           .filter((entry: any) => !overallKnownPrefixes.some((prefix) => String(entry.optionCode || "").startsWith(prefix)))
           .map((entry: any) => render(entry.content))
@@ -2223,10 +2233,39 @@ export async function POST(request: NextRequest) {
           .map((entry: any) => render(entry.content)).filter(Boolean).join(" "),
         overallAdvice = [overallChosenGroup(["advice_overall_", "recent_advice_"]), overallOther].filter(Boolean).join(" "),
         overallDestiny = [elementSentence, deitySentence].filter(Boolean).join(" "),
+        overallWork = (() => {
+          const codes = new Set(workRows.map((row) => row.optionCode)),
+            isWood = elementLabels.includes("木"),
+            missingWater = codes.has("work_missing_water"),
+            management = ["work_status_management", "work_status_manage_ability", "work_status_lead_people", "work_status_manage_regions", "work_status_high_management"].some((code) => codes.has(code)),
+            continueCurrent = codes.has("work_status_continue") || codes.has("work_status_stay_company") || codes.has("work_goal_continue"),
+            promotion = codes.has("work_goal_promotion") || codes.has("work_goal_high_management") || codes.has("work_status_high_management") || codes.has("work_status_manage_regions"),
+            startBusiness = codes.has("work_goal_start_business") || codes.has("work_goal_partnership") || codes.has("work_goal_network_business") || codes.has("work_goal_professional_business"),
+            parts: string[] = [];
+          if (management) parts.push(isWood
+            ? "本命格屬木，本身做管理、帶人這一塊是有能力的，所以不用一定要想著自己出去當老闆。"
+            : "本身做管理、帶人這一塊是有能力的，留在熟悉的工作環境發展，會比較能夠發揮。"
+          );
+          if (continueCurrent) parts.push(management
+            ? "這份工作可以繼續做，尤其現在做的是管理，這一塊本身就適合。管理能力是有的，本身留在公司發展，比自己出去創業來得穩。"
+            : "現在的工作可以繼續做，先把目前的位置與收入穩住，不需要急著頻繁更換工作。"
+          );
+          if (promotion) parts.push("往後如果有升職、往更高階主管發展的機會，可以去爭取。像是管理更多區域、帶更多人，甚至往高層的位置走，這些都可以去爭取。比起自己一個人出去扛所有事情，待在公司裡面往管理階層走，會穩很多。");
+          if (codes.has("work_goal_start_business") && !management && !codes.has("work_status_stay_company")) parts.push("如果真的想自己出來做，方向要先確認清楚。比較適合從自己已經熟悉、有經驗的事情開始，不要在條件還沒有穩定以前就一次投入太多。");
+          if (startBusiness && (management || codes.has("work_status_stay_company"))) parts.push("如果想自己出來做，不需要急著現在就離開公司。本身命格比較適合站在管理的位置，不一定要自己當老闆，做到公司裡面的主管或高層，反而比較能發揮。");
+          if (startBusiness && missingWater) parts.push("如果真的要出來做，就不要走那種完全靠人脈、靠貴人幫忙的生意。因為本身命格缺水，貴人方面比較不足，很多事情容易變成自己一個人扛。");
+          if (startBusiness && codes.has("work_goal_professional_business")) parts.push("比較適合靠專業、技術、經驗去賺錢的工作，要有一套自己的能力跟技術，客人是因為這個專業來找，而不是一直要靠別人介紹。");
+          if (startBusiness && codes.has("work_goal_network_business")) parts.push("如果生意需要一直依靠別人介紹、牽線或幫忙，發展上會比較不穩，也容易受到別人的影響。");
+          if (startBusiness && codes.has("work_goal_partnership")) parts.push("如果是合夥很多人、靠人情、靠關係才能做起來的生意，就比較容易遇到意見不合與是非，這一類型要特別小心。");
+          if (!startBusiness && missingWater && continueCurrent) parts.push("本身命格缺水，工作上的貴人助力會比較不足，很多事情還是要依靠自己的能力處理。現在的工作可以繼續做，重要的是累積專業與實際經驗，不要把發展全部寄託在別人幫忙。");
+          if (codes.has("work_status_avoid_changes") && !continueCurrent) parts.push("目前不適合頻繁更換工作，先把現有的位置與實際經驗穩定下來，再看下一步會比較好。");
+          return parts.join("\n\n");
+        })(),
         overallAnswer = [
           overallBody ? `${safeHeading("身體狀況")}\n${overallBody}` : "",
           overallDestiny ? `${safeHeading("本命格")}\n${overallDestiny}` : "",
           overallStatus ? `${safeHeading("整體運勢")}\n${overallStatus}` : "",
+          overallWork ? `${safeHeading("工作建議")}\n${overallWork}` : "",
           overallRecent ? `${safeHeading("最近狀況")}\n${overallRecent}` : "",
           overallAdvice ? `${safeHeading("建議")}\n${overallAdvice}` : "",
         ].filter(Boolean).join("\n\n"),
