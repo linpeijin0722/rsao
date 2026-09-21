@@ -125,6 +125,29 @@ const externalResultCode = (label: string) => {
 export async function detectExternalConsultationResults(documentId: string) {
   await assertExternalConsultationDocument(documentId);
   const slots = await getQuickReplySectionSlots(documentId);
+  const token = await accessToken();
+  const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
+  const { plain } = indexedDocumentText(document);
+  const answerArea = plain.indexOf("您好，以下是您的諮詢結果");
+  const formLines = plain.slice(0, answerArea >= 0 ? answerArea : plain.length).split("\n").map(value => value.trim()).filter(Boolean);
+  const sourceProfiles = new Map<string, { consultantLines: string[]; targetLines: string[] }>();
+  const isPersonLine = (value: string) => /／(?:男|女)(?:\s|（|$)/u.test(value);
+  const isProfileLine = (value: string) => isPersonLine(value) || /^(?:農曆生日|居住地址|生前居住地址|農曆往生日期)：/u.test(value);
+  for (let index = 0; index < formLines.length; index += 1) {
+    const itemCode = externalResultCode(formLines[index]);
+    if (!itemCode || formLines[index].length > 40) continue;
+    let end = formLines.length;
+    for (let cursor = index + 1; cursor < formLines.length; cursor += 1) {
+      if (externalResultCode(formLines[cursor]) && formLines[cursor].length <= 40) { end = cursor; break; }
+    }
+    const block = formLines.slice(index + 1, end), targetAt = block.findIndex(line => /^(?:【)?對象資料(?:】)?$/u.test(line));
+    const consultantSource = targetAt >= 0 ? block.slice(0, targetAt) : block;
+    const targetSource = targetAt >= 0 ? block.slice(targetAt + 1) : [];
+    const consultantStart = consultantSource.findIndex(isPersonLine), targetStart = targetSource.findIndex(isPersonLine);
+    const consultantLines = consultantStart >= 0 ? consultantSource.slice(consultantStart).filter(isProfileLine) : [];
+    const targetLines = targetStart >= 0 ? targetSource.slice(targetStart).filter(isProfileLine) : [];
+    if (consultantLines.length && !sourceProfiles.has(itemCode)) sourceProfiles.set(itemCode, { consultantLines, targetLines });
+  }
   const candidates = slots.map(slot => {
     const lines = slot.answer.split("\n").map(value => value.trim()).filter(Boolean);
     const profileAt = (start: number) => lines.slice(start, start + 3).filter(line => /(?:／(?:男|女)|農曆生日：|居住地址：)/u.test(line));
@@ -134,9 +157,9 @@ export async function detectExternalConsultationResults(documentId: string) {
       slotIndex: slot.slotIndex,
       label: slot.label,
       itemCode: externalResultCode(slot.label),
-      consultantLines: firstPerson >= 0 ? profileAt(firstPerson) : [],
-      targetLines: targetHeading >= 0 ? profileAt(targetHeading + 1) : [],
-      profileImmediatelyBelowHeading: firstPerson === 0,
+      consultantLines: sourceProfiles.get(externalResultCode(slot.label))?.consultantLines || (firstPerson >= 0 ? profileAt(firstPerson) : []),
+      targetLines: sourceProfiles.get(externalResultCode(slot.label))?.targetLines || (targetHeading >= 0 ? profileAt(targetHeading + 1) : []),
+      profileImmediatelyBelowHeading: sourceProfiles.has(externalResultCode(slot.label)) || firstPerson === 0,
     };
   }).filter(slot => slot.itemCode);
   // 舊文件會把「流年運勢、整體建議」等內部小標題也寫成【】。
@@ -158,7 +181,7 @@ export async function upsertExternalConsultationSectionReplies(documentId:string
   for(const [key,raw] of Object.entries(answers)){
     const slotIndex=Number(key),match=matches[slotIndex],value=normalizeConsultationReturnText(raw);if(!match||!value)continue;
     const blockStart=baseOffset+(match.index||0)+match[0].length,rest=plain.slice(blockStart),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),blockEnd=boundary>=0?blockStart+boundary:Math.max(blockStart,plain.replace(/\n$/,"").length);
-    const block=plain.slice(blockStart,blockEnd),addresses=Array.from(block.matchAll(/(?:^|\n)居住地址：[^\n]*/g));
+    const block=plain.slice(blockStart,blockEnd),addresses=Array.from(block.matchAll(/(?:^|\n)(?:居住地址|生前居住地址|農曆往生日期)：[^\n]*/g));
     let resultStart=blockStart;
     if(addresses.length){const last=addresses[addresses.length-1],lineEnd=(last.index||0)+last[0].length;resultStart=blockStart+lineEnd+(block[lineEnd]==="\n"?1:0)}
     const startIndex=documentIndexAt(resultStart),endIndex=documentIndexAt(blockEnd);

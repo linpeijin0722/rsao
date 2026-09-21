@@ -818,6 +818,11 @@ const profilePresentation = (profile: any, ownerName: string) => {
       genderPronoun: "祂",
       isPet: false,
     };
+  const externalProfileLines = Array.isArray(profile._externalProfileLines) ? profile._externalProfileLines.map(clean).filter(Boolean) : [];
+  if (externalProfileLines.length) {
+    const externalGender = clean(profile.gender), externalRelationship = clean(profile.relationship_detail || profile.relationship), externalName = clean(profile.name);
+    return { profileLines: externalProfileLines, locationSubject: externalRelationship || externalName || "祂", genderPronoun: externalGender.includes("女") ? "她" : externalGender.includes("男") ? "他" : "祂", isPet: false };
+  }
   const isPet = profile.profile_type === "pet",
     name = clean(profile.name),
     detail = clean(profile.relationship_detail),
@@ -868,7 +873,7 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
   let booking:any,error:any=null;
   if(external){
     await getExternalConsultationReply(requestedDocumentId);
-    const detected=(await detectExternalConsultationResults(requestedDocumentId)).find(entry=>entry.slotIndex===externalSlotIndex),parseProfile=(lines:string[],id:string)=>{const first=String(lines[0]||""),parts=first.split("／"),tail=parts.slice(1).join("／"),relation=tail.match(/（([^）]+)）/)?.[1]||"";return{id,profile_type:"person",name:parts[0]?.trim()||"",gender:tail.includes("女")?"女":tail.includes("男")?"男":"",relationship_detail:relation,lunar_birth_text:String(lines[1]||"").replace(/^農曆生日：/u,""),address:String(lines[2]||"").replace(/^居住地址：/u,"")}},selfProfile=parseProfile(detected?.consultantLines||[],"external-self"),targetProfile=parseProfile(detected?.targetLines||[],"external-target"),hasTarget=Boolean(targetProfile.name),answer={profile_id:selfProfile.id,questions:[],extra_data:hasTarget?{relationship_details:{[targetProfile.id]:{}}}:{},consultation_profiles:selfProfile,booking_answer_participants:hasTarget?[{position:1,profile_id:targetProfile.id,consultation_profiles:targetProfile}]:[]},itemTitle=detected?.label||externalTitles[externalItemCode]||"外部諮詢";
+    const detected=(await detectExternalConsultationResults(requestedDocumentId)).find(entry=>entry.slotIndex===externalSlotIndex),parseProfile=(lines:string[],id:string)=>{const first=String(lines[0]||""),parts=first.split("／"),tail=parts.slice(1).join("／"),relation=tail.match(/（([^）]+)）/)?.[1]||"",lunarLine=lines.find(line=>/^農曆生日：/u.test(line))||"",addressLine=lines.find(line=>/^(?:居住地址|生前居住地址)：/u.test(line))||"";return{id,profile_type:"person",name:parts[0]?.trim()||"",gender:tail.includes("女")?"女":tail.includes("男")?"男":"",relationship_detail:relation,lunar_birth_text:lunarLine.replace(/^農曆生日：/u,""),address:addressLine.replace(/^(?:居住地址|生前居住地址)：/u,""),_externalProfileLines:lines}},selfProfile=parseProfile(detected?.consultantLines||[],"external-self"),targetProfile=parseProfile(detected?.targetLines||[],"external-target"),hasTarget=Boolean(targetProfile.name),answer={profile_id:selfProfile.id,questions:[],extra_data:hasTarget?{relationship_details:{[targetProfile.id]:{}}}:{},consultation_profiles:selfProfile,booking_answer_participants:hasTarget?[{position:1,profile_id:targetProfile.id,consultation_profiles:targetProfile}]:[]},itemTitle=detected?.label||externalTitles[externalItemCode]||"外部諮詢";
     booking={id:`external-${requestedDocumentId}`,customer_id:null,booking_no:"外部諮詢單",customers:{full_name:selfProfile.name||"外部諮詢單"},booking_details:[{id:`external-${requestedDocumentId}`,item_id:null,created_at:"",item_title:itemTitle,google_document_id:requestedDocumentId,google_document_url:`https://docs.google.com/document/d/${requestedDocumentId}/edit`,booking_items:{code:externalItemCode},booking_detail_sub_items:[],booking_consultation_answers:[answer]}]};
   }else{
     const result = await db

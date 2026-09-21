@@ -1398,7 +1398,7 @@ export default function QuickConsultationReply({
             <h2>建立諮詢回覆</h2>
             {data && (
               <p>
-                {data.customerName}｜{data.bookingNo}
+                {embedded ? "外部諮詢單" : `${data.customerName}｜${data.bookingNo}`}
               </p>
             )}
           </div>
