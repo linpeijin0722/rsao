@@ -1,4 +1,7 @@
 "use client";
+import AnnualFortuneEditor from "./AnnualFortuneEditor";
+import AiAnswerChoices from "./AiAnswerChoices";
+import type { AnnualState } from "@/lib/annual-fortune";
 import { useEffect, useMemo, useRef, useState } from "react";
 const asCodes = (value: unknown): string[] =>
   Array.isArray(value)
@@ -75,6 +78,7 @@ type Draft = {
   completed?: boolean;
 };
 type SectionDraft = {
+  annualState?: AnnualState;
   optionIds: string[];
   phraseIds: string[];
   answer: string;
@@ -1483,7 +1487,7 @@ export default function QuickConsultationReply({
                     </div>
                   ))}
                   {section && (
-                    <>
+                    <div className={section.itemCode === "overall-fortune" && section.label === "流年運勢" ? "annualReplyMode" : ""}>
                       <div ref={itemDetailRef} className="quickReplyItemAnchor" aria-hidden="true" />
                       {section.profileLines?.length > 0 && (
                         <section className="quickReplyProfileCard">
@@ -1493,6 +1497,7 @@ export default function QuickConsultationReply({
                           ))}
                         </section>
                       )}
+                      {section.itemCode === "overall-fortune" && section.label === "流年運勢" && <AnnualFortuneEditor key={sectionKey} startAge={Number(section.profileLines.join(" ").match(/虛歲\s*[:：]\s*(\d+)/)?.[1]||sectionDraft.answer.match(/(\d+)歲\s*[:：]/)?.[1]||0)} value={sectionDraft.answer} state={sectionDraft.annualState} onChange={(answer,annualState)=>{setSectionDrafts(c=>({...c,[sectionKey]:{...sectionDraft,answer,annualState,completed:true}}));setWritten(false)}}/>}
                       {sectionTopic?.code !== "naming_result" && section.itemCode !== "infant-spirit" && (!embedded || section.requestLines.length > 0) && (
                           <section className="quickReplyInputCard">
                             <h3>{section.requestLines.length ? "用戶填寫的內容" : "用戶無填寫內容"}</h3>
@@ -3208,10 +3213,11 @@ export default function QuickConsultationReply({
                           </button>
                         </div>
                       </section>
-                    </>
+                    </div>
                   )}
                 </>
               )}
+              {!!data?.questions.length && <AiAnswerChoices fingerprint={JSON.stringify(Object.fromEntries(Object.entries(sectionDrafts).map(([key,row])=>[key,row.answer])))} generate={()=>post({mode:"ai_question_choices",sectionReplies:sectionDrafts})} onChoose={(slotIndex,answer)=>{const key=String(slotIndex);if(drafts[key]?.answer?.trim()&&!window.confirm("這題已有答案，是否用選取的 AI 回答替換？"))return false;setDrafts(c=>({...c,[key]:{selections:c[key]?.selections||{},phraseIds:[],answer,completed:true}}));setWritten(false);return true}}/>}
               {view === "question" && (
                 <>
                   <section className="quickReplyQuestions">

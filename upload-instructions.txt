@@ -1,31 +1,66 @@
-防止視訊重複預約｜2026-10-01
+阿嫂預約系統：15年流年快速寫單、AI每題3種回答、客服每日提醒
 
-部署順序
-1. 確認選擇阿嫂預約系統的 Supabase 專案，前一版044、045已成功執行。
-2. 打開046_atomic_video_reservations.sql，完整貼上SQL Editor並執行。
-3. 覆蓋網站專案以下路徑：
-app/page.tsx
-app/api/bookings/route.ts
-4. 重新部署網站。
-本次不用更新Google Apps Script。
-ZIP中的SQL需在Supabase執行，僅上傳SQL檔案不會生效。
+上傳方式
+1. ZIP解壓縮後，app/、lib/、vercel.json依原路徑放到網站專案根目錄，覆蓋同名檔案。
+   新增的檔案也要一起上傳，請不要只上傳QuickConsultationReply.tsx。
+   tests/可一併保留作開發驗證，不是網站執行所需。
+2. 在正確專案的Supabase SQL Editor，完整執行 supabase/047_staff_data_reminders.sql。
+   這次SQL可重複執行，會新增客服提醒設定及每日發送記錄。
+   不需要更新Google Apps Script（程式碼.gs）。
+3. Vercel重新部署網站。vercel.json新增每天04:00 UTC＝台灣12:00的客服提醒排程。
 
-規則
-- 兩人可以事先選到同一時間，但送出時由資料庫交易鎖序列化檢查。
-- 待付款訂單立即占用時段，不必等待付款。
-- 取消才釋放；已逾期的待付款訂單在新預約交易中先取消，再重新檢查可約。
-- 時段及諮詢、緩衝時間重疊皆阻擋，後台手動新增與修改也受保護。
-- 失敗交易回滾，不留下半筆訂單。
-- 前台衝突回應409，清除原時段、更新可約時間並回到時間選擇；不進付款，不傳成功通知。
-- 所有日期與時間判斷維持台灣時區。
+網站檔案與上傳路徑（均以網站專案根目錄為起點）
+- app/layout.tsx
+- app/v45.css
+- app/staff/AnnualFortuneEditor.tsx
+- app/staff/AiAnswerChoices.tsx
+- app/staff/QuickConsultationReply.tsx
+- app/api/staff/quick-reply/route.ts
+- app/api/cron/staff-data-reminders/route.ts
+- lib/annual-fortune.ts
+- lib/ai-question-choices.ts
+- lib/staff-data-reminders.ts
+- lib/google-consultation-docs.ts
+- vercel.json
+- supabase/047_staff_data_reminders.sql
 
-既有重複預約
-SQL最後會列出既有重疊的訂單編號與台灣時間，僅供人工核對，不會自動刪除、取消或發送LINE。
-若輸出重疊訂單，請聯絡客人協調改期；新限制不會替你更動舊訂單。
+環境變數
+沿用既有 NEXT_PUBLIC_SUPABASE_URL、SUPABASE_SERVICE_ROLE_KEY、LINE_MESSAGING_CHANNEL_ACCESS_TOKEN、ADMIN_SESSION_SECRET、NEXT_PUBLIC_SITE_URL。
+OPENAI_API_KEY：AI回答必須設定，沿用既有AI潤稿金鑰。
+OPENAI_ANSWER_MODEL：可選；未設定時沿用OPENAI_POLISH_MODEL，再未設定使用gpt-5-mini。
+CRON_SECRET：必須設定；排程以Authorization: Bearer驗證。
+如果沒有設定排程或CRON_SECRET，僅上傳網站檔案不會產生每日提醒。
+
+客服身分與驗收
+目前工作環境沒有正式Supabase連線，因此沒有取得或猜測林啟恩的實際LINE UID。
+SQL只在customers中，本名精確等於「林啟恩」且LINE名稱精確等於「Nnn」，並僅有一個不同UID時，自動綁定及啟用。
+執行SQL最後會顯示enabled與UID。enabled=false表示尚未啟用；請檢查後方列出的用戶資料、修正本名後重跑SQL，不要猜UID。
+每次排程也會核對資料庫名稱與LINE實際profile名稱；核對失敗停止發送。
+登入後台後，在同一瀏覽器開啟：
+https://你的網站網域/api/cron/staff-data-reminders?dryRun=1
+這只會核對身分並列出符合條件的通知預覽，不會發送LINE或建立發送記錄。
+可先確認recipient為林啟恩／Nnn，previews的訂單及台灣時間正確。
+沒有符合條件的訂單時count=0是正常情況。
+
+提醒規則
+視訊日期前4個台灣日曆日起，到預約開始前，尚無data_submitted_at的訂單，每天台灣中午12點通知客服。
+包含尚待付款但仍未失效的訂單；已取消、已失效、資料已送出、已過預約時間都不通知。
+資料送出指系統「送出資料」的完成狀態，不是填到一半或建立部分人物資料。
+通知內容有客人姓名、訂單編號、台灣視訊時間及客服後台連結。
+同訂單／日期／客服只有一筆發送記錄；重複排程不重送。
+LINE失敗會留在staff_data_reminder_log.last_error；當天不盲目重送，以避免網路逾時實際已送達造成重複訊息，次日若仍未填資料會再通知。
+
+寫單規則
+整體運勢的新文件從目前虛歲起共15年（例44～58歲），最高到99歲。
+流年快速寫單一次只展開一年，財運、助力、需要留意、健康可複選，各年獨立，文字可自行修改。
+自行修改的文字不會因勾選選項而自動覆蓋，按「依選項重新組合／換個說法」才重新產生。
+既有舊文件不會被批次改寫；開啟流年介面顯示15年，編輯後按「確認寫入全部回答」才更新該段。
+身體健康文件沿用21年，這次15年調整針對整體運勢。
+AI只參考對應人物／項目的阿嫂內容，每題提供3個候選，點選才填入A，已有答案會先確認是否替換。
+產生AI候選不會直接修改Google諮詢單，仍須按下方確認寫入。
+修改阿嫂原文後，過期候選會清除，需要重新產生。
 
 驗證
-Production build通過。
-真實PostgreSQL兩個連線測試：A交易未提交時B等待；A提交待付款後B被拒絕，僅一筆訂單。
-取消、逾期釋放、交易回滾、緩衝、後台新增／修改、最終金額時長重疊測試通過。
-API與實際前台送出函式測試：衝突不進付款、不送通知、清除時段並更新選項。
-未連接正式資料庫，未發送客人測試訊息。
+25項自動化測試通過；390px手機與1280px電腦實測：逐年內容保留、3候選選取、答案寫入、無水平溢出。
+047 SQL以PostgreSQL引擎測試：重複執行、唯一身分綁定、未匹配／重名停用、每日唯一限制。
+測試全部使用模擬資料，沒有向客人或客服發送正式LINE，也沒有修改正式資料庫。

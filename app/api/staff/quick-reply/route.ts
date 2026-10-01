@@ -1,3 +1,4 @@
+import { generateQuestionChoices } from "@/lib/ai-question-choices";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
@@ -1549,12 +1550,15 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
   const allRawSectionSlots = await getQuickReplySectionSlots(documentDetail.google_document_id),
     rawSectionSlots = external && externalSlotIndex >= 0 ? allRawSectionSlots.filter(slot => slot.slotIndex === externalSlotIndex) : allRawSectionSlots,
     usedMeta = new Set<number>();
+  let previousMetaIndex = -1;
   const sectionSlots = rawSectionSlots
     .map((slot) => {
       let metaIndex = sectionMeta.findIndex(
         (entry: any, index: number) =>
           !usedMeta.has(index) && entry.label === slot.label,
       );
+      const childSection = /^(整體建議|健康建議|流年運勢)$/.test(slot.label);
+      if(childSection&&previousMetaIndex>=0&&["overall-fortune","health"].includes(sectionMeta[previousMetaIndex].itemCode))metaIndex=previousMetaIndex;
       if (metaIndex < 0 && /整體建議|流年運勢|整體運勢/.test(slot.label))
         metaIndex = sectionMeta.findIndex(
           (entry: any, index: number) =>
@@ -1579,7 +1583,8 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
         if (remaining.length === 1) metaIndex = remaining[0];
       }
       if (metaIndex < 0) return null;
-      usedMeta.add(metaIndex);
+      if(!childSection)usedMeta.add(metaIndex);
+      previousMetaIndex=metaIndex;
       const meta = sectionMeta[metaIndex],
         itemCode = meta.itemCode || "",
         previousRow =
@@ -1759,6 +1764,7 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
           completed: contaminated ? false : existing.completed === true,
           accentElementIds: contaminated ? [] : asArray(existing.accentElementIds).map(String),
           spiritualDetail: contaminated ? "" : clean(existing.spiritualDetail),
+          annualState: existing.annualState || undefined,
         },
       ];
     }),
@@ -1851,6 +1857,15 @@ export async function POST(request: NextRequest) {
         { error: "連結驗證失敗，請重新從 Google 諮詢單開啟" },
         { status: 401 },
       );
+    if(body.mode === "ai_question_choices"){
+      const incoming=body.sectionReplies&&typeof body.sectionReplies==="object"?body.sectionReplies:{};
+      const questions=data.questionSlots.map((q:any)=>{
+        const sections=data.sectionSlots.filter((section:any)=>section.itemCode===q.itemCode&&section.profileName===q.profileName);
+        const source=sections.map((section:any)=>`【${section.label}${section.targetDisplay ? `／${section.targetDisplay}` : ""}】\n${String(incoming[String(section.slotIndex)]?.answer??data.sectionReplies[String(section.slotIndex)]?.answer??section.answer??"")}`).join("\n\n").slice(0,9000);
+        return{slotIndex:q.slotIndex,questionNumber:q.questionNumber,question:q.question,profileName:q.profileName||"",source};
+      });
+      return NextResponse.json({ok:true,choices:await generateQuestionChoices(questions)});
+    }
     if (body.mode === "compose" || body.mode === "compose_section") {
       const selections =
           body.selections && typeof body.selections === "object"
@@ -2391,6 +2406,7 @@ export async function POST(request: NextRequest) {
         targetName: slot.targetName || "",
         accentElementIds: asArray(row.accentElementIds).map(String),
         spiritualDetail: clean(row.spiritualDetail),
+        annualState: slot.itemCode === "overall-fortune" && slot.label === "流年運勢" ? row.annualState : undefined,
       };
       sectionAnswers[String(slot.slotIndex)] = answer;
     }

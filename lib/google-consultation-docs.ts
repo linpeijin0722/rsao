@@ -1317,7 +1317,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     add("【流年運勢】", "section");
     const startingAge = virtualAge(people[0]);
     if (startingAge) {
-      for (let age = startingAge; age <= Math.min(99, startingAge + 20); age += 1) add(`${age}歲：\u00a0`, "teacher");
+      for (let age = startingAge; age <= Math.min(99, startingAge + (isOverallFortune ? 14 : 20)); age += 1) add(`${age}歲：\u00a0`, "teacher");
     }
     add("");
     add("備註：");
