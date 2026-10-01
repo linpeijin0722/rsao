@@ -1,0 +1,11 @@
+歷史預約與諮詢單介面更新
+
+請解壓縮 rsao-history-ui-update.zip，覆蓋現有專案以下兩個檔案：
+app/staff/page.tsx
+app/v43.css
+
+路徑起點是 package.json 所在的專案根目錄。
+這次不需要重跑 Supabase SQL，也不需要更新 Google Apps Script。
+GitHub 提交後等待 Vercel 部署成功，再重新整理後台。
+
+更新：歷史區塊預設收合；諮詢方式與狀態以標籤區分；沿用現有系統配色；視訊時間獨立醒目呈現；字級及操作區放大。
