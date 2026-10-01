@@ -479,6 +479,14 @@ export default function Page() {
         r = await createBooking();
       }
       const j = await r.json();
+      if (!r.ok && j.code === "SLOT_UNAVAILABLE") {
+        setSlot("");setScreen("slots");
+        const refreshed=await fetch(`/api/slots?methodId=${method?.id}&_=${Date.now()}`,{cache:"no-store"});
+        const refreshedData=await refreshed.json();
+        setSlots(refreshed.ok&&Array.isArray(refreshedData.slots)?refreshedData.slots:[]);
+        setAlertMessage(j.error||"此時段已被預約，請重新選擇");
+        return;
+      }
       if (!r.ok) throw Error(j.error);
       setBookingNo(j.booking.booking_no);
       try {

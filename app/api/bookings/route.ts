@@ -60,7 +60,11 @@ export async function POST(request: NextRequest) {
       p_payment_method: body.paymentMethod,
       p_items: body.items,
     });
-    if (error) throw error;
+    if (error) {
+      if (["23P01","23505","40001","40P01"].includes(error.code||"")||/此時段|時段.*重疊/.test(error.message||""))
+        return NextResponse.json({error:"此時段已被預約或無法安排完整諮詢時間，請重新選擇",code:"SLOT_UNAVAILABLE"},{status:409});
+      throw error;
+    }
     return NextResponse.json({ booking: data });
   } catch (error) {
     const message =
