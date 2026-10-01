@@ -19,10 +19,6 @@ const shiftMonth = (value: string, amount: number) => {
 };
 type DayBooking = {id:string;bookingNo:string;customerName:string;start:string;end:string;bufferEnd:string;minutes:number};
 function clockLabel(value:string){const hour=Number(value.slice(0,2));return `${hour<12?"上午":hour<13?"中午":hour<18?"下午":"晚上"} ${hour%12||12}:${value.slice(3,5)}`;}
-function TimePicker({label,value,onChange,allowEnd=false}:{label:string;value:string;onChange:(value:string)=>void;allowEnd?:boolean}){
-  const hour=value.slice(0,2),minute=value.slice(3,5);
-  return <div className="scheduleTimePicker"><span>{label}</span><div><select aria-label={`${label}小時`} value={hour} onChange={event=>onChange(`${event.target.value}:${(event.target.value==="23"||(!allowEnd&&event.target.value==="22"))?"00":minute}`)}>{Array.from({length:allowEnd?17:16},(_,index)=>String(index+7).padStart(2,"0")).map(h=><option key={h} value={h}>{clockLabel(`${h}:00`).split(" ")[0]} {Number(h)%12||12} 時</option>)}</select><select aria-label={`${label}分鐘`} value={minute} onChange={event=>onChange(`${hour}:${event.target.value}`)}>{(hour==="23"||(!allowEnd&&hour==="22")?["00"]:["00","10","20","30","40","50"]).map(m=><option key={m} value={m}>{m} 分</option>)}</select></div></div>;
-}
 export default function Admin() {
   const [login, setLogin] = useState(false),
     [password, setPassword] = useState(""),
@@ -35,9 +31,6 @@ export default function Admin() {
     [openTimes, setOpenTimes] = useState<string[]>([]),
     [dayBookings,setDayBookings]=useState<DayBooking[]>([]),
     [showAllTimes,setShowAllTimes]=useState(false),
-    [customTimeOpen,setCustomTimeOpen]=useState(false),
-    [customTime,setCustomTime]=useState("10:00"),
-    [customAction,setCustomAction]=useState("open"),
     [dayLoading,setDayLoading]=useState(false),
     [slotSaving,setSlotSaving]=useState(false),
     [dayError,setDayError]=useState(""),
@@ -179,7 +172,7 @@ export default function Admin() {
     load();
   }, []);
   useEffect(() => {
-    setShowAllTimes(false);setCustomTimeOpen(false);setOpenTimes([]);setDayBookings([]);dayLoad();
+    setShowAllTimes(false);setOpenTimes([]);setDayBookings([]);dayLoad();
   }, [date, methodId]);
   useEffect(() => {
     monthLoad();
@@ -572,10 +565,9 @@ export default function Admin() {
             <button className={videoBookingEnabled ? "activeOpen" : ""} onClick={() => setVideoControlConfirm("open")}>開啟</button>
           </div>
         </div>
-        <div className="scheduleDayToolbar"><div><b>{showAllTimes?"全部時間":"可預約時間"}</b><small>目前可約 {openTimes.length} 個時段</small></div><button aria-expanded={customTimeOpen} onClick={()=>setCustomTimeOpen(value=>!value)}>自訂時段</button><label><input type="checkbox" checked={showAllTimes} onChange={event=>setShowAllTimes(event.target.checked)}/>顯示全部時間</label></div>
-        <p className="scheduleHint">預設只顯示可約時間；需要精細調整時，可自訂時間或展開每 10 分鐘的全部時間。</p>
-        {customTimeOpen&&<div className="scheduleCustomTime"><TimePicker label="自訂時間" value={customTime} onChange={setCustomTime}/><label>操作<select value={customAction} onChange={event=>setCustomAction(event.target.value)}><option value="open">開放此時段</option><option value="close">關閉此時段</option></select></label><button className="schedulePrimaryButton" disabled={slotSaving||dayLoading||Boolean(slotBlockReason(customTime))||Boolean(dayError)||(customAction==="open"&&holidays.some(h=>h.holiday_date===date))} onClick={()=>void slotToggle(customTime,customAction==="open")}>{slotSaving?"儲存中…":"套用時段"}</button>{slotBlockReason(customTime)&&<p className="scheduleBlockedHint">{slotBlockReason(customTime)}，請選擇其他時間。</p>}</div>}
-        {dayLoading?<p role="status">時段讀取中…</p>:dayError?<div className="scheduleLoadError" role="alert">{dayError}<button onClick={()=>void dayLoad()}>重新讀取</button></div>:<><div className="daySlots scheduleCompactSlots">{displayTimes.map(t=>{const blocked=slotBlockReason(t),open=openTimes.includes(t);return <button key={t} disabled={slotSaving||Boolean(blocked)||holidays.some(h=>h.holiday_date===date)} className={blocked?"booked":open?"open":"closed"} onClick={()=>void slotToggle(t)}><b>{clockLabel(t)}</b><small>{blocked|| (open?"可預約・點選關閉":"未開放・點選開啟")}</small></button>})}</div>{!displayTimes.length&&<p className="scheduleEmpty">此日沒有可約時段。需要加開時，請點「自訂時段」。</p>}
+        <div className="scheduleDayToolbar"><div><b>{showAllTimes?"全部時間":"可預約時間"}</b><small>目前可約 {openTimes.length} 個時段</small></div><label><input type="checkbox" checked={showAllTimes} onChange={event=>setShowAllTimes(event.target.checked)}/>顯示全部時間</label></div>
+        <p className="scheduleHint">預設只顯示可約時間；需要精細調整時，請勾選「顯示全部時間」，直接點選時間格開放或關閉。</p>
+        {dayLoading?<p role="status">時段讀取中…</p>:dayError?<div className="scheduleLoadError" role="alert">{dayError}<button onClick={()=>void dayLoad()}>重新讀取</button></div>:<><div className="daySlots scheduleCompactSlots">{displayTimes.map(t=>{const blocked=slotBlockReason(t),open=openTimes.includes(t);return <button key={t} disabled={slotSaving||Boolean(blocked)||holidays.some(h=>h.holiday_date===date)} aria-label={`${clockLabel(t)}，${blocked||(open?"已開放，點選關閉":"未開放，點選開啟")}`} aria-pressed={open} className={blocked?"booked":open?"open":"closed"} onClick={()=>void slotToggle(t)}><b><span>{clockLabel(t).split(" ")[0]}</span><span>{clockLabel(t).split(" ")[1]}</span></b>{blocked&&<small>{blocked}</small>}</button>})}</div>{!displayTimes.length&&<p className="scheduleEmpty">此日沒有可約時段。需要加開時，請勾選「顯示全部時間」，再點選時間格。</p>}
         <section className="scheduleBookedList"><h3>當日已預約（{dayBookings.length} 筆）</h3>{dayBookings.length?dayBookings.map(booking=><article key={booking.id}><div><span>已預約</span><b>{clockLabel(bookingClock(booking.start))} ～ {clockLabel(bookingClock(booking.end))}</b></div><p>諮詢 {booking.minutes} 分鐘・緩衝至 {clockLabel(bookingClock(booking.bufferEnd))}</p><p className="scheduleBookingCustomer">客人：{booking.customerName||"未提供姓名"}</p><small>訂單編號：{booking.bookingNo}</small></article>):<p className="scheduleHint">當日尚無預約。</p>}</section></>}
       </section>
       </div>
