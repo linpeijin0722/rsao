@@ -1,4 +1,4 @@
-const SCRIPT_VERSION = "2026-09-19-v32";
+const SCRIPT_VERSION = "2026-10-01-v33";
 const RETURN_BUTTON_ANCHOR = "\u200B";
 const RETURN_BUTTON_ALT_TITLE = "RSAO_CONSULTATION_RETURN_BUTTON";
 
@@ -180,7 +180,7 @@ function doPost(e) {
       (payload.previousDocumentIds || []).forEach(function(documentId) {
         if (documentId && documentId !== doc.getId()) {
           try {
-            DriveApp.getFileById(documentId).setTrashed(true);
+            // 保留歷史諮詢單，不移至垃圾桶。
           } catch (trashError) {
             entrypointWarnings.push("舊文件無法移至垃圾桶（" + documentId + "）：" + String(trashError.message || trashError));
           }

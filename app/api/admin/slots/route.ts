@@ -39,8 +39,8 @@ export async function POST(r: NextRequest) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(b.date || ""))
       return NextResponse.json({ error: "日期資料不完整" }, { status: 400 });
     const methodId = await resolveVideoMethodId();
-    const rows = Array.from({ length: 32 }, (_, index) => {
-      const hour = 7 + Math.floor(index / 2), minute = index % 2 ? "30" : "00";
+    const rows = Array.from({ length: 94 }, (_, index) => {
+      const hour = 7 + Math.floor(index / 6), minute = String(index % 6 * 10).padStart(2,"0");
       return { consultation_method_id: methodId, slot_start: `${b.date}T${String(hour).padStart(2, "0")}:${minute}:00+08:00`, is_open: false, updated_at: new Date().toISOString() };
     });
     const { error } = await db.from("slot_overrides").upsert(rows, { onConflict: "consultation_method_id,slot_start" });

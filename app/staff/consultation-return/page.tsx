@@ -1,4 +1,5 @@
 "use client";
+import { normalizeConsultationText } from "@/lib/consultation-text";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type ReturnItem = { index:number; itemTitle:string; content:string };
@@ -7,7 +8,7 @@ type SendMode = "immediate" | "scheduled";
 type PolishIssue = { originalText:string; action:"removed"|"kept"; reason:string; restored?:boolean };
 type PolishVersion = { id:string; label:string; content:string; changeSummary:string[]; suspectedIssues:PolishIssue[]; manuallyEdited?:boolean };
 type SendSnapshotItem = { index:number; itemTitle:string; versionId:string; versionLabel:string; content:string };
-const normalizeDraft=(value:string)=>String(value||"").replace(/\r\n?/g,"\n").replace(/[ \t]+$/gm,"").replace(/\n[ \t]*\n(?:[ \t]*\n)+/g,"\n\n").trim();
+const normalizeDraft=normalizeConsultationText;
 
 function taipeiDefaults(){
   const taipeiMs=Date.now()+8*60*60*1000;
@@ -38,7 +39,7 @@ export default function ConsultationReturnPage(){
   const scheduleMinutes=Number(scheduleTimeValue.slice(0,2))*60+Number(scheduleTimeValue.slice(3,5));
   const outsideRecommendedHours=Number.isFinite(scheduleMinutes)&&(scheduleMinutes<7*60||scheduleMinutes>21*60);
 
-  useEffect(()=>{const params=new URLSearchParams(window.location.search),bookingNo=params.get("bookingNo")||"",documentId=params.get("documentId")||"";fetch(`/api/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}`).then(async response=>{const result=await response.json();if(!response.ok)throw new Error(result.error||"讀取失敗");const items:ReturnItem[]=result.items||[];setData(result);setSelected(items.map(entry=>entry.index));setVersions(Object.fromEntries(items.map(entry=>[entry.index,[{id:"original",label:"原始版本",content:entry.content,changeSummary:[],suspectedIssues:[]}]])));setActiveVersionIds(Object.fromEntries(items.map(entry=>[entry.index,"original"])))}).catch(err=>setError(err instanceof Error?err.message:"讀取失敗")).finally(()=>setLoading(false))},[]);
+  useEffect(()=>{const params=new URLSearchParams(window.location.search),bookingNo=params.get("bookingNo")||"",documentId=params.get("documentId")||"";fetch(`/api/staff/consultation-return?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}`).then(async response=>{const result=await response.json();if(!response.ok)throw new Error(result.error||"讀取失敗");const items:ReturnItem[]=(result.items||[]).map((entry:ReturnItem)=>({...entry,content:normalizeDraft(entry.content)}));setData(result);setSelected(items.map(entry=>entry.index));setVersions(Object.fromEntries(items.map(entry=>[entry.index,[{id:"original",label:"原始版本",content:entry.content,changeSummary:[],suspectedIssues:[]}]])));setActiveVersionIds(Object.fromEntries(items.map(entry=>[entry.index,"original"])))}).catch(err=>setError(err instanceof Error?err.message:"讀取失敗")).finally(()=>setLoading(false))},[]);
   useEffect(()=>{if(editing)editorRef.current?.focus()},[editing]);
   useEffect(()=>{setActive(value=>Math.max(0,Math.min(value,selectedItems.length-1)))},[selectedItems.length]);
   useEffect(()=>{const onKey=(event:KeyboardEvent)=>{if(event.key==="Escape"){if(editConfirm)setEditConfirm(false);else if(confirmMode&&!sending)setConfirmMode(null);else if(scheduleOpen)setScheduleOpen(false);else if(choiceOpen)setChoiceOpen(false);else if(skipConfirm)setSkipConfirm(false);else if(editing)setEditing(false);else if(data?.documentUrl)window.location.href=data.documentUrl;return}if(event.key==="Enter"&&editConfirm){event.preventDefault();setEditConfirm(false);setEditing(true);return}if(choiceOpen||scheduleOpen||confirmMode||skipConfirm||sending||editing)return;const key=event.key.toLowerCase();if(event.key==="ArrowLeft"||key==="q"){event.preventDefault();setActive(value=>Math.max(0,value-1))}if(event.key==="ArrowRight"||key==="e"){event.preventDefault();setActive(value=>Math.min(Math.max(0,selectedItems.length-1),value+1))}if(event.key==="Enter"&&item){event.preventDefault();setEditConfirm(true)}};window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey)},[choiceOpen,scheduleOpen,confirmMode,skipConfirm,editConfirm,sending,editing,data,item,selectedItems.length]);

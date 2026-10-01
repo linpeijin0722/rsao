@@ -1,8 +1,11 @@
+import { normalizeConsultationText, consultationStructure } from "@/lib/consultation-text";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
 
-const polishInstructions = `整理以下內容時，請嚴格遵守以下規則：
+const polishInstructions = `
+結構規則：所有 Qn/An 編號、問題文字、【】或《》標題、人物個性標題與雙人關係模板提示，必須原樣保留且維持原本順序。每個人的內容只能留在該人物原本的區段，不可合併、移到另一人或重排。空白答案不可補寫。Qn、An 或 Q、A 冒號後有內容時必須同一行，段落內必要換行可以保留。不要輸出 Markdown 標記。
+整理以下內容時，請嚴格遵守以下規則：
 
 1. 完整保留原意
 完全不要改變原本的意思，也不要自行解讀、延伸或補充內容。
@@ -49,7 +52,7 @@ export async function POST(request: NextRequest) {
   if (!apiKey) return NextResponse.json({ error: "尚未設定 OPENAI_API_KEY" }, { status: 500 });
   try {
     const body = await request.json();
-    const content = String(body.content || "").trim();
+    const content = normalizeConsultationText(String(body.content || ""));
     if (!content) return NextResponse.json({ error: "沒有可潤飾的內容" }, { status: 400 });
     if (content.length > 18000) return NextResponse.json({ error: "內容過長，請分項潤飾" }, { status: 400 });
     const response = await fetch("https://api.openai.com/v1/responses", {
@@ -82,7 +85,8 @@ export async function POST(request: NextRequest) {
     if (!response.ok) throw new Error(result?.error?.message || "AI 潤飾失敗");
     const outputText = (result.output || []).flatMap((entry: any) => Array.isArray(entry.content) ? entry.content : []).filter((entry: any) => entry.type === "output_text" && typeof entry.text === "string").map((entry: any) => entry.text).join("").trim();
     const parsed = JSON.parse(outputText || "{}");
-    const polished = String(parsed.polishedContent || "").trim();
+    const polished = normalizeConsultationText(String(parsed.polishedContent || ""));
+    if(JSON.stringify(consultationStructure(content))!==JSON.stringify(consultationStructure(polished)))throw new Error("AI 改動了問題、人物標題或區段順序，已保留原始版本，請重新潤飾");
     if (!polished) throw new Error("AI 沒有回傳文字，請再試一次");
     return NextResponse.json({
       ok: true, polished,

@@ -14,9 +14,9 @@ type H = { holiday_date: string; note: string | null };
 type TextDateOverride = { release_date: string; release_count: number | string; note: string | null };
 const days = ["一", "二", "三", "四", "五", "六", "日"],
   times = Array.from(
-    { length: 32 },
+    { length: 94 },
     (_, i) =>
-      `${String(7 + Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`,
+      `${String(7 + Math.floor(i / 6)).padStart(2, "0")}:${String((i % 6)*10).padStart(2,"0")}`,
   ),
   today = () =>
     new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Taipei" }).format(

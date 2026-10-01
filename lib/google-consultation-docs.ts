@@ -10,7 +10,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-09-19-v32";
+const requiredAppsScriptVersion = "2026-10-01-v33";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -1311,8 +1311,8 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   add("");
   const isPastLifePersonal = itemCode === "past-life-personal" || text(detail.item_title).includes("前世因果（個人）");
   const isPastLifeRelation = relation;
-  if (isOverallFortune) {
-    add("【整體建議】", "section");
+  if (isOverallFortune || itemCode === "health" || text(detail.item_title).includes("身體健康")) {
+    add(isOverallFortune ? "【整體建議】" : "【健康建議】", "section");
     for (let index = 0; index < 5; index += 1) add("\u00a0", "teacher");
     add("【流年運勢】", "section");
     const startingAge = virtualAge(people[0]);
@@ -1423,9 +1423,9 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     if (profileError) throw profileError;
     const profilesById = new Map((profiles || []).map((profile: any) => [profile.id, profile]));
     allAnswers.forEach((answer: any) => {
-      if (!one(answer.consultation_profiles) && profilesById.has(answer.profile_id)) answer.consultation_profiles = profilesById.get(answer.profile_id);
+      if ((!submissionId || !one(answer.consultation_profiles)) && profilesById.has(answer.profile_id)) answer.consultation_profiles = profilesById.get(answer.profile_id);
       (answer.booking_answer_participants || []).forEach((participant: any) => {
-        if (!one(participant.consultation_profiles) && profilesById.has(participant.profile_id)) participant.consultation_profiles = profilesById.get(participant.profile_id);
+        if ((!submissionId || !one(participant.consultation_profiles)) && profilesById.has(participant.profile_id)) participant.consultation_profiles = profilesById.get(participant.profile_id);
       });
       answer.__profileLookup = Object.fromEntries(profilesById);
     });
@@ -1577,6 +1577,10 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     const time = taipeiClock(date);
     fileTitle = `${get("month")}/${get("day")}(${week})${time} ${lineName}．${ownerName}`;
   }
+  for(const old of existingDetails){
+    const {error:archiveError}=await db.from("consultation_document_history").upsert({booking_id:bookingId,document_id:old.google_document_id,document_url:`https://docs.google.com/document/d/${old.google_document_id}/edit`,created_at:old.google_document_created_at||new Date().toISOString()},{onConflict:"document_id"});
+    if(archiveError)throw archiveError;
+  }
   const response = await fetch(appsScriptUrl, {
     method: "POST",
     headers: { "content-type": "text/plain;charset=utf-8" },
@@ -1605,7 +1609,9 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
       warnings: result.warnings,
     });
   }
-  const createdAt = existingDetails.map((detail: any) => detail.google_document_created_at).filter(Boolean).sort()[0] || new Date().toISOString();
+  const createdAt = new Date().toISOString();
+  const {error:archiveError}=await db.from("consultation_document_history").upsert({booking_id:bookingId,document_id:result.documentId,document_url:result.documentUrl||`https://docs.google.com/document/d/${result.documentId}/edit`,created_at:createdAt},{onConflict:"document_id"});
+  if(archiveError)throw archiveError;
   const { error: updateError } = await db.from("booking_details").update({
     google_document_id: result.documentId,
     google_document_url: result.documentUrl || `https://docs.google.com/document/d/${result.documentId}/edit`,
