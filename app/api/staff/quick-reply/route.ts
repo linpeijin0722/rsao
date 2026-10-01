@@ -846,7 +846,7 @@ const profilePresentation = (profile: any, ownerName: string) => {
     birthYear = rocYear
       ? rocYear + 1911
       : Number(clean(profile.birth_date).match(/^(\d{4})/)?.[1]),
-    age = birthYear ? Math.max(1, new Date().getFullYear() - birthYear + 1) : 0,
+    age = birthYear ? Math.max(1, Number(new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"numeric"}).format(new Date())) - birthYear + 1) : 0,
     shichen = clean(profile.birth_shichen).split(/[（(]/)[0],
     gender = clean(profile.gender),
     zodiac = clean(profile.zodiac),

@@ -1,3 +1,4 @@
+import { parseTaipeiDateTime } from "@/lib/taipei-time";
 import { NextRequest, NextResponse } from "next/server";
 import { adminSupabase, publicSupabase } from "@/lib/supabase";
 import { verifyLineSession } from "@/lib/line-session";
@@ -19,6 +20,7 @@ export async function POST(request: NextRequest) {
     const friendship=await fetch(`https://api.line.me/v2/bot/profile/${encodeURIComponent(lineUid)}`,{headers:{Authorization:`Bearer ${channelToken}`},cache:"no-store"});
     if(!friendship.ok)return NextResponse.json({error:"請先加入 LINE 官方帳號好友；若曾封鎖，請先解除封鎖後再進行預約。"},{status:403});
     const body = await request.json();
+    if(body.slotStart){const parsed=parseTaipeiDateTime(String(body.slotStart));if(!Number.isFinite(parsed.getTime()))return NextResponse.json({error:"預約時間不正確"},{status:400});body.slotStart=parsed.toISOString();}
     if (
       !body.methodId ||
       !Array.isArray(body.items) ||

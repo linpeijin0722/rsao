@@ -199,8 +199,8 @@ export default function Admin() {
     // 週五開啟個別時段時僅提示，不影響後續操作或前台總開關。
     if (value) {
       const [year, monthValue, dayValue] = date.split("-").map(Number);
-      const selectedDay = new Date(year, monthValue - 1, dayValue);
-      if (selectedDay.getDay() === 5) {
+      const selectedDay = new Date(Date.UTC(year, monthValue - 1, dayValue));
+      if (selectedDay.getUTCDay() === 5) {
         window.alert(`${monthValue}/${dayValue}是週五，請確認是否會撞到子龍廟時間。`);
       }
     }
@@ -249,7 +249,7 @@ export default function Admin() {
   const displayTimes=showAllTimes?[...new Set([...times,...openTimes])].sort():[...openTimes].sort();
   const selectedDateLabel = (() => {
     const [year, monthValue, dayValue] = date.split("-").map(Number),
-      weekday = days[(new Date(year, monthValue - 1, dayValue).getDay() + 6) % 7];
+      weekday = days[(new Date(Date.UTC(year, monthValue - 1, dayValue)).getUTCDay() + 6) % 7];
     return `${monthValue}/${dayValue}(${weekday})`;
   })();
   async function holidayAdd() {
@@ -300,8 +300,8 @@ export default function Admin() {
   }
   const cal = useMemo(() => {
     const [y, m] = month.split("-").map(Number),
-      pad = (new Date(y, m - 1, 1).getDay() + 6) % 7,
-      n = new Date(y, m, 0).getDate();
+      pad = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7,
+      n = new Date(Date.UTC(y, m, 0)).getUTCDate();
     return [
       ...Array(pad).fill(null),
       ...Array.from(

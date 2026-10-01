@@ -1,4 +1,5 @@
 "use client";
+import { taipeiDateKey } from "@/lib/taipei-time";
 import liff from "@line/liff";
 import { useEffect, useRef, useState } from "react";
 import { lunarProfile } from "@/lib/lunar-profile";
@@ -2590,26 +2591,14 @@ function hasCount(text: string, count: number) {
     text.toLowerCase().includes(value.toLowerCase()),
   );
 }
-function isAtLeast15(birthDate: string) {
-  if (!birthDate) return false;
-  const birth = new Date(`${String(birthDate).slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(birth.getTime())) return false;
-  const cutoff = new Date();
-  cutoff.setFullYear(cutoff.getFullYear() - 15);
-  return birth <= cutoff;
+function ageOnTaipeiToday(birthDate: string) {
+  const value=String(birthDate).slice(0,10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return -1;
+  const today=taipeiDateKey();
+  return Number(today.slice(0,4))-Number(value.slice(0,4))-(today.slice(5)<value.slice(5)?1:0);
 }
-function isAtMostAge(birthDate: string, maximumAge: number) {
-  if (!birthDate) return false;
-  const birth = new Date(`${String(birthDate).slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(birth.getTime())) return false;
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const beforeBirthday =
-    today.getMonth() < birth.getMonth() ||
-    (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
-  if (beforeBirthday) age -= 1;
-  return age >= 0 && age <= maximumAge;
-}
+function isAtLeast15(birthDate: string) { return Boolean(birthDate)&&ageOnTaipeiToday(birthDate)>=15; }
+function isAtMostAge(birthDate: string, maximumAge: number) { const age=ageOnTaipeiToday(birthDate);return Boolean(birthDate)&&age>=0&&age<=maximumAge; }
 
 const PAST_LIFE_RELATION_QUESTIONS = [
   "我們前世是怎麼認識的？是什麼關係？",

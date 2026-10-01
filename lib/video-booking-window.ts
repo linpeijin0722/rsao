@@ -1,3 +1,4 @@
+import { parseTaipeiDateTime } from "@/lib/taipei-time";
 const TAIPEI_TIME_ZONE = "Asia/Taipei";
 
 export function taipeiDateKey(value: Date | string = new Date()) {
@@ -6,7 +7,7 @@ export function taipeiDateKey(value: Date | string = new Date()) {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(typeof value === "string" ? new Date(value) : value);
+  }).format(typeof value === "string" ? parseTaipeiDateTime(value) : value);
 }
 
 export function addCalendarDays(dateKey: string, days: number) {

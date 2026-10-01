@@ -68,13 +68,13 @@ const money = (v: number) =>
     ),
   shiftMonth = (value: string, amount: number) => {
     const [y, m] = value.split("-").map(Number),
-      d = new Date(y, m - 1 + amount, 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      d = new Date(Date.UTC(y, m - 1 + amount, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
   },
   addMonths = (value: string, amount: number) => {
     const [y, m, d] = value.split("-").map(Number),
-      x = new Date(y, m - 1 + amount, d);
-    return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+      x = new Date(Date.UTC(y, m - 1 + amount, d));
+    return `${x.getUTCFullYear()}-${String(x.getUTCMonth() + 1).padStart(2, "0")}-${String(x.getUTCDate()).padStart(2, "0")}`;
   };
 export default function Page() {
   const today = taiwanToday(),
@@ -275,8 +275,8 @@ export default function Page() {
     calendar = useMemo(() => {
       if (!month) return [];
       const [y, m] = month.split("-").map(Number),
-        pad = (new Date(y, m - 1, 1).getDay() + 6) % 7,
-        count = new Date(y, m, 0).getDate();
+        pad = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7,
+        count = new Date(Date.UTC(y, m, 0)).getUTCDate();
       return [
         ...Array(pad).fill(null),
         ...Array.from(

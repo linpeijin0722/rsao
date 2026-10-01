@@ -1,3 +1,4 @@
+import { parseTaipeiDateTime } from "@/lib/taipei-time";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
     if (!method) return NextResponse.json({ error: "諮詢方式目前未開放" }, { status: 400 });
     let slotStart: string | null = null, slotEnd: string | null = null;
     if (methodCode === "video") {
-      const start = new Date(String(body.slotStart || ""));
+      const start = parseTaipeiDateTime(String(body.slotStart || ""));
       if (Number.isNaN(start.getTime())) return NextResponse.json({ error: "請選擇視訊時間" }, { status: 400 });
       slotStart = start.toISOString();
       slotEnd = new Date(start.getTime() + Math.max(1, Number(method.duration_minutes) || 25) * 60000).toISOString();
@@ -326,8 +327,13 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
-  const body = await request.json(),
-    db = adminSupabase(),
+  const body = await request.json();
+  if(body.slotStart){
+    const parsed=parseTaipeiDateTime(String(body.slotStart));
+    if(!Number.isFinite(parsed.getTime()))return NextResponse.json({error:"預約時間不正確"},{status:400});
+    body.slotStart=parsed.toISOString();
+  }
+  const db = adminSupabase(),
     { data: b } = await db
       .from("bookings")
       .select(
@@ -458,9 +464,12 @@ export async function PATCH(request: NextRequest) {
       .trim(),
   );
   if(timeChanged||itemsChanged){try{await syncBookingCalendar(b.booking_no)}catch(calendarError){console.error("修改預約 Calendar 同步失敗",calendarError)}}
+  // 通知以資料庫儲存後的時間為準，避免輸入與通知使用不同時區。
+  const {data:savedBooking,error:savedTimeError}=await db.from("bookings").select("slot_start").eq("id",b.id).single();
+  if(savedTimeError||!savedBooking)return NextResponse.json({error:"預約已修改，但無法確認儲存時間，尚未發送 LINE 通知，請重新整理確認"},{status:500});
   const c = b.customers as unknown as { line_user_id: string },
     site = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin,
-    effectiveSlot = body.slotStart || oldSlotStart,
+    effectiveSlot = savedBooking.slot_start,
     isVideo = (b.consultation_methods as unknown as { code: string })?.code === "video",
     slotDate = effectiveSlot ? new Date(effectiveSlot) : null,
     dateParts = slotDate ? new Intl.DateTimeFormat("zh-TW", {

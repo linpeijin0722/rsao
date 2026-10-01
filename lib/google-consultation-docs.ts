@@ -1045,7 +1045,7 @@ const virtualAge = (profile: any) => {
   const rocYear = Number(lunar.match(/民國\s*(\d+)/)?.[1]);
   const birthYear = rocYear ? rocYear + 1911 : Number(text(profile?.birth_date).match(/^(\d{4})/)?.[1]);
   if (!birthYear) return null;
-  return Math.max(1, new Date().getFullYear() - birthYear + 1);
+  return Math.max(1, Number(new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"numeric"}).format(new Date())) - birthYear + 1);
 };
 
 const profileLines = (profile: any, ownerName: string) => {

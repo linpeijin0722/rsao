@@ -1,3 +1,4 @@
+import { parseTaipeiDateTime } from "@/lib/taipei-time";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
@@ -37,11 +38,13 @@ export async function POST(r: NextRequest) {
   };
   if (b.action) return NextResponse.json({ error: "此功能已移除" }, { status: 410 });
   if (!b.slotStart) return NextResponse.json({ error: "缺少時段資料，請重新整理後再試" }, { status: 400 });
+  const parsed=parseTaipeiDateTime(String(b.slotStart));
+  if(!Number.isFinite(parsed.getTime()))return NextResponse.json({error:"時段時間不正確"},{status:400});
   const methodId = await resolveVideoMethodId();
   const { error } = await db.from("slot_overrides").upsert(
       {
         consultation_method_id: methodId,
-        slot_start: b.slotStart,
+        slot_start: parsed.toISOString(),
         is_open: b.isOpen,
         updated_at: new Date().toISOString(),
       },

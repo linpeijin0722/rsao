@@ -1,4 +1,5 @@
 "use client";
+import { taipeiDateKey, taipeiDateTimeInput, taipeiYear } from "@/lib/taipei-time";
 import { useEffect, useMemo, useState } from "react";
 import StaffAnswerEditorV2 from "./StaffAnswerEditorV2";
 import QuickConsultationReply from "./QuickConsultationReply";
@@ -143,7 +144,7 @@ export default function Staff() {
     [manualNotifyPayment, setManualNotifyPayment] = useState(true),
     [manualSaving, setManualSaving] = useState(false),
     [error, setError] = useState(""),
-    [month, setMonth] = useState(new Date().toISOString().slice(0, 7)),
+    [month, setMonth] = useState(taipeiDateKey().slice(0, 7)),
     [selectedDate, setSelectedDate] = useState(""),
     [editing, setEditing] = useState<any>(null),
     [userView, setUserView] = useState<any>(null),
@@ -297,8 +298,8 @@ export default function Staff() {
     const base=`${String.fromCharCode(65+Math.floor((position-1)/99))}${String(((position-1)%99)+1).padStart(2,"0")}`;
     const date=new Date(booking.paid_at||booking.created_at||Date.now());
     const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit"}).formatToParts(date);
-    const year=parts.find((part)=>part.type==="year")?.value||String(date.getFullYear());
-    const month=parts.find((part)=>part.type==="month")?.value||String(date.getMonth()+1).padStart(2,"0");
+    const year=parts.find((part)=>part.type==="year")?.value||String(taipeiYear(date));
+    const month=parts.find((part)=>part.type==="month")?.value||taipeiDateKey(date).slice(5,7);
     return `${base}.${year}${month}`;
   }
   async function openAnswerEditor(latestBase:any,fallbackIds:string[]){
@@ -549,8 +550,8 @@ export default function Staff() {
       .sort((a,b)=>new Date(a.slot_start).getTime()-new Date(b.slot_start).getTime()),
     cal = useMemo(() => {
       const [y, m] = month.split("-").map(Number),
-        pad = (new Date(y, m - 1, 1).getDay() + 6) % 7,
-        n = new Date(y, m, 0).getDate();
+        pad = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7,
+        n = new Date(Date.UTC(y, m, 0)).getUTCDate();
       return [
         ...Array(pad).fill(null),
         ...Array.from(
@@ -568,16 +569,7 @@ export default function Staff() {
   const textRevenueCount=text.filter(isRevenueBooking).length,videoRevenueCount=video.filter(isRevenueBooking).length;
   function openEdit(x: any) {
     setEditing(x);
-    setEditTime(
-      x.slot_start
-        ? new Date(
-            new Date(x.slot_start).getTime() -
-              new Date(x.slot_start).getTimezoneOffset() * 60000,
-          )
-            .toISOString()
-            .slice(0, 16)
-        : "",
-    );
+    setEditTime(x.slot_start ? taipeiDateTimeInput(x.slot_start) : "");
     setEditLines(
       (x.booking_details || []).map((d: any) => ({
         lineKey: d.id,
@@ -647,7 +639,7 @@ export default function Staff() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         bookingNo: editing.booking_no,
-        slotStart: editTime || null,
+        slotStart: editTime ? `${editTime}:00+08:00` : null,
         lines: editLines,
       }),
     });
@@ -691,7 +683,7 @@ export default function Staff() {
     );
   return (
     <main className={`staffPage returned-edit-${returnedEditMode}`}>
-      <div className="staffPageHeading"><h1>預約工作後台</h1><div className="staffHeadingActions"><a className="lineAdminButton" href="https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/" target="_blank" rel="noreferrer">官方LINE後台</a><a className="videoCalendarButton" href={(()=>{const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(new Date());const year=parts.find((part)=>part.type==="year")?.value||String(new Date().getFullYear());const month=parts.find((part)=>part.type==="month")?.value||String(new Date().getMonth()+1);return `https://calendar.google.com/calendar/u/4/r/month/${year}/${Number(month)}/1`;})()} target="_blank" rel="noreferrer" aria-label="開啟本月視訊諮詢 Google 行事曆">視訊諮詢行事曆</a><button className="manualBookingEntry" onClick={()=>setManualOpen(true)}>＋ 手動建立預約</button></div></div>
+      <div className="staffPageHeading"><h1>預約工作後台</h1><div className="staffHeadingActions"><a className="lineAdminButton" href="https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/" target="_blank" rel="noreferrer">官方LINE後台</a><a className="videoCalendarButton" href={(()=>{const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(new Date());const year=parts.find((part)=>part.type==="year")?.value||String(taipeiYear());const month=parts.find((part)=>part.type==="month")?.value||String(Number(taipeiDateKey().slice(5,7)));return `https://calendar.google.com/calendar/u/4/r/month/${year}/${Number(month)}/1`;})()} target="_blank" rel="noreferrer" aria-label="開啟本月視訊諮詢 Google 行事曆">視訊諮詢行事曆</a><button className="manualBookingEntry" onClick={()=>setManualOpen(true)}>＋ 手動建立預約</button></div></div>
       {paymentSettings&&<details className="staffPaymentControl"><summary><h2>目前付款方式</h2><strong>{paymentSettings.payment_mode==="bank_transfer"?"銀行轉帳":paymentSettings.payment_mode==="auto"?"自動判斷":"藍新金流"}</strong><span><i>展開設定</i><i>收合設定</i></span></summary><div className="staffPaymentControlBody"><div className="paymentModeChoices">{[["bank_transfer","銀行轉帳"],["auto","自動判斷"],["newebpay","藍新金流"]].map(([value,label])=><button key={value} className={paymentSettings.payment_mode===value?"active":""} onClick={()=>void changePaymentMode(value)}>{label}</button>)}</div><div className="bankAccountManager"><div className="bankAccountManagerTitle"><div><h3>固定收款帳號</h3><p>選定的帳號會自動顯示在用戶付款頁，切換前會再次確認。</p></div></div><div className="bankAccountList">{bankAccounts.map(account=><article key={account.id} className={account.id===paymentSettings.bank_account_key?"active":""}><div><b>{account.label}</b>{account.id===paymentSettings.bank_account_key&&<em>目前使用</em>}<p>{account.bank_name}（{account.bank_code}）{account.branch_name?` ${account.branch_name}`:""}　{account.account_number}</p><p>戶名：{account.account_name}</p></div><div><button onClick={()=>void selectBankAccount(account)} disabled={account.id===paymentSettings.bank_account_key}>{account.id===paymentSettings.bank_account_key?"使用中":"切換使用"}</button></div></article>)}</div></div></div></details>}
       {bankEditorOpen&&<div className="modalBackdrop priorityModal" onClick={()=>setBankEditorOpen(false)}><div className="modal bankAccountEditor" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setBankEditorOpen(false)}>×</button><h2>{bankForm.id?"編輯收款帳號":"新增常用帳號"}</h2><div><label>帳號名稱<input value={bankForm.label||""} onChange={e=>setBankForm({...bankForm,label:e.target.value})} placeholder="例如：珮均常用帳號"/></label><label>銀行名稱<input value={bankForm.bank_name||""} onChange={e=>setBankForm({...bankForm,bank_name:e.target.value})} placeholder="例如：國泰世華"/></label><label>銀行代碼<input inputMode="numeric" maxLength={3} value={bankForm.bank_code||""} onChange={e=>setBankForm({...bankForm,bank_code:e.target.value.replace(/\D/g,"")})} placeholder="013"/></label><label>銀行帳號<input inputMode="numeric" value={bankForm.account_number||""} onChange={e=>setBankForm({...bankForm,account_number:e.target.value.replace(/\s/g,"")})}/></label><label>戶名<input value={bankForm.account_name||""} onChange={e=>setBankForm({...bankForm,account_name:e.target.value})}/></label><label>備註<input value={bankForm.note||""} onChange={e=>setBankForm({...bankForm,note:e.target.value})} placeholder="例如：媽媽的帳號"/></label></div><button className="bankAccountSave" onClick={()=>void saveBankAccount()}>儲存帳號</button></div></div>}
       {profileCopyToast&&<div className="profileCopyToast" role="status">✓ {profileCopyToast}</div>}
@@ -1023,7 +1015,7 @@ export default function Staff() {
               {!filteredManualCustomers.length&&<p className="manualUserEmpty">找不到符合條件的用戶</p>}
             </div>
             {filteredManualCustomers.length>5&&<nav className="manualUserPagination" aria-label="最近註冊用戶分頁"><button disabled={manualUserPage<=1} onClick={()=>setManualUserPage(page=>Math.max(1,page-1))}>‹ 上一頁</button><span>第 {Math.min(manualUserPage,manualUserPageCount)}／{manualUserPageCount} 頁</span><button disabled={manualUserPage>=manualUserPageCount} onClick={()=>setManualUserPage(page=>Math.min(manualUserPageCount,page+1))}>下一頁 ›</button></nav>}
-            {manualMethod==="video"&&<div className="manualVideoDateTime"><label><b>視訊日期</b><span className="manualVideoDateParts"><select aria-label="年份" value={manualVideoYear} onChange={event=>{setManualVideoYear(event.target.value);setManualVideoDay("")}}>{[0,1].map(offset=>{const year=String(new Date().getFullYear()+offset);return <option key={year} value={year}>{year}年</option>})}</select><select aria-label="月份" value={manualVideoMonth} onChange={event=>{setManualVideoMonth(event.target.value);setManualVideoDay("")}}>{Array.from({length:12},(_,index)=>String(index+1).padStart(2,"0")).map(month=><option key={month} value={month}>{Number(month)}月</option>)}</select><select aria-label="日期" value={manualVideoDay} onChange={event=>setManualVideoDay(event.target.value)}><option value="">選擇日期</option>{Array.from({length:new Date(Number(manualVideoYear),Number(manualVideoMonth),0).getDate()},(_,index)=>String(index+1)).map(day=><option key={day} value={day}>{day}日</option>)}</select></span></label><label><b>視訊時間</b><input type="time" value={manualVideoTime} onChange={event=>setManualVideoTime(event.target.value)}/></label><small>年份與月份已帶入本月，請選擇日期與時間；時間為台灣時間。</small></div>}
+            {manualMethod==="video"&&<div className="manualVideoDateTime"><label><b>視訊日期</b><span className="manualVideoDateParts"><select aria-label="年份" value={manualVideoYear} onChange={event=>{setManualVideoYear(event.target.value);setManualVideoDay("")}}>{[0,1].map(offset=>{const year=String(taipeiYear()+offset);return <option key={year} value={year}>{year}年</option>})}</select><select aria-label="月份" value={manualVideoMonth} onChange={event=>{setManualVideoMonth(event.target.value);setManualVideoDay("")}}>{Array.from({length:12},(_,index)=>String(index+1).padStart(2,"0")).map(month=><option key={month} value={month}>{Number(month)}月</option>)}</select><select aria-label="日期" value={manualVideoDay} onChange={event=>setManualVideoDay(event.target.value)}><option value="">選擇日期</option>{Array.from({length:new Date(Date.UTC(Number(manualVideoYear),Number(manualVideoMonth),0)).getUTCDate()},(_,index)=>String(index+1)).map(day=><option key={day} value={day}>{day}日</option>)}</select></span></label><label><b>視訊時間</b><input type="time" value={manualVideoTime} onChange={event=>setManualVideoTime(event.target.value)}/></label><small>年份與月份已帶入本月，請選擇日期與時間；時間為台灣時間。</small></div>}
             <section className="manualItems"><h3>選擇諮詢項目</h3>{items.map(item=>{const line=manualLines.find(candidate=>candidate.itemId===item.id);return <article key={item.id} className={line?"selected":""}>
               <label><input type="checkbox" checked={Boolean(line)} onChange={event=>toggleManualItem(item,event.target.checked)}/><b>{item.title}</b><span>NT$ {Number(item.price||0).toLocaleString("zh-TW")}</span></label>
               {line&&item.sub_items?.length>0&&<select value={line.subId} onChange={event=>{setManualCustomTotal(null);setManualLines(value=>value.map(candidate=>candidate.itemId===item.id?{...candidate,subId:event.target.value}:candidate))}}><option value="">請選擇子項目</option>{item.sub_items.map((sub:any)=><option key={sub.id} value={sub.id}>{sub.title}　NT$ {Number(sub.price||0).toLocaleString("zh-TW")}</option>)}</select>}
@@ -1076,7 +1068,7 @@ export default function Staff() {
               <div className="editTime staffEditTimeRow">
                 <strong>預約時間</strong>
                 <label><span>日期</span><input type="date" value={editTime.slice(0,10)} onChange={(e) => setEditTime(`${e.target.value}T${editTime.slice(11,16) || "12:00"}`)} /></label>
-                <label><span>時間</span><input type="time" step="1800" value={editTime.slice(11,16)} onChange={(e) => setEditTime(`${editTime.slice(0,10)}T${e.target.value}`)} /></label>
+                <label><span>時間</span><input type="time" step="600" value={editTime.slice(11,16)} onChange={(e) => setEditTime(`${editTime.slice(0,10)}T${e.target.value}`)} /></label>
               </div>
             )}
             <div className="staffEditSectionHeading"><div><span>預約內容</span><h3>修改諮詢項目與數量</h3></div><small>左側調整目前項目，右側可快速新增其他諮詢。</small></div>

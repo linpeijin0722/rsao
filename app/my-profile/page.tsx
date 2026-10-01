@@ -1,4 +1,5 @@
 "use client";
+import { taipeiDateKey } from "@/lib/taipei-time";
 import { useEffect, useState } from "react";
 import liff from "@line/liff";
 import { lunarProfile } from "@/lib/lunar-profile";
@@ -177,7 +178,7 @@ export default function MyProfile() {
             type="date"
             value={form.birth_date || ""}
             onChange={(e) => birth(e.target.value)}
-            max={new Date().toISOString().slice(0, 10)}
+            max={taipeiDateKey()}
           />
         </label>
         <div className="profileReadOnly">

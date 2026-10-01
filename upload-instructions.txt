@@ -1,6 +1,43 @@
-將 app/admin/page.tsx 與 app/v44.css 依相同路徑覆蓋網站專案的檔案，然後重新部署。
-本次不需要執行 SQL 或更新 Apps Script。
-前提：已完成前一版手動視訊時段更新及 045 SQL。
+台灣時區修正｜2026-10-01
 
-更新：移除自訂時間表單、移除可約／未開放操作文字、電腦每行9格（手機3格，依寬度調整）、移除文字諮詢外層框線。保留預約及緩衝標示。
-驗證：production build；375px與1280px 模擬資料直接開關時段、預約緩衝鎖定、格數及無橫向溢出通過。
+上傳方式
+將 ZIP 解壓後，將下列檔案依相同路徑放入網站專案根目錄。已有檔案覆蓋，lib/taipei-time.ts 為新檔案。
+app/staff/page.tsx
+app/api/staff/bookings/route.ts
+app/api/bookings/route.ts
+app/api/admin/slots/route.ts
+app/api/admin/text-capacity/route.ts
+app/my-profile/page.tsx
+lib/google-consultation-docs.ts
+app/api/staff/quick-reply/route.ts
+lib/video-booking-window.ts
+app/api/staff/consultation-return/route.ts
+app/booking-data/page.tsx
+app/admin/page.tsx
+app/page.tsx
+lib/taipei-time.ts
+
+上傳後重新部署網站。這次不需要執行 SQL 或更新 Apps Script。
+前提：已完成先前更新，包含 045 手動視訊時段 SQL。
+ZIP 裡 tests/taipei-time.test.cjs 為驗證程式，非網站部署必要檔案，可保留於專案測試資料夾。
+
+重要：部署後，既有存錯的訂單仍須手動改回正確時間。程式不會批次修改既有預約，也不會自動通知客人。
+1. 部署完成後重新整理後台，確認使用新版本。
+2. 找到原訂單，點「修改」，日期與時間設為正確台灣時間（例如10/6下午3:20）。
+3. 按「儲存並發送 LINE 通知」。
+4. 後台及通知應一致顯示10/6下午3:20。
+資料庫 UTC 值07:20Z等同台灣15:20，資料庫顯示UTC不代表預約時間錯誤。
+
+修改內容
+- 後台修改時間輸入與儲存固定台灣時區，不依装置或伺服器時區。
+- 前台預約、手動新增與開放時段API補上無時區輸入處理。
+- LINE預約變更通知讀取儲存後的資料庫時間；儲存失敗或無法確認該時間不發送通知。
+- 本月文字預約統計、今日與月份、年齡及年界線等統一台灣日期。
+- 日期日曆運算不依賴裝置時區；修改時間可每10分鐘。
+- 現行LINE、文件、Calendar、提醒、排程回傳及Supabase可約規則的台灣時區處理已檢查。
+
+驗證
+production build 與14項測試通過。
+UTC、Asia/Taipei、America/New_York環境：輸入15:20，資料庫儲存07:20Z，實際LINE Flex產生下午3:20。
+包含僅改時間／連同項目修改、資料庫錯誤不發通知、午夜／跨月／跨年／星期測試。
+所有測試攔截LINE及資料庫，未對客人發送測試通知，未修改正式預約。
