@@ -1,15 +1,5 @@
 "use client";
 import { useEffect, useMemo, useState, useRef } from "react";
-type R = {
-  id: string;
-  weekday: number;
-  start_time: string;
-  end_time: string;
-  valid_from: string | null;
-  valid_until: string | null;
-  is_open: boolean;
-};
-type W = { weekday: number; start_time: string; is_open: boolean };
 type H = { holiday_date: string; note: string | null };
 type TextDateOverride = { release_date: string; release_count: number | string; note: string | null };
 const days = ["一", "二", "三", "四", "五", "六", "日"],
@@ -27,7 +17,7 @@ const shiftMonth = (value: string, amount: number) => {
     serial = year * 12 + month - 1 + amount;
   return `${Math.floor(serial / 12)}-${String((serial % 12) + 1).padStart(2, "0")}`;
 };
-type DayBooking = {id:string;bookingNo:string;start:string;end:string;bufferEnd:string;minutes:number};
+type DayBooking = {id:string;bookingNo:string;customerName:string;start:string;end:string;bufferEnd:string;minutes:number};
 function clockLabel(value:string){const hour=Number(value.slice(0,2));return `${hour<12?"上午":hour<13?"中午":hour<18?"下午":"晚上"} ${hour%12||12}:${value.slice(3,5)}`;}
 function TimePicker({label,value,onChange,allowEnd=false}:{label:string;value:string;onChange:(value:string)=>void;allowEnd?:boolean}){
   const hour=value.slice(0,2),minute=value.slice(3,5);
@@ -38,17 +28,8 @@ export default function Admin() {
     [password, setPassword] = useState(""),
     [rememberPassword, setRememberPassword] = useState(false),
     [error, setError] = useState(""),
-    [rules, setRules] = useState<R[]>([]),
-    [weekly, setWeekly] = useState<W[]>([]),
     [holidays, setHolidays] = useState<H[]>([]),
     [methodId, setMethodId] = useState(""),
-    [picked, setPicked] = useState<number[]>([]),
-    [start, setStart] = useState("09:00"),
-    [end, setEnd] = useState("17:00"),
-    [opening, setOpening] = useState(true),
-    [scope, setScope] = useState("all"),
-    [from, setFrom] = useState(""),
-    [until, setUntil] = useState(""),
     [month, setMonth] = useState(today().slice(0, 7)),
     [date, setDate] = useState(today()),
     [openTimes, setOpenTimes] = useState<string[]>([]),
@@ -60,12 +41,9 @@ export default function Admin() {
     [dayLoading,setDayLoading]=useState(false),
     [slotSaving,setSlotSaving]=useState(false),
     [dayError,setDayError]=useState(""),
-    [ruleSaving,setRuleSaving]=useState(false),
     [openDates, setOpenDates] = useState<string[]>([]),
-    [confirmCloseDate, setConfirmCloseDate] = useState(false),
-    [closingDate, setClosingDate] = useState(false),
     [videoBookingEnabled, setVideoBookingEnabled] = useState(true),
-    [videoControlConfirm, setVideoControlConfirm] = useState<"close" | "open" | "close_all" | null>(null),
+    [videoControlConfirm, setVideoControlConfirm] = useState<"close" | "open" | null>(null),
     [videoControlSaving, setVideoControlSaving] = useState(false),
     [holidayDate, setHolidayDate] = useState(today()),
     [note, setNote] = useState(""),
@@ -104,8 +82,6 @@ export default function Admin() {
       return;
     }
     setLogin(true);
-    setRules(j.rules);
-    setWeekly(j.weekly);
     setHolidays(j.holidays);
     setMethodId(j.methodId);
     setVideoBookingEnabled(j.videoBookingEnabled !== false);
@@ -220,71 +196,6 @@ export default function Admin() {
     else localStorage.removeItem("lin_a_sao_admin_password");
     load();
   }
-  async function save() {
-    if (!picked.length)return setError("請選擇至少一個星期");
-    if(start>=end)return setError("結束時間必須晚於開始時間");
-    if (start < "07:00" || end > "23:00")
-      return setError("時間只能設定在07:00至23:00");
-    if((scope==="from"||scope==="range")&&!from)return setError("請選擇起始日期");
-    if((scope==="until"||scope==="range")&&!until)return setError("請選擇結束日期");
-    if(scope==="range"&&from>until)return setError("結束日期必須晚於或等於起始日期");
-    setRuleSaving(true);setError("");
-    try {
-    const vf = scope === "from" || scope === "range" ? from : null,
-      vu = scope === "until" || scope === "range" ? until : null,
-      r = await fetch("/api/admin/schedule", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          weekdays: picked,
-          startTime: start,
-          endTime: end,
-          validFrom: vf,
-          validUntil: vu,
-          isOpen: opening,
-        }),
-      }),
-      j = await r.json();
-    if (!r.ok) return setError(j.error);
-    await Promise.all([load(),dayLoad(),monthLoad()]);
-    } catch { setError("儲存失敗，請檢查連線後再試"); } finally { setRuleSaving(false); }
-  }
-  function weeklyOpen(day: number, t: string) {
-    const o = weekly.find(
-      (x) => x.weekday === day && x.start_time.slice(0, 5) === t,
-    );
-    if (o) return o.is_open;
-    return (
-      rules.some(
-        (r) =>
-          r.weekday === day &&
-          r.is_open &&
-          t >= r.start_time.slice(0, 5) &&
-          t < r.end_time.slice(0, 5),
-      ) &&
-      !rules.some(
-        (r) =>
-          r.weekday === day &&
-          !r.is_open &&
-          t >= r.start_time.slice(0, 5) &&
-          t < r.end_time.slice(0, 5),
-      )
-    );
-  }
-  async function weekToggle(day: number, t: string) {
-    const value = !weeklyOpen(day, t);
-    await fetch("/api/admin/weekly", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ weekday: day, startTime: t, isOpen: value }),
-    });
-    setWeekly((w) => [
-      ...w.filter(
-        (x) => !(x.weekday === day && x.start_time.slice(0, 5) === t),
-      ),
-      { weekday: day, start_time: t, is_open: value },
-    ]);
-  }
   async function slotToggle(t: string, desired?:boolean) {
     if (!methodId) return window.alert("找不到視訊諮詢設定，請重新整理後再試");
     if(slotSaving||dayLoading||dayError)return;
@@ -322,24 +233,6 @@ export default function Admin() {
     await Promise.all([dayLoad(), monthLoad()]);
     } catch { setDayError("儲存失敗，請檢查連線後重新讀取"); } finally { setSlotSaving(false); }
   }
-  async function closeAllDaySlots() {
-    setClosingDate(true);
-    const response = await fetch("/api/admin/slots", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ methodId, date, action: "close_day" }),
-    });
-    const result = await response.json().catch(() => ({}));
-    setClosingDate(false);
-    if (!response.ok) {
-      setConfirmCloseDate(false);
-      window.alert(`關閉失敗：${result.error || "請稍後再試"}`);
-      return;
-    }
-    setConfirmCloseDate(false);
-    setOpenTimes([]);
-    await Promise.all([dayLoad(), monthLoad()]);
-  }
   async function setVideoBookingAccess(enabled: boolean) {
     setVideoControlSaving(true);
     const response = await fetch("/api/admin/schedule", {
@@ -352,19 +245,6 @@ export default function Admin() {
     if (!response.ok) return window.alert(result.error || "設定失敗，請稍後再試");
     setVideoBookingEnabled(enabled);
     setVideoControlConfirm(null);
-  }
-  async function clearEverySlot() {
-    setVideoControlSaving(true);
-    const response = await fetch("/api/admin/slots", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "close_all" }),
-    });
-    const result = await response.json().catch(() => ({}));
-    setVideoControlSaving(false);
-    if (!response.ok) return window.alert(result.error || "清除失敗，請稍後再試");
-    setVideoControlConfirm(null);
-    await Promise.all([dayLoad(), monthLoad(), load()]);
   }
   function slotBlockReason(t:string){
     const candidate=new Date(`${date}T${t}:00+08:00`).getTime();
@@ -425,10 +305,6 @@ export default function Admin() {
       setHolidayEditSaving(false);
     }
   }
-  async function ruleDel(id: string) {
-    await fetch(`/api/admin/schedule?id=${id}`, { method: "DELETE" });
-    load();
-  }
   const cal = useMemo(() => {
     const [y, m] = month.split("-").map(Number),
       pad = (new Date(y, m - 1, 1).getDay() + 6) % 7,
@@ -464,6 +340,7 @@ export default function Admin() {
         <h1>時段管理後台</h1>
       </header>
       {error && <div className="error">{error}</div>}
+      <div className="consultationSettingsGroup textConsultationGroup">
       <section className="adminCard textSettingsBlock">
         <h2>文字諮詢設定</h2>
         <p>本月目前預約：{textUsed} 筆</p>
@@ -584,9 +461,10 @@ export default function Admin() {
           </strong>
         )}
       </section>
+      </div>
+      <div className="consultationSettingsGroup videoConsultationGroup">
       <div className="consultationDivider">
         <h2>視訊諮詢時段設定</h2>
-        <p>以下設定只影響視訊諮詢可預約時間。</p>
       </div>
       <section className="adminCard">
         <h2>特定休假日</h2>
@@ -634,15 +512,6 @@ export default function Admin() {
           </div>
         </div>
       )}
-      <section className="adminCard scheduleRulesCard">
-        <h2>每週固定開放時間</h2><p className="scheduleHint">選擇星期與開放範圍，系統依 50 分鐘間隔安排可約時間。套用後會取代同星期、時間重疊的舊設定。</p>
-        <div className="scheduleWeekdays">{days.map((day,index)=><label key={day}><input type="checkbox" checked={picked.includes(index+1)} onChange={event=>setPicked(current=>event.target.checked?[...current,index+1]:current.filter(value=>value!==index+1))}/>週{day}</label>)}</div>
-        <div className="scheduleTimeRange"><TimePicker label="開始時間" value={start} onChange={setStart}/><span className="scheduleRangeDivider">～</span><TimePicker label="結束時間" value={end} onChange={setEnd} allowEnd/></div>
-        <p className="scheduleRangePreview">{clockLabel(start)} ～ {clockLabel(end)}</p>
-        <div className="scheduleRuleOptions"><label>設定方式<select value={opening?"open":"close"} onChange={event=>setOpening(event.target.value==="open")}><option value="open">開放</option><option value="close">關閉</option></select></label><label>適用期間<select value={scope} onChange={event=>setScope(event.target.value)}><option value="all">每週固定</option><option value="from">指定日期起</option><option value="until">指定日期止</option><option value="range">指定日期範圍</option></select></label>{(scope==="from"||scope==="range")&&<label>起始日期<input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></label>}{(scope==="until"||scope==="range")&&<label>結束日期<input type="date" value={until} onChange={event=>setUntil(event.target.value)}/></label>}</div>
-        <button className="schedulePrimaryButton" disabled={ruleSaving||!picked.length||start>=end} onClick={()=>void save()}>{ruleSaving?"儲存中…":"套用固定時間"}</button>
-        <details className="scheduleSavedRules"><summary>查看已設定的固定時間（{rules.length} 筆）</summary>{rules.length?rules.map(rule=><div className="scheduleSavedRule" key={rule.id}><span><b>週{days[rule.weekday-1]}・{rule.is_open?"開放":"關閉"}</b><small>{clockLabel(rule.start_time.slice(0,5))} ～ {clockLabel(rule.end_time.slice(0,5))}</small><small>{rule.valid_from||"不限起日"} ～ {rule.valid_until||"不限迄日"}</small></span><button onClick={()=>void ruleDel(rule.id)}>刪除</button></div>):<p>尚未設定固定時間。</p>}</details>
-      </section>
       <section className="adminCard scheduleDayCard">
         <h2>個別日期時段</h2>
         <div className="monthNav">
@@ -703,46 +572,23 @@ export default function Admin() {
             <button className={videoBookingEnabled ? "activeOpen" : ""} onClick={() => setVideoControlConfirm("open")}>開啟</button>
           </div>
         </div>
-        <button className="closeAllDayButton closeEverySlotButton" onClick={() => setVideoControlConfirm("close_all")} disabled={videoControlSaving}>
-          清除所有時段
-        </button>
-        <button className="closeAllDayButton" onClick={() => setConfirmCloseDate(true)} disabled={!methodId || closingDate}>
-          清除{selectedDateLabel}所有時段
-        </button>
-        {holidays.some((h) => h.holiday_date === date) && (
-          <div className="holidayNotice">此日為休假日</div>
-        )}
         <div className="scheduleDayToolbar"><div><b>{showAllTimes?"全部時間":"可預約時間"}</b><small>目前可約 {openTimes.length} 個時段</small></div><button aria-expanded={customTimeOpen} onClick={()=>setCustomTimeOpen(value=>!value)}>自訂時段</button><label><input type="checkbox" checked={showAllTimes} onChange={event=>setShowAllTimes(event.target.checked)}/>顯示全部時間</label></div>
         <p className="scheduleHint">預設只顯示可約時間；需要精細調整時，可自訂時間或展開每 10 分鐘的全部時間。</p>
         {customTimeOpen&&<div className="scheduleCustomTime"><TimePicker label="自訂時間" value={customTime} onChange={setCustomTime}/><label>操作<select value={customAction} onChange={event=>setCustomAction(event.target.value)}><option value="open">開放此時段</option><option value="close">關閉此時段</option></select></label><button className="schedulePrimaryButton" disabled={slotSaving||dayLoading||Boolean(slotBlockReason(customTime))||Boolean(dayError)||(customAction==="open"&&holidays.some(h=>h.holiday_date===date))} onClick={()=>void slotToggle(customTime,customAction==="open")}>{slotSaving?"儲存中…":"套用時段"}</button>{slotBlockReason(customTime)&&<p className="scheduleBlockedHint">{slotBlockReason(customTime)}，請選擇其他時間。</p>}</div>}
         {dayLoading?<p role="status">時段讀取中…</p>:dayError?<div className="scheduleLoadError" role="alert">{dayError}<button onClick={()=>void dayLoad()}>重新讀取</button></div>:<><div className="daySlots scheduleCompactSlots">{displayTimes.map(t=>{const blocked=slotBlockReason(t),open=openTimes.includes(t);return <button key={t} disabled={slotSaving||Boolean(blocked)||holidays.some(h=>h.holiday_date===date)} className={blocked?"booked":open?"open":"closed"} onClick={()=>void slotToggle(t)}><b>{clockLabel(t)}</b><small>{blocked|| (open?"可預約・點選關閉":"未開放・點選開啟")}</small></button>})}</div>{!displayTimes.length&&<p className="scheduleEmpty">此日沒有可約時段。需要加開時，請點「自訂時段」。</p>}
-        <section className="scheduleBookedList"><h3>當日已預約（{dayBookings.length} 筆）</h3>{dayBookings.length?dayBookings.map(booking=><article key={booking.id}><div><span>已預約</span><b>{clockLabel(bookingClock(booking.start))} ～ {clockLabel(bookingClock(booking.end))}</b></div><p>諮詢 {booking.minutes} 分鐘・緩衝至 {clockLabel(bookingClock(booking.bufferEnd))}</p><small>訂單編號：{booking.bookingNo}</small></article>):<p className="scheduleHint">當日尚無預約。</p>}</section></>}
+        <section className="scheduleBookedList"><h3>當日已預約（{dayBookings.length} 筆）</h3>{dayBookings.length?dayBookings.map(booking=><article key={booking.id}><div><span>已預約</span><b>{clockLabel(bookingClock(booking.start))} ～ {clockLabel(bookingClock(booking.end))}</b></div><p>諮詢 {booking.minutes} 分鐘・緩衝至 {clockLabel(bookingClock(booking.bufferEnd))}</p><p className="scheduleBookingCustomer">客人：{booking.customerName||"未提供姓名"}</p><small>訂單編號：{booking.bookingNo}</small></article>):<p className="scheduleHint">當日尚無預約。</p>}</section></>}
       </section>
-      {confirmCloseDate && (
-        <div className="modalBackdrop" onClick={() => !closingDate && setConfirmCloseDate(false)}>
-          <div className="modal closeDayConfirmModal" onClick={(event) => event.stopPropagation()}>
-            <div className="closeDayIcon">!</div>
-            <h2>清除當日所有時段？</h2>
-            <p>確定要清除 <b>{selectedDateLabel}</b> 目前所有開啟的視訊諮詢時段嗎？</p>
-            <small>清除後，該日期暫時不會有可預約時段；不會關閉前台視訊預約功能。</small>
-            <div className="closeDayActions">
-              <button className="cancel" disabled={closingDate} onClick={() => setConfirmCloseDate(false)}>取消</button>
-              <button className="confirmClose" disabled={closingDate} onClick={() => void closeAllDaySlots()}>{closingDate ? "清除中…" : `確認清除 ${selectedDateLabel}`}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
       {videoControlConfirm && (
         <div className="modalBackdrop" onClick={() => !videoControlSaving && setVideoControlConfirm(null)}>
           <div className="modal closeDayConfirmModal" onClick={(event) => event.stopPropagation()}>
             <div className={`closeDayIcon ${videoControlConfirm === "open" ? "openIcon" : ""}`}>{videoControlConfirm === "open" ? "✓" : "!"}</div>
-            <h2>{videoControlConfirm === "open" ? "開啟前台視訊預約？" : videoControlConfirm === "close" ? "關閉前台視訊預約？" : "清除所有已開啟時段？"}</h2>
-            <p>{videoControlConfirm === "open" ? "開啟後，前台將重新套用下方設定的開放時間。" : videoControlConfirm === "close" ? "關閉後，前台會顯示所有時段已額滿；後台時段設定不會改變。" : "確定要清除目前所有已開啟的視訊諮詢時段嗎？前台視訊預約功能會維持原本的開啟／關閉狀態。"}</p>
-            {videoControlConfirm === "close_all" && <small>只清除時段，不會變更上方「前台視訊預約」總開關；之後仍可重新開啟個別時段。</small>}
+            <h2>{videoControlConfirm === "open" ? "開啟前台視訊預約？" : "關閉前台視訊預約？"}</h2>
+            <p>{videoControlConfirm === "open" ? "開啟後，前台將顯示手動開放的可約時段。" : "關閉後，前台會顯示所有時段已額滿；後台時段設定不會改變。"}</p>
             <div className="closeDayActions">
               <button className="cancel" disabled={videoControlSaving} onClick={() => setVideoControlConfirm(null)}>取消</button>
-              <button className={videoControlConfirm === "open" ? "confirmOpen" : "confirmClose"} disabled={videoControlSaving} onClick={() => videoControlConfirm === "close_all" ? void clearEverySlot() : void setVideoBookingAccess(videoControlConfirm === "open")}>
-                {videoControlSaving ? "處理中…" : videoControlConfirm === "open" ? "確認開啟" : videoControlConfirm === "close" ? "確認關閉" : "確認清除所有時段"}
+              <button className={videoControlConfirm === "open" ? "confirmOpen" : "confirmClose"} disabled={videoControlSaving} onClick={() => void setVideoBookingAccess(videoControlConfirm === "open")}>
+                {videoControlSaving ? "處理中…" : videoControlConfirm === "open" ? "確認開啟" : "確認關閉"}
               </button>
             </div>
           </div>
