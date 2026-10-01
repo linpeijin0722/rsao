@@ -32,7 +32,7 @@ const itemLines=(details:any[])=>details.flatMap((detail:any)=>{
 
 export async function syncBookingCalendar(bookingNo:string) {
   const db=adminSupabase();
-  const {data:booking,error}=await db.from("bookings").select("id,booking_no,slot_start,slot_end,payment_status,status,cancellation_reason,google_calendar_event_id,customers(full_name),consultation_methods(code,title,duration_minutes),booking_details(item_title,quantity,booking_detail_sub_items(sub_item_title))").eq("booking_no",bookingNo).single();
+  const {data:booking,error}=await db.from("bookings").select("id,booking_no,slot_start,slot_end,payment_status,status,cancellation_reason,google_calendar_event_id,customers(full_name,line_display_name),consultation_methods(code,title,duration_minutes),booking_details(item_title,quantity,booking_detail_sub_items(sub_item_title))").eq("booking_no",bookingNo).single();
   if(error||!booking)throw new Error(error?.message||"找不到訂單");
   const method=one(booking.consultation_methods), customer=one(booking.customers);
   const shouldExist=method?.code==="video"&&booking.payment_status==="paid"&&booking.status!=="cancelled"&&!!booking.slot_start;
@@ -46,7 +46,7 @@ export async function syncBookingCalendar(bookingNo:string) {
   }
   const start=new Date(booking.slot_start), end=booking.slot_end?new Date(booking.slot_end):new Date(start.getTime()+Math.max(1,Number(method.duration_minutes)||30)*60000);
   const items=itemLines(booking.booking_details||[]);
-  const description=[`訂單編號：${booking.booking_no}`,"","諮詢項目：",...items.map((x:string)=>`・${x}`)].join("\n");
+  const description=[`訂單編號：${booking.booking_no}`,`LINE名稱：${customer?.line_display_name||""}`,"","諮詢項目：",...items.map((x:string)=>`・${x}`)].join("\n");
   const event={summary:`${customer?.full_name||"未填姓名"}｜視訊諮詢`,description,start:{dateTime:start.toISOString(),timeZone:"Asia/Taipei"},end:{dateTime:end.toISOString(),timeZone:"Asia/Taipei"},reminders:{useDefault:false,overrides:[{method:"popup",minutes:15}]}};
   let result:any;
   if(booking.google_calendar_event_id){

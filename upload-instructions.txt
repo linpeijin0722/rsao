@@ -1,66 +1,55 @@
-阿嫂預約系統：15年流年快速寫單、AI每題3種回答、客服每日提醒
+LINE視訊通知：更換新行事曆與客服測試單排除
 
-上傳方式
-1. ZIP解壓縮後，app/、lib/、vercel.json依原路徑放到網站專案根目錄，覆蓋同名檔案。
-   新增的檔案也要一起上傳，請不要只上傳QuickConsultationReply.tsx。
-   tests/可一併保留作開發驗證，不是網站執行所需。
-2. 在正確專案的Supabase SQL Editor，完整執行 supabase/047_staff_data_reminders.sql。
-   這次SQL可重複執行，會新增客服提醒設定及每日發送記錄。
-   不需要更新Google Apps Script（程式碼.gs）。
-3. Vercel重新部署網站。vercel.json新增每天04:00 UTC＝台灣12:00的客服提醒排程。
+請依以下順序更新
+1. ZIP內的lib/及app/依原路徑覆蓋網站專案，重新部署Vercel。
+2. 確認Vercel的GOOGLE_CALENDAR_ID為ginshan820@gmail.com；系統使用的服務帳號必須能修改這個行事曆。
+   如果網站原本已經同步到這個行事曆，不需要重新變更ID。
+3. 登入阿嫂後台，再開啟：
+   https://rsao-virid.vercel.app/staff/calendar-sync
+   先核對行事曆ID及待同步訂單，按「以預約系統資料更新行事曆」。
+   此操作只更新已有活動的預約資料與LINE名稱，不發送LINE；會以预約系統的時間更新行事曆時間。
+   請確認每筆顯示已同步。如果顯示活動不存在或權限錯誤，先檢查Google Calendar權限，不要繼續啟用通知。
+4. 在原本LINE視訊通知的Apps Script專案，整份覆蓋VideoCalendarNotifications.gs內容。
+   不要貼到預約系統的Google文件產生器程式碼.gs。這是另外一個視訊通知程式。
+5. Apps Script專案設定的時區請設Asia/Taipei，指令碼屬性LINE_TOKEN沿用原設定。
+6. 先手動執行previewCalendarNotifications，查看執行紀錄。此函式完全不發送LINE。
+   確認新行事曆來源、時間、訂單，且客服測試單沒有出現後，才使用原有排程。
+   今日/明日/30天及三天內檢查的原函式名稱保留，可以沿用既有觸發器。
+   如果這個專案同時部署作為LINE Webhook，更新程式後也更新原部署版本。
 
-網站檔案與上傳路徑（均以網站專案根目錄為起點）
-- app/layout.tsx
-- app/v45.css
-- app/staff/AnnualFortuneEditor.tsx
-- app/staff/AiAnswerChoices.tsx
-- app/staff/QuickConsultationReply.tsx
-- app/api/staff/quick-reply/route.ts
-- app/api/cron/staff-data-reminders/route.ts
-- lib/annual-fortune.ts
-- lib/ai-question-choices.ts
-- lib/staff-data-reminders.ts
-- lib/google-consultation-docs.ts
-- vercel.json
-- supabase/047_staff_data_reminders.sql
+網站上傳路徑（專案根目錄）
+- lib/google-calendar.ts
+- app/api/staff/calendar-sync/route.ts
+- app/staff/calendar-sync/page.tsx
 
-環境變數
-沿用既有 NEXT_PUBLIC_SUPABASE_URL、SUPABASE_SERVICE_ROLE_KEY、LINE_MESSAGING_CHANNEL_ACCESS_TOKEN、ADMIN_SESSION_SECRET、NEXT_PUBLIC_SITE_URL。
-OPENAI_API_KEY：AI回答必須設定，沿用既有AI潤稿金鑰。
-OPENAI_ANSWER_MODEL：可選；未設定時沿用OPENAI_POLISH_MODEL，再未設定使用gpt-5-mini。
-CRON_SECRET：必須設定；排程以Authorization: Bearer驗證。
-如果沒有設定排程或CRON_SECRET，僅上傳網站檔案不會產生每日提醒。
+Apps Script來源
+- google-apps-script/VideoCalendarNotifications.gs：整份貼到原LINE視訊通知專案的編輯器。
+- tests/是開發驗證檔，不需要貼進Apps Script。
+- 這次不用Supabase SQL。
 
-客服身分與驗收
-目前工作環境沒有正式Supabase連線，因此沒有取得或猜測林啟恩的實際LINE UID。
-SQL只在customers中，本名精確等於「林啟恩」且LINE名稱精確等於「Nnn」，並僅有一個不同UID時，自動綁定及啟用。
-執行SQL最後會顯示enabled與UID。enabled=false表示尚未啟用；請檢查後方列出的用戶資料、修正本名後重跑SQL，不要猜UID。
-每次排程也會核對資料庫名稱與LINE實際profile名稱；核對失敗停止發送。
-登入後台後，在同一瀏覽器開啟：
-https://你的網站網域/api/cron/staff-data-reminders?dryRun=1
-這只會核對身分並列出符合條件的通知預覽，不會發送LINE或建立發送記錄。
-可先確認recipient為林啟恩／Nnn，previews的訂單及台灣時間正確。
-沒有符合條件的訂單時count=0是正常情況。
+通知判斷
+- 新行事曆ID：ginshan820@gmail.com。
+- 一個活動視為一筆訂單；同一人兩筆不同訂單會分別列出，沒有只取最早時間。
+- 標題「姓名｜視訊諮詢」與ASCII「姓名|視訊」均能讀取姓名。
+- 活動說明包含「訂單編號：...」及新補上的「LINE名稱：...」。
+- 只排除林珮均+Peggy，或林啟恩+Nnn的完整精確配對。
+- 同名但LINE名稱不同的客人正常列入，不會只因本名相同就排除。
+- 若同名活動缺少LINE名稱，停止該次行事曆通知，提醒先補齊資料；不猜測身分。
+- 今天、明天、30天、三天內諮詢結果回傳提醒皆採用同一套過濾及逐訂單判斷。
+- 原Drive資料夾檢查與LINE接收者沿用來源程式設定；這次更換的是行事曆來源及活動辨識。
+- 三天內「諮詢結果回傳」仍按來源程式查指定資料夾的姓名全文，不等於預約網站「客人是否填資料」的每日客服提醒。
+- 所有行事曆日期、星期、開始時間和凌晨篩選均明確使用Asia/Taipei。
 
-提醒規則
-視訊日期前4個台灣日曆日起，到預約開始前，尚無data_submitted_at的訂單，每天台灣中午12點通知客服。
-包含尚待付款但仍未失效的訂單；已取消、已失效、資料已送出、已過預約時間都不通知。
-資料送出指系統「送出資料」的完成狀態，不是填到一半或建立部分人物資料。
-通知內容有客人姓名、訂單編號、台灣視訊時間及客服後台連結。
-同訂單／日期／客服只有一筆發送記錄；重複排程不重送。
-LINE失敗會留在staff_data_reminder_log.last_error；當天不盲目重送，以避免網路逾時實際已送達造成重複訊息，次日若仍未填資料會再通知。
+關於禁止手動修改行事曆
+此更新没有把Google Calendar擁有者上鎖。建議以Google共用權限處理：
+1. 行事曆設定→與特定人士或群組共用。
+2. 一般客服與查看用帳號設為「查看所有活動詳情」，不能修改活動。
+3. 預約系統的Google服務帳號保留「變更活動」權限。
+4. 執行通知Apps Script的帳號只需能查看活動詳情並加入該行事曆。
+如果平常查看行事曆的帳號就是ginshan820@gmail.com擁有者，仍可手動改動；要避免誤改，請用另一個只有查看權限的Google帳號看這個行事曆。
+本次沒有實際更改Google共用設定，需要在行事曆中設定權限。
 
-寫單規則
-整體運勢的新文件從目前虛歲起共15年（例44～58歲），最高到99歲。
-流年快速寫單一次只展開一年，財運、助力、需要留意、健康可複選，各年獨立，文字可自行修改。
-自行修改的文字不會因勾選選項而自動覆蓋，按「依選項重新組合／換個說法」才重新產生。
-既有舊文件不會被批次改寫；開啟流年介面顯示15年，編輯後按「確認寫入全部回答」才更新該段。
-身體健康文件沿用21年，這次15年調整針對整體運勢。
-AI只參考對應人物／項目的阿嫂內容，每題提供3個候選，點選才填入A，已有答案會先確認是否替換。
-產生AI候選不會直接修改Google諮詢單，仍須按下方確認寫入。
-修改阿嫂原文後，過期候選會清除，需要重新產生。
-
-驗證
-25項自動化測試通過；390px手機與1280px電腦實測：逐年內容保留、3候選選取、答案寫入、無水平溢出。
-047 SQL以PostgreSQL引擎測試：重複執行、唯一身分綁定、未匹配／重名停用、每日唯一限制。
-測試全部使用模擬資料，沒有向客人或客服發送正式LINE，也沒有修改正式資料庫。
+驗證結果
+36項測試通過，npm run build通過。
+同步頁面以模擬資料驗證預覽與按鈕更新、手機無水平溢出。
+程式語法檢查通過；Apps Script與LINE發送測試均使用模擬，不曾向正式帳號發送通知。
