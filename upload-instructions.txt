@@ -1,55 +1,34 @@
-LINE視訊通知：更換新行事曆與客服測試單排除
+本次更新：過世親人多份填寫資料、舊行事曆活動 LINE 名稱補齊
 
-請依以下順序更新
-1. ZIP內的lib/及app/依原路徑覆蓋網站專案，重新部署Vercel。
-2. 確認Vercel的GOOGLE_CALENDAR_ID為ginshan820@gmail.com；系統使用的服務帳號必須能修改這個行事曆。
-   如果網站原本已經同步到這個行事曆，不需要重新變更ID。
-3. 登入阿嫂後台，再開啟：
-   https://rsao-virid.vercel.app/staff/calendar-sync
-   先核對行事曆ID及待同步訂單，按「以預約系統資料更新行事曆」。
-   此操作只更新已有活動的預約資料與LINE名稱，不發送LINE；會以预約系統的時間更新行事曆時間。
-   請確認每筆顯示已同步。如果顯示活動不存在或權限錯誤，先檢查Google Calendar權限，不要繼續啟用通知。
-4. 在原本LINE視訊通知的Apps Script專案，整份覆蓋VideoCalendarNotifications.gs內容。
-   不要貼到預約系統的Google文件產生器程式碼.gs。這是另外一個視訊通知程式。
-5. Apps Script專案設定的時區請設Asia/Taipei，指令碼屬性LINE_TOKEN沿用原設定。
-6. 先手動執行previewCalendarNotifications，查看執行紀錄。此函式完全不發送LINE。
-   確認新行事曆來源、時間、訂單，且客服測試單沒有出現後，才使用原有排程。
-   今日/明日/30天及三天內檢查的原函式名稱保留，可以沿用既有觸發器。
-   如果這個專案同時部署作為LINE Webhook，更新程式後也更新原部署版本。
+一、先執行 SQL
+請在正確的預約系統 Supabase 專案，開啟 SQL Editor，完整執行 048_deceased_relative_quantity_units.sql。不要只貼其中一段。
+可重複執行，不會重複拆分；實際拆分會在客人開啟原有填寫連結時自動進行。
 
-網站上傳路徑（專案根目錄）
-- lib/google-calendar.ts
-- app/api/staff/calendar-sync/route.ts
-- app/staff/calendar-sync/page.tsx
+二、網站檔案覆蓋路徑（專案根目錄）
+app/api/booking-data/route.ts
+app/booking-data/page.tsx
+lib/google-calendar.ts
+app/api/staff/calendar-sync/route.ts
+app/staff/calendar-sync/page.tsx
+覆蓋這五個檔案後重新部署網站。SQL 檔不需要貼到 Google Apps Script；這次不需要覆蓋通知程式碼.gs。
 
-Apps Script來源
-- google-apps-script/VideoCalendarNotifications.gs：整份貼到原LINE視訊通知專案的編輯器。
-- tests/是開發驗證檔，不需要貼進Apps Script。
-- 這次不用Supabase SQL。
+三、兩位過世親人填寫
+同一筆「過世親人 ×2」訂單，原本的填寫連結會出現「第1位／共2位」、「第2位／共2位」。
+兩份資料獨立選擇、儲存。保留原本第一位答案，不會複製到第二位，訂單總金額不變。
+兩位都儲存後才能確認送出。若已有舊諮詢單，送出後另外建立包含兩位的新版，保留原本諮詢單及阿嫂已寫內容。
+客人重新開啟之前收到的填寫連結即可，不需要建立另一筆訂單。
 
-通知判斷
-- 新行事曆ID：ginshan820@gmail.com。
-- 一個活動視為一筆訂單；同一人兩筆不同訂單會分別列出，沒有只取最早時間。
-- 標題「姓名｜視訊諮詢」與ASCII「姓名|視訊」均能讀取姓名。
-- 活動說明包含「訂單編號：...」及新補上的「LINE名稱：...」。
-- 只排除林珮均+Peggy，或林啟恩+Nnn的完整精確配對。
-- 同名但LINE名稱不同的客人正常列入，不會只因本名相同就排除。
-- 若同名活動缺少LINE名稱，停止該次行事曆通知，提醒先補齊資料；不猜測身分。
-- 今天、明天、30天、三天內諮詢結果回傳提醒皆採用同一套過濾及逐訂單判斷。
-- 原Drive資料夾檢查與LINE接收者沿用來源程式設定；這次更換的是行事曆來源及活動辨識。
-- 三天內「諮詢結果回傳」仍按來源程式查指定資料夾的姓名全文，不等於預約網站「客人是否填資料」的每日客服提醒。
-- 所有行事曆日期、星期、開始時間和凌晨篩選均明確使用Asia/Taipei。
+四、修正行事曆通知錯誤
+部署後，先登入 https://rsao-virid.vercel.app/staff
+再開啟 https://rsao-virid.vercel.app/staff/calendar-sync
+按「補齊活動的 LINE 名稱」，檢查 LAS-20260920-4CE9C5 顯示「已同步」。
+這次會包含過往訂單，從已連結訂單的用戶資料讀取 LINE 名稱；只更新活動說明，不更動時間，不發送 LINE。
+再到 Google Apps Script 執行 previewCalendarNotifications。先檢查預覽，再恢復正式通知。
+客服測試預約僅在「林珮均＋Peggy」或「林啟恩＋Nnn」同時符合時略過。只有同名的其他客人仍正常列入。
+若該筆顯示「用戶尚未有LINE名稱」或「活動與訂單編號不符」，請提供該筆同步結果，不能直接依本名當作客服略過。
 
-關於禁止手動修改行事曆
-此更新没有把Google Calendar擁有者上鎖。建議以Google共用權限處理：
-1. 行事曆設定→與特定人士或群組共用。
-2. 一般客服與查看用帳號設為「查看所有活動詳情」，不能修改活動。
-3. 預約系統的Google服務帳號保留「變更活動」權限。
-4. 執行通知Apps Script的帳號只需能查看活動詳情並加入該行事曆。
-如果平常查看行事曆的帳號就是ginshan820@gmail.com擁有者，仍可手動改動；要避免誤改，請用另一個只有查看權限的Google帳號看這個行事曆。
-本次沒有實際更改Google共用設定，需要在行事曆中設定權限。
-
-驗證結果
-36項測試通過，npm run build通過。
-同步頁面以模擬資料驗證預覽與按鈕更新、手機無水平溢出。
-程式語法檢查通過；Apps Script與LINE發送測試均使用模擬，不曾向正式帳號發送通知。
+五、已完成的本機驗證
+39項程式測試通過、TypeScript 檢查通過、網站建置通過。
+SQL 實際 PostgreSQL 引擎測試通過：重複執行、同時開啟拆分一次、第一位答案保留、兩份金額合計1400、未完成第二位不能送出。
+行事曆 API 測試確認只 PATCH description，保留活動時間；訂單身分不符或 LINE 名稱缺漏時停止。
+尚未操作正式資料庫、正式行事曆，也沒有對客人發送任何 LINE。

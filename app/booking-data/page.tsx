@@ -1279,7 +1279,7 @@ function Answer({
     return (
       <article className="answerCard collapsed">
         <div className="answerTitle">
-          <span>{detail.item_title}</span>
+          <span>{detail.item_title}{Number(detail.unit_count)>1?`（第${detail.unit_number}位／共${detail.unit_count}位）`:""}</span>
           <small>{displaySub}</small>
         </div>
         <button
@@ -1301,7 +1301,7 @@ function Answer({
   return (
     <article className="answerCard">
       <div className="answerTitle">
-        <span>{detail.item_title}</span>
+        <span>{detail.item_title}{Number(detail.unit_count)>1?`（第${detail.unit_number}位／共${detail.unit_count}位）`:""}</span>
         <small>{displaySub}</small>
       </div>
       {relation || marriage ? (
