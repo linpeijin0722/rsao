@@ -1,3 +1,4 @@
+import {parseAnnual,annualAges,annualText} from "@/lib/annual-fortune";
 import { generateQuestionChoices } from "@/lib/ai-question-choices";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -1558,7 +1559,13 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
           !usedMeta.has(index) && entry.label === slot.label,
       );
       const childSection = /^(整體建議|健康建議|流年運勢)$/.test(slot.label);
-      if(childSection&&previousMetaIndex>=0&&["overall-fortune","health"].includes(sectionMeta[previousMetaIndex].itemCode))metaIndex=previousMetaIndex;
+      if(slot.label==="流年運勢"&&previousMetaIndex>=0&&["overall-fortune","health"].includes(sectionMeta[previousMetaIndex].itemCode))metaIndex=previousMetaIndex;
+      if(slot.label==="整體建議"||slot.label==="健康建議"){
+        const code=slot.label==="健康建議"?"health":"overall-fortune";
+        const next=sectionMeta.findIndex((entry:any,index:number)=>!usedMeta.has(index)&&entry.itemCode===code);
+        if(next>=0)metaIndex=next;
+        else if(previousMetaIndex>=0&&sectionMeta[previousMetaIndex].itemCode===code)metaIndex=previousMetaIndex;
+      }
       if (metaIndex < 0 && /整體建議|流年運勢|整體運勢/.test(slot.label))
         metaIndex = sectionMeta.findIndex(
           (entry: any, index: number) =>
@@ -1583,7 +1590,7 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
         if (remaining.length === 1) metaIndex = remaining[0];
       }
       if (metaIndex < 0) return null;
-      if(!childSection)usedMeta.add(metaIndex);
+      if(slot.label!=="流年運勢")usedMeta.add(metaIndex);
       previousMetaIndex=metaIndex;
       const meta = sectionMeta[metaIndex],
         itemCode = meta.itemCode || "",
@@ -1625,7 +1632,11 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
         .filter((value: string, index: number, all: string[]) => value && all.indexOf(value) === index);
       return {
         ...slot,
-        label: itemCode === "past-life-personal"
+        sectionLabel: slot.label,
+        itemLabel: meta.label,
+        detailId: meta.detailId,
+        profileId: meta.profileId,
+        label: childSection ? slot.label : itemCode === "past-life-personal"
           ? "前世因果（個人）"
           : itemCode === "past-life-relationship"
             ? "前世因果（與他人前世關係）"
@@ -1760,11 +1771,11 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
           phraseIds: contaminated
             ? []
             : asArray(existing.phraseIds).map(String),
-          answer: contaminated ? "" : existing.answer || slot.answer || "",
+          answer: contaminated ? "" : slot.label === "流年運勢" ? slot.answer || "" : existing.answer || slot.answer || "",
           completed: contaminated ? false : existing.completed === true,
           accentElementIds: contaminated ? [] : asArray(existing.accentElementIds).map(String),
           spiritualDetail: contaminated ? "" : clean(existing.spiritualDetail),
-          annualState: existing.annualState || undefined,
+          annualState: existing.answer === slot.answer ? existing.annualState : undefined,
         },
       ];
     }),
@@ -1857,14 +1868,37 @@ export async function POST(request: NextRequest) {
         { error: "連結驗證失敗，請重新從 Google 諮詢單開啟" },
         { status: 401 },
       );
+    if(body.mode === "write_annual"){
+      const slot=data.sectionSlots.find((entry:any)=>entry.slotIndex===Number(body.sectionSlotIndex));
+      const age=Number(body.age);
+      if(!slot||(slot.sectionLabel||slot.label)!=="流年運勢"||!Number.isInteger(age))return NextResponse.json({error:"找不到對應的流年區域"},{status:400});
+      const currentSlots=await getQuickReplySectionSlots(data.documentDetail.google_document_id);
+      const current=currentSlots.find(entry=>entry.slotIndex===slot.slotIndex&&entry.label==="流年運勢");
+      if(!current)throw new Error("文件區域已變動，請重新開啟快速回覆");
+      const state=parseAnnual(current.answer),ages=annualAges(Number(Object.keys(state)[0]||0));
+      if(!ages.includes(age))return NextResponse.json({error:"這個年齡不在文件的15年範圍內"},{status:400});
+      state[age]={codes:asArray(body.codes).map(String).slice(0,120),text:normalizeConsultationReturnText(String(body.answer??"")).slice(0,5000),manual:body.manual===true};
+      await upsertQuickConsultationSectionReplies(data.documentDetail.google_document_id,{[String(slot.slotIndex)]:annualText(ages,state)},{[String(slot.slotIndex)]:{state,dirtyAges:[age]}});
+      // 文件是目前內容的來源；回讀後保存，避免把別年的舊草稿寫回去。
+      const fresh=(await getQuickReplySectionSlots(data.documentDetail.google_document_id)).find(entry=>entry.slotIndex===slot.slotIndex);
+      if(!data.external){const sectionReplies={...data.sectionReplies,[String(slot.slotIndex)]:{...data.sectionReplies[String(slot.slotIndex)],answer:fresh?.answer||annualText(ages,state),annualState:state,completed:true}};
+        const {error}=await data.db.from("booking_quick_replies").upsert({booking_id:data.booking.id,section_replies:sectionReplies,google_document_id:data.documentDetail.google_document_id,updated_at:new Date().toISOString()},{onConflict:"booking_id"});
+        if(error)throw new Error("流年已寫入文件，但草稿保存失敗；請重新開啟確認");
+      }
+      return NextResponse.json({ok:true,age,answer:fresh?.answer||annualText(ages,state)});
+    }
     if(body.mode === "ai_question_choices"){
       const incoming=body.sectionReplies&&typeof body.sectionReplies==="object"?body.sectionReplies:{};
-      const questions=data.questionSlots.map((q:any)=>{
-        const sections=data.sectionSlots.filter((section:any)=>section.itemCode===q.itemCode&&section.profileName===q.profileName);
-        const source=sections.map((section:any)=>`【${section.label}${section.targetDisplay ? `／${section.targetDisplay}` : ""}】\n${String(incoming[String(section.slotIndex)]?.answer??data.sectionReplies[String(section.slotIndex)]?.answer??section.answer??"")}`).join("\n\n").slice(0,9000);
-        return{slotIndex:q.slotIndex,questionNumber:q.questionNumber,question:q.question,profileName:q.profileName||"",source};
-      });
-      return NextResponse.json({ok:true,choices:await generateQuestionChoices(questions)});
+      let q:any=data.questionSlots.find((entry:any)=>entry.slotIndex===Number(body.questionSlotIndex));
+      if(!q){
+        const slot=data.sectionSlots.find((entry:any)=>entry.slotIndex===Number(body.sectionSlotIndex));
+        if(!slot||!String(body.question||"").trim())return NextResponse.json({error:"找不到這題對應的諮詢區域"},{status:400});
+        q={slotIndex:-1,questionNumber:0,question:String(body.question).slice(0,2000),profileName:slot.profileName,itemCode:slot.itemCode,targetName:slot.targetName};
+      }
+      const sections=data.sectionSlots.filter((entry:any)=>entry.itemCode===q.itemCode&&entry.profileName===q.profileName&&(!q.targetName||entry.targetName===q.targetName));
+      const source=sections.map((entry:any)=>`【${entry.sectionLabel||entry.label}${entry.targetDisplay ? `／${entry.targetDisplay}` : ""}】\n${String(incoming[String(entry.slotIndex)]?.answer??entry.answer??"")}`).join("\n\n");
+      const ownAnswer=String(body.currentAnswer||"").slice(0,2500);
+      return NextResponse.json({ok:true,...await generateQuestionChoices([{slotIndex:q.slotIndex,questionNumber:q.questionNumber,question:q.question,profileName:q.profileName||"",source:[source,ownAnswer?`【這題阿嫂已寫的回答】\n${ownAnswer}`:""].filter(Boolean).join("\n").slice(0,13000)}])});
     }
     if (body.mode === "compose" || body.mode === "compose_section") {
       const selections =
@@ -2406,7 +2440,7 @@ export async function POST(request: NextRequest) {
         targetName: slot.targetName || "",
         accentElementIds: asArray(row.accentElementIds).map(String),
         spiritualDetail: clean(row.spiritualDetail),
-        annualState: slot.itemCode === "overall-fortune" && slot.label === "流年運勢" ? row.annualState : undefined,
+        annualState: slot.sectionLabel === "流年運勢" || slot.label === "流年運勢" ? row.annualState : undefined,
       };
       sectionAnswers[String(slot.slotIndex)] = answer;
     }
@@ -2499,6 +2533,7 @@ export async function POST(request: NextRequest) {
       await upsertQuickConsultationSectionReplies(
         data.documentDetail.google_document_id,
         regularSectionAnswers,
+        Object.fromEntries(data.sectionSlots.filter((slot:any)=>slot.sectionLabel === "流年運勢" || slot.label === "流年運勢").map((slot:any)=>[String(slot.slotIndex), {state:incomingSections[String(slot.slotIndex)]?.annualState,dirtyAges:incomingSections[String(slot.slotIndex)]?.annualDirtyAges||[]} ])),
       );
     if (pastLifeOverviewAnswers.some((entry: any) => entry.answer))
       await upsertPastLifeOverviewReplies(

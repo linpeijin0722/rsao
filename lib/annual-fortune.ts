@@ -47,7 +47,97 @@ export const annualFortuneGroups=[
  ["liver_stomach","肝胃不合",["要注意肝胃不合，身體要保養。","身體方面要留意肝胃不合。","肝胃不合的情況要多注意。"]],
  ]),
 ];
+// 具體判斷由阿嫂選用；不依年齡自動推算。
+const direct=(code:string,label:string,text:string)=>({code,label,phrases:[text,text.replace(/^這一年/,"今年"),text.replace(/^這一年/,"這一歲") ]});
+annualFortuneGroups.splice(1,0,
+ {title:"工作、升遷與考試",options:[
+ direct("promotion","有升遷機會","這一年有升遷機會，職位或權責會往上提升。"),
+ direct("no_promotion","升遷受阻","這一年升遷會受阻，職位不容易往上提升。"),
+ direct("job_success","換工作能成","這一年換工作能成，新工作能順利接上。"),
+ direct("job_fail","換工作不順","這一年換工作不順，離職後工作銜接會有阻力。"),
+ direct("job_stay","適合留原職","這一年適合留在原本的工作，先穩住現職。"),
+ direct("job_leave","原工作留不住","這一年原本的工作留不住，會有離職或職務調整。"),
+ direct("boss_help","主管提拔","這一年會得到主管提拔，工作上有人替你說話。"),
+ direct("boss_pressure","主管施壓","這一年主管會施壓，工作要求與責任會增加。"),
+ direct("interview_pass","面試能過","這一年的面試能過，求職能有結果。"),
+ direct("interview_fail","面試不易過","這一年的面試不容易過，求職會遇到阻力。"),
+ direct("exam_pass","考試能上榜","這一年考試能上榜，準備的方向能有成果。"),
+ direct("exam_fail","考試難上榜","這一年考試難上榜，準備與臨場表現會遇到阻力。"),
+ direct("certificate","證照能取得","這一年證照能取得，考核能有結果。"),
+ direct("business_ok","生意有起色","這一年生意會有起色，客源與業績會增加。"),
+ direct("business_down","生意走下坡","這一年生意會走下坡，客源與業績會減少。"),
+ direct("work_load","工作量增加","這一年工作量會增加，事情多、責任也重。"),
+ ]},
+ {title:"感情、婚姻與家庭",options:[
+ direct("romance_meet","會遇到對象","這一年會遇到可以發展的感情對象。"),
+ direct("romance_none","暫無對象","這一年感情緣分沒有進展，不容易遇到能發展的對象。"),
+ direct("romance_stable","感情能穩定","這一年感情能穩定，兩人的關係能繼續往前走。"),
+ direct("romance_break","感情易分開","這一年感情容易分開，兩人的關係會出現明顯裂痕。"),
+ direct("marry","有結婚機會","這一年有結婚機會，婚事能往定下來的方向走。"),
+ direct("marry_block","婚事受阻","這一年婚事會受阻，談婚論嫁不容易定下來。"),
+ direct("romance_ex","舊情會聯絡","這一年舊情會再聯絡，過去的感情會重新出現。"),
+ direct("bad_romance","爛桃花糾纏","這一年會有爛桃花糾纏，容易遇到不適合的感情。"),
+ direct("third_party","第三者干擾","這一年感情會受第三者干擾，兩人的關係容易起衝突。"),
+ direct("family_argument","家人起爭執","這一年會因家人的事情起爭執，意見不容易一致。"),
+ direct("family_money","為家人花錢","這一年會因家人的事情花錢，家庭支出會增加。"),
+ direct("family_help","家人有助力","這一年家人能給你助力，遇到事情有人協助。"),
+ ]},
+ {title:"人際、小人與官司",options:[
+ direct("friend_loss","朋友牽連破財","這一年會因朋友的事情破財，不要替人擔保或借名。"),
+ direct("loan_unpaid","借款難收回","這一年借出去的錢難收回，不要再替人周轉。"),
+ direct("partner_dispute","合夥起爭執","這一年合夥會起爭執，金錢與責任分配會有問題。"),
+ direct("rumor","被造謠議論","這一年會被造謠或議論，說話容易被人曲解。"),
+ direct("credit_taken","功勞被搶","這一年做事的功勞容易被搶，成果會被別人拿走。"),
+ direct("blame","被推卸責任","這一年容易被推卸責任，別人的問題會落到你身上。"),
+ direct("contract_dispute","合約有糾紛","這一年合約容易有糾紛，文字與責任範圍要確認清楚。"),
+ direct("legal_win","官司有利","這一年訴訟的局面對你有利，有機會取得較好的結果。"),
+ direct("legal_lose","官司不利","這一年訴訟的局面對你不利，事情會有阻力。"),
+ direct("settle_yes","能談成和解","這一年能談成和解，爭議能往收尾的方向走。"),
+ direct("settle_no","和解談不成","這一年和解談不成，双方的條件與立場難以一致。"),
+ direct("legal_drag","官司會拖延","這一年官司會拖延，不容易很快結束。"),
+ ]},
+ {title:"居住、外出與變動",options:[
+ direct("move","會搬家","這一年會有搬家或居住環境上的變動。"),
+ direct("move_good","搬家能順利","這一年搬家能順利，新的居住環境能安定下來。"),
+ direct("move_bad","搬家有阻力","這一年搬家會有阻力，房屋或搬遷安排容易卡住。"),
+ direct("repair_cost","房屋修繕花錢","這一年會因房屋修繕花錢，住處有需要處理的問題。"),
+ direct("travel_smooth","外出能順利","這一年外出能順利，行程能照安排進行。"),
+ direct("travel_delay","行程延誤","這一年外出行程容易延誤，交通與時間安排會被打亂。"),
+ direct("vehicle_cost","車子維修破財","這一年會因車子維修破財，車況要先確認。"),
+ direct("fall","容易跌倒受傷","這一年容易跌倒或碰撞受傷，走路與活動要小心。"),
+ direct("water","水邊少去","這一年水邊少去，水上活動要小心謹慎。"),
+ ]},
+);
+annualFortuneGroups[0].options.push(
+ direct("salary_up","薪資增加","這一年薪資會增加，工作收入有往上提升的機會。"),
+ direct("bonus","有獎金入帳","這一年有獎金或額外報酬入帳。"),
+ direct("income_stable","收入穩定","這一年收入能穩定，基本財祿能維持。"),
+ direct("income_down","收入減少","這一年收入會減少，原本的進帳會縮水。"),
+ direct("cash_stuck","資金卡住","這一年資金會卡住，款項不容易按時到位。"),
+ direct("payment_late","款項延遲","這一年款項會延遲，應收的錢不容易準時收到。"),
+ direct("investment_loss","投資容易虧損","這一年投資容易虧損，不宜加碼或與人合夥。"),
+ direct("debt","會有債務壓力","這一年會有債務壓力，還款與資金安排會造成負擔。"),
+ direct("extra_spend","臨時支出增加","這一年臨時支出會增加，會因事情而多花錢。"),
+ direct("saving","能存下錢","這一年能存下錢，收入能留下來，不會全部花掉。"),
+ direct("property_gain","房產有財","這一年房產方面有財，買賣或租金能帶來收入。"),
+);
+annualFortuneGroups[annualFortuneGroups.length-1].options.push(
+ direct("sleep","睡眠不安穩","這一年睡眠不安穩，容易淺眠或睡醒仍疲累。"),
+ direct("acid","胃酸、胃脹","這一年胃腸要留意，容易胃酸或胃脹。"),
+ direct("bowel","排便不順","這一年腸胃要留意，容易排便不順。"),
+ direct("appetite","食慾不佳","這一年胃口要留意，容易食慾不佳。"),
+ direct("neck","肩頸緊繃","這一年肩頸要留意，容易緊繃痠痛。"),
+ direct("back","腰背痠痛","這一年腰背要留意，容易痠痛不適。"),
+ direct("joints","關節不適","這一年關節要留意，活動時容易不適。"),
+ direct("breath","呼吸道不適","這一年呼吸道要留意，容易咳嗽或不適。"),
+ direct("skin_allergy","皮膚容易過敏","這一年皮膚要留意，容易過敏或發癢。"),
+ direct("dizzy","容易頭暈","這一年容易頭暈，身體狀態要留意。"),
+ direct("eye_tired","眼睛容易疲勞","這一年眼睛容易疲勞，視力與眼部不適要留意。"),
+ direct("recovery_slow","體力恢復慢","這一年體力恢復比較慢，忙完容易一直疲累。"),
+);
+export const annualExclusiveFamilies=[['promotion','no_promotion'],['job_success','job_fail'],['job_stay','job_leave'],['interview_pass','interview_fail'],['exam_pass','exam_fail'],['business_ok','business_down'],['romance_meet','romance_none'],['romance_stable','romance_break'],['marry','marry_block'],['legal_win','legal_lose'],['settle_yes','settle_no'],['move_good','move_bad'],['travel_smooth','travel_delay'],['income_stable','income_down']];
+export function toggleAnnualCodes(codes:string[],code:string){if(codes.includes(code))return codes.filter(c=>c!==code);const family=annualExclusiveFamilies.find(group=>group.includes(code))||[];return [...codes.filter(c=>!family.includes(c)),code];}
 export function annualAges(start:number){return Number.isInteger(start)&&start>0?Array.from({length:Math.max(0,Math.min(15,100-start))},(_,i)=>start+i):[];}
-export function composeAnnual(codes:string[],variant=0){return annualFortuneGroups.flatMap(g=>g.options).filter(o=>codes.includes(o.code)).map((o,i)=>o.phrases[(variant+i)%o.phrases.length]).join("");}
-export function parseAnnual(text:string):AnnualState {const result:AnnualState={};const pattern=/(?:^|\n)(\d+)歲\s*[:：]([^\n]*)/g;for(const match of text.matchAll(pattern))result[match[1]]={codes:[],text:match[2].trim(),manual:Boolean(match[2].trim())};return result;}
-export function annualText(ages:number[],state:AnnualState){return ages.map(age=>`${age}歲：${state[String(age)]?.text||""}`).join("\n");}
+export function composeAnnual(codes:string[],variant=0){return annualFortuneGroups.flatMap(g=>g.options).filter(o=>codes.includes(o.code)).map((o,i)=>o.phrases[(variant+i)%o.phrases.length].replace(i>0?/^這一年|^今年|^這一歲/:/$^/,"")).join("");}
+export function parseAnnual(text:string):AnnualState {const result:AnnualState={};const pattern=/(?:^|\n)(\d+)歲\s*[:：]([\s\S]*?)(?=\n\d+歲\s*[:：]|$)/g;for(const match of text.matchAll(pattern))result[match[1]]={codes:[],text:match[2].trim(),manual:Boolean(match[2].trim())};return result;}
+export function annualText(ages:number[],state:AnnualState){return ages.map(age=>`${age}歲：${state[String(age)]?.text.replace(/\s*\n\s*/g," ")||""}`).join("\n");}

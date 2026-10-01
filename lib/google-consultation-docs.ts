@@ -1,3 +1,4 @@
+import {parseAnnual,annualAges,annualText,type AnnualState} from "./annual-fortune";
 import crypto from "node:crypto";
 import { makeQuickReplyToken } from "@/lib/quick-reply-token";
 
@@ -940,7 +941,7 @@ export async function upsertQuickConsultationQuestionReplies(documentId:string,a
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
 
-export async function upsertQuickConsultationSectionReplies(documentId:string,answers:Record<string,string>) {
+export async function upsertQuickConsultationSectionReplies(documentId:string,answers:Record<string,string>,annualEdits:Record<string,{state?:AnnualState;dirtyAges:number[]}>={}) {
   if(!documentId)throw new Error("缺少 Google 文件 ID");
   const token=await accessToken();
   const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
@@ -948,7 +949,13 @@ export async function upsertQuickConsultationSectionReplies(documentId:string,an
   const matches=Array.from(scopedPlain.matchAll(headingPattern));
   const slots=matches.map((match,slotIndex)=>{
     const startOffset=baseOffset+(match.index||0)+match[0].length,rest=plain.slice(startOffset),boundary=rest.search(/\n(?=(?:[【《][^】》\n]+[】》]|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:Math.max(startOffset,plain.replace(/\n$/,"").length);
-    return {slotIndex,value:normalizeConsultationReturnText(String(answers[String(slotIndex)]||"")),startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset)};
+    let value=normalizeConsultationReturnText(String(answers[String(slotIndex)]||""));
+    if(match[1].trim()==="流年運勢" && value){
+      const current=parseAnnual(plain.slice(startOffset,endOffset)),startAge=Number(Object.keys(current)[0]||Object.keys(parseAnnual(value))[0]||0),ages=annualAges(startAge),edit=annualEdits[String(slotIndex)];
+      if(edit){for(const age of edit.dirtyAges){if(ages.includes(age)&&edit.state?.[age])current[age]=edit.state[age];}value=annualText(ages,current);}
+      else value=annualText(ages,parseAnnual(value));
+    }
+    return {slotIndex,value,startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset)};
   }).filter(slot=>slot.value).sort((a,b)=>b.startIndex-a.startIndex);
   if(!slots.length)return;
   const requests:any[]=[];
@@ -1317,7 +1324,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     add("【流年運勢】", "section");
     const startingAge = virtualAge(people[0]);
     if (startingAge) {
-      for (let age = startingAge; age <= Math.min(99, startingAge + (isOverallFortune ? 14 : 20)); age += 1) add(`${age}歲：\u00a0`, "teacher");
+      for (let age = startingAge; age <= Math.min(99, startingAge + 14); age += 1) add(`${age}歲：\u00a0`, "teacher");
     }
     add("");
     add("備註：");
@@ -1365,7 +1372,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     const count = /六|6/.test(subTitle) ? 6 : 3;
     for (let index = 1; index <= count; index += 1) add(`${index}.\u00a0`, "teacher");
   }
-  const alreadyHasTeacherLayout = isPastLifePersonal || isPastLifeRelation || isOverallFortune || marriage || itemCode === "date-time-selection" || title.includes("擇日");
+  const alreadyHasTeacherLayout = isPastLifePersonal || isPastLifeRelation || isOverallFortune || itemCode === "health" || marriage || itemCode === "date-time-selection" || title.includes("擇日");
   if (!alreadyHasTeacherLayout) {
     const teacherKind = itemCode === "deceased-relative" ? "deceasedTeacher" : "teacher";
     add(infantSpirit ? "【嬰靈】" : `【${subTitle || title}】`, "section");
