@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 type R = {
   id: string;
   weekday: number;
@@ -14,7 +14,7 @@ type H = { holiday_date: string; note: string | null };
 type TextDateOverride = { release_date: string; release_count: number | string; note: string | null };
 const days = ["一", "二", "三", "四", "五", "六", "日"],
   times = Array.from(
-    { length: 94 },
+    { length: 91 },
     (_, i) =>
       `${String(7 + Math.floor(i / 6)).padStart(2, "0")}:${String((i % 6)*10).padStart(2,"0")}`,
   ),
@@ -27,6 +27,12 @@ const shiftMonth = (value: string, amount: number) => {
     serial = year * 12 + month - 1 + amount;
   return `${Math.floor(serial / 12)}-${String((serial % 12) + 1).padStart(2, "0")}`;
 };
+type DayBooking = {id:string;bookingNo:string;start:string;end:string;bufferEnd:string;minutes:number};
+function clockLabel(value:string){const hour=Number(value.slice(0,2));return `${hour<12?"上午":hour<13?"中午":hour<18?"下午":"晚上"} ${hour%12||12}:${value.slice(3,5)}`;}
+function TimePicker({label,value,onChange,allowEnd=false}:{label:string;value:string;onChange:(value:string)=>void;allowEnd?:boolean}){
+  const hour=value.slice(0,2),minute=value.slice(3,5);
+  return <div className="scheduleTimePicker"><span>{label}</span><div><select aria-label={`${label}小時`} value={hour} onChange={event=>onChange(`${event.target.value}:${(event.target.value==="23"||(!allowEnd&&event.target.value==="22"))?"00":minute}`)}>{Array.from({length:allowEnd?17:16},(_,index)=>String(index+7).padStart(2,"0")).map(h=><option key={h} value={h}>{clockLabel(`${h}:00`).split(" ")[0]} {Number(h)%12||12} 時</option>)}</select><select aria-label={`${label}分鐘`} value={minute} onChange={event=>onChange(`${hour}:${event.target.value}`)}>{(hour==="23"||(!allowEnd&&hour==="22")?["00"]:["00","10","20","30","40","50"]).map(m=><option key={m} value={m}>{m} 分</option>)}</select></div></div>;
+}
 export default function Admin() {
   const [login, setLogin] = useState(false),
     [password, setPassword] = useState(""),
@@ -46,6 +52,15 @@ export default function Admin() {
     [month, setMonth] = useState(today().slice(0, 7)),
     [date, setDate] = useState(today()),
     [openTimes, setOpenTimes] = useState<string[]>([]),
+    [dayBookings,setDayBookings]=useState<DayBooking[]>([]),
+    [showAllTimes,setShowAllTimes]=useState(false),
+    [customTimeOpen,setCustomTimeOpen]=useState(false),
+    [customTime,setCustomTime]=useState("10:00"),
+    [customAction,setCustomAction]=useState("open"),
+    [dayLoading,setDayLoading]=useState(false),
+    [slotSaving,setSlotSaving]=useState(false),
+    [dayError,setDayError]=useState(""),
+    [ruleSaving,setRuleSaving]=useState(false),
     [openDates, setOpenDates] = useState<string[]>([]),
     [confirmCloseDate, setConfirmCloseDate] = useState(false),
     [closingDate, setClosingDate] = useState(false),
@@ -77,6 +92,8 @@ export default function Admin() {
         release_count: 0,
       })),
     );
+  const selectedDateRef=useRef(date),dayRequestRef=useRef(0);
+  selectedDateRef.current=date;
   async function load() {
     const r = await fetch("/api/admin/schedule"),
       j = await r.json();
@@ -92,7 +109,7 @@ export default function Admin() {
     setHolidays(j.holidays);
     setMethodId(j.methodId);
     setVideoBookingEnabled(j.videoBookingEnabled !== false);
-    dayLoad(j.methodId, date);
+
     fetch("/api/admin/text-capacity").then(async (x) => {
       if (x.ok) {
         const y = await x.json();
@@ -160,10 +177,16 @@ export default function Admin() {
       setTextCap({ ...textCap, enabled: value });
   }
   async function dayLoad(id = methodId, d = date) {
-    if (!id) return;
-    const r = await fetch(`/api/admin/day?methodId=${id}&date=${d}&_=${Date.now()}`, { cache: "no-store" }),
-      j = await r.json();
-    if (r.ok) setOpenTimes(j.open);
+    if (!id || d!==selectedDateRef.current) return;
+    const requestId=++dayRequestRef.current;
+    setDayLoading(true);setDayError("");
+    try{
+      const r=await fetch(`/api/admin/day?methodId=${id}&date=${d}&_=${Date.now()}`,{cache:"no-store"}),j=await r.json();
+      if(!r.ok)throw new Error(j.error||"無法讀取時段");
+      if(requestId!==dayRequestRef.current||d!==selectedDateRef.current)return;
+      setOpenTimes(j.open||[]);setDayBookings(j.bookings||[]);
+    }catch(err){if(requestId!==dayRequestRef.current||d!==selectedDateRef.current)return;setOpenTimes([]);setDayBookings([]);setDayError(err instanceof Error?err.message:"無法讀取時段");}
+    finally{if(requestId===dayRequestRef.current&&d===selectedDateRef.current)setDayLoading(false);}
   }
   async function monthLoad(id = methodId, value = month) {
     if (!id) return;
@@ -180,7 +203,7 @@ export default function Admin() {
     load();
   }, []);
   useEffect(() => {
-    dayLoad();
+    setShowAllTimes(false);setCustomTimeOpen(false);setOpenTimes([]);setDayBookings([]);dayLoad();
   }, [date, methodId]);
   useEffect(() => {
     monthLoad();
@@ -198,8 +221,15 @@ export default function Admin() {
     load();
   }
   async function save() {
+    if (!picked.length)return setError("請選擇至少一個星期");
+    if(start>=end)return setError("結束時間必須晚於開始時間");
     if (start < "07:00" || end > "23:00")
       return setError("時間只能設定在07:00至23:00");
+    if((scope==="from"||scope==="range")&&!from)return setError("請選擇起始日期");
+    if((scope==="until"||scope==="range")&&!until)return setError("請選擇結束日期");
+    if(scope==="range"&&from>until)return setError("結束日期必須晚於或等於起始日期");
+    setRuleSaving(true);setError("");
+    try {
     const vf = scope === "from" || scope === "range" ? from : null,
       vu = scope === "until" || scope === "range" ? until : null,
       r = await fetch("/api/admin/schedule", {
@@ -216,7 +246,8 @@ export default function Admin() {
       }),
       j = await r.json();
     if (!r.ok) return setError(j.error);
-    load();
+    await Promise.all([load(),dayLoad(),monthLoad()]);
+    } catch { setError("儲存失敗，請檢查連線後再試"); } finally { setRuleSaving(false); }
   }
   function weeklyOpen(day: number, t: string) {
     const o = weekly.find(
@@ -254,9 +285,12 @@ export default function Admin() {
       { weekday: day, start_time: t, is_open: value },
     ]);
   }
-  async function slotToggle(t: string) {
+  async function slotToggle(t: string, desired?:boolean) {
     if (!methodId) return window.alert("找不到視訊諮詢設定，請重新整理後再試");
-    const value = !openTimes.includes(t);
+    if(slotSaving||dayLoading||dayError)return;
+    const value = desired ?? !openTimes.includes(t);
+    const blocked=slotBlockReason(t);if(blocked)return setDayError(`${clockLabel(t)}：${blocked}，請選擇其他時間`);
+    if(value&&holidays.some(h=>h.holiday_date===date))return setDayError("此日為休假日，請先取消休假再開放時段");
 
     // 週五開啟個別時段時僅提示，不影響後續操作或前台總開關。
     if (value) {
@@ -267,6 +301,8 @@ export default function Admin() {
       }
     }
 
+    setSlotSaving(true);
+    try {
     const r = await fetch("/api/admin/slots", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -284,6 +320,7 @@ export default function Admin() {
     // 單日時段是最明確的人工設定，成功後立即反映，再從伺服器重新校正。
     setOpenTimes((current) => value ? [...new Set([...current, t])].sort() : current.filter((item) => item !== t));
     await Promise.all([dayLoad(), monthLoad()]);
+    } catch { setDayError("儲存失敗，請檢查連線後重新讀取"); } finally { setSlotSaving(false); }
   }
   async function closeAllDaySlots() {
     setClosingDate(true);
@@ -329,6 +366,14 @@ export default function Admin() {
     setVideoControlConfirm(null);
     await Promise.all([dayLoad(), monthLoad(), load()]);
   }
+  function slotBlockReason(t:string){
+    const candidate=new Date(`${date}T${t}:00+08:00`).getTime();
+    const booking=dayBookings.find(b=>candidate<new Date(b.bufferEnd).getTime()&&candidate+50*60000>new Date(b.start).getTime());
+    if(!booking)return "";
+    return candidate<new Date(booking.start).getTime()?"與預約重疊":candidate<new Date(booking.end).getTime()?"已預約":"預約緩衝時間";
+  }
+  function bookingClock(value:string){return new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Taipei",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(value));}
+  const displayTimes=showAllTimes?[...new Set([...times,...openTimes])].sort():[...openTimes].sort();
   const selectedDateLabel = (() => {
     const [year, monthValue, dayValue] = date.split("-").map(Number),
       weekday = days[(new Date(year, monthValue - 1, dayValue).getDay() + 6) % 7];
@@ -589,7 +634,16 @@ export default function Admin() {
           </div>
         </div>
       )}
-      <section className="adminCard">
+      <section className="adminCard scheduleRulesCard">
+        <h2>每週固定開放時間</h2><p className="scheduleHint">選擇星期與開放範圍，系統依 50 分鐘間隔安排可約時間。套用後會取代同星期、時間重疊的舊設定。</p>
+        <div className="scheduleWeekdays">{days.map((day,index)=><label key={day}><input type="checkbox" checked={picked.includes(index+1)} onChange={event=>setPicked(current=>event.target.checked?[...current,index+1]:current.filter(value=>value!==index+1))}/>週{day}</label>)}</div>
+        <div className="scheduleTimeRange"><TimePicker label="開始時間" value={start} onChange={setStart}/><span className="scheduleRangeDivider">～</span><TimePicker label="結束時間" value={end} onChange={setEnd} allowEnd/></div>
+        <p className="scheduleRangePreview">{clockLabel(start)} ～ {clockLabel(end)}</p>
+        <div className="scheduleRuleOptions"><label>設定方式<select value={opening?"open":"close"} onChange={event=>setOpening(event.target.value==="open")}><option value="open">開放</option><option value="close">關閉</option></select></label><label>適用期間<select value={scope} onChange={event=>setScope(event.target.value)}><option value="all">每週固定</option><option value="from">指定日期起</option><option value="until">指定日期止</option><option value="range">指定日期範圍</option></select></label>{(scope==="from"||scope==="range")&&<label>起始日期<input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></label>}{(scope==="until"||scope==="range")&&<label>結束日期<input type="date" value={until} onChange={event=>setUntil(event.target.value)}/></label>}</div>
+        <button className="schedulePrimaryButton" disabled={ruleSaving||!picked.length||start>=end} onClick={()=>void save()}>{ruleSaving?"儲存中…":"套用固定時間"}</button>
+        <details className="scheduleSavedRules"><summary>查看已設定的固定時間（{rules.length} 筆）</summary>{rules.length?rules.map(rule=><div className="scheduleSavedRule" key={rule.id}><span><b>週{days[rule.weekday-1]}・{rule.is_open?"開放":"關閉"}</b><small>{clockLabel(rule.start_time.slice(0,5))} ～ {clockLabel(rule.end_time.slice(0,5))}</small><small>{rule.valid_from||"不限起日"} ～ {rule.valid_until||"不限迄日"}</small></span><button onClick={()=>void ruleDel(rule.id)}>刪除</button></div>):<p>尚未設定固定時間。</p>}</details>
+      </section>
+      <section className="adminCard scheduleDayCard">
         <h2>個別日期時段</h2>
         <div className="monthNav">
           <button
@@ -658,17 +712,11 @@ export default function Admin() {
         {holidays.some((h) => h.holiday_date === date) && (
           <div className="holidayNotice">此日為休假日</div>
         )}
-        <div className="daySlots">
-          {times.map((t) => (
-            <button
-              key={t}
-              className={openTimes.includes(t) ? "open" : "closed"}
-              onClick={() => slotToggle(t)}
-            >
-              <b>{t}</b>
-            </button>
-          ))}
-        </div>
+        <div className="scheduleDayToolbar"><div><b>{showAllTimes?"全部時間":"可預約時間"}</b><small>目前可約 {openTimes.length} 個時段</small></div><button aria-expanded={customTimeOpen} onClick={()=>setCustomTimeOpen(value=>!value)}>自訂時段</button><label><input type="checkbox" checked={showAllTimes} onChange={event=>setShowAllTimes(event.target.checked)}/>顯示全部時間</label></div>
+        <p className="scheduleHint">預設只顯示可約時間；需要精細調整時，可自訂時間或展開每 10 分鐘的全部時間。</p>
+        {customTimeOpen&&<div className="scheduleCustomTime"><TimePicker label="自訂時間" value={customTime} onChange={setCustomTime}/><label>操作<select value={customAction} onChange={event=>setCustomAction(event.target.value)}><option value="open">開放此時段</option><option value="close">關閉此時段</option></select></label><button className="schedulePrimaryButton" disabled={slotSaving||dayLoading||Boolean(slotBlockReason(customTime))||Boolean(dayError)||(customAction==="open"&&holidays.some(h=>h.holiday_date===date))} onClick={()=>void slotToggle(customTime,customAction==="open")}>{slotSaving?"儲存中…":"套用時段"}</button>{slotBlockReason(customTime)&&<p className="scheduleBlockedHint">{slotBlockReason(customTime)}，請選擇其他時間。</p>}</div>}
+        {dayLoading?<p role="status">時段讀取中…</p>:dayError?<div className="scheduleLoadError" role="alert">{dayError}<button onClick={()=>void dayLoad()}>重新讀取</button></div>:<><div className="daySlots scheduleCompactSlots">{displayTimes.map(t=>{const blocked=slotBlockReason(t),open=openTimes.includes(t);return <button key={t} disabled={slotSaving||Boolean(blocked)||holidays.some(h=>h.holiday_date===date)} className={blocked?"booked":open?"open":"closed"} onClick={()=>void slotToggle(t)}><b>{clockLabel(t)}</b><small>{blocked|| (open?"可預約・點選關閉":"未開放・點選開啟")}</small></button>})}</div>{!displayTimes.length&&<p className="scheduleEmpty">此日沒有可約時段。需要加開時，請點「自訂時段」。</p>}
+        <section className="scheduleBookedList"><h3>當日已預約（{dayBookings.length} 筆）</h3>{dayBookings.length?dayBookings.map(booking=><article key={booking.id}><div><span>已預約</span><b>{clockLabel(bookingClock(booking.start))} ～ {clockLabel(bookingClock(booking.end))}</b></div><p>諮詢 {booking.minutes} 分鐘・緩衝至 {clockLabel(bookingClock(booking.bufferEnd))}</p><small>訂單編號：{booking.bookingNo}</small></article>):<p className="scheduleHint">當日尚無預約。</p>}</section></>}
       </section>
       {confirmCloseDate && (
         <div className="modalBackdrop" onClick={() => !closingDate && setConfirmCloseDate(false)}>
