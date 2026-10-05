@@ -699,7 +699,7 @@ export async function wasDocumentEditedBy(documentId: string, editorEmail: strin
   return (result.revisions || []).some((revision: any) => String(revision?.lastModifyingUser?.emailAddress || "").toLowerCase() === editorEmail.toLowerCase());
 }
 
-export type ConsultationReturnItem = { index: number; itemTitle: string; content: string };
+export type ConsultationReturnItem = { index: number; itemTitle: string; content: string; parseWarning?: string };
 
 export function normalizeConsultationReturnText(value: string) {
   return String(value || "")
@@ -711,14 +711,20 @@ export function normalizeConsultationReturnText(value: string) {
 
 function documentPlainText(document: any) {
   let output = "";
-  for (const block of document.body?.content || []) {
+  function readBlocks(blocks: any[]) {
+  for (const block of blocks) {
     if (block.paragraph) {
       for (const element of block.paragraph.elements || []) {
         if (element.textRun?.content) output += String(element.textRun.content);
         else if (element.pageBreak) output += "\n";
       }
     }
+    for (const row of block.table?.tableRows || []) {
+      for (const cell of row.tableCells || []) readBlocks(cell.content || []);
+    }
   }
+  }
+  readBlocks(document.body?.content || []);
   return output.replace(/[\u00a0\u200b]/g, " ").replace(/\r/g, "");
 }
 
@@ -759,16 +765,19 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
         : `${segment.replace(/\s+$/u, "")}\n\n${appended}`;
     }
     let startOffset = -1;
-    if (idx === 0) startOffset = segment.indexOf("您好，以下是您的諮詢結果");
+    startOffset = segment.indexOf("您好，以下是您的諮詢結果");
     if (startOffset < 0) {
-      const q1 = /(?:^|\n)Q1\s*[:：]/m.exec(segment);
+      const q1 = /(?:^|\n)[ \t　]*[QＱqｑ][1１]\s*[:：]/m.exec(segment);
       if (q1) startOffset = (q1.index || 0) + (q1[0].startsWith("\n") ? 1 : 0);
     }
     if (startOffset < 0) {
-      const tag = /(?:^|\n)[【《][^】》\n]+[】》]/.exec(segment);
+      const tag = /(?:^|\n)[ \t　]*[【《][^】》\n]+[】》]/.exec(segment);
       if (tag) startOffset = (tag.index || 0)+(tag[0].startsWith("\n")?1:0);
     }
-    if (startOffset < 0) throw new Error(`項目 ${idx + 1} 找不到 Q1 或結果標籤，請確認文件格式`);
+    if (startOffset < 0) return {
+      index: idx + 1, itemTitle: firstLine, content: "",
+      parseWarning: `項目 ${idx + 1} 尚未辨識到回覆區，已暫停此項回傳。請到原 Google 文件確認 Q1：或《結果標題》與回覆內容，修正後重新整理；其他項目仍可使用。`,
+    };
     const namedHeading=lines.find(line=>/^[^【《\n]+【[^】\n]+】$/.test(line.trim()))?.trim();
     const content = normalizeConsultationReturnText([namedHeading,segment.slice(startOffset)].filter(Boolean).join("\n\n"));
     return { index: idx + 1, itemTitle: firstLine, content };

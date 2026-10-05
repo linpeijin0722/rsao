@@ -102,6 +102,8 @@ export async function prepareConsultationReturn(args: {
   const { booking, detail, customer, method } = await bookingForConsultationReturn(args.bookingNo, args.documentId);
   if (!customer?.line_user_id) throw new Error("這位用戶沒有 LINE UID，無法回傳");
   const freshItems = await getConsultationReturnPreview(detail.google_document_id);
+  const unreadable = freshItems.find(item => selected.includes(item.index) && item.parseWarning);
+  if (unreadable) throw new Error(unreadable.parseWarning);
   const bindings = await returnItemBindings(booking.id);
   const items = freshItems.filter((item) => selected.includes(item.index)).map((item) => ({
     ...item,

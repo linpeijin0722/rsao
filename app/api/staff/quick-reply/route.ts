@@ -968,9 +968,9 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
     const previousSameGroup = questionMeta.slice(0, index).filter((entry: any) =>
       entry.itemCode === meta.itemCode && entry.profileName === meta.profileName,
     ).length;
-    return { slotIndex: index, questionNumber: previousSameGroup + 1, question: meta.question, answer, itemCode: meta.itemCode || "", itemTitle: meta.itemTitle || "", profileName: meta.profileName || "", profileLines: meta.profileLines || [], manualOnly: true };
+    return { slotIndex: index, questionNumber: previousSameGroup + 1, question: meta.question, answer, itemCode: meta.itemCode || "", itemTitle: meta.itemTitle || "", profileName: meta.profileName || "", profileLines: meta.profileLines || [], manualOnly: false };
   });
-  if (!questionSlots.length) questionSlots = documentQuestionSlots.map((slot, index) => ({ ...slot, itemCode: externalItemCode, itemTitle: externalTitles[externalItemCode]||"", profileName: "", profileLines: [], manualOnly: !external }));
+  if (!questionSlots.length) questionSlots = documentQuestionSlots.map((slot, index) => ({ ...slot, itemCode: externalItemCode, itemTitle: externalTitles[externalItemCode]||"", profileName: "", profileLines: [], manualOnly: false }));
   if (!questionSlots.length) {
     const fallback = details
       .flatMap((detail: any) =>
@@ -989,9 +989,7 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
       itemTitle: questionMeta[slotIndex]?.itemTitle || "",
       profileName: questionMeta[slotIndex]?.profileName || "",
       profileLines: questionMeta[slotIndex]?.profileLines || [],
-      manualOnly: String(questionMeta[slotIndex]?.itemCode || "").startsWith(
-        "past-life-",
-      ),
+      manualOnly: false,
     }));
   }
   if (questionMeta.length > questionSlots.length) {

@@ -1,0 +1,62 @@
+本次更新：視訊預約天數、過世寵物、快速回覆按鈕與視訊單回傳頁面修正
+
+部署順序
+1. 在既有 Supabase 專案的 SQL Editor 執行 supabase/049_configurable_video_lead_days.sql。假設既有 001～048 遷移已完成；不要重建資料庫。
+2. 將本壓縮檔 rsao-main 內的程式更新到原網站專案，沿用原本環境變數與部署設定，重新部署。
+3. 進後台「個別日期時段」設定天數；輸入時日期立即預覽，滑鼠離開、鍵盤 Tab 或 Enter 時出現確認視窗。取消還原，確認儲存立即生效。
+
+規則
+- 日期一律使用 Asia/Taipei。最早日期＝台灣今天＋設定天數＋1。
+- 2026/10/5 設 7，最早 10/13(二)；0 表示最早明天。
+- 預設值 3，保留原系統最早第 4 天可約的行為，不擅自改成 7。
+- 只接受 0～36500 的整數；空白、負數、小數不儲存。
+- 前台時段 API、預約建立 API、資料庫函式都套用限制。既有預約不取消，後台原有開放時段也保留。
+- 已開啟的前台頁面在重新讀取時段後顯示新設定；若用舊頁面送出受限日期，會拒絕並更新時段。
+- 原本約兩個月的可預約範圍保留；設定超過此範圍時，前台可能沒有可選時段。
+- 「與他人前世關係」可選既有過世寵物資料，標示為「寵物姓名（過世寵物）」。合盤類項目的對象規則不變。
+
+驗證
+- TypeScript：tsc --noEmit --incremental false 通過。
+- 本次相關測試 22 項通過（日期邊界、台灣跨日、確認/取消/失敗、數字與登入驗證、寵物選項、預約衝突）。
+- 全套測試 52 項：48 通過、4 失敗。比對原始碼後確認，4 個失敗原本即存在：3 個流年 15/20 年差異、1 個 AI 回覆方向測試；未修改這些功能。
+- Next.js 正式建置編譯成功，後續建置子程序因執行環境 spawn EPERM 中止，不能視為完整正式建置成功。
+- 尚未連線正式資料庫、執行 SQL 或部署網站；需要部署後驗收真實登入、儲存與預約流程。
+
+主要更新檔案
+app/admin/page.tsx
+app/admin/admin.css
+app/api/admin/schedule/route.ts
+app/api/slots/route.ts
+app/api/bookings/route.ts
+app/page.tsx
+app/booking-data/page.tsx
+lib/video-booking-window.ts
+supabase/049_configurable_video_lead_days.sql
+新增 tests/video-lead-days.test.cjs、tests/booking-settings-flow.test.cjs
+更新 tests/booking-conflicts.test.cjs 的前台狀態模擬
+
+緊急修正：快速回覆按鈕消失
+- 原始碼把所有客人問題標記為 manualOnly=true，導致前端不顯示快速回覆句庫。
+- 已修正問題資料的標記，恢復分類切換、快速回覆按鈕、第一組預設展開；仍可自行輸入與使用 AI。
+- 同時有項目回覆與客人問題時，提供兩種回覆模式切換。
+- 測試覆蓋實際 React 頁面輸出、按鈕點選產生回答、不同對象的答案隔離。
+
+緊急修正：視訊單回傳頁面無法開啟
+- 原本任一項目找不到 Q1 或結果標籤，會拋出錯誤並中止整張單。
+- 已加入縮排、全形 Q1、Google 文件表格內容與後續頁問候語的辨識。
+- 無法辨識的項目保留原編號，顯示警示並禁止選取；其他項目可正常預覽回傳。
+- 伺服器也禁止送出未辨識項目，不會以原始個人資料當作回覆。
+- 若實際第 7 項仍顯示警示，請開啟原 Google 文件確認 Q1：或《結果標題》與回覆內容，再重新整理。沒有取得該正式文件內容，不能宣稱已還原其中缺失的文字。
+- 開啟預覽只讀取資料，不會改寫 Google 文件或傳送 LINE 訊息。
+
+追加修改檔案
+app/api/staff/quick-reply/route.ts
+app/staff/QuickConsultationReply.tsx
+lib/google-consultation-docs.ts
+lib/consultation-return-delivery.ts
+app/staff/consultation-return/page.tsx
+app/staff/style.css
+新增 tests/quick-reply-visibility.test.cjs、tests/return-preview-resilience.test.cjs
+
+本包為完整原始碼更新包，未包含 node_modules、編譯快取或 npm 快取。
+部署後請使用原本的快速回覆／視訊單連結重新整理驗收。

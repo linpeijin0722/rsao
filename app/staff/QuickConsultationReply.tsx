@@ -238,7 +238,7 @@ export default function QuickConsultationReply({
           Object.fromEntries(
             (x.questions || []).map((q: Question) => [
               String(q.slotIndex),
-              x.recommendedByQuestion?.[String(q.slotIndex)]?.[0] ||
+              x.recommendedByQuestion?.[String(q.slotIndex)]?.find((code: string) => x.topics?.some((topic: Topic) => topic.code === code)) ||
                 x.topics?.[0]?.code ||
                 "",
             ]),
@@ -641,7 +641,7 @@ export default function QuickConsultationReply({
       answer: "",
       completed: false,
     },
-    categoryCode = activeCategory[questionKey] || "",
+    categoryCode = activeCategory[questionKey] || data?.recommendedByQuestion?.[questionKey]?.find(code => topicMap.has(code)) || data?.topics?.[0]?.code || "",
     category = topicMap.get(categoryCode),
     questionOptionGroups = useMemo(() => {
       const groups = new Map<string, Option[]>();
@@ -911,7 +911,7 @@ export default function QuickConsultationReply({
       ...c,
       [questionKey]: { ...draft, selections: next, completed: false },
     }));
-    if (nextCodes.length) void compose(next);
+    if (Object.values(next).some(values => values.length)) void compose(next);
     else
       setDrafts((c) => ({
         ...c,
@@ -1465,6 +1465,12 @@ export default function QuickConsultationReply({
         ) : (
           data && (
             <div className="quickReplyBody">
+              {sections.length > 0 && questionGroups.length > 0 && (
+                <nav className="quickReplySectionTabs" aria-label="回覆模式">
+                  <button type="button" className={view === "section" ? "selected" : ""} onClick={() => pickTarget("section", activeSection)}>項目快速回覆</button>
+                  <button type="button" className={view === "question" ? "selected" : ""} onClick={() => pickTarget("question", activeQuestion)}>客人問題快速回覆</button>
+                </nav>
+              )}
               {data.previousSummaries?.length > 0 && (
                 <section className="quickReplyPreviousSummary">
                   <h3>最近一次諮詢摘要</h3>
@@ -3310,6 +3316,14 @@ export default function QuickConsultationReply({
                           })}
                         </section>
                       )}
+                      {!question.manualOnly && (
+                        <section className="quickReplyCategoryPicker quickReplyQuestionCategoryPicker">
+                          <h3>快速回覆分類</h3>
+                          <p>選擇分類，再點選下方的快速回覆按鈕。</p>
+                          <div>{(data.topics || []).map(topic => <button type="button" key={topic.code} className={categoryCode === topic.code ? "active" : ""} aria-pressed={categoryCode === topic.code} onClick={() => setActiveCategory(current => ({ ...current, [questionKey]: topic.code }))}>{topic.icon} {topic.title}</button>)}</div>
+                          {!data.topics?.length && <p role="status">目前沒有可用的快速回覆分類，請確認句庫設定。</p>}
+                        </section>
+                      )}
                       {!question.manualOnly && category && (
                         <section className="quickReplyOptions quickReplyQuestionGroups">
                           <h3>
@@ -3318,27 +3332,32 @@ export default function QuickConsultationReply({
                           <p>每一個分類最多可複選 3 個選項。</p>
                           {questionOptionGroups.map(([groupLabel, options], groupIndex) => {
                             const panelKey = `question-${questionKey}-${category.code}-${groupLabel}`;
+                            const expanded = openPanels[panelKey] ?? groupIndex === 0;
                             const selectedCodes = asCodes(
                               draft.selections[category.code],
                             );
                             return (
-                              <div className={`quickReplySpecialField quickReplyQuestionGroup${openPanels[panelKey] ? " expanded" : ""}`} key={groupLabel}>
-                                <div
+                              <div className={`quickReplySpecialField quickReplyQuestionGroup${expanded ? " expanded" : ""}`} key={groupLabel}>
+                                <button
+                                  type="button"
+                                  aria-expanded={expanded}
                                   className="quickReplySpecialHeading"
                                   onClick={() =>
                                     setOpenPanels((current) => ({
                                       ...current,
-                                      [panelKey]: !current[panelKey],
+                                      [panelKey]: !(current[panelKey] ?? groupIndex === 0),
                                     }))
                                   }
                                 >
                                   <span>{["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧"][groupIndex] || groupIndex + 1}</span>
                                   <div><h4>{groupLabel}</h4></div>
-                                </div>
-                                {openPanels[panelKey] && (
+                                </button>
+                                {expanded && (
                                   <div className="quickReplySpecialChoices">
                                     {options.map((o) => (
                                       <button
+                                        type="button"
+                                        disabled={busy}
                                         key={o.code}
                                         className={
                                           selectedCodes.includes(o.code)
@@ -3358,6 +3377,7 @@ export default function QuickConsultationReply({
                               </div>
                             );
                           })}
+                          {!questionOptionGroups.length && <p role="status">此分類目前沒有快速回覆選項，請選擇其他分類或自行填寫回覆。</p>}
                           {asCodes(draft.selections[category.code]).length > 0 && (
                             <button
                               className="quickReplyRemoveCategory"
@@ -3372,7 +3392,7 @@ export default function QuickConsultationReply({
                         <div>
                           {aiForReply(question)}
                         </div>
-                        {editing || question.manualOnly ? (
+                        {editing || question.manualOnly || !draft.answer ? (
                           <textarea
                             value={draft.answer}
                             onChange={(e) => {

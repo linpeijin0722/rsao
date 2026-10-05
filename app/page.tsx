@@ -78,7 +78,7 @@ const money = (v: number) =>
   };
 export default function Page() {
   const today = taiwanToday(),
-    earliestVideoDate = addCalendarDays(today, 4),
+    [earliestVideoDate, setEarliestVideoDate] = useState(addCalendarDays(today, 4)),
     maxDate = addMonths(today, 2),
     firstMonth = today.slice(0, 7),
     lastMonth = maxDate.slice(0, 7),
@@ -305,10 +305,11 @@ export default function Page() {
       const r = await fetch(`/api/slots?methodId=${selected.id}`),
         j = await r.json();
       if (!r.ok) throw Error(j.error);
+      setEarliestVideoDate(j.earliestDate);
       const loadedSlots: Slot[] = Array.isArray(j.slots) ? j.slots : [];
       const selectableDates = loadedSlots
         .map((item) => dk(item.slot_start))
-        .filter((day) => day >= earliestVideoDate && day <= maxDate)
+        .filter((day) => day >= j.earliestDate && day <= maxDate)
         .sort();
       setSlots(loadedSlots);
       // 當本月沒有可預約時段時，直接顯示最近一個有時段的月份。
@@ -484,6 +485,7 @@ export default function Page() {
         const refreshed=await fetch(`/api/slots?methodId=${method?.id}&_=${Date.now()}`,{cache:"no-store"});
         const refreshedData=await refreshed.json();
         setSlots(refreshed.ok&&Array.isArray(refreshedData.slots)?refreshedData.slots:[]);
+        if(refreshed.ok) setEarliestVideoDate(refreshedData.earliestDate);
         setAlertMessage(j.error||"此時段已被預約，請重新選擇");
         return;
       }

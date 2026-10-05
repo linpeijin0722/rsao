@@ -1230,7 +1230,7 @@ function Answer({
         {profiles
           .filter((p: any) =>
             p.profile_type === "person" ||
-            (relation && p.profile_type === "deceased"),
+            (relation && ["deceased", "pet"].includes(p.profile_type)),
           )
           .map((p: any) => (
             <option
@@ -1240,7 +1240,7 @@ function Answer({
             >
               {p.name}（{p.profile_type === "deceased"
                 ? `過世親人${p.relationship_detail ? `・${p.relationship_detail}` : ""}`
-                : p.relationship_detail || p.relationship}）
+                : p.profile_type === "pet" ? "過世寵物" : p.relationship_detail || p.relationship}）
             </option>
           ))}
       </select>
