@@ -1,3 +1,4 @@
+import { parseTaipeiDateTime } from "@/lib/taipei-time";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
       skipCarousel: body.skipCarousel === true,
     });
     if (mode === "scheduled") {
-      const scheduledFor = new Date(String(body.scheduledAt || ""));
+      const scheduledFor = parseTaipeiDateTime(String(body.scheduledAt || ""));
       if (!Number.isFinite(scheduledFor.getTime())) return NextResponse.json({ error: "請選擇正確的排程日期與時間" }, { status: 400 });
       if (![0, 30].includes(scheduledFor.getUTCMinutes()) || scheduledFor.getUTCSeconds() !== 0)
         return NextResponse.json({ error: "排程時間只能選擇整點或半點（00／30 分）" }, { status: 400 });

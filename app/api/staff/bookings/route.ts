@@ -1,3 +1,4 @@
+import { parseTaipeiDateTime } from "@/lib/taipei-time";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
@@ -52,6 +53,11 @@ export async function GET() {
     if(submissionError)return NextResponse.json({error:submissionError.message},{status:500});
     for(const booking of bookings)booking.data_submissions=(submissions||[]).filter((submission:any)=>submission.booking_id===booking.id);
   }
+  if(bookingIds.length){
+    const {data:docs,error:docsError}=await db.from("consultation_document_history").select("booking_id,document_id,document_url,created_at").in("booking_id",bookingIds).order("created_at",{ascending:false});
+    if(docsError)return NextResponse.json({error:docsError.message},{status:500});
+    for(const booking of bookings)booking.document_history=(docs||[]).filter((doc:any)=>doc.booking_id===booking.id);
+  }
   return NextResponse.json({ bookings, customers: customers || [], consultationProfiles: consultationProfiles || [],paymentSettings,bankAccounts:bankAccounts||[] });
 }
 export async function POST(request: NextRequest) {
@@ -81,7 +87,7 @@ export async function POST(request: NextRequest) {
     if (!method) return NextResponse.json({ error: "諮詢方式目前未開放" }, { status: 400 });
     let slotStart: string | null = null, slotEnd: string | null = null;
     if (methodCode === "video") {
-      const start = new Date(String(body.slotStart || ""));
+      const start = parseTaipeiDateTime(String(body.slotStart || ""));
       if (Number.isNaN(start.getTime())) return NextResponse.json({ error: "請選擇視訊時間" }, { status: 400 });
       slotStart = start.toISOString();
       slotEnd = new Date(start.getTime() + Math.max(1, Number(method.duration_minutes) || 25) * 60000).toISOString();
@@ -181,23 +187,38 @@ export async function POST(request: NextRequest) {
   }
   if (action === "update_submission_answer") {
     if(!body.submissionId||!body.answerId)return NextResponse.json({error:"缺少填寫版本資料"},{status:400});
-    const db=adminSupabase(),{data:submission,error:readError}=await db.from("booking_data_submissions").select("payload").eq("id",body.submissionId).single();
+    const db=adminSupabase(),{data:submission,error:readError}=await db.from("booking_data_submissions").select("payload,booking_id").eq("id",body.submissionId).single();
     if(readError||!submission)return NextResponse.json({error:"找不到填寫版本"},{status:404});
     const payload={...(submission.payload||{})},answers=Array.isArray(payload.answers)?[...payload.answers]:[],index=answers.findIndex((answer:any)=>answer.id===body.answerId);
     if(index<0)return NextResponse.json({error:"版本中找不到這筆問事資料"},{status:404});
     answers[index]={...answers[index],profile_id:body.profileId,questions:(body.questions||[]).slice(0,3),extra_data:body.extraData||{},booking_answer_participants:(body.profileIds||[]).filter(Boolean).map((profile_id:string,position:number)=>({profile_id,position}))};
     const {error}=await db.from("booking_data_submissions").update({payload:{...payload,answers}}).eq("id",body.submissionId);
+    if(!error){
+      const {data:latest}=await db.from("booking_data_submissions").select("id").eq("booking_id",submission.booking_id).order("submitted_at",{ascending:false}).limit(1).maybeSingle();
+      if(latest?.id===body.submissionId){
+        const {error:syncError}=await db.from("booking_consultation_answers").update({profile_id:body.profileId,questions:answers[index].questions,extra_data:answers[index].extra_data,updated_at:new Date().toISOString()}).eq("id",body.answerId);
+        if(syncError)return NextResponse.json({error:syncError.message},{status:400});
+        const {error:deleteError}=await db.from("booking_answer_participants").delete().eq("answer_id",body.answerId);
+        if(deleteError)return NextResponse.json({error:deleteError.message},{status:400});
+        const participants=answers[index].booking_answer_participants.map((p:any)=>({...p,answer_id:body.answerId}));
+        if(participants.length){const {error:insertError}=await db.from("booking_answer_participants").insert(participants);if(insertError)return NextResponse.json({error:insertError.message},{status:400});}
+      }
+    }
     return error?NextResponse.json({error:error.message},{status:400}):NextResponse.json({ok:true});
   }
   if (action === "update_submission_profile") {
     if(!body.submissionId||!body.profileId)return NextResponse.json({error:"缺少填寫版本資料"},{status:400});
-    const db=adminSupabase(),{data:submission,error:readError}=await db.from("booking_data_submissions").select("payload").eq("id",body.submissionId).single();
+    const db=adminSupabase(),{data:submission,error:readError}=await db.from("booking_data_submissions").select("payload,booking_id").eq("id",body.submissionId).single();
     if(readError||!submission)return NextResponse.json({error:"找不到填寫版本"},{status:404});
     const payload={...(submission.payload||{})},profiles=Array.isArray(payload.profiles)?[...payload.profiles]:[],index=profiles.findIndex((profile:any)=>profile.id===body.profileId);
     if(index<0)return NextResponse.json({error:"版本中找不到這位諮詢者"},{status:404});
     const allowed=["name","relationship_detail","gender","birth_date","lunar_birth_text","zodiac","birth_shichen","address","death_date","lunar_death_text","death_shichen","notes","owner_profile_id","photo_data"];
     profiles[index]={...profiles[index],...Object.fromEntries(allowed.filter(key=>key in body.profile).map(key=>[key,body.profile[key]||null]))};
     const {error}=await db.from("booking_data_submissions").update({payload:{...payload,profiles}}).eq("id",body.submissionId);
+    if(!error){
+      const {data:latest}=await db.from("booking_data_submissions").select("id").eq("booking_id",submission.booking_id).order("submitted_at",{ascending:false}).limit(1).maybeSingle();
+      if(latest?.id===body.submissionId){const {error:syncError}=await db.from("consultation_profiles").update(Object.fromEntries(allowed.filter(key=>key in body.profile).map(key=>[key,body.profile[key]||null]))).eq("id",body.profileId);if(syncError)return NextResponse.json({error:syncError.message},{status:400});}
+    }
     return error?NextResponse.json({error:error.message},{status:400}):NextResponse.json({ok:true});
   }
   if (action === "update_consultation_profile") {
@@ -306,8 +327,13 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
-  const body = await request.json(),
-    db = adminSupabase(),
+  const body = await request.json();
+  if(body.slotStart){
+    const parsed=parseTaipeiDateTime(String(body.slotStart));
+    if(!Number.isFinite(parsed.getTime()))return NextResponse.json({error:"預約時間不正確"},{status:400});
+    body.slotStart=parsed.toISOString();
+  }
+  const db = adminSupabase(),
     { data: b } = await db
       .from("bookings")
       .select(
@@ -332,10 +358,10 @@ export async function PATCH(request: NextRequest) {
       Array.isArray(body.lines) &&
       JSON.stringify(normalizeLines(body.lines)) !==
         JSON.stringify(normalizeLines(b.booking_details || []));
-  if (body.slotStart) {
+  if (body.slotStart && !(Array.isArray(body.lines) && body.lines.length)) {
     const start = new Date(body.slotStart),
       end = new Date(start.getTime() + 1800000);
-    await db
+    const {error:slotError}=await db
       .from("bookings")
       .update({
         slot_start: start.toISOString(),
@@ -343,6 +369,7 @@ export async function PATCH(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq("id", b.id);
+    if(slotError)return NextResponse.json({error:slotError.message},{status:409});
   }
   let titles: string[] = [];
   if (Array.isArray(body.lines) && body.lines.length) {
@@ -364,6 +391,10 @@ export async function PATCH(request: NextRequest) {
         : { data: [] };
       return { subItems: data || [] };
     })();
+    const plannedSubtotal=body.lines.reduce((sum:number,line:any)=>{const item=items?.find((entry:any)=>entry.id===line.itemId);if(!item)return sum;const sub=subItems.find((entry:any)=>entry.id===line.subId&&entry.item_id===item.id);return sum+Number(sub?.price??item.price)*Math.max(1,Number(line.qty)||1)},0);
+    if(!items?.length||body.lines.some((line:any)=>!items.find((item:any)=>item.id===line.itemId)))return NextResponse.json({error:"諮詢項目不存在或未開放"},{status:400});
+    const {error:reservationError}=await db.from("bookings").update({subtotal:plannedSubtotal,total_price:plannedSubtotal+Number((b.consultation_methods as any)?.base_price||0),...(body.slotStart?{slot_start:new Date(body.slotStart).toISOString()}:{}),updated_at:new Date().toISOString()}).eq("id",b.id);
+    if(reservationError)return NextResponse.json({error:reservationError.message},{status:409});
     await db.from("booking_details").delete().eq("booking_id", b.id);
     if (items?.length) {
       let subtotal = 0;
@@ -433,9 +464,12 @@ export async function PATCH(request: NextRequest) {
       .trim(),
   );
   if(timeChanged||itemsChanged){try{await syncBookingCalendar(b.booking_no)}catch(calendarError){console.error("修改預約 Calendar 同步失敗",calendarError)}}
+  // 通知以資料庫儲存後的時間為準，避免輸入與通知使用不同時區。
+  const {data:savedBooking,error:savedTimeError}=await db.from("bookings").select("slot_start").eq("id",b.id).single();
+  if(savedTimeError||!savedBooking)return NextResponse.json({error:"預約已修改，但無法確認儲存時間，尚未發送 LINE 通知，請重新整理確認"},{status:500});
   const c = b.customers as unknown as { line_user_id: string },
     site = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin,
-    effectiveSlot = body.slotStart || oldSlotStart,
+    effectiveSlot = savedBooking.slot_start,
     isVideo = (b.consultation_methods as unknown as { code: string })?.code === "video",
     slotDate = effectiveSlot ? new Date(effectiveSlot) : null,
     dateParts = slotDate ? new Intl.DateTimeFormat("zh-TW", {

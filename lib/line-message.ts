@@ -1,3 +1,5 @@
+import { parseTaipeiDateTime, taipeiDateKey } from "@/lib/taipei-time";
+
 export async function pushLineFlex(
   userId: string,
   altText: string,
@@ -85,19 +87,42 @@ export async function pushDataReceivedCarousel(userId: string, site: string) {
     imageCarousel({ site, images: ["data-received-01.png", "data-received-02.png"] }),
   );
 }
-const statusColors={pending:{background:"#FDECEC",text:"#C94040",label:"待付款"},paid:{background:"#EBFBF9",text:"#168A54",label:"已付款"},data_required:{background:"#FDECEC",text:"#C94040",label:"請填寫諮詢者資料"},changed:{background:"#F1F1F1",text:"#444444",label:"預約已變更"},cancelled:{background:"#EEEEEE",text:"#666666",label:"預約已取消"}} as const;
+const statusColors={pending:{background:"#FDECEC",text:"#C94040",label:"待付款"},paid:{background:"#EBFBF9",text:"#168A54",label:"已付款"},data_required:{background:"#FDECEC",text:"#C94040",label:"請完成問事資料填寫"},changed:{background:"#F1F1F1",text:"#444444",label:"預約已變更"},cancelled:{background:"#EEEEEE",text:"#666666",label:"預約已取消"}} as const;
 const bookingLiffId = process.env.NEXT_PUBLIC_LIFF_ID || "2011674988-QKCQBn9L";
 export const liffPageUrl = (path: string, params?: URLSearchParams) =>
   `https://liff.line.me/${bookingLiffId}${path}${params?.size ? `?${params}` : ""}`;
 export const liffBookingDataUrl = (bookingNo: string, refill = false) =>
   liffPageUrl("/booking-data", new URLSearchParams({ order: bookingNo, ...(refill ? { refill: "1" } : {}) }));
 const cleanItemTitle=(value:string)=>value.replace(/(兩位嬰靈[（(]含[）)]以上).*/u,"$1").replace(/[（(]?無論幾位[^）)]*[）)]?/g,"").replace(/^＋加購[：:]\s*/u,"").replace(/\s+/g," ").trim();
-function videoDateParts(slotStart?:string){if(!slotStart)return null;const date=new Date(slotStart);if(Number.isNaN(date.getTime()))return null;const parts=new Intl.DateTimeFormat("zh-TW",{timeZone:"Asia/Taipei",month:"numeric",day:"numeric",weekday:"short"}).formatToParts(date),part=(type:string)=>parts.find(x=>x.type===type)?.value||"",time=new Intl.DateTimeFormat("zh-TW",{timeZone:"Asia/Taipei",hour:"numeric",minute:"2-digit",hour12:true}).format(date).replace(/\s/g,"");return{date:`${part("month")}月${part("day")}日（${part("weekday").replace("週","")}）`,time}}
+function videoDateParts(slotStart?:string){if(!slotStart)return null;const date=parseTaipeiDateTime(slotStart);if(Number.isNaN(date.getTime()))return null;const parts=new Intl.DateTimeFormat("zh-TW",{timeZone:"Asia/Taipei",month:"numeric",day:"numeric",weekday:"short"}).formatToParts(date),part=(type:string)=>parts.find(x=>x.type===type)?.value||"",time=new Intl.DateTimeFormat("zh-TW",{timeZone:"Asia/Taipei",hour:"numeric",minute:"2-digit",hour12:true}).format(date).replace(/\s/g,"");return{date:`${part("month")}月${part("day")}日（${part("weekday").replace("週","")}）`,time}}
+/** Four Taiwan calendar days before the appointment, always at Taiwan noon. */
+export function videoDataDeadlineLabel(slotStart?:string):string|null{
+  if(!slotStart)return null;
+  const slot=parseTaipeiDateTime(slotStart);
+  if(!Number.isFinite(slot.getTime()))return null;
+  const [year,month,day]=taipeiDateKey(slot).split("-").map(Number);
+  const deadline=new Date(Date.UTC(year,month-1,day-4));
+  return `${deadline.getUTCFullYear()}/${deadline.getUTCMonth()+1}/${deadline.getUTCDate()} 中午12:00`;
+}
 export function bookingStatusFlex(args:{status:"pending"|"paid"|"data_required"|"changed"|"cancelled";headerLabel?:string;bookingNo:string;method:string;total?:number;slotStart?:string;items?:string[];site:string;expiresAt?:string;calendarSlot?:string}){
   const theme=statusColors[args.status],isVideo=args.method==="video",needsData=args.status==="paid"||args.status==="data_required",video=videoDateParts(args.slotStart),numbered=(args.items||[]).map(cleanItemTitle).filter(Boolean).map((title,index)=>`${["❶","❷","❸","❹","❺","❻","❼","❽","❾"][index]||`${index+1}.`}${title}`).join("\n"),mainUrl=args.status==="pending"?`${args.site}/pay?order=${encodeURIComponent(args.bookingNo)}`:needsData?liffBookingDataUrl(args.bookingNo,args.status==="data_required"):liffPageUrl("/my-bookings",new URLSearchParams({order:args.bookingNo})),buttonLabel=args.status==="pending"?"繼續付款":needsData?"📝 立即填寫問事資料（必填）":"查看預約",body:any[]=[{type:"text",text:isVideo?"視訊諮詢":"文字諮詢",align:"center",weight:"bold",size:"lg"},{type:"separator",margin:"md"}];
   if(video)body.push({type:"text",text:"預約時間",color:"#222222",size:"sm",margin:"lg"},{type:"text",text:video.date,wrap:true,color:"#168A54",weight:"bold",size:"xxl"},{type:"text",text:video.time,wrap:true,color:"#168A54",weight:"bold",size:"xxl"});
   if(numbered)body.push({type:"text",text:`諮詢項目\n${numbered}`,wrap:true,margin:"lg",color:"#333333",size:"md"});
   if(typeof args.total==="number")body.push({type:"text",text:`付款金額：NT$ ${args.total.toLocaleString("zh-TW")}`,color:"#8A3045",weight:"bold",margin:"md"});
+  if(needsData){
+    body.push({type:"box",layout:"vertical",backgroundColor:"#FFF6E8",cornerRadius:"10px",paddingAll:"14px",margin:"lg",spacing:"sm",contents:[
+      {type:"text",text:"下一步：請完成問事資料填寫",weight:"bold",color:"#8A3045",size:"md",wrap:true},
+      {type:"text",text:isVideo?"請幫我們點擊下方【立即填寫問事資料】完成填寫，阿嫂老師才能先整理並傳送諮詢結果，讓您提前準備想詢問的問題唷。":"請幫我們點擊下方【立即填寫問事資料】完成填寫，阿嫂老師才能依照您的資料整理並傳送諮詢結果唷。",color:"#333333",size:"md",wrap:true},
+    ]});
+    if(isVideo){
+      const deadline=videoDataDeadlineLabel(args.slotStart);
+      body.push({type:"box",layout:"vertical",backgroundColor:"#FDECEC",cornerRadius:"10px",paddingAll:"14px",margin:"md",spacing:"sm",contents:[
+        {type:"text",text:"視訊資料填寫期限",color:"#A33040",weight:"bold",size:"md",wrap:true},
+        {type:"text",text:deadline?`${deadline} 前（台灣時間）`:"視訊前4天中午12:00前（台灣時間）",color:"#A33040",weight:"bold",size:"lg",wrap:true},
+        {type:"text",text:"為了讓老師有足夠時間準備，請於上述期限前回傳資料。若未能在期限內完成，視訊需另行安排時間，謝謝您的理解與配合。",color:"#333333",size:"md",wrap:true},
+      ]});
+    }
+  }
   if(args.status==="pending"&&args.expiresAt)body.push({type:"text",text:`請於 ${new Date(args.expiresAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})} 前完成付款，逾期訂單將自動失效。`,wrap:true,color:"#666666",size:"sm"});
   const footer:any[]=[{type:"button",style:"primary",height:"md",color:args.status==="changed"?"#4A78C2":args.status==="paid"?"#168A54":"#C94040",action:{type:"uri",label:buttonLabel,uri:mainUrl}}];
   if(args.status==="paid"&&isVideo&&args.calendarSlot)footer.push({type:"button",style:"link",height:"sm",action:{type:"uri",label:"加入 Google 行事曆",uri:`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent("林阿嫂視訊諮詢")}&dates=${args.calendarSlot}`}});

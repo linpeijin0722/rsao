@@ -32,7 +32,7 @@ const itemLines=(details:any[])=>details.flatMap((detail:any)=>{
 
 export async function syncBookingCalendar(bookingNo:string) {
   const db=adminSupabase();
-  const {data:booking,error}=await db.from("bookings").select("id,booking_no,slot_start,slot_end,payment_status,status,cancellation_reason,google_calendar_event_id,customers(full_name),consultation_methods(code,title,duration_minutes),booking_details(item_title,quantity,booking_detail_sub_items(sub_item_title))").eq("booking_no",bookingNo).single();
+  const {data:booking,error}=await db.from("bookings").select("id,booking_no,slot_start,slot_end,payment_status,status,cancellation_reason,google_calendar_event_id,customers(full_name,line_display_name),consultation_methods(code,title,duration_minutes),booking_details(item_title,quantity,booking_detail_sub_items(sub_item_title))").eq("booking_no",bookingNo).single();
   if(error||!booking)throw new Error(error?.message||"找不到訂單");
   const method=one(booking.consultation_methods), customer=one(booking.customers);
   const shouldExist=method?.code==="video"&&booking.payment_status==="paid"&&booking.status!=="cancelled"&&!!booking.slot_start;
@@ -46,7 +46,7 @@ export async function syncBookingCalendar(bookingNo:string) {
   }
   const start=new Date(booking.slot_start), end=booking.slot_end?new Date(booking.slot_end):new Date(start.getTime()+Math.max(1,Number(method.duration_minutes)||30)*60000);
   const items=itemLines(booking.booking_details||[]);
-  const description=[`訂單編號：${booking.booking_no}`,"","諮詢項目：",...items.map((x:string)=>`・${x}`)].join("\n");
+  const description=[`訂單編號：${booking.booking_no}`,`LINE名稱：${customer?.line_display_name||""}`,"","諮詢項目：",...items.map((x:string)=>`・${x}`)].join("\n");
   const event={summary:`${customer?.full_name||"未填姓名"}｜視訊諮詢`,description,start:{dateTime:start.toISOString(),timeZone:"Asia/Taipei"},end:{dateTime:end.toISOString(),timeZone:"Asia/Taipei"},reminders:{useDefault:false,overrides:[{method:"popup",minutes:15}]}};
   let result:any;
   if(booking.google_calendar_event_id){
@@ -55,4 +55,17 @@ export async function syncBookingCalendar(bookingNo:string) {
     result=await google(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,token,{method:"POST",body:JSON.stringify(event)});
   }
   if(result.id&&result.id!==booking.google_calendar_event_id)await db.from("bookings").update({google_calendar_event_id:result.id,updated_at:new Date().toISOString()}).eq("id",booking.id);
+}
+
+/** Backfill identity metadata only, without changing event time or recreating events. */
+export async function syncBookingCalendarMetadata(bookingNo:string){
+ const db=adminSupabase();const {data:booking,error}=await db.from('bookings').select('booking_no,google_calendar_event_id,customers(full_name,line_display_name)').eq('booking_no',bookingNo).single();
+ if(error||!booking?.google_calendar_event_id)throw new Error('找不到已連結的行事曆活動');
+ const customer=one(booking.customers);if(!customer?.line_display_name?.trim())throw new Error('用戶尚未有LINE名稱，無法確認客服身分');
+ const token=await accessToken(),url=`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(booking.google_calendar_event_id)}`;
+ const current=await google(url,token);const oldDescription=String(current.description||'');
+ const stated=oldDescription.match(/訂單編號\s*[:：]\s*([^\n\r<]+)/)?.[1]?.trim();if(stated&&stated!==booking.booking_no)throw new Error('活動與訂單編號不符，已停止同步');
+ const description=oldDescription.replace(/(?:^|\n)\s*LINE\s*(?:名稱|名字|暱稱)\s*[:：][^\n]*/g,'').trim();
+ const newDescription=[stated?'':`訂單編號：${booking.booking_no}`,`LINE名稱：${customer.line_display_name.trim()}`,description].filter(Boolean).join('\n');
+ await google(url,token,{method:'PATCH',body:JSON.stringify({description:newDescription}),headers:current.etag?{'If-Match':current.etag}:{}});
 }

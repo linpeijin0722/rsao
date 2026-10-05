@@ -1,3 +1,4 @@
+import { taipeiDateKey } from "@/lib/taipei-time";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
@@ -23,11 +24,7 @@ export async function GET() {
         .neq("status", "cancelled")
         .gte(
           "created_at",
-          new Date(
-            new Date().getFullYear(),
-            new Date().getMonth(),
-            1,
-          ).toISOString(),
+          new Date(`${taipeiDateKey().slice(0,7)}-01T00:00:00+08:00`).toISOString(),
         ),
     ]);
   const loadError = settingsError || weeklyError || overridesError || countError;

@@ -17,11 +17,19 @@ async function context(order: string) {
   if (!c) return null;
   const { data: b } = await db
     .from("bookings")
-    .select("id,booking_no,payment_status,data_submitted_at,booking_details(id,item_title,quantity,booking_items(code),booking_detail_sub_items(sub_item_title))")
+    .select("id,booking_no,payment_status,data_submitted_at,booking_details(id,item_title,quantity,unit_group_id,unit_number,unit_count,booking_items(code),booking_detail_sub_items(sub_item_title))")
     .eq("booking_no", order)
     .eq("customer_id", c.id)
     .single();
-  return b ? { db, c, b } : null;
+  if(!b)return null;
+  const {data:splitCount,error:splitError}=await db.rpc("ensure_deceased_relative_units",{p_booking_id:b.id});
+  if(splitError)throw new Error("無法準備各位親友的填寫資料，請確認已執行048 SQL");
+  if(Number(splitCount)>0){
+    const {data:refreshed,error:refreshError}=await db.from("bookings").select("id,booking_no,payment_status,data_submitted_at,booking_details(id,item_title,quantity,unit_group_id,unit_number,unit_count,booking_items(code),booking_detail_sub_items(sub_item_title))").eq("id",b.id).single();
+    if(refreshError||!refreshed)throw new Error("重新讀取填寫項目失敗");
+    return {db,c,b:refreshed};
+  }
+  return { db, c, b };
 }
 export async function GET(r: NextRequest) {
   const x = await context(r.nextUrl.searchParams.get("order") || "");
@@ -100,7 +108,10 @@ export async function POST(r: NextRequest) {
     }
     after(async () => {
       try {
-        await createConsultationDocuments(x.db,x.b.id,x.b.booking_no,false,"replace",undefined,r.nextUrl.origin);
+        // A formerly single-person document must also include newly collected units.
+        // Preserve the prior document (and any written replies) as a historical version.
+        const multipleRelatives=(x.b.booking_details||[]).some((detail:any)=>Number(detail.unit_count)>1);
+        await createConsultationDocuments(x.db,x.b.id,x.b.booking_no,multipleRelatives,multipleRelatives?"new":"replace",undefined,r.nextUrl.origin);
       } catch (error) {
         console.error("建立諮詢 Google 文件失敗", error);
       }
