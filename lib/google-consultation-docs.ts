@@ -1,3 +1,4 @@
+import {parseAnnual,annualAges,annualText,type AnnualState} from "./annual-fortune";
 import crypto from "node:crypto";
 import { makeQuickReplyToken } from "@/lib/quick-reply-token";
 
@@ -10,14 +11,14 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-09-19-v32";
+const requiredAppsScriptVersion = "2026-10-01-v33";
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
 const resultMatchesConsultationItem = (content: unknown, itemCode: string) => {
   const value = text(content);
-  if (itemCode === "deceased-relative") return !/【\s*過世寵物\s*】/u.test(value);
-  if (itemCode === "deceased-pet") return !/【\s*過世親人\s*】/u.test(value);
+  if (itemCode === "deceased-relative") return !/[【《]\s*過世寵物\s*[】》]/u.test(value);
+  if (itemCode === "deceased-pet") return !/[【《]\s*過世親人\s*[】》]/u.test(value);
   return true;
 };
 
@@ -125,7 +126,7 @@ const externalResultCode = (label: string) => {
 // 表單區只能把真正的「項目標題」當成分段點。舊做法使用關鍵字模糊
 // 判斷，會把「農曆往生日期」誤認為「過世親人」的新標題，導致資料被截斷。
 const externalFormHeadingCode = (label: string) => {
-  const value = text(label).replace(/[【】\s]/g, "");
+  const value = text(label).replace(/[【】《》\s]/g, "");
   const headings: Record<string, string> = {
     "合八字": "marriage-bazi",
     "雙人關係與緣份": "marriage-bazi",
@@ -166,7 +167,7 @@ export async function detectExternalConsultationResults(documentId: string) {
     for (let cursor = index + 1; cursor < formLines.length; cursor += 1) {
       if (externalFormHeadingCode(formLines[cursor])) { end = cursor; break; }
     }
-    const block = formLines.slice(index + 1, end), targetAt = block.findIndex(line => /^(?:【)?對象資料(?:】)?$/u.test(line));
+    const block = formLines.slice(index + 1, end), targetAt = block.findIndex(line => /^(?:[【《])?對象資料(?:[】》])?$/u.test(line));
     const consultantSource = targetAt >= 0 ? block.slice(0, targetAt) : block;
     const targetSource = targetAt >= 0 ? block.slice(targetAt + 1) : [];
     const consultantStart = consultantSource.findIndex(isPersonLine), targetStart = targetSource.findIndex(isPersonLine);
@@ -178,7 +179,7 @@ export async function detectExternalConsultationResults(documentId: string) {
     const lines = slot.answer.split("\n").map(value => value.trim()).filter(Boolean);
     const profileAt = (start: number) => lines.slice(start, start + 3).filter(line => /(?:／(?:男|女)|農曆生日：|居住地址：)/u.test(line));
     const firstPerson = lines.findIndex(line => /／(?:男|女)(?:\s|（|$)/u.test(line));
-    const targetHeading = lines.findIndex(line => /^(?:【)?對象資料(?:】)?$/u.test(line));
+    const targetHeading = lines.findIndex(line => /^(?:[【《])?對象資料(?:[】》])?$/u.test(line));
     return {
       slotIndex: slot.slotIndex,
       label: slot.label,
@@ -202,11 +203,11 @@ export async function detectExternalConsultationResults(documentId: string) {
 export async function upsertExternalConsultationSectionReplies(documentId:string,answers:Record<string,string>) {
   await assertExternalConsultationDocument(documentId);
   const token=await accessToken(),document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
-  const {plain,documentIndexAt}=indexedDocumentText(document),headingPattern=/(?:^|\n)【([^】\n]+)】[^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset),matches=Array.from(scopedPlain.matchAll(headingPattern));
+  const {plain,documentIndexAt}=indexedDocumentText(document),headingPattern=/(?:^|\n)(?:[^\n【《]{1,80})?[【《]([^】》\n]+)[】》][^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset),matches=Array.from(scopedPlain.matchAll(headingPattern)).filter(match=>!/^\s*[^【《\n]+【/.test(match[0]));
   const requests:any[]=[];
   for(const [key,raw] of Object.entries(answers)){
     const slotIndex=Number(key),match=matches[slotIndex],value=normalizeConsultationReturnText(raw);if(!match||!value)continue;
-    const blockStart=baseOffset+(match.index||0)+match[0].length,rest=plain.slice(blockStart),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),blockEnd=boundary>=0?blockStart+boundary:Math.max(blockStart,plain.replace(/\n$/,"").length);
+    const blockStart=baseOffset+(match.index||0)+match[0].length,rest=plain.slice(blockStart),boundary=rest.search(/\n(?=(?:(?:[^\n【《]{1,80})?[【《][^】》\n]+[】》]|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),blockEnd=boundary>=0?blockStart+boundary:Math.max(blockStart,plain.replace(/\n$/,"").length);
     const block=plain.slice(blockStart,blockEnd),addresses=Array.from(block.matchAll(/(?:^|\n)(?:居住地址|生前居住地址|農曆往生日期)：[^\n]*/g));
     let resultStart=blockStart;
     if(addresses.length){const last=addresses[addresses.length-1],lineEnd=(last.index||0)+last[0].length;resultStart=blockStart+lineEnd+(block[lineEnd]==="\n"?1:0)}
@@ -752,7 +753,7 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
       const maxQuestion = Math.max(0, ...Array.from(segment.matchAll(/(?:^|\n)Q(\d+)\s*[:：]/g)).map((entry) => Number(entry[1])));
       const appended = manualRows.map((row, rowIndex) => `Q${maxQuestion + rowIndex + 1}:${row.question}\nA${maxQuestion + rowIndex + 1}:${row.answer}`).join("\n\n");
       segment = lines.join("\n");
-      const tagOffset = segment.search(/【[^】\n]+】/u);
+      const tagOffset = segment.search(/(?:^|\n)[【《][^】》\n]+[】》]/u);
       segment = tagOffset >= 0
         ? `${segment.slice(0, tagOffset).replace(/\s+$/u, "")}\n\n${appended}\n\n${segment.slice(tagOffset)}`
         : `${segment.replace(/\s+$/u, "")}\n\n${appended}`;
@@ -764,11 +765,12 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
       if (q1) startOffset = (q1.index || 0) + (q1[0].startsWith("\n") ? 1 : 0);
     }
     if (startOffset < 0) {
-      const tag = /【[^】\n]+】/.exec(segment);
-      if (tag) startOffset = tag.index || 0;
+      const tag = /(?:^|\n)[【《][^】》\n]+[】》]/.exec(segment);
+      if (tag) startOffset = (tag.index || 0)+(tag[0].startsWith("\n")?1:0);
     }
     if (startOffset < 0) throw new Error(`項目 ${idx + 1} 找不到 Q1 或結果標籤，請確認文件格式`);
-    const content = normalizeConsultationReturnText(segment.slice(startOffset));
+    const namedHeading=lines.find(line=>/^[^【《\n]+【[^】\n]+】$/.test(line.trim()))?.trim();
+    const content = normalizeConsultationReturnText([namedHeading,segment.slice(startOffset)].filter(Boolean).join("\n\n"));
     return { index: idx + 1, itemTitle: firstLine, content };
   });
 }
@@ -811,7 +813,7 @@ export async function upsertQuickConsultationManualReplies(documentId:string,ent
       }
     }
     if(insertOffset<0){
-      const headingOffset=page.text.search(/【[^】\n]+】/u);
+      const headingOffset=page.text.search(/[【《][^】》\n]+[】》]/u);
       insertOffset=headingOffset>=0?page.start+headingOffset:page.end;
     }
     const following=plain.slice(insertOffset,page.end),existing=/^阿嫂回覆\s*[:：][^\n]*/u.exec(following);
@@ -903,11 +905,11 @@ export async function getQuickReplySectionSlots(documentId:string):Promise<Quick
   if(!documentId)throw new Error("缺少 Google 文件 ID");
   const token=await accessToken();
   const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
-  const {plain}=indexedDocumentText(document),headingPattern=/(?:^|\n)【([^】\n]+)】[^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset);
-  const matches=Array.from(scopedPlain.matchAll(headingPattern));
+  const {plain}=indexedDocumentText(document),headingPattern=/(?:^|\n)(?:[^\n【《]{1,80})?[【《]([^】》\n]+)[】》][^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset);
+  const matches=Array.from(scopedPlain.matchAll(headingPattern)).filter(match=>!/^\s*[^【《\n]+【/.test(match[0]));
   return matches.map((match,slotIndex)=>{
     const start=baseOffset+(match.index||0)+match[0].length;
-    const rest=plain.slice(start),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/);
+    const rest=plain.slice(start),boundary=rest.search(/\n(?=(?:(?:[^\n【《]{1,80})?[【《][^】》\n]+[】》]|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/);
     const raw=boundary>=0?rest.slice(0,boundary):rest;
     return {slotIndex,label:normalizeConsultationReturnText(match[1]),answer:normalizeConsultationReturnText(raw.replace(/[\u00a0\u200b]/g," "))};
   });
@@ -940,15 +942,21 @@ export async function upsertQuickConsultationQuestionReplies(documentId:string,a
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
 
-export async function upsertQuickConsultationSectionReplies(documentId:string,answers:Record<string,string>) {
+export async function upsertQuickConsultationSectionReplies(documentId:string,answers:Record<string,string>,annualEdits:Record<string,{state?:AnnualState;dirtyAges:number[]}>={}) {
   if(!documentId)throw new Error("缺少 Google 文件 ID");
   const token=await accessToken();
   const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
-  const {plain,documentIndexAt}=indexedDocumentText(document),headingPattern=/(?:^|\n)【([^】\n]+)】[^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset);
-  const matches=Array.from(scopedPlain.matchAll(headingPattern));
+  const {plain,documentIndexAt}=indexedDocumentText(document),headingPattern=/(?:^|\n)(?:[^\n【《]{1,80})?[【《]([^】》\n]+)[】》][^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset);
+  const matches=Array.from(scopedPlain.matchAll(headingPattern)).filter(match=>!/^\s*[^【《\n]+【/.test(match[0]));
   const slots=matches.map((match,slotIndex)=>{
-    const startOffset=baseOffset+(match.index||0)+match[0].length,rest=plain.slice(startOffset),boundary=rest.search(/\n(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:Math.max(startOffset,plain.replace(/\n$/,"").length);
-    return {slotIndex,value:normalizeConsultationReturnText(String(answers[String(slotIndex)]||"")),startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset)};
+    const startOffset=baseOffset+(match.index||0)+match[0].length,rest=plain.slice(startOffset),boundary=rest.search(/\n(?=(?:(?:[^\n【《]{1,80})?[【《][^】》\n]+[】》]|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:Math.max(startOffset,plain.replace(/\n$/,"").length);
+    let value=normalizeConsultationReturnText(String(answers[String(slotIndex)]||""));
+    if(match[1].trim()==="流年運勢" && value){
+      const current=parseAnnual(plain.slice(startOffset,endOffset)),startAge=Number(Object.keys(current)[0]||Object.keys(parseAnnual(value))[0]||0),ages=annualAges(startAge),edit=annualEdits[String(slotIndex)];
+      if(edit){for(const age of edit.dirtyAges){if(ages.includes(age)&&edit.state?.[age])current[age]=edit.state[age];}value=annualText(ages,current);}
+      else value=annualText(ages,parseAnnual(value));
+    }
+    return {slotIndex,value,startIndex:documentIndexAt(startOffset),endIndex:documentIndexAt(endOffset)};
   }).filter(slot=>slot.value).sort((a,b)=>b.startIndex-a.startIndex);
   if(!slots.length)return;
   const requests:any[]=[];
@@ -965,11 +973,11 @@ export async function upsertPastLifeOverviewReplies(documentId:string,answers:{a
   const values=answers.map(entry=>{
     const normalized=normalizeConsultationReturnText(entry.answer).replace(/\u2060/g,"");
     const extract=(heading:string)=>{
-      const markers=[`【${heading}】`,`＊${heading}`,`*${heading}`],marker=markers.find(value=>normalized.includes(value))||"",markerIndex=marker?normalized.indexOf(marker):-1;
+      const markers=[`【${heading}】`,`《${heading}》`,`＊${heading}`,`*${heading}`],marker=markers.find(value=>normalized.includes(value))||"",markerIndex=marker?normalized.indexOf(marker):-1;
       if(markerIndex<0)return heading==="綜觀今生"?normalized:"";
       const contentStart=markerIndex+marker.length;
       const remaining=normalized.slice(contentStart).replace(/^\s*\n?/,"");
-      const nextHeading=remaining.search(/\n(?:【[^】]+】|[＊*][^\n]+)/);
+      const nextHeading=remaining.search(/\n(?:[【《][^】》]+[】》]|[＊*][^\n]+)/);
       return (nextHeading>=0?remaining.slice(0,nextHeading):remaining).trim();
     };
     const overview=extract("綜觀今生"),advice=extract("兩人相處建議");
@@ -991,12 +999,12 @@ export async function upsertPastLifeOverviewReplies(documentId:string,answers:{a
     for(const [heading,key] of [["綜觀今生","overview"],["兩人相處建議","advice"]] as const){
       const value=entry[key];
       if(!value)continue;
-      const marker=`【${heading}】`,headingOffset=page.text.indexOf(marker);
+      const marker=[`【${heading}】`,`《${heading}》`].find(value=>page.text.includes(value))||"",headingOffset=marker?page.text.indexOf(marker):-1;
       if(headingOffset<0)continue;
       const afterHeading=page.start+headingOffset+marker.length;
       const newlineOffset=plain.indexOf("\n",afterHeading);
       const startOffset=newlineOffset>=0&&newlineOffset<page.end?newlineOffset+1:afterHeading;
-      const rest=plain.slice(startOffset,page.end),boundary=rest.search(/\n\s*(?=(?:【[^】\n]+】|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),rawExisting=boundary>=0?rest.slice(0,boundary):rest;
+      const rest=plain.slice(startOffset,page.end),boundary=rest.search(/\n\s*(?=(?:(?:[^\n【《]{1,80})?[【《][^】》\n]+[】》]|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),rawExisting=boundary>=0?rest.slice(0,boundary):rest;
       // 保留 Google Docs 每個段落／區段最後的換行字元。空白教師輸入區不必刪除，
       // 直接在其前方插入；有舊內容時也只刪到最後一個可見字元。
       const removableExisting=rawExisting.replace(/[\s\u00a0\u200b]+$/u,"");
@@ -1045,7 +1053,7 @@ const virtualAge = (profile: any) => {
   const rocYear = Number(lunar.match(/民國\s*(\d+)/)?.[1]);
   const birthYear = rocYear ? rocYear + 1911 : Number(text(profile?.birth_date).match(/^(\d{4})/)?.[1]);
   if (!birthYear) return null;
-  return Math.max(1, new Date().getFullYear() - birthYear + 1);
+  return Math.max(1, Number(new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"numeric"}).format(new Date())) - birthYear + 1);
 };
 
 const profileLines = (profile: any, ownerName: string) => {
@@ -1172,12 +1180,18 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   const renderedSubTitle = infantSpirit
     ? (infantMultiple ? "兩位嬰靈(含)以上" : "一位嬰靈")
     : subItems.join("、");
-  add([text(detail.item_title), renderedSubTitle].filter(Boolean).join("｜"), "title");
+  // Main heading is added after resolving the people below.
   add("");
   const participants = (answer?.booking_answer_participants || []).slice().sort((a: any, b: any) => a.position - b.position);
   const selectedParticipants = target ? [target] : participants;
   const people = [one(answer?.consultation_profiles), ...selectedParticipants.map((entry: any) => one(entry.consultation_profiles))]
     .filter(Boolean).filter((profile: any, index: number, all: any[]) => all.findIndex((entry) => entry.id === profile.id) === index);
+  const mainNames = people.map((profile:any)=>text(profile.name)).filter(Boolean);
+  const primaryTitle = marriage ? "感情運勢與關係合盤" : itemCode.startsWith("past-life-") ? "前世因果" : text(detail.item_title);
+  add(`${mainNames.join("&")||ownerName}【${primaryTitle}】`, "title");
+  if (text(detail.item_title)!==primaryTitle) add(text(detail.item_title), "meta");
+  if (renderedSubTitle) add(renderedSubTitle, "meta");
+  add("");
   people.forEach((profile: any) => {
     profileLines(profile, ownerName).forEach((line) => add(line));
     if (infantSpirit) {
@@ -1311,13 +1325,13 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   add("");
   const isPastLifePersonal = itemCode === "past-life-personal" || text(detail.item_title).includes("前世因果（個人）");
   const isPastLifeRelation = relation;
-  if (isOverallFortune) {
-    add("【整體建議】", "section");
+  if (isOverallFortune || itemCode === "health" || text(detail.item_title).includes("身體健康")) {
+    add(isOverallFortune ? "《整體建議》" : "《健康建議》", "section");
     for (let index = 0; index < 5; index += 1) add("\u00a0", "teacher");
-    add("【流年運勢】", "section");
+    add("《流年運勢》", "section");
     const startingAge = virtualAge(people[0]);
     if (startingAge) {
-      for (let age = startingAge; age <= Math.min(99, startingAge + 20); age += 1) add(`${age}歲：\u00a0`, "teacher");
+      for (let age = startingAge; age <= Math.min(99, startingAge + 19); age += 1) add(`${age}歲：\u00a0`, "teacher");
     }
     add("");
     add("備註：");
@@ -1330,7 +1344,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     const primaryFullName = text(primaryProfile?.name) || ownerName;
     const primaryDisplayName = /^[\u3400-\u9fff]{2,4}$/.test(primaryFullName) ? primaryFullName.slice(1) : primaryFullName;
     const targetName = text(targetProfile?.name) || "對方";
-    add("【感情運勢與關係合盤】", "section");
+    add("《感情運勢與關係合盤》", "section");
     add("");
     add(`${primaryDisplayName}本身個性`, "teacher");
     add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher");
@@ -1348,11 +1362,11 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     add("");
     add("如果要姻緣比較順利，", "teacher");
   }
-  const sections = isPastLifeRelation ? ["【前前世】", "【前世】", "【綜觀今生】", "【兩人相處建議】"] : !isPastLifePersonal ? [] : /前三世|三世/.test(subTitle)
-    ? ["【前前前世】", "【前前世】", "【前世】", "【綜觀今生】"]
+  const sections = isPastLifeRelation ? ["《前前世》", "《前世》", "《綜觀今生》", "《兩人相處建議》"] : !isPastLifePersonal ? [] : /前三世|三世/.test(subTitle)
+    ? ["《前前前世》", "《前前世》", "《前世》", "《綜觀今生》"]
     : /前兩世|二世/.test(subTitle)
-      ? ["【前前世】", "【前世】", "【綜觀今生】"]
-      : ["【前世】", "【綜觀今生】"];
+      ? ["《前前世》", "《前世》", "《綜觀今生》"]
+      : ["《前世》", "《綜觀今生》"];
   sections.forEach((heading) => {
     add(heading, "section");
     if (isPastLifeRelation && heading === sections[0] && targetProfile?.name) add(`${text(targetProfile.name)}是`, "teacher");
@@ -1361,14 +1375,14 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     add("\u00a0", "teacher");
   });
   if (itemCode === "date-time-selection" || title.includes("擇日")) {
-    add("【擇日建議】", "section");
+    add("《擇日建議》", "section");
     const count = /六|6/.test(subTitle) ? 6 : 3;
     for (let index = 1; index <= count; index += 1) add(`${index}.\u00a0`, "teacher");
   }
-  const alreadyHasTeacherLayout = isPastLifePersonal || isPastLifeRelation || isOverallFortune || marriage || itemCode === "date-time-selection" || title.includes("擇日");
+  const alreadyHasTeacherLayout = isPastLifePersonal || isPastLifeRelation || isOverallFortune || itemCode === "health" || marriage || itemCode === "date-time-selection" || title.includes("擇日");
   if (!alreadyHasTeacherLayout) {
     const teacherKind = itemCode === "deceased-relative" ? "deceasedTeacher" : "teacher";
-    add(infantSpirit ? "【嬰靈】" : `【${subTitle || title}】`, "section");
+    add(infantSpirit ? "《嬰靈》" : `《${subTitle || title}》`, "section");
     for (let index = 0; index < 4; index += 1) add(itemCode === "deceased-relative" ? "\u200b" : "\u00a0", teacherKind);
   }
   return { content, marks, images };
@@ -1423,9 +1437,9 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     if (profileError) throw profileError;
     const profilesById = new Map((profiles || []).map((profile: any) => [profile.id, profile]));
     allAnswers.forEach((answer: any) => {
-      if (!one(answer.consultation_profiles) && profilesById.has(answer.profile_id)) answer.consultation_profiles = profilesById.get(answer.profile_id);
+      if ((!submissionId || !one(answer.consultation_profiles)) && profilesById.has(answer.profile_id)) answer.consultation_profiles = profilesById.get(answer.profile_id);
       (answer.booking_answer_participants || []).forEach((participant: any) => {
-        if (!one(participant.consultation_profiles) && profilesById.has(participant.profile_id)) participant.consultation_profiles = profilesById.get(participant.profile_id);
+        if ((!submissionId || !one(participant.consultation_profiles)) && profilesById.has(participant.profile_id)) participant.consultation_profiles = profilesById.get(participant.profile_id);
       });
       answer.__profileLookup = Object.fromEntries(profilesById);
     });
@@ -1577,6 +1591,10 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     const time = taipeiClock(date);
     fileTitle = `${get("month")}/${get("day")}(${week})${time} ${lineName}．${ownerName}`;
   }
+  for(const old of existingDetails){
+    const {error:archiveError}=await db.from("consultation_document_history").upsert({booking_id:bookingId,document_id:old.google_document_id,document_url:`https://docs.google.com/document/d/${old.google_document_id}/edit`,created_at:old.google_document_created_at||new Date().toISOString()},{onConflict:"document_id"});
+    if(archiveError)throw archiveError;
+  }
   const response = await fetch(appsScriptUrl, {
     method: "POST",
     headers: { "content-type": "text/plain;charset=utf-8" },
@@ -1605,7 +1623,9 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
       warnings: result.warnings,
     });
   }
-  const createdAt = existingDetails.map((detail: any) => detail.google_document_created_at).filter(Boolean).sort()[0] || new Date().toISOString();
+  const createdAt = new Date().toISOString();
+  const {error:archiveError}=await db.from("consultation_document_history").upsert({booking_id:bookingId,document_id:result.documentId,document_url:result.documentUrl||`https://docs.google.com/document/d/${result.documentId}/edit`,created_at:createdAt},{onConflict:"document_id"});
+  if(archiveError)throw archiveError;
   const { error: updateError } = await db.from("booking_details").update({
     google_document_id: result.documentId,
     google_document_url: result.documentUrl || `https://docs.google.com/document/d/${result.documentId}/edit`,

@@ -1,8 +1,13 @@
+import {planConsultationPolish,mergeConsultationPolish} from "@/lib/consultation-polish";
+import { normalizeConsultationText, consultationStructure } from "@/lib/consultation-text";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
 
-const polishInstructions = `整理以下內容時，請嚴格遵守以下規則：
+const polishInstructions = `
+輸入為 segments，每段包含不可更動的 id、僅供參考的 context，以及要整理的 content。只回傳原 id 與整理後的 content；context 不可混入回答。人物、標題、問題、回答標記與年齡列由程式保留，你不得在 content 新增这些標記。每段維持對應的人物及問題，不可移到另一段。疑似問題請以原文精確引用；無法確定時保持原句，讓內文可標示確認。
+結構規則：所有 Qn/An 編號、問題文字、【】或《》標題、人物個性標題與雙人關係模板提示，必須原樣保留且維持原本順序。每個人的內容只能留在該人物原本的區段，不可合併、移到另一人或重排。空白答案不可補寫。Qn、An 或 Q、A 冒號後有內容時必須同一行，段落內必要換行可以保留。不要輸出 Markdown 標記。
+整理以下內容時，請嚴格遵守以下規則：
 
 1. 完整保留原意
 完全不要改變原本的意思，也不要自行解讀、延伸或補充內容。
@@ -37,8 +42,8 @@ const polishInstructions = `整理以下內容時，請嚴格遵守以下規則�
 總原則：寧可保留原文，也不要過度修改。這次是「整理原文」，不是重新寫作。
 
 另外檢查疑似語音輸入錯誤：
-- 只有與整篇內容明顯完全無關、可高度確定是語音辨識雜訊的句子，才可從 polishedContent 刪除，並在 suspectedIssues 中以 action="removed" 完整列出原句與原因。
-- 只要無法高度確定，就必須保留在 polishedContent，並以 action="kept" 提醒人工確認。
+- 只有與整篇內容明顯完全無關、可高度確定是語音辨識雜訊的句子，才可從 content 刪除，並在 suspectedIssues 中以 action="removed" 完整列出原句與原因。
+- 只要無法高度確定，就必須保留在 content，並以 action="kept" 提醒人工確認。
 - 人名、稱謂、日期、時間、地址、生肖、年紀、親屬關係，即使看起來奇怪也不可擅自刪除，只能保留並提醒。
 - changeSummary 只簡單列出實際做過的整理，不得聲稱未做過的修改。`;
 
@@ -49,22 +54,24 @@ export async function POST(request: NextRequest) {
   if (!apiKey) return NextResponse.json({ error: "尚未設定 OPENAI_API_KEY" }, { status: 500 });
   try {
     const body = await request.json();
-    const content = String(body.content || "").trim();
+    const content = normalizeConsultationText(String(body.content || ""));
     if (!content) return NextResponse.json({ error: "沒有可潤飾的內容" }, { status: 400 });
     if (content.length > 18000) return NextResponse.json({ error: "內容過長，請分項潤飾" }, { status: 400 });
+    const plan=planConsultationPolish(content);
+    if(!plan.segments.length)return NextResponse.json({ok:true,polished:mergeConsultationPolish(plan,[]),changeSummary:plan.removedEmptyAges.length?["移除未填寫的流年年齡列"]:[],suspectedIssues:[]});
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
       body: JSON.stringify({
         model: process.env.OPENAI_POLISH_MODEL || "gpt-5-mini",
         instructions: polishInstructions,
-        input: `請整理以下原文：\n\n${content}`,
+        input: JSON.stringify({segments:plan.segments}),
         text: { format: {
           type: "json_schema", name: "consultation_polish_result", strict: true,
           schema: {
             type: "object", additionalProperties: false,
             properties: {
-              polishedContent: { type: "string" },
+              segments: { type:"array", minItems:plan.segments.length,maxItems:plan.segments.length,items:{type:"object",additionalProperties:false,properties:{id:{type:"integer"},content:{type:"string"}},required:["id","content"]} },
               changeSummary: { type: "array", items: { type: "string" } },
               suspectedIssues: { type: "array", items: {
                 type: "object", additionalProperties: false,
@@ -72,7 +79,7 @@ export async function POST(request: NextRequest) {
                 required: ["originalText", "action", "reason"],
               } },
             },
-            required: ["polishedContent", "changeSummary", "suspectedIssues"],
+            required: ["segments", "changeSummary", "suspectedIssues"],
           },
         } },
         max_output_tokens: 7000,
@@ -82,11 +89,12 @@ export async function POST(request: NextRequest) {
     if (!response.ok) throw new Error(result?.error?.message || "AI 潤飾失敗");
     const outputText = (result.output || []).flatMap((entry: any) => Array.isArray(entry.content) ? entry.content : []).filter((entry: any) => entry.type === "output_text" && typeof entry.text === "string").map((entry: any) => entry.text).join("").trim();
     const parsed = JSON.parse(outputText || "{}");
-    const polished = String(parsed.polishedContent || "").trim();
+    const polished = mergeConsultationPolish(plan,parsed.segments);
+    if(JSON.stringify(consultationStructure(content))!==JSON.stringify(consultationStructure(polished)))throw new Error("AI 改動了問題、人物標題或區段順序，已保留原始版本，請重新潤飾");
     if (!polished) throw new Error("AI 沒有回傳文字，請再試一次");
     return NextResponse.json({
       ok: true, polished,
-      changeSummary: Array.isArray(parsed.changeSummary) ? parsed.changeSummary.map(String).filter(Boolean) : [],
+      changeSummary: [...(Array.isArray(parsed.changeSummary) ? parsed.changeSummary.map(String).filter(Boolean) : []),...(plan.removedEmptyAges.length?["移除未填寫的流年年齡列（原始版本保留）"]:[])],
       suspectedIssues: Array.isArray(parsed.suspectedIssues) ? parsed.suspectedIssues.map((issue: any) => ({ originalText: String(issue?.originalText || ""), action: issue?.action === "removed" ? "removed" : "kept", reason: String(issue?.reason || "") })).filter((issue: any) => issue.originalText) : [],
     });
   } catch (error) {
