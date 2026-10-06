@@ -33,9 +33,9 @@ const itemKind = (detail: any) => {
   };
 };
 
-async function returnItemBindings(bookingId: string) {
+export async function returnItemBindings(bookingId: string) {
   const { data, error } = await adminSupabase().from("booking_details").select(
-    "id,item_id,item_title,created_at,google_document_created_at,booking_items(code),booking_detail_sub_items(sub_item_title),booking_consultation_answers(profile_id,booking_answer_participants(profile_id,position))",
+    "id,item_id,item_title,created_at,google_document_created_at,booking_items(code),booking_detail_sub_items(sub_item_title),booking_consultation_answers(profile_id,consultation_profiles(name),booking_answer_participants(profile_id,position,consultation_profiles(name)))",
   ).eq("booking_id", bookingId).order("created_at", { ascending: true });
   if (error) throw error;
   return (data || []).flatMap((detail: any) => {
@@ -49,6 +49,7 @@ async function returnItemBindings(bookingId: string) {
     const pages = (kind.relation || kind.marriage) && targets.length ? targets : [null];
     return pages.map((target: any) => ({
       bookingDetailId: detail.id, itemId: detail.item_id, profileId: primaryId,
+      headingName: kind.relation ? String(one(target?.consultation_profiles)?.name || one(answer.consultation_profiles)?.name || "") : "",
       targetProfileId: target?.profile_id || null, consultationCreatedAt: detail.google_document_created_at || detail.created_at,
     }));
   });
@@ -105,7 +106,7 @@ export async function prepareConsultationReturn(args: {
   const unreadable = freshItems.find(item => selected.includes(item.index) && item.parseWarning);
   if (unreadable) throw new Error(unreadable.parseWarning);
   const bindings = await returnItemBindings(booking.id);
-  const items = freshItems.filter((item) => selected.includes(item.index)).map((item) => ({
+  const items = correctReturnHeadings(freshItems, bindings).filter((item) => selected.includes(item.index)).map((item) => ({
     ...item,
     content: normalizeConsultationReturnText(
       Object.prototype.hasOwnProperty.call(editedItems, String(item.index))
@@ -171,4 +172,13 @@ export async function deliverPreparedConsultationReturn(payload: PreparedConsult
   try { await moveConsultationDocumentToReturnedFolder(payload.documentId); }
   catch (moveError) { console.error("移動 Google 諮詢單到已回傳資料夾失敗", moveError); }
   return { returnedAt, messageCount };
+}
+
+export function correctReturnHeadings<T extends {index:number;itemTitle:string;content:string}>(items:T[], bindings:{headingName?:string}[]):T[] {
+  return items.map(item=>{
+    const name=bindings[item.index-1]?.headingName;
+    if(!name)return item;
+    const fix=(value:string)=>value.replace(/^([^\n【]+)【([^】]*前世[^】]*)】/gm,(heading,names,label)=>names.split(/[&＆]/).map((entry:string)=>entry.trim()).includes(name)?name+"【"+label+"】":heading);
+    return {...item,itemTitle:fix(item.itemTitle),content:fix(item.content)};
+  });
 }

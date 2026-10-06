@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { isAdminSession } from "@/lib/admin-session";
 import { adminSupabase } from "@/lib/supabase";
 import { getConsultationReturnPreview } from "@/lib/google-consultation-docs";
-import { bookingForConsultationReturn, deliverPreparedConsultationReturn, prepareConsultationReturn } from "@/lib/consultation-return-delivery";
+import { returnItemBindings, correctReturnHeadings, bookingForConsultationReturn, deliverPreparedConsultationReturn, prepareConsultationReturn } from "@/lib/consultation-return-delivery";
 
 export async function GET(request: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value)) return NextResponse.json({ error: "未登入" }, { status: 401 });
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     if (!bookingNo) return NextResponse.json({ error: "缺少訂單編號" }, { status: 400 });
     const { booking, detail, customer } = await bookingForConsultationReturn(bookingNo, documentId);
     // 開啟頁面只讀取資料，不可重寫按鈕或「上次回傳時間」。
-    const items = await getConsultationReturnPreview(detail.google_document_id);
+    const items = correctReturnHeadings(await getConsultationReturnPreview(detail.google_document_id), await returnItemBindings(booking.id));
     return NextResponse.json({
       ok: true, bookingNo: booking.booking_no,
       customerName: customer?.full_name || customer?.line_display_name || "LINE 用戶",

@@ -776,7 +776,7 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
     }
     if (startOffset < 0) return {
       index: idx + 1, itemTitle: firstLine, content: "",
-      parseWarning: `項目 ${idx + 1} 尚未辨識到回覆區，已暫停此項回傳。請到原 Google 文件確認 Q1：或《結果標題》與回覆內容，修正後重新整理；其他項目仍可使用。`,
+      parseWarning: `項目 ${idx + 1} 尚未辨識到回覆區，已暫停此項回傳。請在本項目的實際回覆前獨立一行填入【主項目名稱】（例如【外靈干擾】），內部小標題使用《》。勿將標籤放在姓名、生日、地址等資料前；修正後重新整理。`,
     };
     const namedHeading=lines.find(line=>/^[^【《\n]+【[^】\n]+】$/.test(line.trim()))?.trim();
     const content = normalizeConsultationReturnText([namedHeading,segment.slice(startOffset)].filter(Boolean).join("\n\n"));
@@ -1195,7 +1195,8 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   const selectedParticipants = target ? [target] : participants;
   const people = [one(answer?.consultation_profiles), ...selectedParticipants.map((entry: any) => one(entry.consultation_profiles))]
     .filter(Boolean).filter((profile: any, index: number, all: any[]) => all.findIndex((entry) => entry.id === profile.id) === index);
-  const mainNames = people.map((profile:any)=>text(profile.name)).filter(Boolean);
+  const headingPeople = relation ? [target ? one(target.consultation_profiles) : one(answer?.consultation_profiles)] : people;
+  const mainNames = headingPeople.filter(Boolean).map((profile:any)=>text(profile.name)).filter(Boolean);
   const primaryTitle = marriage ? "感情運勢與關係合盤" : itemCode.startsWith("past-life-") ? "前世因果" : text(detail.item_title);
   add(`${mainNames.join("&")||ownerName}【${primaryTitle}】`, "title");
   if (text(detail.item_title)!==primaryTitle) add(text(detail.item_title), "meta");
@@ -1391,7 +1392,8 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   const alreadyHasTeacherLayout = isPastLifePersonal || isPastLifeRelation || isOverallFortune || itemCode === "health" || marriage || itemCode === "date-time-selection" || title.includes("擇日");
   if (!alreadyHasTeacherLayout) {
     const teacherKind = itemCode === "deceased-relative" ? "deceasedTeacher" : "teacher";
-    add(infantSpirit ? "《嬰靈》" : `《${subTitle || title}》`, "section");
+    add(infantSpirit ? "【嬰靈】" : `【${title}】`, "section");
+    if (subTitle && subTitle !== title) add(`《${subTitle}》`, "section");
     for (let index = 0; index < 4; index += 1) add(itemCode === "deceased-relative" ? "\u200b" : "\u00a0", teacherKind);
   }
   return { content, marks, images };
