@@ -24,20 +24,28 @@ export async function GET(request:NextRequest){
  const {data:rows,error}=await db.from('bookings').select(fields).eq('consultation_methods.code','video').is('data_submitted_at',null).gt('slot_start',now.toISOString());
  if(error)throw new Error('預約查詢失敗');const bookings=(rows||[]).filter(b=>reminderEligible(b,now));
  const site=process.env.NEXT_PUBLIC_SITE_URL||request.nextUrl.origin;
- if(dryRun)return NextResponse.json({ok:true,dryRun:true,recipient:{fullName:settings.expected_full_name,lineName:profile.displayName},count:bookings.length,previews:bookings.map(b=>staffReminderText(b,site))});
+ if(dryRun)return NextResponse.json({ok:true,dryRun:true,recipient:{fullName:settings.expected_full_name,lineName:profile.displayName},count:bookings.length,previews:bookings.length?[staffReminderText(bookings,site)]:[]});
  let sent=0,skipped=0,failed=0;
- for(const booking of bookings){
- const {data:claim,error:claimError}=await db.from('staff_data_reminder_log').insert({booking_id:booking.id,reminder_date:taipeiDateKey(now),recipient_line_user_id:settings.recipient_line_user_id}).select('id').single();
- if(claimError){if(claimError.code==='23505'){skipped++;continue;}throw new Error('提醒記錄建立失敗，已停止發送');}
- try{
- const {data:fresh,error:freshError}=await db.from('bookings').select(fields).eq('id',booking.id).single();
- if(freshError)throw new Error('重新確認預約失敗');
- if(!fresh||!reminderEligible(fresh,new Date())){await db.from('staff_data_reminder_log').update({status:'skipped'}).eq('id',claim.id);skipped++;continue;}
- const response=await fetch('https://api.line.me/v2/bot/message/push',{method:'POST',headers:{Authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({to:settings.recipient_line_user_id,messages:[{type:'text',text:staffReminderText(fresh,site)}]})});
- if(!response.ok)throw new Error(`LINE通知失敗（${response.status}）`);
- const {error:logError}=await db.from('staff_data_reminder_log').update({status:'sent',sent_at:new Date().toISOString()}).eq('id',claim.id);
- if(logError)throw new Error('通知已送出，但更新記錄失敗');sent++;
- }catch(e){failed++;await db.from('staff_data_reminder_log').update({status:'failed',last_error:e instanceof Error?e.message:'通知失敗'}).eq('id',claim.id);}
+ const {data:claims,error:claimError}=await db.rpc('claim_staff_reminders',{p_booking_ids:bookings.map(b=>b.id),p_date:taipeiDateKey(now),p_recipient:settings.recipient_line_user_id});
+ if(claimError)throw new Error('提醒批次建立失敗，請確認已執行050 SQL');
+ skipped=bookings.length-(claims||[]).length;
+ const ready:Array<{id:string;booking:any}>=[];
+ for(const claim of claims||[]){
+  try{
+   const {data:fresh,error:freshError}=await db.from('bookings').select(fields).eq('id',claim.booking_id).single();
+   if(freshError)throw new Error('重新確認預約失敗');
+   if(!fresh||!reminderEligible(fresh,new Date())){await db.from('staff_data_reminder_log').update({status:'skipped'}).eq('id',claim.id);skipped++;continue;}
+   ready.push({id:claim.id,booking:fresh});
+  }catch(e){failed++;await db.from('staff_data_reminder_log').update({status:'failed',last_error:e instanceof Error?e.message:'查詢失敗'}).eq('id',claim.id);}
+ }
+ ready.sort((a,b)=>Date.parse(a.booking.slot_start)-Date.parse(b.booking.slot_start));
+ // LINE text limit: keep a normal batch together, split only when it exceeds 4,500 characters.
+ const batches:typeof ready[]=[];
+ for(const row of ready){let batch=batches[batches.length-1];if(!batch||staffReminderText([...batch.map(x=>x.booking),row.booking],site).length>4500){batch=[];batches.push(batch)}batch.push(row)}
+ for(const batch of batches){
+  let deliveryError='';
+  try{const response=await fetch('https://api.line.me/v2/bot/message/push',{method:'POST',headers:{Authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({to:settings.recipient_line_user_id,messages:[{type:'text',text:staffReminderText(batch.map(x=>x.booking),site)}]})});if(!response.ok)throw new Error(`LINE通知失敗（${response.status}）`)}catch(e){deliveryError=e instanceof Error?e.message:'通知失敗'}
+  for(const row of batch){const {error:logError}=await db.from('staff_data_reminder_log').update(deliveryError?{status:'failed',last_error:deliveryError}:{status:'sent',sent_at:new Date().toISOString()}).eq('id',row.id);if(deliveryError||logError)failed++;else sent++}
  }
  return NextResponse.json({ok:failed===0,sent,skipped,failed});
  }catch(e){return NextResponse.json({error:e instanceof Error?e.message:'客服提醒失敗'},{status:500});}

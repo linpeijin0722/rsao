@@ -24,8 +24,8 @@ test('editor renders both highlights and editable text and focuses selected issu
  const effects=[],calls=[];let ref=0;
  const input={focus:()=>calls.push('focus'),setSelectionRange:(a,b)=>calls.push([a,b]),scrollIntoView:()=>{},scrollTop:0,scrollLeft:0,clientHeight:100};
  const backdrop={offsetTop:0,scrollTop:0,querySelector:()=>({offsetTop:220})};
- const mock={...React,useMemo:fn=>fn(),useRef:value=>({current:ref++===0?input:ref===2?backdrop:value}),useEffect:fn=>effects.push(fn)};
- const c=vm.createContext({React,exports:{},require:name=>name==='react'?mock:{consultationIssueRanges:()=>[{start:2,end:4,issueIndex:0}]}});
+ const mock={...React,useMemo:fn=>fn(),useRef:value=>({current:ref++===2?input:ref===4?backdrop:value}),useEffect:fn=>effects.push(fn)};
+ const c=vm.createContext({document:{addEventListener(){},removeEventListener(){}},React,exports:{},require:name=>name==='react'?mock:{consultationIssueRanges:()=>[{start:2,end:4,issueIndex:0}]}});
  vm.runInContext(compile(fs.readFileSync('app/staff/ConsultationIssueEditor.tsx','utf8')),c);
  const html=renderToStaticMarkup(React.createElement(c.exports.default,{value:'前文錯字後文',issues:[{originalText:'錯字',action:'kept'}],focusRequest:{index:0,nonce:1},onChange:()=>{},onDone:()=>{}}));
  assert.match(html,/<mark[^>]*>錯字<\/mark>/);assert.match(html,/<textarea[^>]*>前文錯字後文<\/textarea>/);effects.forEach(fn=>fn());assert.deepEqual(calls,['focus',[2,4]]);assert.ok(input.scrollTop>0);assert.equal(backdrop.scrollTop,input.scrollTop);

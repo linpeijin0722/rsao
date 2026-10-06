@@ -59,11 +59,14 @@ export async function POST(request: NextRequest) {
     if (content.length > 18000) return NextResponse.json({ error: "內容過長，請分項潤飾" }, { status: 400 });
     const plan=planConsultationPolish(content);
     if(!plan.segments.length)return NextResponse.json({ok:true,polished:mergeConsultationPolish(plan,[]),changeSummary:plan.removedEmptyAges.length?["移除未填寫的流年年齡列"]:[],suspectedIssues:[]});
+    const started=Date.now();
+    const model=process.env.OPENAI_POLISH_MODEL || "gpt-5-mini";
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
       body: JSON.stringify({
-        model: process.env.OPENAI_POLISH_MODEL || "gpt-5-mini",
+        model,
+        ...(/^gpt-5(?:-mini|-nano)?(?:-\d{4}-\d{2}-\d{2})?$/.test(model)?{reasoning:{effort:"low"}}:{}),
         instructions: polishInstructions,
         input: JSON.stringify({segments:plan.segments}),
         text: { format: {
@@ -93,7 +96,7 @@ export async function POST(request: NextRequest) {
     if(JSON.stringify(consultationStructure(content))!==JSON.stringify(consultationStructure(polished)))throw new Error("AI 改動了問題、人物標題或區段順序，已保留原始版本，請重新潤飾");
     if (!polished) throw new Error("AI 沒有回傳文字，請再試一次");
     return NextResponse.json({
-      ok: true, polished,
+      ok: true, polished, elapsedMs:Date.now()-started,
       changeSummary: [...(Array.isArray(parsed.changeSummary) ? parsed.changeSummary.map(String).filter(Boolean) : []),...(plan.removedEmptyAges.length?["移除未填寫的流年年齡列（原始版本保留）"]:[])],
       suspectedIssues: Array.isArray(parsed.suspectedIssues) ? parsed.suspectedIssues.map((issue: any) => ({ originalText: String(issue?.originalText || ""), action: issue?.action === "removed" ? "removed" : "kept", reason: String(issue?.reason || "") })).filter((issue: any) => issue.originalText) : [],
     });

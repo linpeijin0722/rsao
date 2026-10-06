@@ -7,6 +7,9 @@ export default function ConsultationIssueEditor({ value, issues, focusRequest, o
   value: string; issues: Issue[]; focusRequest?: { index: number; nonce: number } | null;
   onChange: (value: string) => void; onDone: () => void;
 }) {
+  const container=useRef<HTMLDivElement>(null);
+  const done=useRef(onDone);done.current=onDone;
+  useEffect(()=>{const outside=(event:Event)=>{const target=event.target;if(target instanceof Element&&!container.current?.contains(target)&&!target.closest(".returnPolishReview"))done.current()};document.addEventListener("pointerdown",outside,true);document.addEventListener("focusin",outside);return()=>{document.removeEventListener("pointerdown",outside,true);document.removeEventListener("focusin",outside)}},[]);
   const input = useRef<HTMLTextAreaElement>(null), backdrop = useRef<HTMLPreElement>(null);
   const ranges = useMemo(() => consultationIssueRanges(value, issues), [value, issues]);
   const latest = useRef(ranges); latest.current = ranges;
@@ -25,11 +28,11 @@ export default function ConsultationIssueEditor({ value, issues, focusRequest, o
   }, [focusRequest]);
   let cursor = 0;
   const pieces = ranges.flatMap(range => { const before = value.slice(cursor, range.start); cursor = range.end; return [before, <mark key={`${range.start}:${range.issueIndex}`} data-issue={range.issueIndex}>{value.slice(range.start, range.end)}</mark>]; });
-  return <div className="consultationIssueEditor">
+  return <div ref={container} className="consultationIssueEditor">
     <div className="consultationIssueEditorLayers">
       <pre ref={backdrop} aria-hidden="true">{pieces}{value.slice(cursor)}{"\n"}</pre>
       <textarea ref={input} aria-label="編輯回傳內容（保留疑似錯誤標示）" value={value} onChange={event => onChange(event.target.value)} onScroll={syncScroll} />
     </div>
-    <button type="button" onClick={onDone}>完成編輯</button>
+
   </div>;
 }

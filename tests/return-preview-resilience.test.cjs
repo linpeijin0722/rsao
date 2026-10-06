@@ -55,7 +55,7 @@ test('actual return-page load excludes unreadable item without failing whole pag
   const ui = fs.readFileSync('app/staff/consultation-return/page.tsx', 'utf8');
   const start = ui.indexOf('  useEffect(()=>{const params='), end = ui.indexOf('  useEffect(()=>{if(editing)', start);
   let selected, data, error, loading;
-  const context = vm.createContext({ URLSearchParams, window: { location: { search: '?bookingNo=TEST&documentId=TEST' } }, useEffect: fn => fn(), normalizeDraft: value => value, setData: value => data = value, setSelected: value => selected = value, setVersions: () => {}, setActiveVersionIds: () => {}, setError: value => error = value, setLoading: value => loading = value, fetch: async () => ({ ok: true, json: async () => ({ items: [{ index: 6, content: '回答6' }, { index: 7, content: '', parseWarning: '待確認' }, { index: 8, content: '回答8' }] }) }) });
+  const context = vm.createContext({ URLSearchParams, window: { location: { search: '?bookingNo=TEST&documentId=TEST' } }, useEffect: fn => fn(), normalizeDraft: value => value, setData: value => data = value, setSelected: value => selected = value, setVersions: () => {}, setActiveVersionIds: () => {}, setError: value => error = value, setLoading: value => loading = value, setDraftRevision:()=>{},setDraftSnapshot:()=>{},setDraftReady:()=>{},setDraftWarning:()=>{}, fetch: async () => ({ ok: true, json: async () => ({ items: [{ index: 6, content: '回答6' }, { index: 7, content: '', parseWarning: '待確認' }, { index: 8, content: '回答8' }] }) }) });
   vm.runInContext(stripTypeScriptTypes(ui.slice(start, end)), context);
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(Array.from(selected), [6, 8]);

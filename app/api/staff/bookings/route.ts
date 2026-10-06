@@ -58,6 +58,7 @@ export async function GET() {
     if(docsError)return NextResponse.json({error:docsError.message},{status:500});
     for(const booking of bookings)booking.document_history=(docs||[]).filter((doc:any)=>doc.booking_id===booking.id);
   }
+  if(bookings.length){const {data:schedules,error:scheduleError}=await adminSupabase().from('consultation_return_schedules').select('id,booking_no,scheduled_for,status,sent_at,last_error').in('booking_no',bookings.map(b=>b.booking_no)).order('created_at',{ascending:false});for(const booking of bookings){booking.return_schedules=(schedules||[]).filter(s=>s.booking_no===booking.booking_no);booking.return_schedule_error=!!scheduleError}}
   return NextResponse.json({ bookings, customers: customers || [], consultationProfiles: consultationProfiles || [],paymentSettings,bankAccounts:bankAccounts||[] });
 }
 export async function POST(request: NextRequest) {

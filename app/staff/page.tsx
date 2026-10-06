@@ -1,4 +1,5 @@
 "use client";
+import ReturnScheduleStatus from "./ReturnScheduleStatus";
 import { taipeiDateKey, taipeiDateTimeInput, taipeiYear } from "@/lib/taipei-time";
 import { useEffect, useMemo, useState } from "react";
 import StaffAnswerEditorV2 from "./StaffAnswerEditorV2";
@@ -802,7 +803,7 @@ export default function Staff() {
                     ) : (
                       <span>—</span>
                     )}
-                    <div className="staffOrderCell"><small>{x.booking_no}</small>{showVideoItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-video-item-${index}`}>{line}</div>)}</div>}</div>
+                    <div className="staffOrderCell"><small>{x.booking_no}</small><ReturnScheduleStatus schedules={x.return_schedules}/>{x.return_schedule_error&&<small>排程狀態暫時無法讀取</small>}{showVideoItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-video-item-${index}`}>{line}</div>)}</div>}</div>
                     <button onClick={() => openEdit(x)}>修改</button>
                     {documentActions(x,false)}
                   </article>
@@ -973,7 +974,7 @@ export default function Staff() {
                 ) : (
                   <span>—</span>
                 )}
-                <div className="staffOrderCell"><small>{x.booking_no}</small>{showTextItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-item-${index}`}>{line}</div>)}</div>}</div>
+                <div className="staffOrderCell"><small>{x.booking_no}</small><ReturnScheduleStatus schedules={x.return_schedules}/>{x.return_schedule_error&&<small>排程狀態暫時無法讀取</small>}{showTextItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-item-${index}`}>{line}</div>)}</div>}</div>
                 <button onClick={() => openEdit(x)}>修改</button>
                 {documentActions(x)}
               </article>
