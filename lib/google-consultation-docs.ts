@@ -22,7 +22,7 @@ const resultMatchesConsultationItem = (content: unknown, itemCode: string) => {
   return true;
 };
 
-async function accessToken() {
+async function accessToken(signal?: AbortSignal) {
   if (!email || !privateKey) throw new Error("尚未設定 Google 服務帳號環境變數");
   const now = Math.floor(Date.now() / 1000);
   const unsigned = `${b64({ alg: "RS256", typ: "JWT" })}.${b64({
@@ -37,6 +37,7 @@ async function accessToken() {
   sign.end();
   const assertion = `${unsigned}.${sign.sign(privateKey, "base64url")}`;
   const response = await fetch("https://oauth2.googleapis.com/token", {
+    signal,
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }),
@@ -62,6 +63,36 @@ export type ExternalConsultationDocument = {
   modifiedTime: string;
   webViewLink: string;
 };
+
+/** Include nested folders, pagination and document shortcuts. Never infer from a name. */
+export async function listReturnedConsultationDocumentIds(): Promise<Set<string>> {
+  const signal = AbortSignal.timeout(12000);
+  const token = await accessToken(signal);
+  // Listing an inaccessible folder can silently return no files; verify access first.
+  const folder = await google(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(returnedFolderId)}?fields=id,mimeType,trashed&supportsAllDrives=true`, token, { signal });
+  if (folder.trashed || folder.mimeType !== "application/vnd.google-apps.folder") throw new Error("已回傳資料夾無法使用");
+  const pending = [returnedFolderId], visited = new Set<string>(), ids = new Set<string>();
+  while (pending.length) {
+    const id = pending.shift()!;
+    if (visited.has(id)) continue;
+    visited.add(id);
+    let pageToken = "";
+    do {
+      const params = new URLSearchParams({ q: `'${id.replace(/'/g, "\\'")}' in parents and trashed=false`,
+        fields: "nextPageToken,files(id,mimeType,shortcutDetails(targetId,targetMimeType))", pageSize: "1000",
+        supportsAllDrives: "true", includeItemsFromAllDrives: "true" });
+      if (pageToken) params.set("pageToken", pageToken);
+      const result = await google(`https://www.googleapis.com/drive/v3/files?${params}`, token, { signal });
+      for (const file of result.files || []) {
+        if (file.mimeType === "application/vnd.google-apps.folder") pending.push(file.id);
+        else if (file.mimeType === "application/vnd.google-apps.document") ids.add(file.id);
+        else if (file.shortcutDetails?.targetMimeType === "application/vnd.google-apps.document") ids.add(file.shortcutDetails.targetId);
+      }
+      pageToken = result.nextPageToken || "";
+    } while (pageToken);
+  }
+  return ids;
+}
 
 export async function listExternalConsultationDocuments(): Promise<ExternalConsultationDocument[]> {
   const token = await accessToken();

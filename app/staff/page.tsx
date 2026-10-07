@@ -1,4 +1,5 @@
 "use client";
+import PendingWork, { ResultReturnStatus } from "./PendingWork";
 import ReturnScheduleStatus from "./ReturnScheduleStatus";
 import { taipeiDateKey, taipeiDateTimeInput, taipeiYear } from "@/lib/taipei-time";
 import { useEffect, useMemo, useState } from "react";
@@ -126,6 +127,10 @@ export default function Staff() {
     [submissionActions,setSubmissionActions]=useState<any>(null),
     [submissionBusy,setSubmissionBusy]=useState(false),
     [rows, setRows] = useState<any[]>([]),
+    [resultSyncWarning,setResultSyncWarning]=useState(""),
+    [bookingsLoading,setBookingsLoading]=useState(false),
+    [showVideoReturn,setShowVideoReturn]=useState(false),
+    [showTextReturn,setShowTextReturn]=useState(false),
     [items, setItems] = useState<any[]>([]),
     [methods, setMethods] = useState<any[]>([]),
     [manualCustomers, setManualCustomers] = useState<any[]>([]),
@@ -323,9 +328,13 @@ export default function Staff() {
     setPriceEdit(null);setPriceValue("");setEditing(null);await load();alert("訂單價格已更新，並已發送 LINE 通知");
   }
   async function load() {
-    const r = await fetch("/api/staff/bookings"),
-      j = await r.json();
-    if(r.ok){setRows(j.bookings);setManualCustomers(j.customers||[]);setCustomerProfiles(j.consultationProfiles||[]);setPaymentSettings(j.paymentSettings||null);setBankAccounts(j.bankAccounts||[])}else setError(j.error);
+    setBookingsLoading(true);
+    try {
+      const r = await fetch("/api/staff/bookings", { cache: "no-store" }), j = await r.json();
+      if(r.ok){setError("");setRows(j.bookings);setResultSyncWarning(j.resultSyncWarning||"");setManualCustomers(j.customers||[]);setCustomerProfiles(j.consultationProfiles||[]);setPaymentSettings(j.paymentSettings||null);setBankAccounts(j.bankAccounts||[])}
+      else {setError(j.error);setResultSyncWarning("訂單更新失敗，目前顯示上次載入資料");}
+    } catch {setError("訂單讀取失敗，請稍後重新整理");setResultSyncWarning("訂單更新失敗，目前顯示上次載入資料");}
+    finally {setBookingsLoading(false);}
   }
   useEffect(() => {
     const saved=localStorage.getItem("lin_a_sao_staff_password");if(saved){setPassword(saved);setRememberPassword(true)}
@@ -692,6 +701,7 @@ export default function Staff() {
       {bankEditorOpen&&<div className="modalBackdrop priorityModal" onClick={()=>setBankEditorOpen(false)}><div className="modal bankAccountEditor" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setBankEditorOpen(false)}>×</button><h2>{bankForm.id?"編輯收款帳號":"新增常用帳號"}</h2><div><label>帳號名稱<input value={bankForm.label||""} onChange={e=>setBankForm({...bankForm,label:e.target.value})} placeholder="例如：珮均常用帳號"/></label><label>銀行名稱<input value={bankForm.bank_name||""} onChange={e=>setBankForm({...bankForm,bank_name:e.target.value})} placeholder="例如：國泰世華"/></label><label>銀行代碼<input inputMode="numeric" maxLength={3} value={bankForm.bank_code||""} onChange={e=>setBankForm({...bankForm,bank_code:e.target.value.replace(/\D/g,"")})} placeholder="013"/></label><label>銀行帳號<input inputMode="numeric" value={bankForm.account_number||""} onChange={e=>setBankForm({...bankForm,account_number:e.target.value.replace(/\s/g,"")})}/></label><label>戶名<input value={bankForm.account_name||""} onChange={e=>setBankForm({...bankForm,account_name:e.target.value})}/></label><label>備註<input value={bankForm.note||""} onChange={e=>setBankForm({...bankForm,note:e.target.value})} placeholder="例如：媽媽的帳號"/></label></div><button className="bankAccountSave" onClick={()=>void saveBankAccount()}>儲存帳號</button></div></div>}
       {profileCopyToast&&<div className="profileCopyToast" role="status">✓ {profileCopyToast}</div>}
       {error && <div className="error">{error}</div>}
+      <PendingWork bookings={rows} onSubmission={setSubmissionActions} onViewData={openReturnedData} documentActions={x=>documentActions(x,false)} onRefresh={load} warning={resultSyncWarning} loading={bookingsLoading}/>
       <section className="staffBookingSection videoBookingSection">
         <h2 className="staffSectionTitle">視訊預約</h2>
         <div className="textBookingTools videoBookingTools">
@@ -703,7 +713,7 @@ export default function Staff() {
           </div>
           <div className="staffSecondaryFilters">
             <div className="staffDateRange"><b>付款日期</b><label><span>從</span><input type="date" value={videoDateFrom} onChange={e=>setVideoDateFrom(e.target.value)}/></label><label><span>到</span><input type="date" value={videoDateTo} min={videoDateFrom||undefined} onChange={e=>setVideoDateTo(e.target.value)}/></label>{(videoDateFrom||videoDateTo)&&<button onClick={()=>{setVideoDateFrom("");setVideoDateTo("")}}>清除日期</button>}</div>
-            <div className="staffDisplayOptions"><b>表格顯示</b><label><input type="checkbox" checked={showVideoItems} onChange={e=>setShowVideoItems(e.target.checked)}/><span>預約項目</span></label><label><input type="checkbox" checked={showVideoAmount} onChange={e=>setShowVideoAmount(e.target.checked)}/><span>訂單金額</span></label></div>
+            <div className="staffDisplayOptions"><b>表格顯示</b><label><input type="checkbox" checked={showVideoItems} onChange={e=>setShowVideoItems(e.target.checked)}/><span>預約項目</span></label><label><input type="checkbox" checked={showVideoAmount} onChange={e=>setShowVideoAmount(e.target.checked)}/><span>訂單金額</span></label><label><input type="checkbox" checked={showVideoReturn} onChange={e=>setShowVideoReturn(e.target.checked)}/><span>諮詢結果回傳</span></label></div>
           </div>
         </div>
         <div className="staffMonthNav">
@@ -755,7 +765,7 @@ export default function Staff() {
         {(selectedDate || showUpcomingVideo || showNewVideo) && (
           <div className="dailyBookings">
             <h3>目前顯示：{showUpcomingVideo?"即將來臨的視訊":showNewVideo?"兩週內的新訂單":selectedDate}</h3>
-            <div className="staffBookingTable">
+            <div className={`staffBookingTable ${showVideoReturn?"showResultReturn":""}`}>
               <div className="staffTableHead">
                 <b>付款時間</b>
                 <b>視訊時間</b>
@@ -765,6 +775,7 @@ export default function Staff() {
                 <b>訂單編號</b>
                 <b>操作</b>
                 <b>諮詢單</b>
+                {showVideoReturn&&<b>諮詢結果回傳</b>}
               </div>
               {daily.map((x) => {
                 const complete = isComplete(x),
@@ -809,6 +820,7 @@ export default function Staff() {
                     <div className="staffOrderCell"><small>{x.booking_no}</small><ReturnScheduleStatus schedules={x.return_schedules}/>{x.return_schedule_error&&<small>排程狀態暫時無法讀取</small>}{showVideoItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-video-item-${index}`}>{line}</div>)}</div>}</div>
                     <button onClick={() => openEdit(x)}>修改</button>
                     {documentActions(x,false)}
+                    {showVideoReturn&&<ResultReturnStatus booking={x} warning={resultSyncWarning}/>}
                   </article>
                 );
               })}
@@ -925,10 +937,10 @@ export default function Staff() {
           </div>
           <div className="staffSecondaryFilters">
             <div className="staffDateRange"><b>付款日期</b><label><span>從</span><input type="date" value={textDateFrom} onChange={e=>setTextDateFrom(e.target.value)}/></label><label><span>到</span><input type="date" value={textDateTo} min={textDateFrom||undefined} onChange={e=>setTextDateTo(e.target.value)}/></label>{(textDateFrom||textDateTo)&&<button onClick={()=>{setTextDateFrom("");setTextDateTo("")}}>清除日期</button>}</div>
-            <div className="staffDisplayOptions"><b>表格顯示</b><label><input type="checkbox" checked={showTextItems} onChange={e=>setShowTextItems(e.target.checked)}/><span>預約項目</span></label><label><input type="checkbox" checked={showTextAmount} onChange={e=>setShowTextAmount(e.target.checked)}/><span>訂單金額</span></label><label><input type="checkbox" checked={showDocumentNumber} onChange={e=>setShowDocumentNumber(e.target.checked)}/><span>諮詢單編號</span></label></div>
+            <div className="staffDisplayOptions"><b>表格顯示</b><label><input type="checkbox" checked={showTextItems} onChange={e=>setShowTextItems(e.target.checked)}/><span>預約項目</span></label><label><input type="checkbox" checked={showTextAmount} onChange={e=>setShowTextAmount(e.target.checked)}/><span>訂單金額</span></label><label><input type="checkbox" checked={showDocumentNumber} onChange={e=>setShowDocumentNumber(e.target.checked)}/><span>諮詢單編號</span></label><label><input type="checkbox" checked={showTextReturn} onChange={e=>setShowTextReturn(e.target.checked)}/><span>諮詢結果回傳</span></label></div>
           </div>
         </div>
-        <div className="staffBookingTable">
+        <div className={`staffBookingTable ${showTextReturn?"showResultReturn":""}`}>
           <div className="staffTableHead">
             <b>付款時間</b>
             <b>用戶</b>
@@ -937,6 +949,7 @@ export default function Staff() {
             <b>訂單編號</b>
             <b>操作</b>
             <b>諮詢單</b>
+            {showTextReturn&&<b>諮詢結果回傳</b>}
           </div>
           {visibleText.map((x) => {
             const complete = isComplete(x),
@@ -980,6 +993,7 @@ export default function Staff() {
                 <div className="staffOrderCell"><small>{x.booking_no}</small><ReturnScheduleStatus schedules={x.return_schedules}/>{x.return_schedule_error&&<small>排程狀態暫時無法讀取</small>}{showTextItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-item-${index}`}>{line}</div>)}</div>}</div>
                 <button onClick={() => openEdit(x)}>修改</button>
                 {documentActions(x)}
+                {showTextReturn&&<ResultReturnStatus booking={x} warning={resultSyncWarning}/>}
               </article>
             );
           })}
