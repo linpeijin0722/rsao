@@ -1,4 +1,6 @@
 "use client";
+import TimeOffEditor from "./TimeOffEditor";
+import { overlapsTimeOff, type VideoTimeOff } from "@/lib/video-time-off";
 import { earliestVideoBookingDate, videoBookingDateLabel, validVideoLeadDays } from "@/lib/video-booking-window";
 import { useEffect, useMemo, useState, useRef } from "react";
 type H = { holiday_date: string; note: string | null };
@@ -26,6 +28,7 @@ export default function Admin() {
     [rememberPassword, setRememberPassword] = useState(false),
     [error, setError] = useState(""),
     [holidays, setHolidays] = useState<H[]>([]),
+    [timeOffs, setTimeOffs] = useState<VideoTimeOff[]>([]),
     [methodId, setMethodId] = useState(""),
     [month, setMonth] = useState(today().slice(0, 7)),
     [date, setDate] = useState(today()),
@@ -99,6 +102,7 @@ export default function Admin() {
     }
     setLogin(true);
     setHolidays(j.holidays);
+    setTimeOffs(j.timeOffs || []);
     setMethodId(j.methodId);
     setVideoBookingEnabled(j.videoBookingEnabled !== false);
     setLeadDays(j.videoBookingLeadDays); setLeadDraft(String(j.videoBookingLeadDays));
@@ -265,6 +269,7 @@ export default function Admin() {
   }
   function slotBlockReason(t:string){
     const candidate=new Date(`${date}T${t}:00+08:00`).getTime();
+    if(timeOffs.some(off=>overlapsTimeOff(candidate,candidate+50*60000,off)))return "休假／前後一小時";
     const booking=dayBookings.find(b=>candidate<new Date(b.bufferEnd).getTime()&&candidate+50*60000>new Date(b.start).getTime());
     if(!booking)return "";
     return candidate<new Date(booking.start).getTime()?"與預約重疊":candidate<new Date(booking.end).getTime()?"已預約":"預約緩衝時間";
@@ -485,6 +490,7 @@ export default function Admin() {
       </div>
       <section className="adminCard">
         <h2>特定休假日</h2>
+        <h3>整天休假</h3>
         <div className="adminGrid">
           <input
             type="date"
@@ -517,6 +523,7 @@ export default function Admin() {
               </div>
             </div>
           ))}
+        <TimeOffEditor entries={timeOffs} onChanged={async()=>{await load();await Promise.all([dayLoad(),monthLoad()]);}}/>
       </section>
       {holidayEdit && (
         <div className="adminModalBackdrop" onClick={() => !holidayEditSaving && setHolidayEdit(null)}>

@@ -15,7 +15,7 @@ export async function GET() {
   const [{ data, error }, { data: customers, error: customerError }, { data: consultationProfiles, error: profileError }, {data:paymentSettings},{data:bankAccounts}] = await Promise.all([db
     .from("bookings")
     .select(
-      "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,transfer_account_last5,transfer_reported_at,transfer_time,transfer_amount,transfer_status,data_submitted_at,data_submission_source,consultation_result_returned_at,consultation_result_detected_at,status,cancellation_reason,paid_at,created_at,google_calendar_event_id,customers(id,line_user_id,line_display_name,line_picture_url,full_name,phone,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,unit_price,quantity,line_total,google_document_id,google_document_url,google_document_created_at,google_sheet_url,booking_items(code),booking_detail_sub_items(sub_item_id,sub_item_title,unit_price,quantity,line_total),booking_detail_profiles(profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)),booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data),booking_answer_participants(position,profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data))))",
+      "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,transfer_account_last5,transfer_reported_at,transfer_time,transfer_amount,transfer_status,data_submitted_at,data_submission_source,consultation_result_returned_at,consultation_result_detected_at,consultation_result_manual_at,status,cancellation_reason,paid_at,created_at,google_calendar_event_id,customers(id,line_user_id,line_display_name,line_picture_url,full_name,phone,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,unit_price,quantity,line_total,google_document_id,google_document_url,google_document_created_at,google_sheet_url,booking_items(code),booking_detail_sub_items(sub_item_id,sub_item_title,unit_price,quantity,line_total),booking_detail_profiles(profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)),booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data),booking_answer_participants(position,profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data))))",
     )
     .order("created_at", { ascending: false }), db
     .from("customers")
@@ -29,8 +29,8 @@ export async function GET() {
     .order("name", { ascending: true }),db.from("booking_system_settings").select("payment_mode,bank_account_key,gateway_disabled_until,gateway_failure_reason").eq("id",true).maybeSingle(),Promise.resolve({data:[{id:"cathay",label:"國泰世華常用帳號",bank_name:"國泰世華",bank_code:"013",branch_name:"營業部",account_number:"218700524294",account_name:"林珮均",note:""},{id:"esun",label:"玉山銀行公司帳號",bank_name:"玉山銀行",bank_code:"808",branch_name:"林口分行",account_number:"0886940043636",account_name:"林阿嫂有限公司",note:""}]})]);
   if (error || customerError || profileError) {
     const message = error?.message || customerError?.message || profileError?.message || "讀取訂單失敗";
-    return NextResponse.json({ error: /data_submission_source|consultation_result_(?:returned|detected)_at/.test(message)
-      ? "資料庫尚未更新：請先在 Supabase 執行 052_pending_result_status.sql，再重新整理後台。" : message }, { status: 500 });
+    return NextResponse.json({ error: /data_submission_source|consultation_result_(?:returned|detected|manual)_at/.test(message)
+      ? "資料庫尚未更新：請先在 Supabase 依序執行 052_pending_result_status.sql 與 053_manual_results_and_video_time_off.sql，再重新整理後台。" : message }, { status: 500 });
   }
   const bookings:any[]=(data||[]) as any[];
   const answers=bookings.flatMap((booking:any)=>(booking.booking_details||[]).flatMap((detail:any)=>detail.booking_consultation_answers||[]));
@@ -73,6 +73,16 @@ export async function POST(request: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
   const body = await request.json(), { bookingNo, action } = body;
+  if(action === "mark_manual_result") {
+    const now = new Date().toISOString();
+    const {data,error} = await adminSupabase().from("bookings").update({consultation_result_manual_at:now,updated_at:now})
+      .eq("booking_no",bookingNo).eq("payment_status","paid").not("status","in","(cancelled,canceled,expired,refunded)")
+      .is("consultation_result_manual_at",null).is("consultation_result_returned_at",null).is("consultation_result_detected_at",null)
+      .select("id").maybeSingle();
+    if(error)return NextResponse.json({error:error.message},{status:500});
+    if(!data)return NextResponse.json({error:"訂單已註記回傳、未付款或已取消，請重新整理"},{status:409});
+    return NextResponse.json({ok:true,manualAt:now});
+  }
   if(action === "mark_manual_submission") {
     const db=adminSupabase(),now=new Date().toISOString();
     const {data,error}=await db.from("bookings").update({data_submitted_at:now,data_submission_source:"manual_line",updated_at:now})

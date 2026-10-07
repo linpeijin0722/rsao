@@ -5,11 +5,17 @@ export type PendingKind = "video" | "text" | "result";
 export type PendingEntry = { booking: any; kind: PendingKind; dueAt: number };
 const instant = (value: unknown) => value ? parseTaipeiDateTime(String(value)).getTime() : NaN;
 export function resultReturnedAt(booking: any): string | null {
-  return booking.consultation_result_returned_at || booking.consultation_result_detected_at || null;
+  return booking.consultation_result_returned_at || booking.consultation_result_manual_at || booking.consultation_result_detected_at || null;
+}
+export function isStaffTestBooking(booking: any): boolean {
+  const customer = Array.isArray(booking.customers) ? booking.customers[0] : booking.customers;
+  const name = String(customer?.full_name || "").trim(), line = String(customer?.line_display_name || "").trim().toLowerCase();
+  return (name === "林珮均" && line === "peggy") || (name === "林啟恩" && line === "nnn");
 }
 export function pendingBookings(bookings: any[], now = Date.now()): PendingEntry[] {
   const entries: PendingEntry[] = [];
   for (const booking of bookings) {
+    if (isStaffTestBooking(booking) || resultReturnedAt(booking)) continue;
     if (booking.payment_status !== "paid" || ["cancelled", "canceled", "expired", "refunded"].includes(booking.status)) continue;
     let dueAt = NaN;
     let kind: PendingKind;

@@ -76,6 +76,8 @@ test('result UI distinguishes actual delivery time from first folder detection, 
   const actual=render({consultation_result_returned_at:'2026-10-07T10:00:00Z'});
   assert.match(actual,/系統發送時間/);assert.match(actual,/18:00/);
   assert.match(render({consultation_result_detected_at:'2026-10-07T10:00:00Z'}),/資料夾首次偵測時間/);
+  assert.match(render({consultation_result_manual_at:'2026-10-07T10:00:00Z'}),/已手動回傳諮詢結果/);
+  assert.match(render({consultation_result_manual_at:'2026-10-07T10:00:00Z'}),/手動註記時間/);
   assert.match(render({},'failed'),/待確認/);assert.doesNotMatch(render({},'failed'),/尚未回傳/);
   assert.match(render({}),/尚未回傳/);
 });

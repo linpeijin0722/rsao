@@ -9,7 +9,7 @@ export async function GET(request:NextRequest){
   return NextResponse.json({error:'未授權'},{status:401});
  const start=new Date(`${taipeiDateKey()}T00:00:00+08:00`),end=new Date(start.getTime()+3*86400000);
  const db=adminSupabase();
- const {data,error}=await db.from('bookings').select('id,booking_no,slot_start,status,payment_status,data_submitted_at,consultation_result_returned_at,consultation_result_detected_at,customers(full_name,line_display_name),consultation_methods!inner(code),booking_details(google_document_id)')
+ const {data,error}=await db.from('bookings').select('id,booking_no,slot_start,status,payment_status,data_submitted_at,consultation_result_returned_at,consultation_result_detected_at,consultation_result_manual_at,customers(full_name,line_display_name),consultation_methods!inner(code),booking_details(google_document_id)')
   .eq('consultation_methods.code','video').eq('payment_status','paid').not('data_submitted_at','is',null)
   .gte('slot_start',start.toISOString()).lt('slot_start',end.toISOString());
  if(error)return NextResponse.json({error:error.message},{status:500});

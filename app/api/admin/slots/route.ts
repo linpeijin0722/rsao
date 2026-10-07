@@ -41,6 +41,11 @@ export async function POST(r: NextRequest) {
   const parsed=parseTaipeiDateTime(String(b.slotStart));
   if(!Number.isFinite(parsed.getTime()))return NextResponse.json({error:"時段時間不正確"},{status:400});
   const methodId = await resolveVideoMethodId();
+  if (b.isOpen) {
+    const {data:blocked,error} = await db.rpc("video_time_off_overlaps",{p_start:parsed.toISOString(),p_end:new Date(parsed.getTime()+50*60000).toISOString()});
+    if(error)return NextResponse.json({error:error.message},{status:500});
+    if(blocked)return NextResponse.json({error:"此時段與休假或休假前後一小時重疊"},{status:409});
+  }
   const { error } = await db.from("slot_overrides").upsert(
       {
         consultation_method_id: methodId,
