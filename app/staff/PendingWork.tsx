@@ -21,8 +21,9 @@ const categories: { kind: PendingKind; title: string; description: string }[] = 
   { kind: "text", title: "文字待補資料", description: "付款隔天中午 12:00 起，仍未收到問事資料。" },
   { kind: "result", title: "結果待回傳", description: "收到問事資料已滿 15 天，尚無結果回傳紀錄。手動收件以註記時間起算。" },
 ];
-export default function PendingWork({ bookings, onSubmission, onViewData, documentActions, onRefresh, warning, loading }: {
+export default function PendingWork({ bookings, onSubmission, onViewData, onViewUser, documentActions, onRefresh, warning, loading }: {
   bookings: any[]; onSubmission: (booking: any) => void; onViewData: (booking: any) => void;
+  onViewUser: (booking: any) => void;
   documentActions: (booking: any) => ReactNode; onRefresh: () => Promise<void>; warning: string; loading: boolean;
 }) {
   const [kind, setKind] = useState<PendingKind>("video");
@@ -38,13 +39,18 @@ export default function PendingWork({ bookings, onSubmission, onViewData, docume
       </button>)}</div>
     <p className="pendingWorkRule">{categories.find(category => category.kind === kind)?.description}</p>
     {warning && <p className="pendingWorkWarning" role="status">{warning}。結果待回傳清單暫供核對，請確認資料夾後再聯繫客人。</p>}
-    <div className="pendingWorkList">{entries.map(({ booking, dueAt }) => <article key={booking.id}>
-      <div className="pendingWorkPerson"><strong>{booking.customers?.line_display_name || booking.customers?.full_name || "未填姓名"}</strong>
-        {booking.customers?.full_name && <span>{booking.customers.full_name}</span>}<small>{booking.booking_no}</small></div>
-      <div className="pendingWorkTiming"><b>{kind === "video" ? `視訊時間：${format(booking.slot_start)}` : kind === "text" ? `付款時間：${format(booking.paid_at)}` : `資料收到：${format(booking.data_submitted_at)}`}</b>
-        <span>{kind === "result" ? "滿 15 天" : "列入待處理"}：{format(dueAt)}</span>
+    <div className="pendingWorkList">
+      {!!entries.length && <div className="pendingWorkColumns" aria-hidden="true"><b>用戶</b><b>{kind === "result" ? "等待天數" : "待處理時間"}</b><b>訂單編號</b><b>資料回傳／諮詢單</b></div>}
+      {entries.map(({ booking, dueAt }) => <article key={booking.id}>
+      <button type="button" className="customerButton pendingWorkPerson" onClick={() => onViewUser(booking)} title="查看用戶資料">
+        {booking.customers?.line_picture_url && <img src={booking.customers.line_picture_url} alt=""/>}
+        <span>{[booking.customers?.line_display_name, booking.customers?.full_name].filter(Boolean).join("｜") || "未填姓名"}</span>
+      </button>
+      <div className="pendingWorkTiming"><b className={kind === "result" ? "pendingWorkDays" : undefined}>{kind === "video" ? `視訊時間：${format(booking.slot_start)}` : kind === "text" ? `付款時間：${format(booking.paid_at)}` : `收到資料後第 ${Math.max(0, Math.floor((now - parseTaipeiDateTime(booking.data_submitted_at).getTime()) / 86400000))} 天`}</b>
+        {kind !== "result" && <span>列入待處理：{format(dueAt)}</span>}
         {kind === "video" && parseTaipeiDateTime(booking.slot_start).getTime() < now && <em>已過視訊時間，仍待補資料</em>}</div>
-      <div className="pendingWorkActions">{kind === "result" ? <><button type="button" onClick={() => onViewData(booking)}>查看填寫資料</button>{documentActions(booking)}</> : <button type="button" onClick={() => onSubmission(booking)}>處理資料回傳</button>}</div>
+      <div className="pendingWorkOrder"><small>{booking.booking_no}</small></div>
+      <div className="pendingWorkActions">{kind === "result" ? <><button type="button" className="returned" onClick={() => onViewData(booking)} title="查看填寫資料">{booking.data_submission_source === "manual_line" ? "已手動回傳" : "已回傳"}</button>{documentActions(booking)}</> : <button type="button" className="missing" onClick={() => onSubmission(booking)}>尚未回傳</button>}</div>
     </article>)}</div>
     {!entries.length && <p className="pendingWorkEmpty">{loading ? "正在更新訂單與回傳狀態…" : "此類目前沒有待處理訂單"}</p>}
   </section>;
