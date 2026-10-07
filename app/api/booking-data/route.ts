@@ -101,7 +101,7 @@ export async function POST(r: NextRequest) {
     if(snapshotProfileError)return NextResponse.json({error:"無法保存本次填寫紀錄，請稍後再試"},{status:500});
     const {error:snapshotError}=await x.db.from("booking_data_submissions").insert({booking_id:x.b.id,submitted_at:submittedAt,payload:{profiles:snapshotProfiles||[],answers:answers||[]}});
     if(snapshotError){console.error("保存填寫歷史失敗",snapshotError);return NextResponse.json({error:"無法保存本次填寫紀錄，請稍後再試"},{status:500});}
-    const {data:submittedBooking,error:submittedError}=await x.db.from("bookings").update({data_submitted_at:submittedAt}).eq("id",x.b.id).select("id,data_submitted_at").maybeSingle();
+    const {data:submittedBooking,error:submittedError}=await x.db.from("bookings").update({data_submitted_at:submittedAt,data_submission_source:null}).eq("id",x.b.id).select("id,data_submitted_at").maybeSingle();
     if (submittedError || !submittedBooking?.data_submitted_at){
       console.error("更新資料回傳狀態失敗",submittedError);
       return NextResponse.json({error:"資料未能送到後台，請稍後再試"},{status:500});

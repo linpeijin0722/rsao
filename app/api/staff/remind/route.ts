@@ -14,6 +14,7 @@ export async function POST(r: NextRequest) {
       .eq("booking_no", bookingNo)
       .single();
   if (!b) return NextResponse.json({ error: "找不到訂單" }, { status: 404 });
+  if(b.data_submitted_at&&!reopen)return NextResponse.json({error:"資料已回傳，未重複發送填寫通知"},{status:409});
   if (b.payment_status !== "paid") return NextResponse.json({ error: "尚未付款，無法傳送填寫通知" }, { status: 400 });
   const c = b.customers as unknown as { line_user_id: string },
     site = process.env.NEXT_PUBLIC_SITE_URL || r.nextUrl.origin;

@@ -5,7 +5,7 @@ import { adminSupabase } from "@/lib/supabase";
 import { lunarProfile } from "@/lib/lunar-profile";
 
 const fields =
-  "line_display_name,line_picture_url,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen,profile_completed_at";
+  "line_display_name,line_picture_url,full_name,phone,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen,profile_completed_at";
 async function customer() {
   const uid = verifyLineSession((await cookies()).get("line_session")?.value);
   if (!uid) return null;
@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
       .from("customers")
       .update({
         full_name,
+        phone: String(body.phone ?? x.data.phone ?? "").trim().slice(0,50),
         gender,
         full_address,
         birth_date,

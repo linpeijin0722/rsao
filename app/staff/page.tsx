@@ -123,6 +123,8 @@ const videoDateTimeText = (value: string) => {
 };
 export default function Staff() {
   const [password, setPassword] = useState(""),
+    [submissionActions,setSubmissionActions]=useState<any>(null),
+    [submissionBusy,setSubmissionBusy]=useState(false),
     [rows, setRows] = useState<any[]>([]),
     [items, setItems] = useState<any[]>([]),
     [methods, setMethods] = useState<any[]>([]),
@@ -684,6 +686,7 @@ export default function Staff() {
     );
   return (
     <main className={`staffPage returned-edit-${returnedEditMode}`}>
+      {submissionActions&&<div className="modalBackdrop"><div className="modal" role="dialog" aria-modal="true" aria-label="資料回傳操作"><h2>資料回傳</h2><p>{submissionActions.customers?.full_name}・{submissionActions.booking_no}</p><p>若已在 LINE 收到問事資料，請選「已手動回傳」，系統便不再催填。</p><div className="returnedEditActions"><button disabled={submissionBusy} onClick={()=>{const x=submissionActions;setSubmissionActions(null);void remind(x.booking_no,x.customers)}}>發送填寫通知</button><button disabled={submissionBusy} onClick={async()=>{setSubmissionBusy(true);try{const r=await staffPost({action:"mark_manual_submission",bookingNo:submissionActions.booking_no}),data=await r.json();if(!r.ok)throw Error(data.error||"更新失敗");setSubmissionActions(null);await load()}catch(e){alert(e instanceof Error?e.message:"更新失敗")}finally{setSubmissionBusy(false)}}}>已手動回傳</button><button className="cancel" disabled={submissionBusy} onClick={()=>setSubmissionActions(null)}>取消</button></div></div></div>}
       <div className="staffPageHeading"><h1>預約工作後台</h1><div className="staffHeadingActions"><a className="lineAdminButton" href="https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/" target="_blank" rel="noreferrer">官方LINE後台</a><a className="videoCalendarButton" href={(()=>{const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(new Date());const year=parts.find((part)=>part.type==="year")?.value||String(taipeiYear());const month=parts.find((part)=>part.type==="month")?.value||String(Number(taipeiDateKey().slice(5,7)));return `https://calendar.google.com/calendar/u/4/r/month/${year}/${Number(month)}/1`;})()} target="_blank" rel="noreferrer" aria-label="開啟本月視訊諮詢 Google 行事曆">視訊諮詢行事曆</a><button className="manualBookingEntry" onClick={()=>setManualOpen(true)}>＋ 手動建立預約</button></div></div>
       {paymentSettings&&<details className="staffPaymentControl"><summary><h2>目前付款方式</h2><strong>{paymentSettings.payment_mode==="bank_transfer"?"銀行轉帳":paymentSettings.payment_mode==="auto"?"自動判斷":"藍新金流"}</strong><span><i>展開設定</i><i>收合設定</i></span></summary><div className="staffPaymentControlBody"><div className="paymentModeChoices">{[["bank_transfer","銀行轉帳"],["auto","自動判斷"],["newebpay","藍新金流"]].map(([value,label])=><button key={value} className={paymentSettings.payment_mode===value?"active":""} onClick={()=>void changePaymentMode(value)}>{label}</button>)}</div><div className="bankAccountManager"><div className="bankAccountManagerTitle"><div><h3>固定收款帳號</h3><p>選定的帳號會自動顯示在用戶付款頁，切換前會再次確認。</p></div></div><div className="bankAccountList">{bankAccounts.map(account=><article key={account.id} className={account.id===paymentSettings.bank_account_key?"active":""}><div><b>{account.label}</b>{account.id===paymentSettings.bank_account_key&&<em>目前使用</em>}<p>{account.bank_name}（{account.bank_code}）{account.branch_name?` ${account.branch_name}`:""}　{account.account_number}</p><p>戶名：{account.account_name}</p></div><div><button onClick={()=>void selectBankAccount(account)} disabled={account.id===paymentSettings.bank_account_key}>{account.id===paymentSettings.bank_account_key?"使用中":"切換使用"}</button></div></article>)}</div></div></div></details>}
       {bankEditorOpen&&<div className="modalBackdrop priorityModal" onClick={()=>setBankEditorOpen(false)}><div className="modal bankAccountEditor" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setBankEditorOpen(false)}>×</button><h2>{bankForm.id?"編輯收款帳號":"新增常用帳號"}</h2><div><label>帳號名稱<input value={bankForm.label||""} onChange={e=>setBankForm({...bankForm,label:e.target.value})} placeholder="例如：珮均常用帳號"/></label><label>銀行名稱<input value={bankForm.bank_name||""} onChange={e=>setBankForm({...bankForm,bank_name:e.target.value})} placeholder="例如：國泰世華"/></label><label>銀行代碼<input inputMode="numeric" maxLength={3} value={bankForm.bank_code||""} onChange={e=>setBankForm({...bankForm,bank_code:e.target.value.replace(/\D/g,"")})} placeholder="013"/></label><label>銀行帳號<input inputMode="numeric" value={bankForm.account_number||""} onChange={e=>setBankForm({...bankForm,account_number:e.target.value.replace(/\s/g,"")})}/></label><label>戶名<input value={bankForm.account_name||""} onChange={e=>setBankForm({...bankForm,account_name:e.target.value})}/></label><label>備註<input value={bankForm.note||""} onChange={e=>setBankForm({...bankForm,note:e.target.value})} placeholder="例如：媽媽的帳號"/></label></div><button className="bankAccountSave" onClick={()=>void saveBankAccount()}>儲存帳號</button></div></div>}
@@ -790,12 +793,12 @@ export default function Staff() {
                           className="returned"
                           onClick={() => openReturnedData(x)}
                         >
-                          已回傳
+                          {x.data_submission_source==="manual_line"?"已手動回傳":"已回傳"}
                         </button>
                       ) : (
                         <button
                           className="missing"
-                          onClick={() => remind(x.booking_no,x.customers)}
+                          onClick={() => setSubmissionActions(x)}
                         >
                           尚未回傳
                         </button>
@@ -830,7 +833,7 @@ export default function Staff() {
             <div className="staffCustomerProfile">
               <div><span>姓名</span><b>{userView.full_name || "尚未填寫"}</b></div>
               <div><span>性別</span><b>{userView.gender || "尚未填寫"}</b></div>
-              <div><span>地址</span><b>{userView.full_address || "尚未填寫"}</b></div>
+              <div><span>連絡電話</span><b>{userView.phone || "尚未填寫"}</b></div><div><span>地址</span><b>{userView.full_address || "尚未填寫"}</b></div>
               <div><span>國曆生日</span><b>{userView.birth_date || "尚未填寫"}</b></div>
               <div><span>農曆生日</span><b>{userView.lunar_birth_text || "尚未填寫"}</b></div>
               <div><span>生肖</span><b>{userView.zodiac || "尚未填寫"}</b></div>
@@ -851,7 +854,7 @@ export default function Staff() {
           >
             <button className="staffModalClose" aria-label="關閉" onClick={() => {setDataView([]);setDataBooking(null)}}>×</button>
             <h2>已回傳的諮詢者資料</h2>
-            {dataViewMode==="menu"&&<div className="returnedActionMenu"><button className="refillDataButton" disabled={resendingData} onClick={()=>void remind(dataBooking.booking_no,dataBooking.customers,true)}>{resendingData?"通知傳送中…":"📨 傳送重新填寫通知給用戶"}</button><button disabled={!dataView.length} onClick={()=>setDataViewMode("user")}>修改用戶資料</button><button disabled={!dataView.some((p:any)=>Boolean(p.answerId))} onClick={()=>setDataViewMode("answers")}>修改問事資料</button>{!dataView.length&&<p className="staffEmptyReturnedAnswers">此訂單標示為已回傳，但資料庫內找不到可編輯的諮詢者資料。請重新整理；若仍出現此訊息，代表該筆舊資料未正確寫入。</p>}</div>}
+            {dataViewMode==="menu"&&<div className="returnedActionMenu"><button className="refillDataButton" disabled={resendingData} onClick={()=>void remind(dataBooking.booking_no,dataBooking.customers,true)}>{resendingData?"通知傳送中…":"📨 傳送重新填寫通知給用戶"}</button><button disabled={!dataView.length} onClick={()=>setDataViewMode("user")}>修改用戶資料</button><button disabled={!dataView.some((p:any)=>Boolean(p.answerId))} onClick={()=>setDataViewMode("answers")}>修改問事資料</button>{!dataView.length&&<p className="staffEmptyReturnedAnswers">此訂單已回傳，但沒有線上填單內容。若為已手動回傳，請查看 LINE 中客人提供的資料，並連結現有諮詢單。</p>}</div>}
             {dataViewMode!=="menu"&&<button className="returnedMenuBack" onClick={()=>setDataViewMode("menu")}>‹ 返回功能選單</button>}
             {dataViewMode==="user"&&<div className="staffProfileTags">{uniquePeople(dataView).map((p:any)=>{const category=p.relationship==="本人"&&!p.relationship_detail?"本人":p.profile_type==="person"?"親友":p.profile_type==="pet"?"往生寵物":"過世親友";return <button key={p.id} className="staffProfileTag" onClick={()=>setProfileEditor({...p})}>{p.profile_type==="pet"&&p.photo_data&&<img src={p.photo_data} alt=""/>}<span><b>{p.name}</b><small>{category}{p.relationship_detail?`・${p.relationship_detail}`:""}</small></span></button>})}</div>}
             {dataViewMode==="answers"&&!selectedSubmission&&<><p className="submissionVersionHint">請選擇要查看或修改的填寫版本</p><div className="submissionVersionList">{asArray(dataBooking.data_submissions).map((submission:any,index:number)=><button key={submission.id} onClick={()=>setSelectedSubmission(submission)}><span className="submissionVersionBadge">{asArray(dataBooking.data_submissions).length-index}</span><span><b>第 {asArray(dataBooking.data_submissions).length-index} 次填寫</b><small>{submissionTime(submission.submitted_at)}</small></span><span className="submissionVersionArrow">›</span></button>)}</div></>}
@@ -961,12 +964,12 @@ export default function Staff() {
                       className="returned"
                       onClick={() => openReturnedData(x)}
                     >
-                      已回傳
+                      {x.data_submission_source==="manual_line"?"已手動回傳":"已回傳"}
                     </button>
                   ) : (
                     <button
                       className="missing"
-                      onClick={() => remind(x.booking_no,x.customers)}
+                      onClick={() => setSubmissionActions(x)}
                     >
                       尚未回傳
                     </button>

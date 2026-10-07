@@ -215,7 +215,7 @@ export async function upsertExternalConsultationSectionReplies(documentId:string
     if(endIndex>startIndex)requests.push({deleteContentRange:{range:{startIndex,endIndex}}});
     const inserted=`${value}\n`;
     requests.push({insertText:{location:{index:startIndex},text:inserted}});
-    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+value.length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:0.254902,green:0.411765,blue:0.882353}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   if(requests.length)await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
@@ -767,7 +767,7 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
     let startOffset = -1;
     startOffset = segment.indexOf("您好，以下是您的諮詢結果");
     if (startOffset < 0) {
-      const q1 = /(?:^|\n)[ \t　]*[QＱqｑ][1１]\s*[:：]/m.exec(segment);
+      const q1 = /(?:^|\n)[ \t　]*[QＱqｑ][0-9０-９]+\s*[:：]/m.exec(segment);
       if (q1) startOffset = (q1.index || 0) + (q1[0].startsWith("\n") ? 1 : 0);
     }
     if (startOffset < 0) {
@@ -797,6 +797,7 @@ export async function upsertQuickConsultationManualReplies(documentId:string,ent
   const pageStarts=Array.from(plain.matchAll(/(?:^|\n)項目\s*\d+[^\n]*/g)).map(match=>(match.index||0)+(match[0].startsWith("\n")?1:0));
   const pages=pageStarts.map((start,index)=>({start,end:pageStarts[index+1]??plain.length,text:plain.slice(start,pageStarts[index+1]??plain.length)}));
   const writes:any[]=[];
+  const nextNumbers=new Map<number,number>();
   for(const entry of values){
     const page=pages.find(candidate=>entry.targetName&&candidate.text.includes(entry.targetName)&&candidate.text.includes(entry.itemLabel))
       || pages.find(candidate=>entry.profileName&&candidate.text.includes(entry.profileName)&&candidate.text.includes(entry.itemLabel))
@@ -825,17 +826,31 @@ export async function upsertQuickConsultationManualReplies(documentId:string,ent
       const headingOffset=page.text.search(/[【《][^】》\n]+[】》]/u);
       insertOffset=headingOffset>=0?page.start+headingOffset:page.end;
     }
+    // Stable key does not include document offsets, which change after every insertion.
+    const stableName='quick_manual_'+crypto.createHash('sha256').update([entry.itemCode,entry.targetName,entry.profileName,entry.itemLabel,entry.label,entry.question].join('|')).digest('hex').slice(0,32);
+    const named=document.namedRanges?.[stableName]?.namedRanges?.[0];
+    const existingRange=named?.ranges?.[0];
+    const originalOffset=insertOffset,legacy=/^阿嫂回覆\s*[:：][^\n]*/u.exec(plain.slice(insertOffset,page.end));
+    const greeting='您好，以下是您的諮詢結果',greetingOffset=page.text.indexOf(greeting);
+    if(greetingOffset>=0)insertOffset=Math.max(insertOffset,page.start+greetingOffset+greeting.length+1);
+    if(legacy&&insertOffset!==originalOffset&&!existingRange)writes.push({startOffset:originalOffset,endOffset:originalOffset+legacy[0].length,text:'',number:0});
     const following=plain.slice(insertOffset,page.end),existing=/^阿嫂回覆\s*[:：][^\n]*/u.exec(following);
-    const inserted=`阿嫂回覆：${entry.answer}\n`;
-    writes.push({startOffset:insertOffset,endOffset:existing?insertOffset+existing[0].length:insertOffset,text:inserted});
+    const currentNumber=existingRange?Number(Array.from(plain.matchAll(/(?:^|\n)Q(\d+)\s*[:：]/g)).find(m=>documentIndexAt((m.index||0)+(m[0].startsWith('\n')?1:0))===existingRange.startIndex)?.[1]||0):0;
+    const maxNumber=nextNumbers.get(page.start)??Math.max(0,...Array.from(page.text.matchAll(/(?:^|\n)Q(\d+)\s*[:：]/g)).map(m=>Number(m[1])));
+    const number=currentNumber||maxNumber+1;nextNumbers.set(page.start,Math.max(number,maxNumber));
+    const inserted=`Q${number}: ${(entry.question||entry.label||entry.itemLabel).replace(/\n/g,' ')}\nA${number}: ${entry.answer}\n`;
+    writes.push({number,startOffset:insertOffset,endOffset:existing?insertOffset+existing[0].length:insertOffset,text:inserted,rangeName:stableName,namedRangeId:named?.namedRangeId,existingRange});
   }
-  writes.sort((a,b)=>b.startOffset-a.startOffset);
+  writes.sort((a,b)=>(b.existingRange?.startIndex??documentIndexAt(b.startOffset))-(a.existingRange?.startIndex??documentIndexAt(a.startOffset))||b.number-a.number);
   const requests:any[]=[];
   for(const write of writes){
-    const startIndex=documentIndexAt(write.startOffset),endIndex=documentIndexAt(write.endOffset);
+    const startIndex=write.existingRange?.startIndex??documentIndexAt(write.startOffset),endIndex=write.existingRange?.endIndex??documentIndexAt(write.endOffset);
+    if(write.namedRangeId)requests.push({deleteNamedRange:{namedRangeId:write.namedRangeId}});
     if(endIndex>startIndex)requests.push({deleteContentRange:{range:{startIndex,endIndex}}});
+    if(!write.text)continue;
     requests.push({insertText:{location:{index:startIndex},text:write.text}});
-    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+write.text.trimEnd().length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({createNamedRange:{name:write.rangeName,range:{startIndex,endIndex:startIndex+write.text.length}}});
+    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+write.text.trimEnd().length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:0.254902,green:0.411765,blue:0.882353}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   if(requests.length)await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
@@ -892,7 +907,7 @@ export async function upsertQuickConsultationReply(documentId: string, answer: s
     bold: true, fontSize: { magnitude: 15, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: 0, green: 0, blue: 0 } } },
   }, fields: "bold,fontSize,foregroundColor" } });
   requests.push({ updateTextStyle: { range: { startIndex: answerStart, endIndex: answerStart + normalized.length }, textStyle: {
-    bold: false, fontSize: { magnitude: 12, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: 0.102, green: 0.349, blue: 0.8 } } },
+    bold: false, fontSize: { magnitude:9, unit: "PT" }, foregroundColor: { color: { rgbColor: { red:0.254902, green:0.411765, blue:0.882353 } } },
   }, fields: "bold,fontSize,foregroundColor" } });
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
     method: "POST", body: JSON.stringify({ requests }),
@@ -943,7 +958,7 @@ export async function upsertQuickConsultationQuestionReplies(documentId:string,a
   for(const slot of slots){
     if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
     requests.push({insertText:{location:{index:slot.startIndex},text:slot.value}});
-    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:0.254902,green:0.411765,blue:0.882353}}}},fields:"bold,fontSize,foregroundColor"}});
     // 舊版曾把已有 Qn 的回答誤寫成「阿嫂回覆：」。先完成 An 更新，
     // 再刪除前一行的舊文字，避免舊、新答案同時留在文件中。
     if(slot.staleManual&&slot.staleManual.endIndex>slot.staleManual.startIndex)requests.push({deleteContentRange:{range:slot.staleManual}});
@@ -973,7 +988,7 @@ export async function upsertQuickConsultationSectionReplies(documentId:string,an
     if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
     const inserted=`${slot.value}\n`;
     requests.push({insertText:{location:{index:slot.startIndex},text:inserted}});
-    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:0.254902,green:0.411765,blue:0.882353}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
@@ -1028,7 +1043,7 @@ export async function upsertPastLifeOverviewReplies(documentId:string,answers:{a
   for(const slot of slots){
     if(slot.shouldDelete&&slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
     requests.push({insertText:{location:{index:slot.startIndex},text:`${slot.value}\n`}});
-    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:0.254902,green:0.411765,blue:0.882353}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   if(requests.length)await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }

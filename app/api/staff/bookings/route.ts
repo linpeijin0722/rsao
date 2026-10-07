@@ -13,7 +13,7 @@ export async function GET() {
   const [{ data, error }, { data: customers, error: customerError }, { data: consultationProfiles, error: profileError }, {data:paymentSettings},{data:bankAccounts}] = await Promise.all([db
     .from("bookings")
     .select(
-      "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,transfer_account_last5,transfer_reported_at,transfer_time,transfer_amount,transfer_status,data_submitted_at,status,cancellation_reason,paid_at,created_at,google_calendar_event_id,customers(id,line_user_id,line_display_name,line_picture_url,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,unit_price,quantity,line_total,google_document_id,google_document_url,google_document_created_at,google_sheet_url,booking_items(code),booking_detail_sub_items(sub_item_id,sub_item_title,unit_price,quantity,line_total),booking_detail_profiles(profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)),booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data),booking_answer_participants(position,profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data))))",
+      "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,transfer_account_last5,transfer_reported_at,transfer_time,transfer_amount,transfer_status,data_submitted_at,data_submission_source,status,cancellation_reason,paid_at,created_at,google_calendar_event_id,customers(id,line_user_id,line_display_name,line_picture_url,full_name,phone,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,unit_price,quantity,line_total,google_document_id,google_document_url,google_document_created_at,google_sheet_url,booking_items(code),booking_detail_sub_items(sub_item_id,sub_item_title,unit_price,quantity,line_total),booking_detail_profiles(profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)),booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data),booking_answer_participants(position,profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data))))",
     )
     .order("created_at", { ascending: false }), db
     .from("customers")
@@ -65,6 +65,14 @@ export async function POST(request: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
   const body = await request.json(), { bookingNo, action } = body;
+  if(action === "mark_manual_submission") {
+    const db=adminSupabase(),now=new Date().toISOString();
+    const {data,error}=await db.from("bookings").update({data_submitted_at:now,data_submission_source:"manual_line",updated_at:now})
+      .eq("booking_no",bookingNo).eq("payment_status","paid").is("data_submitted_at",null).select("id").maybeSingle();
+    if(error)return NextResponse.json({error:error.message},{status:500});
+    if(!data)return NextResponse.json({error:"此訂單已回傳、尚未付款或不存在，請重新整理"},{status:409});
+    return NextResponse.json({ok:true});
+  }
   if(action==="set_payment_mode"){
     const mode=String(body.mode||"");if(!["auto","newebpay","bank_transfer"].includes(mode))return NextResponse.json({error:"付款模式不正確"},{status:400});
     const {error}=await adminSupabase().from("booking_system_settings").upsert({id:true,payment_mode:mode,updated_at:new Date().toISOString()});
