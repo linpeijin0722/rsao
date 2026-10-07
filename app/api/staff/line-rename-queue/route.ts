@@ -17,3 +17,11 @@ export async function GET(request: Request) {
   response.headers.set("Access-Control-Allow-Credentials", "true");
   return response;
 }
+
+export async function OPTIONS() {
+  const response = new NextResponse(null, { status: 204 });
+  response.headers.set("Access-Control-Allow-Origin", "https://chat.line.biz");
+  response.headers.set("Access-Control-Allow-Credentials", "true");
+  response.headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+  return response;
+}
