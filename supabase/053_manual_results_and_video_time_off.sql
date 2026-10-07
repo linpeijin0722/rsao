@@ -1,5 +1,21 @@
 -- Run after 049 and 052, BEFORE deploying the website.
 begin;
+-- 兼容尚未安裝 046 的正式資料庫；此函式是預約鎖與休假異動共用的必要依賴。
+create table if not exists public.video_booking_mutex (
+  method_id uuid primary key references public.consultation_methods(id) on delete cascade,
+  revision bigint not null default 0
+);
+alter table public.video_booking_mutex enable row level security;
+revoke all on public.video_booking_mutex from anon,authenticated;
+grant all on public.video_booking_mutex to service_role;
+create or replace function public.lock_video_booking_method(p_method_id uuid)
+returns void language plpgsql volatile security definer set search_path=public as $$
+begin
+  insert into public.video_booking_mutex(method_id) values(p_method_id) on conflict(method_id) do nothing;
+  update public.video_booking_mutex set revision=revision+1 where method_id=p_method_id;
+end $$;
+revoke all on function public.lock_video_booking_method(uuid) from public,anon,authenticated;
+grant execute on function public.lock_video_booking_method(uuid) to service_role;
 alter table public.bookings add column if not exists consultation_result_manual_at timestamptz;
 comment on column public.bookings.consultation_result_manual_at is 'Time staff confirmed consultation results were manually returned; not a system LINE delivery timestamp.';
 create table if not exists public.video_time_off (

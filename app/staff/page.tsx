@@ -1,5 +1,7 @@
 "use client";
 import SubmissionStatus from "./SubmissionStatus";
+import LineWatchlist from "./LineWatchlist";
+import "./watchlist.css";
 import PendingWork, { ResultReturnStatus } from "./PendingWork";
 import ReturnScheduleStatus from "./ReturnScheduleStatus";
 import { taipeiDateKey, taipeiDateTimeInput, taipeiYear } from "@/lib/taipei-time";
@@ -717,6 +719,7 @@ export default function Staff() {
       {bankEditorOpen&&<div className="modalBackdrop priorityModal" onClick={()=>setBankEditorOpen(false)}><div className="modal bankAccountEditor" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setBankEditorOpen(false)}>×</button><h2>{bankForm.id?"編輯收款帳號":"新增常用帳號"}</h2><div><label>帳號名稱<input value={bankForm.label||""} onChange={e=>setBankForm({...bankForm,label:e.target.value})} placeholder="例如：珮均常用帳號"/></label><label>銀行名稱<input value={bankForm.bank_name||""} onChange={e=>setBankForm({...bankForm,bank_name:e.target.value})} placeholder="例如：國泰世華"/></label><label>銀行代碼<input inputMode="numeric" maxLength={3} value={bankForm.bank_code||""} onChange={e=>setBankForm({...bankForm,bank_code:e.target.value.replace(/\D/g,"")})} placeholder="013"/></label><label>銀行帳號<input inputMode="numeric" value={bankForm.account_number||""} onChange={e=>setBankForm({...bankForm,account_number:e.target.value.replace(/\s/g,"")})}/></label><label>戶名<input value={bankForm.account_name||""} onChange={e=>setBankForm({...bankForm,account_name:e.target.value})}/></label><label>備註<input value={bankForm.note||""} onChange={e=>setBankForm({...bankForm,note:e.target.value})} placeholder="例如：媽媽的帳號"/></label></div><button className="bankAccountSave" onClick={()=>void saveBankAccount()}>儲存帳號</button></div></div>}
       {profileCopyToast&&<div className="profileCopyToast" role="status">✓ {profileCopyToast}</div>}
       {error && <div className="error">{error}</div>}
+      <LineWatchlist />
       <PendingWork bookings={rows} submissionStatus={submissionStatus} onManualResult={markManualResult} manualBusy={manualResultBusy} onViewUser={x=>setUserView({...x.customers,_booking:x})} documentActions={x=>documentActions(x,false)} onRefresh={load} warning={resultSyncWarning} loading={bookingsLoading}/>
       <section className="staffBookingSection videoBookingSection">
         <h2 className="staffSectionTitle">視訊預約</h2>

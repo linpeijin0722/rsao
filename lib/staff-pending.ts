@@ -22,7 +22,7 @@ export function pendingBookings(bookings: any[], now = Date.now()): PendingEntry
     if (booking.data_submitted_at) {
       if (resultReturnedAt(booking)) continue;
       kind = "result";
-      dueAt = instant(booking.data_submitted_at) + 15 * DAY;
+      dueAt = instant(booking.data_submitted_at) + 14 * DAY;
     } else {
       const method = Array.isArray(booking.consultation_methods) ? booking.consultation_methods[0] : booking.consultation_methods;
       if (method?.code === "video") {

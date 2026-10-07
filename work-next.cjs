@@ -1,0 +1,15 @@
+const fs=require('fs');
+const p='app/staff/consultation-return/page.tsx';let s=fs.readFileSync(p,'utf8');
+s=s.replace('import HighlightedConsultation','import ConsultationIssueEditor from "../ConsultationIssueEditor";\nimport HighlightedConsultation');
+s=s.replace('setEditing(false);setFocusIssue({index,nonce:Date.now()})','setFocusIssue({index,nonce:Date.now()})');
+const old='<textarea ref={editorRef} value={activeVersion.content} onChange={event=>updateActiveContent(event.target.value)} onBlur={()=>{updateActiveContent(normalizeDraft(activeVersion.content));setEditing(false)}}/>';
+if(!s.includes(old))throw Error('missing editor');
+s=s.replace(old,'<ConsultationIssueEditor key={`${item.index}:${activeVersion.id}`} value={activeVersion.content} issues={activeVersion.suspectedIssues} focusRequest={focusIssue} onChange={updateActiveContent} onDone={()=>{updateActiveContent(normalizeDraft(activeVersion.content));setEditing(false)}}/>');
+s=s.replace('編輯中，點框外完成','編輯中，可點錯誤提醒定位；完成後按「完成編輯」');fs.writeFileSync(p,s);
+const css=`\n.consultationIssueEditorLayers{position:relative;height:65vh;min-height:320px;background:white}.consultationIssueEditorLayers>pre,.consultationIssueEditorLayers>textarea{box-sizing:border-box!important;position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:18px!important;border:1px solid transparent!important;border-radius:8px!important;font:20px/1.85 sans-serif!important;letter-spacing:normal!important;white-space:pre-wrap!important;overflow-wrap:break-word!important;word-break:normal!important;tab-size:8!important;overflow:auto!important;scrollbar-gutter:stable!important}.consultationIssueEditorLayers>pre{pointer-events:none;color:transparent!important}.consultationIssueEditorLayers mark{color:transparent;background:#ffe59a;border-radius:2px}.consultationIssueEditorLayers>textarea{resize:none!important;background:transparent!important;color:#302b28!important;caret-color:#302b28!important;border-color:#a98252!important}.consultationIssueEditor>button{margin:12px 0;padding:10px 20px;background:#8a3045;color:#fff;border:0;border-radius:8px;cursor:pointer}\n`;
+fs.appendFileSync('app/staff/style.css',css);
+const d='lib/google-consultation-docs.ts';s=fs.readFileSync(d,'utf8');
+s=s.replace('const mainNames = people.map((profile:any)=>text(profile.name)).filter(Boolean);','const headingPeople = relation ? [target ? one(target.consultation_profiles) : one(answer?.consultation_profiles)] : people;\n  const mainNames = headingPeople.filter(Boolean).map((profile:any)=>text(profile.name)).filter(Boolean);');
+s=s.replace('add(infantSpirit ? "《嬰靈》" : `《${subTitle || title}》`, "section");','add(infantSpirit ? "【嬰靈】" : `【${title}】`, "section");\n    if (subTitle && subTitle !== title) add(`《${subTitle}》`, "section");');
+s=s.replace('請到原 Google 文件確認 Q1：或《結果標題》與回覆內容，修正後重新整理；其他項目仍可使用。','請在本項目的實際回覆前獨立一行填入【主項目名稱】（例如【外靈干擾】），內部小標題使用《》。勿將標籤放在姓名、生日、地址等資料前；修正後重新整理。');
+fs.writeFileSync(d,s);

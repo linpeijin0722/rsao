@@ -19,10 +19,10 @@ test('video begins seven calendar dates before appointment, retains overdue miss
   assert.equal(pending(b,'2026-10-12T16:00:00Z')[0].kind,'video');
   assert.equal(pending(b,'2026-10-21T00:00:00Z').length,1);
 });
-test('manual receipt removes missing-data task and becomes result task only after fifteen days',()=>{
+test('manual receipt removes missing-data task and becomes result task only after fourteen days',()=>{
   const b=booking({data_submission_source:'manual_line',data_submitted_at:'2026-10-08T02:30:00Z'});
-  assert.equal(pending(b,'2026-10-23T02:29:59Z').length,0);
-  assert.equal(pending(b,'2026-10-23T02:30:00Z')[0].kind,'result');
+  assert.equal(pending(b,'2026-10-22T02:29:59Z').length,0);
+  assert.equal(pending(b,'2026-10-22T02:30:00Z')[0].kind,'result');
   for(const field of ['consultation_result_returned_at','consultation_result_detected_at'])
     assert.equal(pending({...b,[field]:'2026-10-22T00:00:00Z'},'2026-10-23T02:30:00Z').length,0);
 });

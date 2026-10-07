@@ -20,7 +20,7 @@ export function ResultReturnStatus({ booking, warning, onManual, busy }: { booki
 const categories: { kind: PendingKind; title: string; description: string }[] = [
   { kind: "video", title: "視訊待補資料", description: "視訊日前 7 天起仍未收到資料；已過視訊時間的未處理訂單也會保留。" },
   { kind: "text", title: "文字待補資料", description: "付款隔天中午 12:00 起，仍未收到問事資料。" },
-  { kind: "result", title: "結果待回傳", description: "收到問事資料已滿 15 天，尚無結果回傳紀錄。手動收件以註記時間起算。" },
+  { kind: "result", title: "結果待回傳", description: "收到問事資料已滿 14 天，尚無結果回傳紀錄。手動收件以註記時間起算。" },
 ];
 export default function PendingWork({ bookings, submissionStatus, onManualResult, manualBusy, onViewUser, documentActions, onRefresh, warning, loading }: {
   bookings: any[]; submissionStatus: (booking: any) => ReactNode; onManualResult: (booking: any) => void; manualBusy: boolean;
