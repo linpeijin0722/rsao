@@ -1,0 +1,23 @@
+接續開發說明（2026-09-21）
+
+來源：使用者提供的 rsao-main.zip。
+本次修正：lib/google-consultation-docs.ts
+- 諮詢單標題辨識與區段邊界同時接受【】和《》。
+- 外部單表單項目、對象資料標題支援《》。
+- 綜觀今生、兩人相處建議的標題定位及回答擷取支援《》。
+- 保留文件原本的括號，不需要重新建立諮詢單。
+
+驗證：5 項模擬 Google 文件測試通過，包含原格式、外部格式、混用括號、相鄰區段與個人資料保留。
+測試檔：tests/consultation-brackets.test.cjs
+執行方式（Node 24）：node --test tests/consultation-brackets.test.cjs
+尚未執行完整 Next.js 建置、正式 Google 文件連線實測或部署。
+
+換電腦：
+1. 解壓縮此完整專案，在新的電腦開啟 rsao-main 資料夾。
+2. 安裝專案依賴（npm ci）。
+3. 依 .env.example 從原環境安全移轉所需環境變數，不要把金鑰放入公開版本庫。
+4. 本機執行 npm run dev；部署前執行 npm run build。
+5. 使用實際外部諮詢單驗證讀取、回覆預覽、寫入位置。
+
+若要套用到已存在的同版本專案，只需更新 lib/google-consultation-docs.ts；tests 是附加測試。
+其他尚未提供的外部格式差異，需搭配實際範例再確認。
