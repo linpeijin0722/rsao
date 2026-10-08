@@ -21,6 +21,7 @@ const categories: { kind: PendingKind; title: string; description: string }[] = 
   { kind: "video", title: "視訊待補資料", description: "視訊日前 7 天起仍未收到資料；已過視訊時間的未處理訂單也會保留。" },
   { kind: "text", title: "文字待補資料", description: "付款隔天中午 12:00 起，仍未收到問事資料。" },
   { kind: "result", title: "結果待回傳", description: "收到問事資料已滿 14 天，尚無結果回傳紀錄。手動收件以註記時間起算。" },
+  { kind: "newborn", title: "新生兒命名", description: "已付款的新生兒命名訂單；無論是否填寫資料，在結果回傳前都會顯示。" },
 ];
 export default function PendingWork({ bookings, submissionStatus, onManualResult, manualBusy, onViewUser, documentActions, onRefresh, warning, loading }: {
   bookings: any[]; submissionStatus: (booking: any) => ReactNode; onManualResult: (booking: any) => void; manualBusy: boolean;
@@ -47,7 +48,7 @@ export default function PendingWork({ bookings, submissionStatus, onManualResult
         {booking.customers?.line_picture_url && <img src={booking.customers.line_picture_url} alt=""/>}
         <span>{[booking.customers?.line_display_name, booking.customers?.full_name].filter(Boolean).join("｜") || "未填姓名"}</span>
       </button>
-      <div className="pendingWorkTiming"><b className={kind === "result" ? "pendingWorkDays" : undefined}>{kind === "video" ? `視訊時間：${format(booking.slot_start)}` : kind === "text" ? `付款時間：${format(booking.paid_at)}` : `收到資料後第 ${Math.max(0, Math.floor((now - parseTaipeiDateTime(booking.data_submitted_at).getTime()) / 86400000))} 天`}</b>
+      <div className="pendingWorkTiming"><b className={kind === "result" ? "pendingWorkDays" : undefined}>{kind === "video" ? `視訊時間：${format(booking.slot_start)}` : kind === "text" ? `付款時間：${format(booking.paid_at)}` : kind === "newborn" ? `付款時間：${format(booking.paid_at || booking.created_at)}` : `收到資料後第 ${Math.max(0, Math.floor((now - parseTaipeiDateTime(booking.data_submitted_at).getTime()) / 86400000))} 天`}</b>
         {kind !== "result" && <span>列入待處理：{format(dueAt)}</span>}
         {kind === "video" && parseTaipeiDateTime(booking.slot_start).getTime() < now && <em>已過視訊時間，仍待補資料</em>}</div>
       <div className="pendingWorkSubmission">{submissionStatus(booking)}</div>
