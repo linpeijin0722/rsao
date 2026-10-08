@@ -24,7 +24,7 @@ export function buildRenameQueue(bookings: any[], now = Date.now()) {
       if(i<0||i>=26*99){reject('尚無可用諮詢單編號，請先建立諮詢單');continue;}
       alias=`${String.fromCharCode(65+Math.floor(i/99))}${String(i%99+1).padStart(2,'0')}-${customer.full_name.trim()}`;
     }
-    rows.push({bookingId:b.id,bookingNo:b.booking_no,lineUserId:customer.line_user_id,fullName:customer.full_name,displayName:customer.line_display_name||'',method,slotStart:b.slot_start,alias});
+    rows.push({bookingId:b.id,bookingNo:b.booking_no,lineUserId:customer.line_user_id,fullName:customer.full_name,displayName:customer.line_display_name||'',pictureUrl:customer.line_picture_url||'',method,slotStart:b.slot_start,alias});
   }
   rows.sort((a,b)=>String(a.slotStart||'').localeCompare(String(b.slotStart||'')));
   const seen=new Set();
