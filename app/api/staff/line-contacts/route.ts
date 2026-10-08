@@ -10,7 +10,7 @@ export async function POST(request:NextRequest) {
  if(body.cursor)params.set('start',String(body.cursor).slice(0,2000));
  const headers={Authorization:`Bearer ${token}`};
  const response=await fetch('https://api.line.me/v2/bot/followers/ids?'+params,{headers});
- if(!response.ok)return NextResponse.json({error:'LINE 尚未允許此官方帳號讀取好友名單（需認證或進階帳號）；目前可搜尋已註冊或已由收訊紀錄取得的聯絡人。'},{status:502});
+ if(!response.ok)return NextResponse.json({next:null,warning:'LINE 尚未允許此官方帳號讀取好友名單；目前改用已註冊用戶與已由收訊紀錄取得的聯絡人。'},{status:200});
  const page=await response.json(),db=adminSupabase();
  for(let i=0;i<(page.userIds||[]).length;i+=5){
   const profiles=await Promise.all(page.userIds.slice(i,i+5).map(async(id:string)=>{const r=await fetch('https://api.line.me/v2/bot/profile/'+encodeURIComponent(id),{headers});if(!r.ok)return null;const p=await r.json();return {line_user_id:id,display_name:p.displayName,picture_url:p.pictureUrl||null,updated_at:new Date().toISOString()};}));
