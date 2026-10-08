@@ -1,7 +1,7 @@
 import { parseTaipeiDateTime, taipeiDateKey } from "./taipei-time";
 
 const DAY = 86400000;
-export type PendingKind = "video" | "text" | "result";
+export type PendingKind = "video" | "text" | "result" | "newborn";
 export type PendingEntry = { booking: any; kind: PendingKind; dueAt: number };
 const instant = (value: unknown) => value ? parseTaipeiDateTime(String(value)).getTime() : NaN;
 export function resultReturnedAt(booking: any): string | null {
@@ -12,6 +12,13 @@ export function isStaffTestBooking(booking: any): boolean {
   const name = String(customer?.full_name || "").trim(), line = String(customer?.line_display_name || "").trim().toLowerCase();
   return (name === "林珮均" && line === "peggy") || (name === "林啟恩" && line === "nnn");
 }
+export function isNewbornNaming(booking: any): boolean {
+  return (booking.booking_details || []).some((detail: any) =>
+    String(detail.item_title || "").includes("新生兒命名") ||
+    (detail.booking_detail_sub_items || []).some((sub: any) => String(sub.sub_item_title || "").includes("新生兒命名")) ||
+    String(detail.booking_items?.code || "").toLowerCase() === "newborn-naming"
+  );
+}
 export function pendingBookings(bookings: any[], now = Date.now()): PendingEntry[] {
   const entries: PendingEntry[] = [];
   for (const booking of bookings) {
@@ -19,7 +26,11 @@ export function pendingBookings(bookings: any[], now = Date.now()): PendingEntry
     if (booking.payment_status !== "paid" || ["cancelled", "canceled", "expired", "refunded"].includes(booking.status)) continue;
     let dueAt = NaN;
     let kind: PendingKind;
-    if (booking.data_submitted_at) {
+    if (isNewbornNaming(booking)) {
+      kind = "newborn";
+      // 新生兒命名付款後立即列入，與是否已填寫資料無關。
+      dueAt = instant(booking.paid_at || booking.created_at);
+    } else if (booking.data_submitted_at) {
       if (resultReturnedAt(booking)) continue;
       kind = "result";
       dueAt = instant(booking.data_submitted_at) + 14 * DAY;
