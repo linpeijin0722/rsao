@@ -1,5 +1,9 @@
 const one = (v: any) => Array.isArray(v) ? v[0] : v;
 export function buildRenameQueue(bookings: any[], now = Date.now()) {
+  const staffIds=new Set(bookings.map(b=>one(b.customers)).filter(c=>{
+    const name=String(c?.full_name||'').trim(),line=String(c?.line_display_name||'').trim().toLowerCase();
+    return (name==='林珮均'&&line==='peggy')||(name==='林啟恩'&&line==='nnn');
+  }).map(c=>c.line_user_id).filter(Boolean));
   const documents = bookings.filter(b => one(b.consultation_methods)?.code !== 'video')
     .flatMap(b => (b.booking_details || []).filter((d:any) => d.google_document_id).map((d:any) => ({id:d.google_document_id,created:d.google_document_created_at||b.created_at})))
     .filter((d:any,i:number,all:any[]) => all.findIndex(x=>x.id===d.id)===i)
@@ -7,6 +11,7 @@ export function buildRenameQueue(bookings: any[], now = Date.now()) {
   const rows:any[] = [], skipped:any[] = [];
   for (const b of bookings) {
     const customer=one(b.customers), method=one(b.consultation_methods)?.code;
+    if(staffIds.has(customer?.line_user_id))continue;
     if (b.payment_status!=='paid'||['cancelled','canceled','expired','refunded'].includes(b.status)||!['text','video'].includes(method)) continue;
     if (method==='video' && (!b.slot_start || !Number.isFinite(Date.parse(b.slot_start)) || Date.parse(b.slot_start)<now)) continue;
     if (method==='text' && (b.consultation_result_returned_at||b.consultation_result_manual_at||b.consultation_result_detected_at)) continue;
@@ -22,7 +27,8 @@ export function buildRenameQueue(bookings: any[], now = Date.now()) {
       const id=(b.booking_details||[]).find((d:any)=>d.google_document_id)?.google_document_id;
       const i=documents.findIndex(d=>d.id===id);
       if(i<0||i>=26*99){reject('尚無可用諮詢單編號，請先建立諮詢單');continue;}
-      alias=`${String.fromCharCode(65+Math.floor(i/99))}${String(i%99+1).padStart(2,'0')}-${customer.full_name.trim()}`;
+      // 文字預約沿用客人原本的 LINE 顯示名稱，讓後台複製搜尋名稱與改名後一致。
+      alias=`${String.fromCharCode(65+Math.floor(i/99))}${String(i%99+1).padStart(2,'0')}-${(customer.line_display_name||customer.full_name).trim()}`;
     }
     rows.push({bookingId:b.id,bookingNo:b.booking_no,lineUserId:customer.line_user_id,fullName:customer.full_name,displayName:customer.line_display_name||'',pictureUrl:customer.line_picture_url||'',method,slotStart:b.slot_start,alias});
   }
