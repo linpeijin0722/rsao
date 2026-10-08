@@ -33,6 +33,13 @@ export async function GET() {
       ? "資料庫尚未更新：請先在 Supabase 依序執行 052_pending_result_status.sql 與 053_manual_results_and_video_time_off.sql，再重新整理後台。" : message }, { status: 500 });
   }
   const bookings:any[]=(data||[]) as any[];
+  // LINE webhook 的聯絡人資料是改名後的最新顯示名稱；優先補回給後台搜尋／複製功能。
+  const lineIds=[...new Set(bookings.map((b:any)=>{const c=Array.isArray(b.customers)?b.customers[0]:b.customers;return c?.line_user_id;}).filter(Boolean))];
+  if(lineIds.length){
+    const {data:liveContacts}=await db.from("line_contacts").select("line_user_id,display_name,picture_url").in("line_user_id",lineIds);
+    const live=new Map((liveContacts||[]).map((x:any)=>[x.line_user_id,x]));
+    for(const booking of bookings){const c=Array.isArray(booking.customers)?booking.customers[0]:booking.customers, current=c&&live.get(c.line_user_id);if(current){c.line_display_name=current.display_name||c.line_display_name;c.line_picture_url=current.picture_url||c.line_picture_url;}}
+  }
   const answers=bookings.flatMap((booking:any)=>(booking.booking_details||[]).flatMap((detail:any)=>detail.booking_consultation_answers||[]));
   const answerIds=[...new Set(answers.map((answer:any)=>answer.id).filter(Boolean))];
   // PostgREST 的深層關聯在舊資料上偶爾只回第一位參與者；另查一次並依位置
