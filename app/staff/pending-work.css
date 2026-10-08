@@ -17,4 +17,6 @@ body .staffPage .textBookingSection .staffBookingTable.showResultReturn .staffTa
 
 .staffPage .pendingWorkSubmission{min-width:0}.staffPage .pendingWorkSubmission .returned,.staffPage .pendingWorkSubmission .missing{width:100%;margin:0;padding:2px 6px;border:1px solid #888;border-radius:0;background:#efefef;font:inherit;font-size:16px;cursor:pointer}.staffPage .pendingWorkSubmission .returned{color:#17783c}.staffPage .pendingWorkSubmission .missing{color:#b52632}
 .staffPage .pendingWork h2,.staffPage .staffBookingSection>.staffSectionTitle{font-size:26px!important;font-weight:700}.pendingWorkColumns b{font-size:19px}
-@media(max-width:760px){.pendingWorkSubmission{grid-column:1/-1;max-width:160px}.staffPage .pendingWork h2,.staffPage .staffBookingSection>.staffSectionTitle{font-size:23px!important}}
+@media(max-width:760px){.pendingWorkSubmission{grid-column:1/-1;max-width:160px}.staffPage .pendingWork h2,.staffPage .staffBookingSection>.staffSectionTitle{font-size:23px!important}}.pendingWorkColumns,.pendingWorkList>article{grid-template-columns:minmax(160px,1fr) minmax(185px,1fr) 112px 175px minmax(335px,1.5fr);gap:12px;min-width:1050px}
+.pendingWorkActions{flex-wrap:nowrap;min-width:0}.pendingWorkActions>button{white-space:nowrap;flex-shrink:0}.pendingWorkActions .consultationSheetLinks{flex-wrap:nowrap;flex-shrink:0}
+@media(max-width:760px){.pendingWorkColumns{display:grid}.pendingWorkPerson,.pendingWorkTiming,.pendingWorkSubmission{grid-column:auto}.pendingWorkActions{justify-content:flex-start}.pendingWorkOrder:before{content:none}}

@@ -291,13 +291,13 @@ export default function Staff() {
     if(!response.ok)return alert(result.error||"更改連結失敗");
     setDocumentLinkEdit(null);setDocumentLinkValue("");await load();alert("諮詢單連結已更新");
   }
-  function documentActions(x:any,showNumber=showDocumentNumber){
+  function documentActions(x:any,showNumber=showDocumentNumber,showReply=true){
     if(!isComplete(x))return <span className="sheetPending">—</span>;
     const links=sheetLinks(x),busy=generatingDocument===x.booking_no;
     return <span className="consultationSheetLinks">
       <button className="consultationSheetLink documentGenerateButton" disabled={busy} onClick={()=>links.length&&asArray(x.data_submissions).length>1?setDocumentVersionPicker(x):links.length?setDocumentRebuild(x):generateDocument(x)} title={links.length?"重新建立諮詢單":"建立諮詢單"} aria-label={links.length?"重新建立諮詢單":"建立諮詢單"}>{busy?"…":"📄"}</button>
       <button className="consultationSheetLink documentRelinkButton" onClick={()=>{setDocumentLinkEdit(x);setDocumentLinkValue(links[0]?.consultation_url||"")}} title="更改為現有 Google 文件連結" aria-label="更改諮詢單連結">🔄</button>
-      {links[0]?.google_document_id&&<button className="quickReplyLaunch" onClick={()=>setQuickReplyTarget({bookingNo:x.booking_no,documentId:links[0].google_document_id})} title="使用固定句庫建立諮詢回覆">✦ 回覆</button>}
+      {showReply&&links[0]?.google_document_id&&<button className="quickReplyLaunch" onClick={()=>setQuickReplyTarget({bookingNo:x.booking_no,documentId:links[0].google_document_id})} title="使用固定句庫建立諮詢回覆">✦ 回覆</button>}
       {links.map((detail:any)=><a key={detail.id} className="consultationSheetLink consultationDocumentLink" href={detail.consultation_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗{showNumber&&<small>{consultationNumberFor(x)}</small>}</a>)}
     </span>
   }
@@ -720,7 +720,7 @@ export default function Staff() {
       {profileCopyToast&&<div className="profileCopyToast" role="status">✓ {profileCopyToast}</div>}
       {error && <div className="error">{error}</div>}
       <LineWatchlist />
-      <PendingWork bookings={rows} submissionStatus={submissionStatus} onManualResult={markManualResult} manualBusy={manualResultBusy} onViewUser={x=>setUserView({...x.customers,_booking:x})} documentActions={x=>documentActions(x,false)} onRefresh={load} warning={resultSyncWarning} loading={bookingsLoading}/>
+      <PendingWork bookings={rows} submissionStatus={submissionStatus} onManualResult={markManualResult} manualBusy={manualResultBusy} onViewUser={x=>setUserView({...x.customers,_booking:x})} documentActions={x=>documentActions(x,false,false)} onRefresh={load} warning={resultSyncWarning} loading={bookingsLoading}/>
       <section className="staffBookingSection videoBookingSection">
         <h2 className="staffSectionTitle">視訊預約</h2>
         <div className="textBookingTools videoBookingTools">

@@ -1,27 +1,16 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { isAdminSession } from "@/lib/admin-session";
-import { adminSupabase } from "@/lib/supabase";
-
-export async function GET(request: Request) {
-  if (!isAdminSession((await cookies()).get("admin_session")?.value)) return NextResponse.json({ error: "未登入" }, { status: 401 });
-  const db = adminSupabase();
-  const url = new URL(request.url);
-  const from = url.searchParams.get("from") || new Date().toISOString();
-  const to = url.searchParams.get("to") || new Date(Date.now() + 31 * 86400000).toISOString();
-  const { data, error } = await db.from("bookings").select("id,booking_no,slot_start,payment_status,status,customers(line_user_id,full_name),consultation_methods(code),booking_details(item_title)").eq("payment_status", "paid").neq("status", "cancelled").gte("slot_start", from).lte("slot_start", to).order("slot_start", { ascending: true });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  const rows = (data || []).filter((b: any) => b.customers?.line_user_id && ["video", "text"].includes(b.consultation_methods?.code)).map((b: any) => ({ bookingId: b.id, bookingNo: b.booking_no, lineUserId: b.customers.line_user_id, fullName: b.customers.full_name || "", method: b.consultation_methods.code, slotStart: b.slot_start }));
-  const response = NextResponse.json({ rows });
-  response.headers.set("Access-Control-Allow-Origin", "https://chat.line.biz");
-  response.headers.set("Access-Control-Allow-Credentials", "true");
-  return response;
-}
-
-export async function OPTIONS() {
-  const response = new NextResponse(null, { status: 204 });
-  response.headers.set("Access-Control-Allow-Origin", "https://chat.line.biz");
-  response.headers.set("Access-Control-Allow-Credentials", "true");
-  response.headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
-  return response;
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { isAdminSession } from '@/lib/admin-session';
+import { adminSupabase } from '@/lib/supabase';
+import { buildRenameQueue } from '@/lib/line-rename-queue';
+export const dynamic='force-dynamic';
+export async function GET() {
+  if(!isAdminSession((await cookies()).get('admin_session')?.value))return NextResponse.json({error:'未登入'},{status:401});
+  const db=adminSupabase(), bookings:any[]=[];
+  for(let offset=0;;offset+=500){
+    const {data,error}=await db.from('bookings').select('id,booking_no,created_at,slot_start,payment_status,status,consultation_result_returned_at,consultation_result_manual_at,consultation_result_detected_at,customers(line_user_id,full_name,line_display_name),consultation_methods(code),booking_details(google_document_id,google_document_created_at)').order('created_at').order('id').range(offset,offset+499);
+    if(error)return NextResponse.json({error:error.message},{status:500});
+    bookings.push(...(data||[]));if((data||[]).length<500)break;
+  }
+  return NextResponse.json(buildRenameQueue(bookings),{headers:{'Cache-Control':'no-store'}});
 }
