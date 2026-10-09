@@ -3,7 +3,7 @@ import SubmissionStatus from "./SubmissionStatus";
 import LineWatchlist from "./LineWatchlist";
 import "./watchlist.css";
 import PendingWork, { ResultReturnStatus } from "./PendingWork";
-import ReturnScheduleStatus from "./ReturnScheduleStatus";
+
 import { taipeiDateKey, taipeiDateTimeInput, taipeiYear } from "@/lib/taipei-time";
 import { useEffect, useMemo, useState } from "react";
 import StaffAnswerEditorV2 from "./StaffAnswerEditorV2";
@@ -720,7 +720,7 @@ export default function Staff() {
       {profileCopyToast&&<div className="profileCopyToast" role="status">✓ {profileCopyToast}</div>}
       {error && <div className="error">{error}</div>}
       <LineWatchlist />
-      <PendingWork bookings={rows} submissionStatus={submissionStatus} onManualResult={markManualResult} manualBusy={manualResultBusy} onViewUser={x=>setUserView({...x.customers,_booking:x})} documentActions={x=>documentActions(x,false,false)} onRefresh={load} warning={resultSyncWarning} loading={bookingsLoading}/>
+      <PendingWork onPayment={setPaymentActions} bookings={rows} submissionStatus={submissionStatus} onManualResult={markManualResult} manualBusy={manualResultBusy} onViewUser={x=>setUserView({...x.customers,_booking:x})} documentActions={x=>documentActions(x,false,false)} onRefresh={load} warning={resultSyncWarning} loading={bookingsLoading}/>
       <section className="staffBookingSection videoBookingSection">
         <h2 className="staffSectionTitle">視訊預約</h2>
         <div className="textBookingTools videoBookingTools">
@@ -818,7 +818,7 @@ export default function Staff() {
                     </button>
                     <button className={`staffState staffStateButton ${statusKey(x)} ${x.transfer_status==="reported"?"transferWaiting":""}`} onClick={()=>setPaymentActions(x)}><span>{x.transfer_status==="reported"?`待核帳｜末五碼 ${x.transfer_account_last5}`:x.status!=="cancelled" && paid && x.collection_source === "manual" ? "手動收款" : status}</span>{showVideoAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</button>
                     {submissionStatus(x)}
-                    <div className="staffOrderCell"><small>{x.booking_no}</small><ReturnScheduleStatus schedules={x.return_schedules}/>{x.return_schedule_error&&<small>排程狀態暫時無法讀取</small>}{showVideoItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-video-item-${index}`}>{line}</div>)}</div>}</div>
+                    <div className="staffOrderCell"><small>{x.booking_no}</small>{showVideoItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-video-item-${index}`}>{line}</div>)}</div>}</div>
                     <button onClick={() => openEdit(x)}>修改</button>
                     {documentActions(x,false)}
                     {showVideoReturn&&<ResultReturnStatus booking={x} warning={resultSyncWarning} onManual={markManualResult} busy={manualResultBusy}/>}
@@ -973,7 +973,7 @@ export default function Staff() {
                 </button>
                 <button className={`staffState staffStateButton ${statusKey(x)} ${x.transfer_status==="reported"?"transferWaiting":""}`} onClick={()=>setPaymentActions(x)}><span>{x.transfer_status==="reported"?`待核帳｜末五碼 ${x.transfer_account_last5}`:x.status!=="cancelled" && paid && x.collection_source === "manual" ? "手動收款" : statusText(x)}</span>{showTextAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</button>
                 {submissionStatus(x)}
-                <div className="staffOrderCell"><small>{x.booking_no}</small><ReturnScheduleStatus schedules={x.return_schedules}/>{x.return_schedule_error&&<small>排程狀態暫時無法讀取</small>}{showTextItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-item-${index}`}>{line}</div>)}</div>}</div>
+                <div className="staffOrderCell"><small>{x.booking_no}</small>{showTextItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-item-${index}`}>{line}</div>)}</div>}</div>
                 <button onClick={() => openEdit(x)}>修改</button>
                 {documentActions(x)}
                 {showTextReturn&&<ResultReturnStatus booking={x} warning={resultSyncWarning} onManual={markManualResult} busy={manualResultBusy}/>}

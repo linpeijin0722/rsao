@@ -1,7 +1,7 @@
 import { parseTaipeiDateTime, taipeiDateKey } from "./taipei-time";
 
 const DAY = 86400000;
-export type PendingKind = "video" | "text" | "result" | "newborn";
+export type PendingKind = "video" | "text" | "result" | "newborn" | "payment";
 export type PendingEntry = { booking: any; kind: PendingKind; dueAt: number };
 const instant = (value: unknown) => value ? parseTaipeiDateTime(String(value)).getTime() : NaN;
 export function resultReturnedAt(booking: any): string | null {
@@ -22,7 +22,13 @@ export function isNewbornNaming(booking: any): boolean {
 export function pendingBookings(bookings: any[], now = Date.now()): PendingEntry[] {
   const entries: PendingEntry[] = [];
   for (const booking of bookings) {
-    if (isStaffTestBooking(booking) || resultReturnedAt(booking)) continue;
+    if (isStaffTestBooking(booking) || ["cancelled", "canceled", "expired", "refunded"].includes(booking.status)) continue;
+    if (booking.transfer_status === "reported" && booking.payment_status !== "paid" && booking.payment_status !== "refunded") {
+      const reported=instant(booking.transfer_reported_at || booking.created_at);
+      entries.push({booking,kind:"payment",dueAt:Number.isFinite(reported)?reported:now});
+      continue;
+    }
+    if (resultReturnedAt(booking)) continue;
     if (booking.payment_status !== "paid" || ["cancelled", "canceled", "expired", "refunded"].includes(booking.status)) continue;
     let dueAt = NaN;
     let kind: PendingKind;
