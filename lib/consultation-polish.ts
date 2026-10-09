@@ -1,4 +1,4 @@
-import {normalizeConsultationText} from './consultation-text';
+import {normalizeConsultationText,consultationStructure} from './consultation-text';
 export type PolishSegment={id:number;context:string;content:string};
 type Part={literal:string}|{id:number};
 export type PolishPlan={parts:Part[];segments:PolishSegment[];removedEmptyAges:number[]};
@@ -21,12 +21,15 @@ export function planConsultationPolish(value:string):PolishPlan{
  }
  flush();return{parts,segments,removedEmptyAges};
 }
-export function mergeConsultationPolish(plan:PolishPlan,rows:{id:number;content:string}[]){
+export function mergeConsultationPolish(plan:PolishPlan,rows:{id:number;content:string}[],retainedIds:number[]=[]){
  if(!Array.isArray(rows)||rows.length!==plan.segments.length)throw new Error('AI 回覆段落不完整，已保留原始版本');
  const values=new Map<number,string>();
  for(const row of rows){const original=plan.segments.find(s=>s.id===row.id);if(!original||values.has(row.id)||typeof row.content!=='string'||!row.content.trim())throw new Error('AI 回覆段落格式不正確，已保留原始版本');
   // No newly generated questions, headings, person titles, or age rows can enter prose.
-  if(/(?:^|\n)\s*(?:[QA]\d*\s*[:：]|(?:[^【《\n]{1,80})?[【《][^】》\n]+[】》]|\d+歲\s*[:：])/.test(row.content)||/(?:^|\n)[^\n]*(?:本身個性|的個性)\s*(?:\n|$)/.test(row.content))throw new Error('AI 在回答中加入了標題或問題，已保留原始版本');
+  if(/(?:^|\n)\s*(?:[QA]\d*\s*[:：]|(?:[^【《\n]{1,80})?[【《][^】》\n]+[】》]|\d+歲\s*[:：])/.test(row.content)||JSON.stringify(consultationStructure(row.content))!==JSON.stringify(consultationStructure(original.content))){
+   // Reject only the unsafe replacement; other independent answers can still be polished.
+   retainedIds.push(row.id);values.set(row.id,original.content);continue;
+  }
   const trailing=original.content.match(/\n+$/)?.[0]||'';values.set(row.id,row.content.trim()+trailing);
  }
  return normalizeConsultationText(plan.parts.map(part=>'literal' in part?part.literal:values.get(part.id)||'').join(''));

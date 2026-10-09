@@ -92,13 +92,23 @@ export async function POST(request: NextRequest) {
     if (!response.ok) throw new Error(result?.error?.message || "AI 潤飾失敗");
     const outputText = (result.output || []).flatMap((entry: any) => Array.isArray(entry.content) ? entry.content : []).filter((entry: any) => entry.type === "output_text" && typeof entry.text === "string").map((entry: any) => entry.text).join("").trim();
     const parsed = JSON.parse(outputText || "{}");
-    const polished = mergeConsultationPolish(plan,parsed.segments);
-    if(JSON.stringify(consultationStructure(content))!==JSON.stringify(consultationStructure(polished)))throw new Error("AI 改動了問題、人物標題或區段順序，已保留原始版本，請重新潤飾");
+    const retainedIds:number[]=[];
+    let polished = mergeConsultationPolish(plan,parsed.segments,retainedIds);
+    if(JSON.stringify(consultationStructure(content))!==JSON.stringify(consultationStructure(polished))){
+      // Never overwrite structural content, and do not ask users to repeat an identical request.
+      polished=content;
+      retainedIds.push(...plan.segments.map(segment=>segment.id));
+    }
     if (!polished) throw new Error("AI 沒有回傳文字，請再試一次");
     return NextResponse.json({
       ok: true, polished, elapsedMs:Date.now()-started,
-      changeSummary: [...(Array.isArray(parsed.changeSummary) ? parsed.changeSummary.map(String).filter(Boolean) : []),...(plan.removedEmptyAges.length?["移除未填寫的流年年齡列（原始版本保留）"]:[])],
-      suspectedIssues: Array.isArray(parsed.suspectedIssues) ? parsed.suspectedIssues.map((issue: any) => ({ originalText: String(issue?.originalText || ""), action: issue?.action === "removed" ? "removed" : "kept", reason: String(issue?.reason || "") })).filter((issue: any) => issue.originalText) : [],
+      changeSummary: retainedIds.length
+        ? [polished===content?"本次未套用潤飾，原文完整保留；請查看需確認段落":"已整理可安全套用的段落；涉及結構變更的段落保留原文，請查看提醒"]
+        : [...(Array.isArray(parsed.changeSummary) ? parsed.changeSummary.map(String).filter(Boolean) : []),...(plan.removedEmptyAges.length?["移除未填寫的流年年齡列（原始版本保留）"]:[])],
+      suspectedIssues: [
+        ...(Array.isArray(parsed.suspectedIssues) ? parsed.suspectedIssues.map((issue: any) => ({ originalText: String(issue?.originalText || ""), action: retainedIds.length||issue?.action!=="removed" ? "kept" : "removed", reason: String(issue?.reason || "") })).filter((issue: any) => issue.originalText) : []),
+        ...[...new Set(retainedIds)].map(id=>({originalText:plan.segments.find(segment=>segment.id===id)!.content.trim(),action:"kept",reason:"此段潤飾新增或改動了問題、人物標題或模板提示，已保留原文；其他安全段落可繼續使用。"}))
+      ],
     });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "AI 潤飾失敗" }, { status: 400 });

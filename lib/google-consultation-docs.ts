@@ -1418,9 +1418,9 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     add("");
     add("如果要姻緣比較順利，", "teacher");
   }
-  const sections = isPastLifeRelation ? ["《前世》", "《綜觀今生》", "《兩人相處建議》"] : !isPastLifePersonal ? [] : /前三世|三世/.test(subTitle)
+  const sections = isPastLifeRelation ? ["《前世》", "《綜觀今生》", "《兩人相處建議》"] : !isPastLifePersonal ? [] : /(?:三|3)\s*世/.test(subTitle.normalize("NFKC"))
     ? ["《前前前世》", "《前前世》", "《前世》", "《綜觀今生》"]
-    : /前兩世|二世/.test(subTitle)
+    : /(?:兩|二|2)\s*世/.test(subTitle.normalize("NFKC"))
       ? ["《前前世》", "《前世》", "《綜觀今生》"]
       : ["《前世》", "《綜觀今生》"];
   sections.forEach((heading) => {
