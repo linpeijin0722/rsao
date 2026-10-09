@@ -443,7 +443,7 @@ export default function Page() {
   }
   async function submit() {
     if (location.pathname.replace(/\/$/, "") === "/booking") {
-      setAlertMessage("您可以免登入查看項目、價格與時段。正式送出預約需透過 LINE，以便接收付款通知及諮詢結果。請由頁面上方進入 LINE 預約。");
+      setAlertMessage("正式預約請點選右下角 LINE 圖示，前往官方帳號。");
       return;
     }
     setBusy(true);
@@ -559,7 +559,9 @@ export default function Page() {
   return (
     <main className="shell">
       <section className="app">
-        {publicBrowsing && <div role="note" style={{padding:"16px",background:"#f6f2ed",lineHeight:1.8,borderRadius:12,marginBottom:12}}><strong>林阿嫂線上諮詢｜公開預約頁面</strong><p style={{margin:"4px 0"}}>免登入查看諮詢項目、價格與可預約時段。送出預約需透過 LINE，以接收付款通知與諮詢結果。</p><a href={officialLineUrl}>進入 LINE 預約</a></div>}
+        {publicBrowsing && <a href="https://line.me/R/ti/p/@405unxzn" target="_blank" rel="noopener noreferrer" aria-label="前往林阿嫂 LINE 官方帳號" style={{position:"fixed",right:18,bottom:"calc(18px + env(safe-area-inset-bottom, 0px))",width:48,height:48,borderRadius:"50%",background:"#06c755",display:"grid",placeItems:"center",boxShadow:"0 2px 8px #0003",zIndex:100}}>
+          <svg width="36" height="36" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="white" d="M34 18c0-7-6.3-12-14-12S6 11 6 18c0 6.1 5.1 11.1 11.8 11.9.5.1 1.2.3 1.4.7.2.4.1 1.1.1 1.6l-.2 1.4c-.1.4-.3 1.5 1.3.8 1.7-.7 9-5.3 12.2-9.1A11 11 0 0 0 34 18Z"/><text x="20" y="21" textAnchor="middle" fill="#06c755" fontSize="9" fontWeight="800" fontFamily="Arial,sans-serif">LINE</text></svg>
+        </a>}
         <nav className="stepBar">
           <div className="stepTrail">
             {stepStart > 0 && <i className="stepLead">›</i>}
