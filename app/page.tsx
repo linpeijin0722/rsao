@@ -83,6 +83,7 @@ export default function Page() {
     firstMonth = today.slice(0, 7),
     lastMonth = maxDate.slice(0, 7),
     [auth, setAuth] = useState("loading"),
+    [publicBrowsing, setPublicBrowsing] = useState(false),
     [profile, setProfile] = useState<{
       pictureUrl?: string;
       full_name?: string;
@@ -124,6 +125,11 @@ export default function Page() {
   useEffect(() => {
     (async () => {
       try {
+        if (location.pathname.replace(/\/$/, "") === "/booking") {
+          setPublicBrowsing(true);
+          setAuth("ready");
+          return;
+        }
         const liffId=bookingLiffId;
         if(liffId&&location.hostname!=="localhost"){
           await liff.init({liffId});
@@ -436,6 +442,10 @@ export default function Page() {
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent("林阿嫂視訊諮詢")}&dates=${stamp(start)}/${stamp(end)}&details=${encodeURIComponent(`預約編號：${no}`)}`;
   }
   async function submit() {
+    if (location.pathname.replace(/\/$/, "") === "/booking") {
+      setAlertMessage("您可以免登入查看項目、價格與時段。正式送出預約需透過 LINE，以便接收付款通知及諮詢結果。請由頁面上方進入 LINE 預約。");
+      return;
+    }
     setBusy(true);
     try {
       const liffId = bookingLiffId;
@@ -549,6 +559,7 @@ export default function Page() {
   return (
     <main className="shell">
       <section className="app">
+        {publicBrowsing && <div role="note" style={{padding:"16px",background:"#f6f2ed",lineHeight:1.8,borderRadius:12,marginBottom:12}}><strong>林阿嫂線上諮詢｜公開預約頁面</strong><p style={{margin:"4px 0"}}>免登入查看諮詢項目、價格與可預約時段。送出預約需透過 LINE，以接收付款通知與諮詢結果。</p><a href={officialLineUrl}>進入 LINE 預約</a></div>}
         <nav className="stepBar">
           <div className="stepTrail">
             {stepStart > 0 && <i className="stepLead">›</i>}
@@ -567,7 +578,7 @@ export default function Page() {
             })}
             {stepStart + 3 < steps.length && <i className="stepMore">…</i>}
           </div>
-          <div className="account">
+          <div className="account" hidden={publicBrowsing}>
             <button onClick={() => setMenu(!menu)}>
               {profile?.pictureUrl ? (
                 <img src={profile.pictureUrl} alt="我的帳號" />
