@@ -49,7 +49,7 @@ export async function returnItemBindings(bookingId: string) {
     const pages = (kind.relation || kind.marriage) && targets.length ? targets : [null];
     return pages.map((target: any) => ({
       bookingDetailId: detail.id, itemId: detail.item_id, profileId: primaryId,
-      headingName: kind.relation ? String(one(target?.consultation_profiles)?.name || one(answer.consultation_profiles)?.name || "") : "",
+      headingName: kind.marriage ? "" : String(one(target?.consultation_profiles)?.name || one(answer.consultation_profiles)?.name || ""),
       targetProfileId: target?.profile_id || null, consultationCreatedAt: detail.google_document_created_at || detail.created_at,
     }));
   });
@@ -178,7 +178,11 @@ export function correctReturnHeadings<T extends {index:number;itemTitle:string;c
   return items.map(item=>{
     const name=bindings[item.index-1]?.headingName;
     if(!name)return item;
-    const fix=(value:string)=>value.replace(/^([^\n【]+)【([^】]*前世[^】]*)】/gm,(heading,names,label)=>names.split(/[&＆]/).map((entry:string)=>entry.trim()).includes(name)?name+"【"+label+"】":heading);
+    const fix=(value:string)=>value.replace(/^([^\n【]+)【([^】]*前世[^】]*)】/gm,(heading,names,label)=>{
+      const prefix=names.trim();
+      const repeated=prefix.length>name.length&&prefix.length%name.length===0&&name.repeat(prefix.length/name.length)===prefix;
+      return repeated||prefix.split(/[&＆]/).map((entry:string)=>entry.trim()).includes(name)?name+"【"+label+"】":heading;
+    });
     return {...item,itemTitle:fix(item.itemTitle),content:fix(item.content)};
   });
 }

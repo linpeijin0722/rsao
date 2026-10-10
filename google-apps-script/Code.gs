@@ -94,9 +94,10 @@ function doPost(e) {
       } else if (mark.kind === "question") {
         editor.setBold(start, end, true).setFontSize(start, end, 12).setForegroundColor(start, end, "#000000");
       } else if (mark.kind === "answer") {
-        editor.setBold(start, end, false).setFontSize(start, end, 12).setForegroundColor(start, end, "#1A59CC");
+        editor.setBold(start, Math.min(lastContentIndex, end + 1), false).setFontSize(start, Math.min(lastContentIndex, end + 1), 9).setForegroundColor(start, Math.min(lastContentIndex, end + 1), "#1a59cc");
       } else if (mark.kind === "teacher") {
-        editor.setBold(start, end, false).setFontSize(start, end, 12).setForegroundColor(start, end, "#1A59CC");
+        // 12 CSS px = 9 pt; include the paragraph break so new input inherits this style.
+        editor.setBold(start, Math.min(lastContentIndex, end + 1), false).setFontSize(start, Math.min(lastContentIndex, end + 1), 9).setForegroundColor(start, Math.min(lastContentIndex, end + 1), "#1a59cc");
       } else if (mark.kind === "section") {
         editor.setBold(start, end, true).setFontSize(start, end, 15).setForegroundColor(start, end, "#000000");
       } else if (mark.kind === "fieldLabel") {

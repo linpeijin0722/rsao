@@ -246,7 +246,7 @@ export async function upsertExternalConsultationSectionReplies(documentId:string
     if(endIndex>startIndex)requests.push({deleteContentRange:{range:{startIndex,endIndex}}});
     const inserted=`${value}\n`;
     requests.push({insertText:{location:{index:startIndex},text:inserted}});
-    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+value.length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:0.254902,green:0.411765,blue:0.882353}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+value.length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   if(requests.length)await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
@@ -881,7 +881,7 @@ export async function upsertQuickConsultationManualReplies(documentId:string,ent
     if(!write.text)continue;
     requests.push({insertText:{location:{index:startIndex},text:write.text}});
     requests.push({createNamedRange:{name:write.rangeName,range:{startIndex,endIndex:startIndex+write.text.length}}});
-    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+write.text.trimEnd().length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:0.254902,green:0.411765,blue:0.882353}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+write.text.trimEnd().length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   if(requests.length)await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
@@ -989,7 +989,7 @@ export async function upsertQuickConsultationQuestionReplies(documentId:string,a
   for(const slot of slots){
     if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
     requests.push({insertText:{location:{index:slot.startIndex},text:slot.value}});
-    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:0.254902,green:0.411765,blue:0.882353}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
     // 舊版曾把已有 Qn 的回答誤寫成「阿嫂回覆：」。先完成 An 更新，
     // 再刪除前一行的舊文字，避免舊、新答案同時留在文件中。
     if(slot.staleManual&&slot.staleManual.endIndex>slot.staleManual.startIndex)requests.push({deleteContentRange:{range:slot.staleManual}});
@@ -1019,7 +1019,7 @@ export async function upsertQuickConsultationSectionReplies(documentId:string,an
     if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
     const inserted=`${slot.value}\n`;
     requests.push({insertText:{location:{index:slot.startIndex},text:inserted}});
-    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:0.254902,green:0.411765,blue:0.882353}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
@@ -1074,7 +1074,7 @@ export async function upsertPastLifeOverviewReplies(documentId:string,answers:{a
   for(const slot of slots){
     if(slot.shouldDelete&&slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
     requests.push({insertText:{location:{index:slot.startIndex},text:`${slot.value}\n`}});
-    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:0.254902,green:0.411765,blue:0.882353}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   if(requests.length)await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
@@ -1242,7 +1242,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   const people = [one(answer?.consultation_profiles), ...selectedParticipants.map((entry: any) => one(entry.consultation_profiles))]
     .filter(Boolean).filter((profile: any, index: number, all: any[]) => all.findIndex((entry) => entry.id === profile.id) === index);
   const headingPeople = relation ? [target ? one(target.consultation_profiles) : one(answer?.consultation_profiles)] : people;
-  const mainNames = headingPeople.filter(Boolean).map((profile:any)=>text(profile.name)).filter(Boolean);
+  const mainNames = Array.from(new Set(headingPeople.filter(Boolean).map((profile:any)=>text(profile.name)).filter(Boolean)));
   const primaryTitle = marriage ? "感情運勢與關係合盤" : itemCode.startsWith("past-life-") ? "前世因果" : text(detail.item_title);
   add(`${mainNames.join("&")||ownerName}【${primaryTitle}】`, "title");
   if (text(detail.item_title)!==primaryTitle) add(text(detail.item_title), "meta");
@@ -1618,7 +1618,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     const offset = content.length;
     const page = documentBody(pageSpec, index + 1, pages.length, ownerName);
     // 保留 NBSP 組成的老師輸入區；尤其「【綜觀今生】」通常位於頁尾，
-    // 若把 NBSP 一併裁掉，Google 文件就不會留下藍色 12pt 的輸入空間。
+    // 若把 NBSP 一併裁掉，Google 文件就不會留下藍色 12px（9pt） 的輸入空間。
     content += page.content.replace(/(?:[ \t]*\n)+$/u, "\n");
     marks.push(...page.marks.map((mark) => ({ ...mark, start: mark.start + offset, end: mark.end + offset })));
     images.push(...page.images);
