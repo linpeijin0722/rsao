@@ -1313,7 +1313,7 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
           ...presentation,
         };
         if (["marriage-bazi", "past-life-relationship"].includes(itemCode) && relationshipTargets.length) {
-          return relationshipTargets.map((target) => {
+          const targetSections=relationshipTargets.map((target) => {
             const targetProfile = target.targetProfile;
             const targetName = clean(targetProfile?.name) || "未命名對象";
             const targetGender = clean(targetProfile?.gender);
@@ -1332,6 +1332,7 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
               requestLines: [...compactTargetProfileLines, ...target.lines.filter((line: string) => !/^【對象：/.test(line) && !targetPresentation.profileLines.some((profileLine: string) => profileLine.replace(/^(?:姓名|農曆生日|居住地址)：/, "") === line))],
             };
           });
+          return itemCode==="past-life-relationship" ? [{...base,requestLines:[],targetName:"",targetDisplay:""},...targetSections] : targetSections;
         }
         return [{ ...base, requestLines }];
       });

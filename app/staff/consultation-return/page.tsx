@@ -93,6 +93,7 @@ export default function ConsultationReturnPage(){
       if(mode==="immediate")setData(current=>current?{...current,returnedAt:result.returnedAt||current.returnedAt}:current);
       setVersions(current=>{const next={...current};for(const sent of sendSnapshot){const chosen=(current[sent.index]||[]).find(version=>version.id===sent.versionId);next[sent.index]=[{...(chosen||{id:sent.versionId,label:sent.versionLabel,changeSummary:[],suspectedIssues:[]}),content:sent.content}]};return next});
       void refreshSchedules();setConfirmMode(null);setCompleted(mode);
+      if(mode==="immediate")window.dispatchEvent(new Event("rsao-consultation-returned"));
     }catch(err){alert(err instanceof Error?err.message:"回傳失敗")}finally{setSending(false)}
   }
   async function polishCurrent(force=false){

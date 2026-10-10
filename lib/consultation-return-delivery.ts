@@ -33,11 +33,16 @@ const itemKind = (detail: any) => {
   };
 };
 
-export async function returnItemBindings(bookingId: string) {
+export async function returnItemBindings(bookingId: string, pageCount?:number) {
   const { data, error } = await adminSupabase().from("booking_details").select(
     "id,item_id,item_title,created_at,google_document_created_at,booking_items(code),booking_detail_sub_items(sub_item_title),booking_consultation_answers(profile_id,consultation_profiles(name),booking_answer_participants(profile_id,position,consultation_profiles(name)))",
   ).eq("booking_id", bookingId).order("created_at", { ascending: true });
   if (error) throw error;
+  const expandedCount=(data||[]).reduce((count:number,detail:any)=>{
+    const answer=one(detail.booking_consultation_answers);if(!answer)return count;
+    const targets=(answer.booking_answer_participants||[]).filter((entry:any)=>String(entry.profile_id||"")!==String(answer.profile_id||""));
+    const kind=itemKind(detail);return count+(kind.relation?1+targets.length:kind.marriage&&targets.length?targets.length:1);
+  },0);
   return (data || []).flatMap((detail: any) => {
     const answer = one(detail.booking_consultation_answers);
     if (!answer) return [];
@@ -46,7 +51,7 @@ export async function returnItemBindings(bookingId: string) {
     const targets = (answer.booking_answer_participants || []).slice()
       .sort((a: any, b: any) => Number(a.position) - Number(b.position))
       .filter((entry: any) => String(entry.profile_id || "") !== primaryId);
-    const pages = (kind.relation || kind.marriage) && targets.length ? targets : [null];
+    const pages = kind.relation&&pageCount===expandedCount ? [null,...targets] : (kind.relation || kind.marriage) && targets.length ? targets : [null];
     return pages.map((target: any) => ({
       bookingDetailId: detail.id, itemId: detail.item_id, profileId: primaryId,
       headingName: kind.marriage ? "" : String(one(target?.consultation_profiles)?.name || one(answer.consultation_profiles)?.name || ""),
@@ -105,7 +110,7 @@ export async function prepareConsultationReturn(args: {
   const freshItems = await getConsultationReturnPreview(detail.google_document_id);
   const unreadable = freshItems.find(item => selected.includes(item.index) && item.parseWarning);
   if (unreadable) throw new Error(unreadable.parseWarning);
-  const bindings = await returnItemBindings(booking.id);
+  const bindings = await returnItemBindings(booking.id,freshItems.length);
   const items = correctReturnHeadings(freshItems, bindings).filter((item) => selected.includes(item.index)).map((item) => ({
     ...item,
     content: normalizeConsultationReturnText(

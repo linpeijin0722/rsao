@@ -775,8 +775,8 @@ function returnHeadingOffset(segment:string) {
 
 function teacherFormReplies(document:any) {
   const rows:{offset:number;question:string;answer:string}[]=[];
-  let offset=0, question="", answer="", answerOffset=0;
-  const flush=()=>{if(question&&answer.trim())rows.push({offset:answerOffset,question,answer:answer.trim()});answer="";};
+  let offset=0, question="", answer="", answerOffset=0, inField=false;
+  const flush=()=>{if(question.trim()&&answer.trim())rows.push({offset:answerOffset,question:question.trim(),answer:answer.trim()});answer="";question="";};
   const color=(style:any,r:number,g:number,b:number)=>{
     const rgb=style?.foregroundColor?.color?.rgbColor;
     return rgb&&Math.abs((rgb.red||0)-r/255)<0.005&&Math.abs((rgb.green||0)-g/255)<0.005&&Math.abs((rgb.blue||0)-b/255)<0.005;
@@ -786,13 +786,15 @@ function teacherFormReplies(document:any) {
       const elements=block.paragraph?.elements||[];
       const line=elements.map((e:any)=>e.textRun?.content||(e.pageBreak?"\n":"")).join("");
       const label=elements.some((e:any)=>color(e.textRun?.textStyle,107,59,36)&&e.textRun?.textStyle?.bold);
-      if(label){flush();question=line.trim();}
-      if(/項目\s*\d+|您好，以下是您的諮詢結果|[【《]|^\s*Q\d+[:：]/u.test(line)){flush();question="";}
+      if(label){flush();inField=true;}
+      if(/項目\s*\d+|您好，以下是您的諮詢結果|[【《]|^\s*Q\d+[:：]/u.test(line)){flush();inField=false;}
       for(const e of elements){
         const value=String(e.textRun?.content||(e.pageBreak?"\n":""));
-        if(question&&color(e.textRun?.textStyle,26,89,204)){
+        if(inField&&!label&&color(e.textRun?.textStyle,26,89,204)){
           if(!answer)answerOffset=offset;
           answer+=value.replace(/[\u00a0\u200b]/g," ");
+        }else if(inField&&!label&&!answer.trim()){
+          question+=value.replace(/[\u00a0\u200b]/g," ");
         }
         offset+=value.length;
       }
@@ -801,6 +803,34 @@ function teacherFormReplies(document:any) {
     }
   }
   read(document.body?.content||[]);flush();return rows;
+}
+
+export async function getConsultationNotebookText(documentId:string) {
+  const token=await accessToken();
+  const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
+  return consultationNotebookText(document);
+}
+
+export function consultationNotebookText(document:any) {
+  let result="",finished=false;
+  function read(blocks:any[]){
+    for(const block of blocks){
+      if(finished)return;
+      const elements=block.paragraph?.elements||[];
+      const line=elements.map((e:any)=>e.textRun?.content||"").join("");
+      if(/項目\s*\d+\s*[（(]共/u.test(line)){finished=true;return;}
+      let redLine="";
+      for(const e of elements){
+        const run=e.textRun,rgb=run?.textStyle?.foregroundColor?.color?.rgbColor;
+        if(rgb&&(rgb.red||0)>0.7&&(rgb.green||0)<0.3&&(rgb.blue||0)<0.3)redLine+=run.content||"";
+      }
+      if(redLine.trim())result+=redLine.trimEnd()+"\n";
+      for(const row of block.table?.tableRows||[])for(const cell of row.tableCells||[])read(cell.content||[]);
+    }
+  }
+  read(document.body?.content||[]);
+  if(!result.trim())throw new Error("文件項目上方沒有找到紅色記事本內容");
+  return result.trim();
 }
 
 export async function getConsultationReturnPreview(documentId: string): Promise<ConsultationReturnItem[]> {
@@ -826,7 +856,7 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
       const valueRow = previous.at(-1), labelRow = previous.at(-2);
       const fallbackQuestion = firstLine.replace(/^【|】$/g, "");
       const question = labelRow && !/^(姓名|農曆生日|居住地址|訂單編號)\s*[:：]/u.test(labelRow.line)
-        ? labelRow.line.replace(/[：:]$/u, "")
+        ? valueRow?.line || fallbackQuestion
         : fallbackQuestion;
       manualRows.push({ question, answer: manual[1].trim() });
       lines[lineIndex] = "";
@@ -1220,6 +1250,7 @@ const previousVideoTime = (value: unknown) => {
   return `${get("month")}/${get("day")}(${week})${period}${get("hour")}:${get("minute")}`;
 };
 const cleanSubItemTitle = (value: unknown) => text(value)
+  .replace(/^基本\s*[：:]\s*你/u, "")
   .replace(/^\s*[＋+]\s*加購\s*[：:]?\s*(?:你)?/, "")
   .replace(/個人感情運\s*[（(]\s*僅看自己\s*[）)]/gu, "個人感情運");
 const taipeiClock = (value: Date) => {
@@ -1255,7 +1286,10 @@ function expandPages(details: any[]): PageSpec[] {
     const participants = (info.answer?.booking_answer_participants || []).slice()
       .sort((a: any, b: any) => a.position - b.position)
       .filter((entry: any) => text(one(entry.consultation_profiles)?.id) !== primaryId);
-    if ((info.relation || info.marriage) && participants.length) {
+    if (info.relation) {
+      return [{detail},...participants.map((target:any,targetIndex:number)=>({detail,target,targetIndex,targetCount:participants.length}))];
+    }
+    if (info.marriage && participants.length) {
       return participants.map((target: any, targetIndex: number) => ({ detail, target, targetIndex, targetCount: participants.length }));
     }
     return [{ detail }];
@@ -1273,6 +1307,12 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
       content += `${line}\u00a0\n\u00a0\n`;
       if (line.length) marks.push({start, end:start+line.length, kind});
       marks.push({start:start+line.length, end:content.length+1, kind:"teacher"});
+      return;
+    }
+    if (kind === "section") {
+      content += `${line}\u00a0\n\u00a0\n`;
+      marks.push({start,end:start+line.length,kind});
+      marks.push({start:start+line.length,end:content.length+1,kind:"teacher"});
       return;
     }
     if (kind === "question") {
@@ -1296,14 +1336,13 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   add("");
   const participants = (answer?.booking_answer_participants || []).slice().sort((a: any, b: any) => a.position - b.position);
   const selectedParticipants = target ? [target] : participants;
-  const people = [one(answer?.consultation_profiles), ...selectedParticipants.map((entry: any) => one(entry.consultation_profiles))]
+  const people = (relation ? [target ? one(target.consultation_profiles) : one(answer?.consultation_profiles)] : [one(answer?.consultation_profiles), ...selectedParticipants.map((entry: any) => one(entry.consultation_profiles))])
     .filter(Boolean).filter((profile: any, index: number, all: any[]) => all.findIndex((entry) => entry.id === profile.id) === index);
   const headingPeople = relation ? [target ? one(target.consultation_profiles) : one(answer?.consultation_profiles)] : people;
   const mainNames = Array.from(new Set(headingPeople.filter(Boolean).map((profile:any)=>text(profile.name)).filter(Boolean)));
   const primaryTitle = marriage ? "感情運勢與關係合盤" : itemCode.startsWith("past-life-") ? "前世因果" : text(detail.item_title);
-  add(`${mainNames.join("&")||ownerName}【${primaryTitle}】`, "title");
-  if (text(detail.item_title)!==primaryTitle) add(text(detail.item_title), "meta");
-  if (renderedSubTitle) add(renderedSubTitle, "meta");
+  add([text(detail.item_title),renderedSubTitle].filter(Boolean).join(" "), "title");
+  const resultHeading=`${mainNames.join("&")||ownerName}【${primaryTitle}】`;
   add("");
   people.forEach((profile: any) => {
     profileLines(profile, ownerName).forEach((line) => add(line));
@@ -1331,9 +1370,9 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   const extra = answer?.extra_data || {};
   const targetProfile = one(target?.consultation_profiles);
   const targetId = text(targetProfile?.id);
-  const questions = targetId
-    ? (Array.isArray(extra.target_questions?.[targetId]) ? extra.target_questions[targetId] : [])
-    : (answer?.questions || []);
+  const questions = relation
+    ? targetId ? (Array.isArray(extra.target_questions?.[targetId])&&extra.target_questions[targetId].length ? extra.target_questions[targetId] : targetIndex===0 ? (answer?.questions||[]) : []) : []
+    : targetId ? (Array.isArray(extra.target_questions?.[targetId]) ? extra.target_questions[targetId] : []) : (answer?.questions || []);
   const addField = (label: string, value: unknown) => {
     const rendered = Array.isArray(value) ? value.map(text).filter(Boolean).join("、") : text(value);
     if (!rendered) return;
@@ -1428,6 +1467,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   const renderedQuestions = isOverallFortune && selectedOverallFocuses.length
     ? selectedOverallFocuses.map((focus: string) => overallQuestionLabels[focus] || `${focus}建議`)
     : questions.map(text).filter(Boolean);
+  if(!relation&&!itemCode.startsWith("past-life-"))add(resultHeading,"section");
   renderedQuestions.forEach((question: string, index: number) => {
     add(`Q${index + 1}:${question}`, "question");
     add(`A${index + 1}:`, "answer");
@@ -1475,7 +1515,8 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     add("");
     add("如果要姻緣比較順利，", "teacher");
   }
-  const sections = isPastLifeRelation ? ["《前世》", "《綜觀今生》", "《兩人相處建議》"] : !isPastLifePersonal ? [] : /(?:三|3)\s*世/.test(subTitle.normalize("NFKC"))
+  if(isPastLifePersonal||isPastLifeRelation)add(resultHeading,"section");
+  const sections = isPastLifeRelation ? (target ? ["《前世》", "《綜觀今生》", "《兩人相處建議》"] : ["《前世》", "《綜觀今生》"]) : !isPastLifePersonal ? [] : /(?:三|3)\s*世/.test(subTitle.normalize("NFKC"))
     ? ["《前前前世》", "《前前世》", "《前世》", "《綜觀今生》"]
     : /(?:兩|二|2)\s*世/.test(subTitle.normalize("NFKC"))
       ? ["《前前世》", "《前世》", "《綜觀今生》"]
@@ -1494,8 +1535,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   }
   const alreadyHasTeacherLayout = isPastLifePersonal || isPastLifeRelation || isOverallFortune || itemCode === "health" || marriage || itemCode === "date-time-selection" || title.includes("擇日");
   if (!alreadyHasTeacherLayout) {
-    const teacherKind = itemCode === "deceased-relative" ? "deceasedTeacher" : "teacher";
-    add(infantSpirit ? "【嬰靈】" : `【${title}】`, "section");
+    const teacherKind = "teacher";
     if (subTitle && subTitle !== title) add(`《${subTitle}》`, "section");
     for (let index = 0; index < 4; index += 1) add(itemCode === "deceased-relative" ? "\u200b" : "\u00a0", teacherKind);
   }

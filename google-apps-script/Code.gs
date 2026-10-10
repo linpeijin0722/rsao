@@ -99,7 +99,7 @@ function doPost(e) {
         // 12 CSS px = 9 pt; include the paragraph break so new input inherits this style.
         editor.setBold(start, Math.min(lastContentIndex, end + 1), false).setFontSize(start, Math.min(lastContentIndex, end + 1), 9).setForegroundColor(start, Math.min(lastContentIndex, end + 1), "#1a59cc");
       } else if (mark.kind === "section") {
-        editor.setBold(start, end, true).setFontSize(start, end, 15).setForegroundColor(start, end, "#000000");
+        editor.setBold(start, end, true).setFontSize(start, end, 10.5).setForegroundColor(start, end, "#000000");
       } else if (mark.kind === "fieldLabel") {
         editor.setBold(start, end, true).setFontSize(start, end, 14).setForegroundColor(start, end, "#6B3B24");
       } else if (mark.kind === "fieldAnswer") {
