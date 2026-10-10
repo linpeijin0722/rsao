@@ -759,11 +759,56 @@ function documentPlainText(document: any) {
   return output.replace(/[\u00a0\u200b]/g, " ").replace(/\r/g, "");
 }
 
+// Only collect explicitly blue teacher runs beneath a form label. Personal data
+// and customer-entered black text must never become an answer.
+function returnHeadingOffset(segment:string) {
+  const pattern=/(?:^|\n)[ \t　]*(?:[^\n【《]{1,80})?[【《][^】》\n]+[】》][ \t　]*(?=\n|$)/gu;
+  for(const match of segment.matchAll(pattern)){
+    const start=(match.index||0)+(match[0].startsWith("\n")?1:0);
+    const following=segment.slice((match.index||0)+match[0].length);
+    // The document title above customer profile data is not an answer boundary.
+    if(/^\s*(?:(?![【《])[^\n]*\n\s*){0,4}姓名\s*[:：]/u.test(following))continue;
+    return start;
+  }
+  return -1;
+}
+
+function teacherFormReplies(document:any) {
+  const rows:{offset:number;question:string;answer:string}[]=[];
+  let offset=0, question="", answer="", answerOffset=0;
+  const flush=()=>{if(question&&answer.trim())rows.push({offset:answerOffset,question,answer:answer.trim()});answer="";};
+  const color=(style:any,r:number,g:number,b:number)=>{
+    const rgb=style?.foregroundColor?.color?.rgbColor;
+    return rgb&&Math.abs((rgb.red||0)-r/255)<0.005&&Math.abs((rgb.green||0)-g/255)<0.005&&Math.abs((rgb.blue||0)-b/255)<0.005;
+  };
+  function read(blocks:any[]) {
+    for(const block of blocks){
+      const elements=block.paragraph?.elements||[];
+      const line=elements.map((e:any)=>e.textRun?.content||(e.pageBreak?"\n":"")).join("");
+      const label=elements.some((e:any)=>color(e.textRun?.textStyle,107,59,36)&&e.textRun?.textStyle?.bold);
+      if(label){flush();question=line.trim();}
+      if(/項目\s*\d+|您好，以下是您的諮詢結果|[【《]|^\s*Q\d+[:：]/u.test(line)){flush();question="";}
+      for(const e of elements){
+        const value=String(e.textRun?.content||(e.pageBreak?"\n":""));
+        if(question&&color(e.textRun?.textStyle,26,89,204)){
+          if(!answer)answerOffset=offset;
+          answer+=value.replace(/[\u00a0\u200b]/g," ");
+        }
+        offset+=value.length;
+      }
+      if(answer&&!answer.endsWith("\n"))answer+="\n";
+      for(const row of block.table?.tableRows||[])for(const cell of row.tableCells||[])read(cell.content||[]);
+    }
+  }
+  read(document.body?.content||[]);flush();return rows;
+}
+
 export async function getConsultationReturnPreview(documentId: string): Promise<ConsultationReturnItem[]> {
   if (!documentId) throw new Error("缺少 Google 文件 ID");
   const token = await accessToken();
   const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
   const body = documentPlainText(document);
+  const formReplies = teacherFormReplies(document);
   const marker = /項目\s*(\d+)\s*[（(]共\s*\d+\s*個項目[）)]/g;
   const matches = Array.from(body.matchAll(marker));
   if (!matches.length) throw new Error("這份諮詢單找不到『項目 N』區段，請重新建立諮詢單後再試");
@@ -773,7 +818,7 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
     let segment = normalizeConsultationReturnText(body.slice(segmentStart, segmentEnd));
     const afterMarker = segment.slice(match[0].length).replace(/^\s+/, "");
     const firstLine = afterMarker.split("\n").map((line) => line.trim()).find(Boolean) || `項目 ${idx + 1}`;
-    const lines = segment.split("\n"), manualRows: { question: string; answer: string }[] = [];
+    const lines = segment.split("\n"), manualRows: { question: string; answer: string }[] = formReplies.filter(row=>row.offset>=segmentStart&&row.offset<segmentEnd).map(({question,answer})=>({question,answer}));
     for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
       const manual = /^阿嫂回覆\s*[:：]\s*(.+)$/u.exec(lines[lineIndex].trim());
       if (!manual) continue;
@@ -790,7 +835,7 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
       const maxQuestion = Math.max(0, ...Array.from(segment.matchAll(/(?:^|\n)Q(\d+)\s*[:：]/g)).map((entry) => Number(entry[1])));
       const appended = manualRows.map((row, rowIndex) => `Q${maxQuestion + rowIndex + 1}:${row.question}\nA${maxQuestion + rowIndex + 1}:${row.answer}`).join("\n\n");
       segment = lines.join("\n");
-      const tagOffset = segment.search(/(?:^|\n)[【《][^】》\n]+[】》]/u);
+      const tagOffset = returnHeadingOffset(segment);
       segment = tagOffset >= 0
         ? `${segment.slice(0, tagOffset).replace(/\s+$/u, "")}\n\n${appended}\n\n${segment.slice(tagOffset)}`
         : `${segment.replace(/\s+$/u, "")}\n\n${appended}`;
@@ -802,15 +847,15 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
       if (q1) startOffset = (q1.index || 0) + (q1[0].startsWith("\n") ? 1 : 0);
     }
     if (startOffset < 0) {
-      const tag = /(?:^|\n)[ \t　]*[【《][^】》\n]+[】》]/.exec(segment);
-      if (tag) startOffset = (tag.index || 0)+(tag[0].startsWith("\n")?1:0);
+      startOffset = returnHeadingOffset(segment);
     }
     if (startOffset < 0) return {
       index: idx + 1, itemTitle: firstLine, content: "",
       parseWarning: `項目 ${idx + 1} 尚未辨識到回覆區，已暫停此項回傳。請在本項目的實際回覆前獨立一行填入【主項目名稱】（例如【外靈干擾】），內部小標題使用《》。勿將標籤放在姓名、生日、地址等資料前；修正後重新整理。`,
     };
     const namedHeading=lines.find(line=>/^[^【《\n]+【[^】\n]+】$/.test(line.trim()))?.trim();
-    const content = normalizeConsultationReturnText([namedHeading,segment.slice(startOffset)].filter(Boolean).join("\n\n"));
+    const resultBody=segment.slice(startOffset);
+    const content = normalizeConsultationReturnText([namedHeading&&!resultBody.includes(namedHeading)?namedHeading:"",resultBody].filter(Boolean).join("\n\n"));
     return { index: idx + 1, itemTitle: firstLine, content };
   });
 }
@@ -1224,6 +1269,18 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   const images: DocumentImage[] = [];
   const add = (line: string, kind?: Mark["kind"]) => {
     const start = content.length + 1;
+    if (kind === "fieldAnswer") {
+      content += `${line}\u00a0\n\u00a0\n`;
+      if (line.length) marks.push({start, end:start+line.length, kind});
+      marks.push({start:start+line.length, end:content.length+1, kind:"teacher"});
+      return;
+    }
+    if (kind === "question") {
+      content += `${line}\u00a0\n`;
+      marks.push({start,end:start+line.length,kind});
+      marks.push({start:start+line.length,end:content.length+1,kind:"teacher"});
+      return;
+    }
     content += `${line}\n`;
     if (kind) marks.push({ start, end: start + line.length, kind });
   };
