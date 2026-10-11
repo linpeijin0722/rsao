@@ -1013,7 +1013,7 @@ export async function upsertQuickConsultationReply(documentId: string, answer: s
     bold: true, fontSize: { magnitude: 15, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: 0, green: 0, blue: 0 } } },
   }, fields: "bold,fontSize,foregroundColor" } });
   requests.push({ updateTextStyle: { range: { startIndex: answerStart, endIndex: answerStart + normalized.length }, textStyle: {
-    bold: false, fontSize: { magnitude:9, unit: "PT" }, foregroundColor: { color: { rgbColor: { red:0.254902, green:0.411765, blue:0.882353 } } },
+    bold: false, fontSize: { magnitude:9, unit: "PT" }, foregroundColor: { color: { rgbColor: { red:26/255, green:89/255, blue:204/255 } } },
   }, fields: "bold,fontSize,foregroundColor" } });
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
     method: "POST", body: JSON.stringify({ requests }),
