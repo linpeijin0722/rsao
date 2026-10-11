@@ -36,3 +36,14 @@ test('notebook extracts only red text before the first item, preserving document
  assert.equal(c.consultationNotebookText(doc),'歐新匯【前世因果】\nhttps://docs.google.com/document/d/example/edit');
  assert.throws(()=>c.consultationNotebookText({body:{content:[p('沒有紅字',{})]}}),/沒有找到/);
 });
+
+test('two relationship targets generate three titled sections recognized by return preview',async()=>{
+ const c=context(),people=[{id:'owner',name:'本人甲'},{id:'one',name:'對象乙'},{id:'two',name:'對象丙'}];
+ const detail={item_title:'前世因果（與他人前世關係）',booking_items:{code:'past-life-relationship'},booking_detail_sub_items:[{sub_item_title:'與兩位對象的前世關係'}],booking_consultation_answers:{profile_id:'owner',consultation_profiles:people[0],questions:['問題'],booking_answer_participants:people.slice(1).map((p,i)=>({position:i,profile_id:p.id,consultation_profiles:p})),extra_data:{}}};
+ const pages=c.expandPages([detail]);assert.equal(pages.length,3);
+ const generated=pages.map((p,i)=>c.documentBody(p,i+1,3,'本人甲'));
+ for(const p of generated)assert.equal(p.marks.filter(m=>m.kind==='title').length,1);
+ c.google=async()=>({body:{content:generated.map(p=>({paragraph:{elements:[{textRun:{content:p.content}}]}}))}});
+ const items=await c.getConsultationReturnPreview('fixture');assert.equal(items.length,3);
+ items.forEach((item,i)=>{assert.equal(item.parseWarning,undefined);assert.match(item.itemTitle,/與兩位對象的前世關係/);assert.ok(item.content.includes(people[i].name+'【前世因果】'))});
+});
