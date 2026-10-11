@@ -74,7 +74,7 @@ export default function ConsultationReturnPage(){
     let payload:any={versions:Object.fromEntries(items.map(entry=>[entry.index,[{id:'original',label:'原始版本',content:entry.content,changeSummary:[],suspectedIssues:[]}]])),activeVersionIds:Object.fromEntries(items.map(entry=>[entry.index,'original'])),selected:items.filter(entry=>!entry.parseWarning).map(entry=>entry.index),sourceItems:items.map(x=>({index:x.index,content:x.content}))};
     try{const response=await fetch(`/api/staff/consultation-return/draft?bookingNo=${encodeURIComponent(result.bookingNo)}&documentId=${encodeURIComponent(result.documentId)}`);const saved=await response.json();if(!response.ok)throw new Error(saved.error);
       setDraftRevision(saved.draft?.revision||0);
-      if(saved.draft?.payload){const restored=restoreReturnDraft(payload,saved.draft.payload);payload=restored.payload;if(restored.changed)setDraftNotice('Google 文件已更新：已保留你的草稿，版本選單另有最新文件內容，請核對後再傳送。')}
+      if(saved.draft?.payload){const restored=restoreReturnDraft(payload,saved.draft.payload);payload=restored.payload;if(restored.changed)setDraftNotice('Google 文件已更新：變更項目已切換為最新文件內容並取消勾選；舊草稿保留在版本選單，請重新核對姓名與內容後勾選。')}
       setDraftSnapshot(JSON.stringify(saved.draft?.payload||payload));setDraftReady(true);
     }catch(e){setDraftSnapshot(JSON.stringify(payload));setDraftWarning(e instanceof Error?e.message:'無法讀取草稿；自動儲存暫停，請重新整理後重試')}
     setSelected(payload.selected);setVersions(payload.versions);setActiveVersionIds(payload.activeVersionIds);
@@ -101,7 +101,7 @@ export default function ConsultationReturnPage(){
     if(!data||sending||!sendSnapshot.length)return;setSending(true);
     try{
       const editedItems=Object.fromEntries(sendSnapshot.map(entry=>[entry.index,entry.content]));
-      const response=await fetch("/api/staff/consultation-return",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({mode,bookingNo:data.bookingNo,documentId:data.documentId,selectedIndexes:sendSnapshot.map(entry=>entry.index),editedItems,confirmedVersions:sendSnapshot.map(entry=>({index:entry.index,versionId:entry.versionId,versionLabel:entry.versionLabel,content:entry.content})),skipCarousel,scheduledAt:mode==="scheduled"?scheduledValue.toISOString():undefined})});
+      const response=await fetch("/api/staff/consultation-return",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({sourceItems:data.items.map(item=>({index:item.index,content:item.content})),mode,bookingNo:data.bookingNo,documentId:data.documentId,selectedIndexes:sendSnapshot.map(entry=>entry.index),editedItems,confirmedVersions:sendSnapshot.map(entry=>({index:entry.index,versionId:entry.versionId,versionLabel:entry.versionLabel,content:entry.content})),skipCarousel,scheduledAt:mode==="scheduled"?scheduledValue.toISOString():undefined})});
       const result=await response.json();if(!response.ok)throw new Error(result.error||"回傳失敗");
       if(mode==="immediate")setData(current=>current?{...current,returnedAt:result.returnedAt||current.returnedAt}:current);
       setVersions(current=>{const next={...current};for(const sent of sendSnapshot){const chosen=(current[sent.index]||[]).find(version=>version.id===sent.versionId);next[sent.index]=[{...(chosen||{id:sent.versionId,label:sent.versionLabel,changeSummary:[],suspectedIssues:[]}),content:sent.content}]};return next});

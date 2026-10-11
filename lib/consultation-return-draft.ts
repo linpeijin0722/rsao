@@ -11,7 +11,7 @@ export function restoreReturnDraft(fresh:any,saved:any){
  for(const item of fresh.sourceItems){if(!saved.versions[item.index])continue;
   next.versions[item.index]=saved.versions[item.index];next.activeVersionIds[item.index]=saved.activeVersionIds[item.index];
   const previous=saved.sourceItems.find((x:any)=>x.index===item.index);
-  if(previous?.content!==item.content){changed=true;next.versions[item.index]=[...saved.versions[item.index],{...fresh.versions[item.index][0],id:`doc-${Date.now()}-${item.index}`,label:'Google 文件更新版本'}]}
+  if(previous?.content!==item.content){changed=true;const id=`doc-${Date.now()}-${item.index}`;next.versions[item.index]=[...saved.versions[item.index],{...fresh.versions[item.index][0],id,label:'Google 文件更新版本'}];next.activeVersionIds[item.index]=id;next.selected=next.selected.filter((index:number)=>index!==item.index)}
  }
  return {payload:next,changed};
 }

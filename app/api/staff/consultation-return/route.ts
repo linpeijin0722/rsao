@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value)) return NextResponse.json({ error: "未登入" }, { status: 401 });
   try {
     const body = await request.json();
+    if(!Array.isArray(body.sourceItems)||!body.sourceItems.every((item:any)=>Number.isInteger(item?.index)&&typeof item?.content==='string'))return NextResponse.json({error:'請重新整理回傳頁，核對最新文件後再傳送'},{status:400});
     const mode = body.mode === "scheduled" ? "scheduled" : "immediate";
     const confirmedVersions = Array.isArray(body.confirmedVersions) ? body.confirmedVersions.map((entry: any) => ({
       index: Number(entry?.index), versionId: String(entry?.versionId || ""), versionLabel: String(entry?.versionLabel || ""), content: String(entry?.content || "").trim(),
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
       selectedIndexes: confirmedVersions.map((entry: any) => entry.index),
       editedItems: Object.fromEntries(confirmedVersions.map((entry: any) => [entry.index, entry.content])),
       skipCarousel: body.skipCarousel === true,
+      sourceItems:body.sourceItems,
     });
     if (mode === "scheduled") {
       const scheduledFor = parseTaipeiDateTime(String(body.scheduledAt || ""));
