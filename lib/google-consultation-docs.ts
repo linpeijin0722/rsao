@@ -12,6 +12,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
 const requiredAppsScriptVersion = "2026-10-01-v33";
+const scriptError=(message:string)=>/版本不一致|舊版 Google Apps Script/.test(message)?message+"。請將完整 Code.gs 更新到 Google Apps Script，再到「部署 → 管理部署 → 編輯 → 版本：新版本 → 部署」。只儲存程式不會更新 /exec；若使用既有部署，Vercel 網址不需變更。":message;
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -614,7 +615,7 @@ async function insertQuickReplyLinkViaAppsScript(documentId: string, bookingNo: 
     }),
   });
   const result = await response.json();
-  if (!response.ok || !result.ok) throw new Error(result.error || "快速建立回覆連結補寫失敗");
+  if (!response.ok || !result.ok) throw new Error(scriptError(result.error || "快速建立回覆連結補寫失敗"));
   if (result.version !== requiredAppsScriptVersion) throw new Error(`Google Apps Script 版本不一致（目前：${result.version || "未知"}；需要：${requiredAppsScriptVersion}）`);
 }
 
@@ -634,7 +635,7 @@ async function updatePositionedReturnButton(args: { documentId: string; imageUrl
     body: JSON.stringify({ secret: appsScriptSecret, expectedVersion: requiredAppsScriptVersion, action: "upsertReturnButton", ...args }),
   });
   const result = await response.json();
-  if (!response.ok || !result.ok) throw new Error(result.error || "Google 文件定位圖片更新失敗");
+  if (!response.ok || !result.ok) throw new Error(scriptError(result.error || "Google 文件定位圖片更新失敗"));
   if (result.version !== requiredAppsScriptVersion) throw new Error(`Google Apps Script 版本不一致（目前：${result.version || "未知"}；需要：${requiredAppsScriptVersion}）`);
 }
 
@@ -1765,7 +1766,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     redirect: "follow",
   });
   const result = await response.json();
-  if (!response.ok || !result.ok) throw new Error(result.error || "Apps Script 建立文件失敗");
+  if (!response.ok || !result.ok) throw new Error(scriptError(result.error || "Apps Script 建立文件失敗"));
   if (result.version !== requiredAppsScriptVersion) throw new Error(`目前連到舊版 Google Apps Script（目前：${result.version || "無版本資訊"}；需要：${requiredAppsScriptVersion}），請更新 Vercel 的 GOOGLE_APPS_SCRIPT_WEB_APP_URL 後重新部署`);
   // 新文件的格式、快速回覆與回傳 LINE 已在同一次 Apps Script 建立流程完成。
   // 不再立刻透過服務帳號重新讀取新文件，徹底避開 Google 權限同步期間的
