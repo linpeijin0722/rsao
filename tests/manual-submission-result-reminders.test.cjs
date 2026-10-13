@@ -33,8 +33,8 @@ test('manual reply writes Q/A, royal blue 12px, and is included in return previe
  const insert=writes.find(r=>r.insertText).insertText;
  assert.match(insert.text,/Q1: 最近睡不好\nA1: 第一段\n第二段/);
  const style=writes.find(r=>r.updateTextStyle).updateTextStyle;
- assert.equal(style.textStyle.fontSize.magnitude,9);
- assert.equal(style.textStyle.foregroundColor.color.rgbColor.blue,0.882353);
+ assert.equal(style.textStyle.fontSize.magnitude,12);
+ assert.equal(style.textStyle.foregroundColor.color.rgbColor.blue,204/255);
  assert.ok(writes.some(r=>r.createNamedRange));
  const updated=text.slice(0,insert.location.index-1)+insert.text+text.slice(insert.location.index-1);
  const preview=await docs(updated).context.getConsultationReturnPreview('DOC');
@@ -73,3 +73,4 @@ test('Drive access error aborts notification instead of treating it as not retur
  const {context,sent}=reminders([],[]);context.DriveApp.getFolderById=()=>{throw Error('permission')};
  assert.throws(()=>context.checkThreeDaysBeforeVideoEvents(),/permission/);assert.equal(sent.length,0);
 });
+

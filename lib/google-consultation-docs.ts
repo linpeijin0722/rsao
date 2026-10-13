@@ -11,7 +11,7 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-10-01-v33";
+const requiredAppsScriptVersion = "2026-10-13-v34";
 const scriptError=(message:string)=>/版本不一致|舊版 Google Apps Script/.test(message)?message+"。請將完整 Code.gs 更新到 Google Apps Script，再到「部署 → 管理部署 → 編輯 → 版本：新版本 → 部署」。只儲存程式不會更新 /exec；若使用既有部署，Vercel 網址不需變更。":message;
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
@@ -247,7 +247,7 @@ export async function upsertExternalConsultationSectionReplies(documentId:string
     if(endIndex>startIndex)requests.push({deleteContentRange:{range:{startIndex,endIndex}}});
     const inserted=`${value}\n`;
     requests.push({insertText:{location:{index:startIndex},text:inserted}});
-    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+value.length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   if(requests.length)await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
@@ -957,7 +957,7 @@ export async function upsertQuickConsultationManualReplies(documentId:string,ent
     if(!write.text)continue;
     requests.push({insertText:{location:{index:startIndex},text:write.text}});
     requests.push({createNamedRange:{name:write.rangeName,range:{startIndex,endIndex:startIndex+write.text.length}}});
-    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+write.text.trimEnd().length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+write.text.trimEnd().length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   if(requests.length)await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
@@ -1014,7 +1014,7 @@ export async function upsertQuickConsultationReply(documentId: string, answer: s
     bold: true, fontSize: { magnitude: 15, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: 0, green: 0, blue: 0 } } },
   }, fields: "bold,fontSize,foregroundColor" } });
   requests.push({ updateTextStyle: { range: { startIndex: answerStart, endIndex: answerStart + normalized.length }, textStyle: {
-    bold: false, fontSize: { magnitude:9, unit: "PT" }, foregroundColor: { color: { rgbColor: { red:26/255, green:89/255, blue:204/255 } } },
+    bold: false, fontSize: { magnitude:12, unit: "PT" }, foregroundColor: { color: { rgbColor: { red:26/255, green:89/255, blue:204/255 } } },
   }, fields: "bold,fontSize,foregroundColor" } });
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
     method: "POST", body: JSON.stringify({ requests }),
@@ -1065,7 +1065,7 @@ export async function upsertQuickConsultationQuestionReplies(documentId:string,a
   for(const slot of slots){
     if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
     requests.push({insertText:{location:{index:slot.startIndex},text:slot.value}});
-    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
     // 舊版曾把已有 Qn 的回答誤寫成「阿嫂回覆：」。先完成 An 更新，
     // 再刪除前一行的舊文字，避免舊、新答案同時留在文件中。
     if(slot.staleManual&&slot.staleManual.endIndex>slot.staleManual.startIndex)requests.push({deleteContentRange:{range:slot.staleManual}});
@@ -1095,7 +1095,7 @@ export async function upsertQuickConsultationSectionReplies(documentId:string,an
     if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
     const inserted=`${slot.value}\n`;
     requests.push({insertText:{location:{index:slot.startIndex},text:inserted}});
-    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
@@ -1150,7 +1150,7 @@ export async function upsertPastLifeOverviewReplies(documentId:string,answers:{a
   for(const slot of slots){
     if(slot.shouldDelete&&slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
     requests.push({insertText:{location:{index:slot.startIndex},text:`${slot.value}\n`}});
-    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:9,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   if(requests.length)await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
@@ -1716,7 +1716,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     const offset = content.length;
     const page = documentBody(pageSpec, index + 1, pages.length, ownerName);
     // 保留 NBSP 組成的老師輸入區；尤其「【綜觀今生】」通常位於頁尾，
-    // 若把 NBSP 一併裁掉，Google 文件就不會留下藍色 12px（9pt） 的輸入空間。
+    // 若把 NBSP 一併裁掉，Google 文件就不會留下藍色字級 12 的輸入空間。
     content += page.content.replace(/(?:[ \t]*\n)+$/u, "\n");
     marks.push(...page.marks.map((mark) => ({ ...mark, start: mark.start + offset, end: mark.end + offset })));
     images.push(...page.images);

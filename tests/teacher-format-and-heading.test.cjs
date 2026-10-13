@@ -10,12 +10,12 @@ test('legacy repeated authoritative name is collapsed only in headings and remai
  assert.deepEqual(c.correctReturnHeadings(result,bindings),result);
  assert.equal(c.correctReturnHeadings(items,[{headingName:'新匯'}])[0].itemTitle,items[0].itemTitle);
 });
-test('template input placeholder and newline are blue 9pt regular while section stays bold',()=>{
+test('template input placeholder and newline are blue size 12 regular while section stays bold',()=>{
  const source=fs.readFileSync('google-apps-script/Code.gs','utf8');
  const block=source.slice(source.indexOf('    (payload.marks || []).forEach'),source.indexOf('    (payload.images || []).forEach'));
  const styles=Array.from({length:8},()=>({}));
  const editor={};for(const [method,key] of [['setBold','bold'],['setFontSize','size'],['setForegroundColor','color']])editor[method]=(start,end,value)=>{for(let i=start;i<=end;i++)styles[i][key]=value;return editor};
  vm.runInNewContext(block,{editor,contentLength:8,lastContentIndex:7,payload:{marks:[{start:1,end:5,kind:'section'},{start:6,end:7,kind:'teacher'}]}});
  assert.equal(styles[0].bold,true);
- for(const i of [5,6])assert.deepEqual(styles[i],{bold:false,size:9,color:'#1a59cc'});
+ for(const i of [5,6])assert.deepEqual(styles[i],{bold:false,size:12,color:'#1a59cc'});
 });
