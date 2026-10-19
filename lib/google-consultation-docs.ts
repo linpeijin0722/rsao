@@ -11,7 +11,8 @@ const appsScriptUrl = appsScriptSetting && !/^https?:\/\//i.test(appsScriptSetti
   ? `https://script.google.com/macros/s/${appsScriptSetting.replace(/^\/+|\/+$/g, "")}/exec`
   : appsScriptSetting;
 const appsScriptSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET || "";
-const requiredAppsScriptVersion = "2026-10-01-v33";
+const requiredAppsScriptVersion = "2026-10-13-v34";
+const scriptError=(message:string)=>/版本不一致|舊版 Google Apps Script/.test(message)?message+"。請將完整 Code.gs 更新到 Google Apps Script，再到「部署 → 管理部署 → 編輯 → 版本：新版本 → 部署」。只儲存程式不會更新 /exec；若使用既有部署，Vercel 網址不需變更。":message;
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 const text = (value: unknown) => String(value ?? "").trim();
 const one = (value: any) => Array.isArray(value) ? value[0] : value;
@@ -22,7 +23,7 @@ const resultMatchesConsultationItem = (content: unknown, itemCode: string) => {
   return true;
 };
 
-async function accessToken() {
+async function accessToken(signal?: AbortSignal) {
   if (!email || !privateKey) throw new Error("尚未設定 Google 服務帳號環境變數");
   const now = Math.floor(Date.now() / 1000);
   const unsigned = `${b64({ alg: "RS256", typ: "JWT" })}.${b64({
@@ -37,6 +38,7 @@ async function accessToken() {
   sign.end();
   const assertion = `${unsigned}.${sign.sign(privateKey, "base64url")}`;
   const response = await fetch("https://oauth2.googleapis.com/token", {
+    signal,
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }),
@@ -62,6 +64,36 @@ export type ExternalConsultationDocument = {
   modifiedTime: string;
   webViewLink: string;
 };
+
+/** Include nested folders, pagination and document shortcuts. Never infer from a name. */
+export async function listReturnedConsultationDocumentIds(): Promise<Set<string>> {
+  const signal = AbortSignal.timeout(12000);
+  const token = await accessToken(signal);
+  // Listing an inaccessible folder can silently return no files; verify access first.
+  const folder = await google(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(returnedFolderId)}?fields=id,mimeType,trashed&supportsAllDrives=true`, token, { signal });
+  if (folder.trashed || folder.mimeType !== "application/vnd.google-apps.folder") throw new Error("已回傳資料夾無法使用");
+  const pending = [returnedFolderId], visited = new Set<string>(), ids = new Set<string>();
+  while (pending.length) {
+    const id = pending.shift()!;
+    if (visited.has(id)) continue;
+    visited.add(id);
+    let pageToken = "";
+    do {
+      const params = new URLSearchParams({ q: `'${id.replace(/'/g, "\\'")}' in parents and trashed=false`,
+        fields: "nextPageToken,files(id,mimeType,shortcutDetails(targetId,targetMimeType))", pageSize: "1000",
+        supportsAllDrives: "true", includeItemsFromAllDrives: "true" });
+      if (pageToken) params.set("pageToken", pageToken);
+      const result = await google(`https://www.googleapis.com/drive/v3/files?${params}`, token, { signal });
+      for (const file of result.files || []) {
+        if (file.mimeType === "application/vnd.google-apps.folder") pending.push(file.id);
+        else if (file.mimeType === "application/vnd.google-apps.document") ids.add(file.id);
+        else if (file.shortcutDetails?.targetMimeType === "application/vnd.google-apps.document") ids.add(file.shortcutDetails.targetId);
+      }
+      pageToken = result.nextPageToken || "";
+    } while (pageToken);
+  }
+  return ids;
+}
 
 export async function listExternalConsultationDocuments(): Promise<ExternalConsultationDocument[]> {
   const token = await accessToken();
@@ -203,11 +235,11 @@ export async function detectExternalConsultationResults(documentId: string) {
 export async function upsertExternalConsultationSectionReplies(documentId:string,answers:Record<string,string>) {
   await assertExternalConsultationDocument(documentId);
   const token=await accessToken(),document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
-  const {plain,documentIndexAt}=indexedDocumentText(document),headingPattern=/(?:^|\n)[【《]([^】》\n]+)[】》][^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset),matches=Array.from(scopedPlain.matchAll(headingPattern));
+  const {plain,documentIndexAt}=indexedDocumentText(document),headingPattern=/(?:^|\n)(?:[^\n【《]{1,80})?[【《]([^】》\n]+)[】》][^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset),matches=Array.from(scopedPlain.matchAll(headingPattern)).filter(match=>!/^\s*[^【《\n]+【/.test(match[0]));
   const requests:any[]=[];
   for(const [key,raw] of Object.entries(answers)){
     const slotIndex=Number(key),match=matches[slotIndex],value=normalizeConsultationReturnText(raw);if(!match||!value)continue;
-    const blockStart=baseOffset+(match.index||0)+match[0].length,rest=plain.slice(blockStart),boundary=rest.search(/\n(?=(?:[【《][^】》\n]+[】》]|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),blockEnd=boundary>=0?blockStart+boundary:Math.max(blockStart,plain.replace(/\n$/,"").length);
+    const blockStart=baseOffset+(match.index||0)+match[0].length,rest=plain.slice(blockStart),boundary=rest.search(/\n(?=(?:(?:[^\n【《]{1,80})?[【《][^】》\n]+[】》]|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),blockEnd=boundary>=0?blockStart+boundary:Math.max(blockStart,plain.replace(/\n$/,"").length);
     const block=plain.slice(blockStart,blockEnd),addresses=Array.from(block.matchAll(/(?:^|\n)(?:居住地址|生前居住地址|農曆往生日期)：[^\n]*/g));
     let resultStart=blockStart;
     if(addresses.length){const last=addresses[addresses.length-1],lineEnd=(last.index||0)+last[0].length;resultStart=blockStart+lineEnd+(block[lineEnd]==="\n"?1:0)}
@@ -215,7 +247,7 @@ export async function upsertExternalConsultationSectionReplies(documentId:string
     if(endIndex>startIndex)requests.push({deleteContentRange:{range:{startIndex,endIndex}}});
     const inserted=`${value}\n`;
     requests.push({insertText:{location:{index:startIndex},text:inserted}});
-    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   if(requests.length)await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
@@ -583,7 +615,7 @@ async function insertQuickReplyLinkViaAppsScript(documentId: string, bookingNo: 
     }),
   });
   const result = await response.json();
-  if (!response.ok || !result.ok) throw new Error(result.error || "快速建立回覆連結補寫失敗");
+  if (!response.ok || !result.ok) throw new Error(scriptError(result.error || "快速建立回覆連結補寫失敗"));
   if (result.version !== requiredAppsScriptVersion) throw new Error(`Google Apps Script 版本不一致（目前：${result.version || "未知"}；需要：${requiredAppsScriptVersion}）`);
 }
 
@@ -603,7 +635,7 @@ async function updatePositionedReturnButton(args: { documentId: string; imageUrl
     body: JSON.stringify({ secret: appsScriptSecret, expectedVersion: requiredAppsScriptVersion, action: "upsertReturnButton", ...args }),
   });
   const result = await response.json();
-  if (!response.ok || !result.ok) throw new Error(result.error || "Google 文件定位圖片更新失敗");
+  if (!response.ok || !result.ok) throw new Error(scriptError(result.error || "Google 文件定位圖片更新失敗"));
   if (result.version !== requiredAppsScriptVersion) throw new Error(`Google Apps Script 版本不一致（目前：${result.version || "未知"}；需要：${requiredAppsScriptVersion}）`);
 }
 
@@ -699,7 +731,7 @@ export async function wasDocumentEditedBy(documentId: string, editorEmail: strin
   return (result.revisions || []).some((revision: any) => String(revision?.lastModifyingUser?.emailAddress || "").toLowerCase() === editorEmail.toLowerCase());
 }
 
-export type ConsultationReturnItem = { index: number; itemTitle: string; content: string };
+export type ConsultationReturnItem = { index: number; itemTitle: string; content: string; parseWarning?: string };
 
 export function normalizeConsultationReturnText(value: string) {
   return String(value || "")
@@ -711,15 +743,95 @@ export function normalizeConsultationReturnText(value: string) {
 
 function documentPlainText(document: any) {
   let output = "";
-  for (const block of document.body?.content || []) {
+  function readBlocks(blocks: any[]) {
+  for (const block of blocks) {
     if (block.paragraph) {
       for (const element of block.paragraph.elements || []) {
         if (element.textRun?.content) output += String(element.textRun.content);
         else if (element.pageBreak) output += "\n";
       }
     }
+    for (const row of block.table?.tableRows || []) {
+      for (const cell of row.tableCells || []) readBlocks(cell.content || []);
+    }
   }
+  }
+  readBlocks(document.body?.content || []);
   return output.replace(/[\u00a0\u200b]/g, " ").replace(/\r/g, "");
+}
+
+// Only collect explicitly blue teacher runs beneath a form label. Personal data
+// and customer-entered black text must never become an answer.
+function returnHeadingOffset(segment:string) {
+  const pattern=/(?:^|\n)[ \t　]*(?:[^\n【《]{1,80})?[【《][^】》\n]+[】》][ \t　]*(?=\n|$)/gu;
+  for(const match of segment.matchAll(pattern)){
+    const start=(match.index||0)+(match[0].startsWith("\n")?1:0);
+    const following=segment.slice((match.index||0)+match[0].length);
+    // The document title above customer profile data is not an answer boundary.
+    if(/^\s*(?:(?![【《])[^\n]*\n\s*){0,4}姓名\s*[:：]/u.test(following))continue;
+    return start;
+  }
+  return -1;
+}
+
+function teacherFormReplies(document:any) {
+  const rows:{offset:number;question:string;answer:string}[]=[];
+  let offset=0, question="", answer="", answerOffset=0, inField=false;
+  const flush=()=>{if(question.trim()&&answer.trim())rows.push({offset:answerOffset,question:question.trim(),answer:answer.trim()});answer="";question="";};
+  const color=(style:any,r:number,g:number,b:number)=>{
+    const rgb=style?.foregroundColor?.color?.rgbColor;
+    return rgb&&Math.abs((rgb.red||0)-r/255)<0.005&&Math.abs((rgb.green||0)-g/255)<0.005&&Math.abs((rgb.blue||0)-b/255)<0.005;
+  };
+  function read(blocks:any[]) {
+    for(const block of blocks){
+      const elements=block.paragraph?.elements||[];
+      const line=elements.map((e:any)=>e.textRun?.content||(e.pageBreak?"\n":"")).join("");
+      const label=elements.some((e:any)=>color(e.textRun?.textStyle,107,59,36)&&e.textRun?.textStyle?.bold);
+      if(label){flush();inField=true;}
+      if(/項目\s*\d+|您好，以下是您的諮詢結果|[【《]|^\s*Q\d+[:：]/u.test(line)){flush();inField=false;}
+      for(const e of elements){
+        const value=String(e.textRun?.content||(e.pageBreak?"\n":""));
+        if(inField&&!label&&color(e.textRun?.textStyle,26,89,204)){
+          if(!answer)answerOffset=offset;
+          answer+=value.replace(/[\u00a0\u200b]/g," ");
+        }else if(inField&&!label&&!answer.trim()){
+          question+=value.replace(/[\u00a0\u200b]/g," ");
+        }
+        offset+=value.length;
+      }
+      if(answer&&!answer.endsWith("\n"))answer+="\n";
+      for(const row of block.table?.tableRows||[])for(const cell of row.tableCells||[])read(cell.content||[]);
+    }
+  }
+  read(document.body?.content||[]);flush();return rows;
+}
+
+export async function getConsultationNotebookText(documentId:string) {
+  const token=await accessToken();
+  const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
+  return consultationNotebookText(document);
+}
+
+export function consultationNotebookText(document:any) {
+  let result="",finished=false;
+  function read(blocks:any[]){
+    for(const block of blocks){
+      if(finished)return;
+      const elements=block.paragraph?.elements||[];
+      const line=elements.map((e:any)=>e.textRun?.content||"").join("");
+      if(/項目\s*\d+\s*[（(]共/u.test(line)){finished=true;return;}
+      let redLine="";
+      for(const e of elements){
+        const run=e.textRun,rgb=run?.textStyle?.foregroundColor?.color?.rgbColor;
+        if(rgb&&(rgb.red||0)>0.7&&(rgb.green||0)<0.3&&(rgb.blue||0)<0.3)redLine+=run.content||"";
+      }
+      if(redLine.trim())result+=redLine.trimEnd()+"\n";
+      for(const row of block.table?.tableRows||[])for(const cell of row.tableCells||[])read(cell.content||[]);
+    }
+  }
+  read(document.body?.content||[]);
+  if(!result.trim())throw new Error("文件項目上方沒有找到紅色記事本內容");
+  return result.trim();
 }
 
 export async function getConsultationReturnPreview(documentId: string): Promise<ConsultationReturnItem[]> {
@@ -727,6 +839,7 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
   const token = await accessToken();
   const document = await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, token);
   const body = documentPlainText(document);
+  const formReplies = teacherFormReplies(document);
   const marker = /項目\s*(\d+)\s*[（(]共\s*\d+\s*個項目[）)]/g;
   const matches = Array.from(body.matchAll(marker));
   if (!matches.length) throw new Error("這份諮詢單找不到『項目 N』區段，請重新建立諮詢單後再試");
@@ -736,7 +849,7 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
     let segment = normalizeConsultationReturnText(body.slice(segmentStart, segmentEnd));
     const afterMarker = segment.slice(match[0].length).replace(/^\s+/, "");
     const firstLine = afterMarker.split("\n").map((line) => line.trim()).find(Boolean) || `項目 ${idx + 1}`;
-    const lines = segment.split("\n"), manualRows: { question: string; answer: string }[] = [];
+    const lines = segment.split("\n"), manualRows: { question: string; answer: string }[] = formReplies.filter(row=>row.offset>=segmentStart&&row.offset<segmentEnd).map(({question,answer})=>({question,answer}));
     for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
       const manual = /^阿嫂回覆\s*[:：]\s*(.+)$/u.exec(lines[lineIndex].trim());
       if (!manual) continue;
@@ -744,7 +857,7 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
       const valueRow = previous.at(-1), labelRow = previous.at(-2);
       const fallbackQuestion = firstLine.replace(/^【|】$/g, "");
       const question = labelRow && !/^(姓名|農曆生日|居住地址|訂單編號)\s*[:：]/u.test(labelRow.line)
-        ? labelRow.line.replace(/[：:]$/u, "")
+        ? valueRow?.line || fallbackQuestion
         : fallbackQuestion;
       manualRows.push({ question, answer: manual[1].trim() });
       lines[lineIndex] = "";
@@ -753,23 +866,27 @@ export async function getConsultationReturnPreview(documentId: string): Promise<
       const maxQuestion = Math.max(0, ...Array.from(segment.matchAll(/(?:^|\n)Q(\d+)\s*[:：]/g)).map((entry) => Number(entry[1])));
       const appended = manualRows.map((row, rowIndex) => `Q${maxQuestion + rowIndex + 1}:${row.question}\nA${maxQuestion + rowIndex + 1}:${row.answer}`).join("\n\n");
       segment = lines.join("\n");
-      const tagOffset = segment.search(/[【《][^】》\n]+[】》]/u);
+      const tagOffset = returnHeadingOffset(segment);
       segment = tagOffset >= 0
         ? `${segment.slice(0, tagOffset).replace(/\s+$/u, "")}\n\n${appended}\n\n${segment.slice(tagOffset)}`
         : `${segment.replace(/\s+$/u, "")}\n\n${appended}`;
     }
     let startOffset = -1;
-    if (idx === 0) startOffset = segment.indexOf("您好，以下是您的諮詢結果");
+    startOffset = segment.indexOf("您好，以下是您的諮詢結果");
     if (startOffset < 0) {
-      const q1 = /(?:^|\n)Q1\s*[:：]/m.exec(segment);
+      const q1 = /(?:^|\n)[ \t　]*[QＱqｑ][0-9０-９]+\s*[:：]/m.exec(segment);
       if (q1) startOffset = (q1.index || 0) + (q1[0].startsWith("\n") ? 1 : 0);
     }
     if (startOffset < 0) {
-      const tag = /[【《][^】》\n]+[】》]/.exec(segment);
-      if (tag) startOffset = tag.index || 0;
+      startOffset = returnHeadingOffset(segment);
     }
-    if (startOffset < 0) throw new Error(`項目 ${idx + 1} 找不到 Q1 或結果標籤，請確認文件格式`);
-    const content = normalizeConsultationReturnText(segment.slice(startOffset));
+    if (startOffset < 0) return {
+      index: idx + 1, itemTitle: firstLine, content: "",
+      parseWarning: `項目 ${idx + 1} 尚未辨識到回覆區，已暫停此項回傳。請在本項目的實際回覆前獨立一行填入【主項目名稱】（例如【外靈干擾】），內部小標題使用《》。勿將標籤放在姓名、生日、地址等資料前；修正後重新整理。`,
+    };
+    const namedHeading=lines.find(line=>/^[^【《\n]+【[^】\n]+】$/.test(line.trim()))?.trim();
+    const resultBody=segment.slice(startOffset);
+    const content = normalizeConsultationReturnText([namedHeading&&!resultBody.includes(namedHeading)?namedHeading:"",resultBody].filter(Boolean).join("\n\n"));
     return { index: idx + 1, itemTitle: firstLine, content };
   });
 }
@@ -787,6 +904,7 @@ export async function upsertQuickConsultationManualReplies(documentId:string,ent
   const pageStarts=Array.from(plain.matchAll(/(?:^|\n)項目\s*\d+[^\n]*/g)).map(match=>(match.index||0)+(match[0].startsWith("\n")?1:0));
   const pages=pageStarts.map((start,index)=>({start,end:pageStarts[index+1]??plain.length,text:plain.slice(start,pageStarts[index+1]??plain.length)}));
   const writes:any[]=[];
+  const nextNumbers=new Map<number,number>();
   for(const entry of values){
     const page=pages.find(candidate=>entry.targetName&&candidate.text.includes(entry.targetName)&&candidate.text.includes(entry.itemLabel))
       || pages.find(candidate=>entry.profileName&&candidate.text.includes(entry.profileName)&&candidate.text.includes(entry.itemLabel))
@@ -815,17 +933,31 @@ export async function upsertQuickConsultationManualReplies(documentId:string,ent
       const headingOffset=page.text.search(/[【《][^】》\n]+[】》]/u);
       insertOffset=headingOffset>=0?page.start+headingOffset:page.end;
     }
+    // Stable key does not include document offsets, which change after every insertion.
+    const stableName='quick_manual_'+crypto.createHash('sha256').update([entry.itemCode,entry.targetName,entry.profileName,entry.itemLabel,entry.label,entry.question].join('|')).digest('hex').slice(0,32);
+    const named=document.namedRanges?.[stableName]?.namedRanges?.[0];
+    const existingRange=named?.ranges?.[0];
+    const originalOffset=insertOffset,legacy=/^阿嫂回覆\s*[:：][^\n]*/u.exec(plain.slice(insertOffset,page.end));
+    const greeting='您好，以下是您的諮詢結果',greetingOffset=page.text.indexOf(greeting);
+    if(greetingOffset>=0)insertOffset=Math.max(insertOffset,page.start+greetingOffset+greeting.length+1);
+    if(legacy&&insertOffset!==originalOffset&&!existingRange)writes.push({startOffset:originalOffset,endOffset:originalOffset+legacy[0].length,text:'',number:0});
     const following=plain.slice(insertOffset,page.end),existing=/^阿嫂回覆\s*[:：][^\n]*/u.exec(following);
-    const inserted=`阿嫂回覆：${entry.answer}\n`;
-    writes.push({startOffset:insertOffset,endOffset:existing?insertOffset+existing[0].length:insertOffset,text:inserted});
+    const currentNumber=existingRange?Number(Array.from(plain.matchAll(/(?:^|\n)Q(\d+)\s*[:：]/g)).find(m=>documentIndexAt((m.index||0)+(m[0].startsWith('\n')?1:0))===existingRange.startIndex)?.[1]||0):0;
+    const maxNumber=nextNumbers.get(page.start)??Math.max(0,...Array.from(page.text.matchAll(/(?:^|\n)Q(\d+)\s*[:：]/g)).map(m=>Number(m[1])));
+    const number=currentNumber||maxNumber+1;nextNumbers.set(page.start,Math.max(number,maxNumber));
+    const inserted=`Q${number}: ${(entry.question||entry.label||entry.itemLabel).replace(/\n/g,' ')}\nA${number}: ${entry.answer}\n`;
+    writes.push({number,startOffset:insertOffset,endOffset:existing?insertOffset+existing[0].length:insertOffset,text:inserted,rangeName:stableName,namedRangeId:named?.namedRangeId,existingRange});
   }
-  writes.sort((a,b)=>b.startOffset-a.startOffset);
+  writes.sort((a,b)=>(b.existingRange?.startIndex??documentIndexAt(b.startOffset))-(a.existingRange?.startIndex??documentIndexAt(a.startOffset))||b.number-a.number);
   const requests:any[]=[];
   for(const write of writes){
-    const startIndex=documentIndexAt(write.startOffset),endIndex=documentIndexAt(write.endOffset);
+    const startIndex=write.existingRange?.startIndex??documentIndexAt(write.startOffset),endIndex=write.existingRange?.endIndex??documentIndexAt(write.endOffset);
+    if(write.namedRangeId)requests.push({deleteNamedRange:{namedRangeId:write.namedRangeId}});
     if(endIndex>startIndex)requests.push({deleteContentRange:{range:{startIndex,endIndex}}});
+    if(!write.text)continue;
     requests.push({insertText:{location:{index:startIndex},text:write.text}});
-    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+write.text.trimEnd().length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({createNamedRange:{name:write.rangeName,range:{startIndex,endIndex:startIndex+write.text.length}}});
+    requests.push({updateTextStyle:{range:{startIndex,endIndex:startIndex+write.text.trimEnd().length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   if(requests.length)await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
@@ -882,7 +1014,7 @@ export async function upsertQuickConsultationReply(documentId: string, answer: s
     bold: true, fontSize: { magnitude: 15, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: 0, green: 0, blue: 0 } } },
   }, fields: "bold,fontSize,foregroundColor" } });
   requests.push({ updateTextStyle: { range: { startIndex: answerStart, endIndex: answerStart + normalized.length }, textStyle: {
-    bold: false, fontSize: { magnitude: 12, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: 0.102, green: 0.349, blue: 0.8 } } },
+    bold: false, fontSize: { magnitude:12, unit: "PT" }, foregroundColor: { color: { rgbColor: { red:26/255, green:89/255, blue:204/255 } } },
   }, fields: "bold,fontSize,foregroundColor" } });
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, token, {
     method: "POST", body: JSON.stringify({ requests }),
@@ -904,11 +1036,11 @@ export async function getQuickReplySectionSlots(documentId:string):Promise<Quick
   if(!documentId)throw new Error("缺少 Google 文件 ID");
   const token=await accessToken();
   const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
-  const {plain}=indexedDocumentText(document),headingPattern=/(?:^|\n)[【《]([^】》\n]+)[】》][^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset);
-  const matches=Array.from(scopedPlain.matchAll(headingPattern));
+  const {plain}=indexedDocumentText(document),headingPattern=/(?:^|\n)(?:[^\n【《]{1,80})?[【《]([^】》\n]+)[】》][^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset);
+  const matches=Array.from(scopedPlain.matchAll(headingPattern)).filter(match=>!/^\s*[^【《\n]+【/.test(match[0]));
   return matches.map((match,slotIndex)=>{
     const start=baseOffset+(match.index||0)+match[0].length;
-    const rest=plain.slice(start),boundary=rest.search(/\n(?=(?:[【《][^】》\n]+[】》]|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/);
+    const rest=plain.slice(start),boundary=rest.search(/\n(?=(?:(?:[^\n【《]{1,80})?[【《][^】》\n]+[】》]|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/);
     const raw=boundary>=0?rest.slice(0,boundary):rest;
     return {slotIndex,label:normalizeConsultationReturnText(match[1]),answer:normalizeConsultationReturnText(raw.replace(/[\u00a0\u200b]/g," "))};
   });
@@ -933,7 +1065,7 @@ export async function upsertQuickConsultationQuestionReplies(documentId:string,a
   for(const slot of slots){
     if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
     requests.push({insertText:{location:{index:slot.startIndex},text:slot.value}});
-    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
     // 舊版曾把已有 Qn 的回答誤寫成「阿嫂回覆：」。先完成 An 更新，
     // 再刪除前一行的舊文字，避免舊、新答案同時留在文件中。
     if(slot.staleManual&&slot.staleManual.endIndex>slot.staleManual.startIndex)requests.push({deleteContentRange:{range:slot.staleManual}});
@@ -945,10 +1077,10 @@ export async function upsertQuickConsultationSectionReplies(documentId:string,an
   if(!documentId)throw new Error("缺少 Google 文件 ID");
   const token=await accessToken();
   const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
-  const {plain,documentIndexAt}=indexedDocumentText(document),headingPattern=/(?:^|\n)[【《]([^】》\n]+)[】》][^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset);
-  const matches=Array.from(scopedPlain.matchAll(headingPattern));
+  const {plain,documentIndexAt}=indexedDocumentText(document),headingPattern=/(?:^|\n)(?:[^\n【《]{1,80})?[【《]([^】》\n]+)[】》][^\n]*\n/g,answerArea=plain.indexOf("您好，以下是您的諮詢結果"),baseOffset=answerArea>=0?answerArea:0,scopedPlain=plain.slice(baseOffset);
+  const matches=Array.from(scopedPlain.matchAll(headingPattern)).filter(match=>!/^\s*[^【《\n]+【/.test(match[0]));
   const slots=matches.map((match,slotIndex)=>{
-    const startOffset=baseOffset+(match.index||0)+match[0].length,rest=plain.slice(startOffset),boundary=rest.search(/\n(?=(?:[【《][^】》\n]+[】》]|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:Math.max(startOffset,plain.replace(/\n$/,"").length);
+    const startOffset=baseOffset+(match.index||0)+match[0].length,rest=plain.slice(startOffset),boundary=rest.search(/\n(?=(?:(?:[^\n【《]{1,80})?[【《][^】》\n]+[】》]|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),endOffset=boundary>=0?startOffset+boundary:Math.max(startOffset,plain.replace(/\n$/,"").length);
     let value=normalizeConsultationReturnText(String(answers[String(slotIndex)]||""));
     if(match[1].trim()==="流年運勢" && value){
       const current=parseAnnual(plain.slice(startOffset,endOffset)),startAge=Number(Object.keys(current)[0]||Object.keys(parseAnnual(value))[0]||0),ages=annualAges(startAge),edit=annualEdits[String(slotIndex)];
@@ -963,7 +1095,7 @@ export async function upsertQuickConsultationSectionReplies(documentId:string,an
     if(slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
     const inserted=`${slot.value}\n`;
     requests.push({insertText:{location:{index:slot.startIndex},text:inserted}});
-    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
@@ -1003,7 +1135,7 @@ export async function upsertPastLifeOverviewReplies(documentId:string,answers:{a
       const afterHeading=page.start+headingOffset+marker.length;
       const newlineOffset=plain.indexOf("\n",afterHeading);
       const startOffset=newlineOffset>=0&&newlineOffset<page.end?newlineOffset+1:afterHeading;
-      const rest=plain.slice(startOffset,page.end),boundary=rest.search(/\n\s*(?=(?:[【《][^】》\n]+[】》]|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),rawExisting=boundary>=0?rest.slice(0,boundary):rest;
+      const rest=plain.slice(startOffset,page.end),boundary=rest.search(/\n\s*(?=(?:(?:[^\n【《]{1,80})?[【《][^】》\n]+[】》]|項目\s*\d+|Q\d+\s*[:：]|備註：|您好，以下是您的諮詢結果))/),rawExisting=boundary>=0?rest.slice(0,boundary):rest;
       // 保留 Google Docs 每個段落／區段最後的換行字元。空白教師輸入區不必刪除，
       // 直接在其前方插入；有舊內容時也只刪到最後一個可見字元。
       const removableExisting=rawExisting.replace(/[\s\u00a0\u200b]+$/u,"");
@@ -1018,7 +1150,7 @@ export async function upsertPastLifeOverviewReplies(documentId:string,answers:{a
   for(const slot of slots){
     if(slot.shouldDelete&&slot.endIndex>slot.startIndex)requests.push({deleteContentRange:{range:{startIndex:slot.startIndex,endIndex:slot.endIndex}}});
     requests.push({insertText:{location:{index:slot.startIndex},text:`${slot.value}\n`}});
-    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:.102,green:.349,blue:.8}}}},fields:"bold,fontSize,foregroundColor"}});
+    requests.push({updateTextStyle:{range:{startIndex:slot.startIndex,endIndex:slot.startIndex+slot.value.length},textStyle:{bold:false,fontSize:{magnitude:12,unit:"PT"},foregroundColor:{color:{rgbColor:{red:26/255,green:89/255,blue:204/255}}}},fields:"bold,fontSize,foregroundColor"}});
   }
   if(requests.length)await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,token,{method:"POST",body:JSON.stringify({requests})});
 }
@@ -1119,6 +1251,7 @@ const previousVideoTime = (value: unknown) => {
   return `${get("month")}/${get("day")}(${week})${period}${get("hour")}:${get("minute")}`;
 };
 const cleanSubItemTitle = (value: unknown) => text(value)
+  .replace(/^基本\s*[：:]\s*你/u, "")
   .replace(/^\s*[＋+]\s*加購\s*[：:]?\s*(?:你)?/, "")
   .replace(/個人感情運\s*[（(]\s*僅看自己\s*[）)]/gu, "個人感情運");
 const taipeiClock = (value: Date) => {
@@ -1154,7 +1287,10 @@ function expandPages(details: any[]): PageSpec[] {
     const participants = (info.answer?.booking_answer_participants || []).slice()
       .sort((a: any, b: any) => a.position - b.position)
       .filter((entry: any) => text(one(entry.consultation_profiles)?.id) !== primaryId);
-    if ((info.relation || info.marriage) && participants.length) {
+    if (info.relation) {
+      return [{detail},...participants.map((target:any,targetIndex:number)=>({detail,target,targetIndex,targetCount:participants.length}))];
+    }
+    if (info.marriage && participants.length) {
       return participants.map((target: any, targetIndex: number) => ({ detail, target, targetIndex, targetCount: participants.length }));
     }
     return [{ detail }];
@@ -1168,6 +1304,24 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   const images: DocumentImage[] = [];
   const add = (line: string, kind?: Mark["kind"]) => {
     const start = content.length + 1;
+    if (kind === "fieldAnswer") {
+      content += `${line}\u00a0\n\u00a0\n`;
+      if (line.length) marks.push({start, end:start+line.length, kind});
+      marks.push({start:start+line.length, end:content.length+1, kind:"teacher"});
+      return;
+    }
+    if (kind === "section") {
+      content += `${line}\u00a0\n\u00a0\n`;
+      marks.push({start,end:start+line.length,kind});
+      marks.push({start:start+line.length,end:content.length+1,kind:"teacher"});
+      return;
+    }
+    if (kind === "question") {
+      content += `${line}\u00a0\n`;
+      marks.push({start,end:start+line.length,kind});
+      marks.push({start:start+line.length,end:content.length+1,kind:"teacher"});
+      return;
+    }
     content += `${line}\n`;
     if (kind) marks.push({ start, end: start + line.length, kind });
   };
@@ -1179,12 +1333,18 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   const renderedSubTitle = infantSpirit
     ? (infantMultiple ? "兩位嬰靈(含)以上" : "一位嬰靈")
     : subItems.join("、");
-  add([text(detail.item_title), renderedSubTitle].filter(Boolean).join("｜"), "title");
+  // Main heading is added after resolving the people below.
   add("");
   const participants = (answer?.booking_answer_participants || []).slice().sort((a: any, b: any) => a.position - b.position);
   const selectedParticipants = target ? [target] : participants;
-  const people = [one(answer?.consultation_profiles), ...selectedParticipants.map((entry: any) => one(entry.consultation_profiles))]
+  const people = (relation ? [target ? one(target.consultation_profiles) : one(answer?.consultation_profiles)] : [one(answer?.consultation_profiles), ...selectedParticipants.map((entry: any) => one(entry.consultation_profiles))])
     .filter(Boolean).filter((profile: any, index: number, all: any[]) => all.findIndex((entry) => entry.id === profile.id) === index);
+  const headingPeople = relation ? [target ? one(target.consultation_profiles) : one(answer?.consultation_profiles)] : people;
+  const mainNames = Array.from(new Set(headingPeople.filter(Boolean).map((profile:any)=>text(profile.name)).filter(Boolean)));
+  const primaryTitle = marriage ? "感情運勢與關係合盤" : itemCode.startsWith("past-life-") ? "前世因果" : text(detail.item_title);
+  add([text(detail.item_title),renderedSubTitle].filter(Boolean).join(" "), "title");
+  const resultHeading=`${mainNames.join("&")||ownerName}【${primaryTitle}】`;
+  add("");
   people.forEach((profile: any) => {
     profileLines(profile, ownerName).forEach((line) => add(line));
     if (infantSpirit) {
@@ -1211,9 +1371,9 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   const extra = answer?.extra_data || {};
   const targetProfile = one(target?.consultation_profiles);
   const targetId = text(targetProfile?.id);
-  const questions = targetId
-    ? (Array.isArray(extra.target_questions?.[targetId]) ? extra.target_questions[targetId] : [])
-    : (answer?.questions || []);
+  const questions = relation
+    ? targetId ? (Array.isArray(extra.target_questions?.[targetId])&&extra.target_questions[targetId].length ? extra.target_questions[targetId] : targetIndex===0 ? (answer?.questions||[]) : []) : []
+    : targetId ? (Array.isArray(extra.target_questions?.[targetId]) ? extra.target_questions[targetId] : []) : (answer?.questions || []);
   const addField = (label: string, value: unknown) => {
     const rendered = Array.isArray(value) ? value.map(text).filter(Boolean).join("、") : text(value);
     if (!rendered) return;
@@ -1308,6 +1468,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   const renderedQuestions = isOverallFortune && selectedOverallFocuses.length
     ? selectedOverallFocuses.map((focus: string) => overallQuestionLabels[focus] || `${focus}建議`)
     : questions.map(text).filter(Boolean);
+  if(!relation&&!itemCode.startsWith("past-life-"))add(resultHeading,"section");
   renderedQuestions.forEach((question: string, index: number) => {
     add(`Q${index + 1}:${question}`, "question");
     add(`A${index + 1}:`, "answer");
@@ -1319,12 +1480,12 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
   const isPastLifePersonal = itemCode === "past-life-personal" || text(detail.item_title).includes("前世因果（個人）");
   const isPastLifeRelation = relation;
   if (isOverallFortune || itemCode === "health" || text(detail.item_title).includes("身體健康")) {
-    add(isOverallFortune ? "【整體建議】" : "【健康建議】", "section");
+    add(isOverallFortune ? "《整體建議》" : "《健康建議》", "section");
     for (let index = 0; index < 5; index += 1) add("\u00a0", "teacher");
-    add("【流年運勢】", "section");
+    add("《流年運勢》", "section");
     const startingAge = virtualAge(people[0]);
     if (startingAge) {
-      for (let age = startingAge; age <= Math.min(99, startingAge + 14); age += 1) add(`${age}歲：\u00a0`, "teacher");
+      for (let age = startingAge; age <= Math.min(99, startingAge + 19); age += 1) add(`${age}歲：\u00a0`, "teacher");
     }
     add("");
     add("備註：");
@@ -1337,7 +1498,7 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     const primaryFullName = text(primaryProfile?.name) || ownerName;
     const primaryDisplayName = /^[\u3400-\u9fff]{2,4}$/.test(primaryFullName) ? primaryFullName.slice(1) : primaryFullName;
     const targetName = text(targetProfile?.name) || "對方";
-    add("【感情運勢與關係合盤】", "section");
+    add("《感情運勢與關係合盤》", "section");
     add("");
     add(`${primaryDisplayName}本身個性`, "teacher");
     add("\u00a0", "teacher"); add("\u00a0", "teacher"); add("\u00a0", "teacher");
@@ -1355,11 +1516,12 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     add("");
     add("如果要姻緣比較順利，", "teacher");
   }
-  const sections = isPastLifeRelation ? ["【前前世】", "【前世】", "【綜觀今生】", "【兩人相處建議】"] : !isPastLifePersonal ? [] : /前三世|三世/.test(subTitle)
-    ? ["【前前前世】", "【前前世】", "【前世】", "【綜觀今生】"]
-    : /前兩世|二世/.test(subTitle)
-      ? ["【前前世】", "【前世】", "【綜觀今生】"]
-      : ["【前世】", "【綜觀今生】"];
+  if(isPastLifePersonal||isPastLifeRelation)add(resultHeading,"section");
+  const sections = isPastLifeRelation ? (target ? ["《前世》", "《綜觀今生》", "《兩人相處建議》"] : ["《前世》", "《綜觀今生》"]) : !isPastLifePersonal ? [] : /(?:三|3)\s*世/.test(subTitle.normalize("NFKC"))
+    ? ["《前前前世》", "《前前世》", "《前世》", "《綜觀今生》"]
+    : /(?:兩|二|2)\s*世/.test(subTitle.normalize("NFKC"))
+      ? ["《前前世》", "《前世》", "《綜觀今生》"]
+      : ["《前世》", "《綜觀今生》"];
   sections.forEach((heading) => {
     add(heading, "section");
     if (isPastLifeRelation && heading === sections[0] && targetProfile?.name) add(`${text(targetProfile.name)}是`, "teacher");
@@ -1368,14 +1530,14 @@ function documentBody(pageSpec: PageSpec, itemIndex: number, totalItems: number,
     add("\u00a0", "teacher");
   });
   if (itemCode === "date-time-selection" || title.includes("擇日")) {
-    add("【擇日建議】", "section");
+    add("《擇日建議》", "section");
     const count = /六|6/.test(subTitle) ? 6 : 3;
     for (let index = 1; index <= count; index += 1) add(`${index}.\u00a0`, "teacher");
   }
   const alreadyHasTeacherLayout = isPastLifePersonal || isPastLifeRelation || isOverallFortune || itemCode === "health" || marriage || itemCode === "date-time-selection" || title.includes("擇日");
   if (!alreadyHasTeacherLayout) {
-    const teacherKind = itemCode === "deceased-relative" ? "deceasedTeacher" : "teacher";
-    add(infantSpirit ? "【嬰靈】" : `【${subTitle || title}】`, "section");
+    const teacherKind = "teacher";
+    if (subTitle && subTitle !== title) add(`《${subTitle}》`, "section");
     for (let index = 0; index < 4; index += 1) add(itemCode === "deceased-relative" ? "\u200b" : "\u00a0", teacherKind);
   }
   return { content, marks, images };
@@ -1554,7 +1716,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     const offset = content.length;
     const page = documentBody(pageSpec, index + 1, pages.length, ownerName);
     // 保留 NBSP 組成的老師輸入區；尤其「【綜觀今生】」通常位於頁尾，
-    // 若把 NBSP 一併裁掉，Google 文件就不會留下藍色 12pt 的輸入空間。
+    // 若把 NBSP 一併裁掉，Google 文件就不會留下藍色字級 12 的輸入空間。
     content += page.content.replace(/(?:[ \t]*\n)+$/u, "\n");
     marks.push(...page.marks.map((mark) => ({ ...mark, start: mark.start + offset, end: mark.end + offset })));
     images.push(...page.images);
@@ -1604,7 +1766,7 @@ export async function createConsultationDocuments(db: any, bookingId: string, bo
     redirect: "follow",
   });
   const result = await response.json();
-  if (!response.ok || !result.ok) throw new Error(result.error || "Apps Script 建立文件失敗");
+  if (!response.ok || !result.ok) throw new Error(scriptError(result.error || "Apps Script 建立文件失敗"));
   if (result.version !== requiredAppsScriptVersion) throw new Error(`目前連到舊版 Google Apps Script（目前：${result.version || "無版本資訊"}；需要：${requiredAppsScriptVersion}），請更新 Vercel 的 GOOGLE_APPS_SCRIPT_WEB_APP_URL 後重新部署`);
   // 新文件的格式、快速回覆與回傳 LINE 已在同一次 Apps Script 建立流程完成。
   // 不再立刻透過服務帳號重新讀取新文件，徹底避開 Google 權限同步期間的

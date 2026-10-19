@@ -7,7 +7,7 @@ const path = require('node:path');
 // Run the actual document parser/writers with Google transport mocked; no credentials needed.
 const source = stripTypeScriptTypes(fs.readFileSync(path.join(__dirname, '../lib/google-consultation-docs.ts'), 'utf8'))
   .replace(/^import .*;\r?\n/gm, '').replace(/\bexport /g, '')
-  .replace('async function accessToken()', 'async function unusedAccessToken()')
+  .replace('async function accessToken(', 'async function unusedAccessToken(')
   .replace('async function google(', 'async function unusedGoogle(');
 function fixture(initial) {
   let content = initial;

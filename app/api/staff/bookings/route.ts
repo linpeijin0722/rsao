@@ -1,3 +1,5 @@
+import { syncReturnedStatus } from "@/lib/sync-returned-status";
+import { listReturnedConsultationDocumentIds } from "@/lib/google-consultation-docs";
 import { parseTaipeiDateTime } from "@/lib/taipei-time";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -13,7 +15,7 @@ export async function GET() {
   const [{ data, error }, { data: customers, error: customerError }, { data: consultationProfiles, error: profileError }, {data:paymentSettings},{data:bankAccounts}] = await Promise.all([db
     .from("bookings")
     .select(
-      "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,transfer_account_last5,transfer_reported_at,transfer_time,transfer_amount,transfer_status,data_submitted_at,status,cancellation_reason,paid_at,created_at,google_calendar_event_id,customers(id,line_user_id,line_display_name,line_picture_url,full_name,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,unit_price,quantity,line_total,google_document_id,google_document_url,google_document_created_at,google_sheet_url,booking_items(code),booking_detail_sub_items(sub_item_id,sub_item_title,unit_price,quantity,line_total),booking_detail_profiles(profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)),booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data),booking_answer_participants(position,profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data))))",
+      "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,transfer_account_last5,transfer_reported_at,transfer_time,transfer_amount,transfer_status,data_submitted_at,data_submission_source,consultation_result_returned_at,consultation_result_detected_at,consultation_result_manual_at,status,cancellation_reason,paid_at,created_at,google_calendar_event_id,customers(id,line_user_id,line_display_name,line_picture_url,full_name,phone,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,unit_price,quantity,line_total,google_document_id,google_document_url,google_document_created_at,google_sheet_url,booking_items(code),booking_detail_sub_items(sub_item_id,sub_item_title,unit_price,quantity,line_total),booking_detail_profiles(profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)),booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data),booking_answer_participants(position,profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data))))",
     )
     .order("created_at", { ascending: false }), db
     .from("customers")
@@ -25,9 +27,19 @@ export async function GET() {
     .from("consultation_profiles")
     .select("id,customer_id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data")
     .order("name", { ascending: true }),db.from("booking_system_settings").select("payment_mode,bank_account_key,gateway_disabled_until,gateway_failure_reason").eq("id",true).maybeSingle(),Promise.resolve({data:[{id:"cathay",label:"國泰世華常用帳號",bank_name:"國泰世華",bank_code:"013",branch_name:"營業部",account_number:"218700524294",account_name:"林珮均",note:""},{id:"esun",label:"玉山銀行公司帳號",bank_name:"玉山銀行",bank_code:"808",branch_name:"林口分行",account_number:"0886940043636",account_name:"林阿嫂有限公司",note:""}]})]);
-  if (error || customerError || profileError)
-    return NextResponse.json({ error: error?.message || customerError?.message || profileError?.message }, { status: 500 });
+  if (error || customerError || profileError) {
+    const message = error?.message || customerError?.message || profileError?.message || "讀取訂單失敗";
+    return NextResponse.json({ error: /data_submission_source|consultation_result_(?:returned|detected|manual)_at/.test(message)
+      ? "資料庫尚未更新：請先在 Supabase 依序執行 052_pending_result_status.sql 與 053_manual_results_and_video_time_off.sql，再重新整理後台。" : message }, { status: 500 });
+  }
   const bookings:any[]=(data||[]) as any[];
+  // LINE webhook 的聯絡人資料是改名後的最新顯示名稱；優先補回給後台搜尋／複製功能。
+  const lineIds=[...new Set(bookings.map((b:any)=>{const c=Array.isArray(b.customers)?b.customers[0]:b.customers;return c?.line_user_id;}).filter(Boolean))];
+  if(lineIds.length){
+    const {data:liveContacts}=await db.from("line_contacts").select("line_user_id,display_name,picture_url").in("line_user_id",lineIds);
+    const live=new Map((liveContacts||[]).map((x:any)=>[x.line_user_id,x]));
+    for(const booking of bookings){const c=Array.isArray(booking.customers)?booking.customers[0]:booking.customers, current=c&&live.get(c.line_user_id);if(current){c.line_display_name=current.display_name||c.line_display_name;c.line_picture_url=current.picture_url||c.line_picture_url;}}
+  }
   const answers=bookings.flatMap((booking:any)=>(booking.booking_details||[]).flatMap((detail:any)=>detail.booking_consultation_answers||[]));
   const answerIds=[...new Set(answers.map((answer:any)=>answer.id).filter(Boolean))];
   // PostgREST 的深層關聯在舊資料上偶爾只回第一位參與者；另查一次並依位置
@@ -58,12 +70,34 @@ export async function GET() {
     if(docsError)return NextResponse.json({error:docsError.message},{status:500});
     for(const booking of bookings)booking.document_history=(docs||[]).filter((doc:any)=>doc.booking_id===booking.id);
   }
-  return NextResponse.json({ bookings, customers: customers || [], consultationProfiles: consultationProfiles || [],paymentSettings,bankAccounts:bankAccounts||[] });
+  if(bookings.length){const {data:schedules,error:scheduleError}=await adminSupabase().from('consultation_return_schedules').select('id,booking_no,scheduled_for,status,sent_at,last_error').in('booking_no',bookings.map(b=>b.booking_no)).order('created_at',{ascending:false});for(const booking of bookings){booking.return_schedules=(schedules||[]).filter(s=>s.booking_no===booking.booking_no);booking.return_schedule_error=!!scheduleError}}
+  let resultSyncWarning = "";
+  try { await syncReturnedStatus(db, bookings, listReturnedConsultationDocumentIds); }
+  catch (error) { console.error("回傳資料夾同步失敗", error); resultSyncWarning = "已回傳資料夾暫時無法同步，請稍後重新整理；若持續發生，請確認 Google 服務帳號具有資料夾讀取權限"; }
+  return NextResponse.json({ resultSyncWarning, bookings, customers: customers || [], consultationProfiles: consultationProfiles || [],paymentSettings,bankAccounts:bankAccounts||[] });
 }
 export async function POST(request: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
   const body = await request.json(), { bookingNo, action } = body;
+  if(action === "mark_manual_result") {
+    const now = new Date().toISOString();
+    const {data,error} = await adminSupabase().from("bookings").update({consultation_result_manual_at:now,updated_at:now})
+      .eq("booking_no",bookingNo).eq("payment_status","paid").not("status","in","(cancelled,canceled,expired,refunded)")
+      .is("consultation_result_manual_at",null).is("consultation_result_returned_at",null).is("consultation_result_detected_at",null)
+      .select("id").maybeSingle();
+    if(error)return NextResponse.json({error:error.message},{status:500});
+    if(!data)return NextResponse.json({error:"訂單已註記回傳、未付款或已取消，請重新整理"},{status:409});
+    return NextResponse.json({ok:true,manualAt:now});
+  }
+  if(action === "mark_manual_submission") {
+    const db=adminSupabase(),now=new Date().toISOString();
+    const {data,error}=await db.from("bookings").update({data_submitted_at:now,data_submission_source:"manual_line",updated_at:now})
+      .eq("booking_no",bookingNo).eq("payment_status","paid").is("data_submitted_at",null).select("id").maybeSingle();
+    if(error)return NextResponse.json({error:error.message},{status:500});
+    if(!data)return NextResponse.json({error:"此訂單已回傳、尚未付款或不存在，請重新整理"},{status:409});
+    return NextResponse.json({ok:true});
+  }
   if(action==="set_payment_mode"){
     const mode=String(body.mode||"");if(!["auto","newebpay","bank_transfer"].includes(mode))return NextResponse.json({error:"付款模式不正確"},{status:400});
     const {error}=await adminSupabase().from("booking_system_settings").upsert({id:true,payment_mode:mode,updated_at:new Date().toISOString()});

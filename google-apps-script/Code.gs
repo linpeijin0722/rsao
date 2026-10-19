@@ -1,4 +1,4 @@
-const SCRIPT_VERSION = "2026-10-01-v33";
+const SCRIPT_VERSION = "2026-10-13-v34";
 const RETURN_BUTTON_ANCHOR = "\u200B";
 const RETURN_BUTTON_ALT_TITLE = "RSAO_CONSULTATION_RETURN_BUTTON";
 
@@ -94,11 +94,12 @@ function doPost(e) {
       } else if (mark.kind === "question") {
         editor.setBold(start, end, true).setFontSize(start, end, 12).setForegroundColor(start, end, "#000000");
       } else if (mark.kind === "answer") {
-        editor.setBold(start, end, false).setFontSize(start, end, 12).setForegroundColor(start, end, "#1A59CC");
+        editor.setBold(start, Math.min(lastContentIndex, end + 1), false).setFontSize(start, Math.min(lastContentIndex, end + 1), 12).setForegroundColor(start, Math.min(lastContentIndex, end + 1), "#1a59cc");
       } else if (mark.kind === "teacher") {
-        editor.setBold(start, end, false).setFontSize(start, end, 12).setForegroundColor(start, end, "#1A59CC");
+        // Use Google Docs font size 12; include the paragraph break so new input inherits this style.
+        editor.setBold(start, Math.min(lastContentIndex, end + 1), false).setFontSize(start, Math.min(lastContentIndex, end + 1), 12).setForegroundColor(start, Math.min(lastContentIndex, end + 1), "#1a59cc");
       } else if (mark.kind === "section") {
-        editor.setBold(start, end, true).setFontSize(start, end, 15).setForegroundColor(start, end, "#000000");
+        editor.setBold(start, end, true).setFontSize(start, end, 10.5).setForegroundColor(start, end, "#000000");
       } else if (mark.kind === "fieldLabel") {
         editor.setBold(start, end, true).setFontSize(start, end, 14).setForegroundColor(start, end, "#6B3B24");
       } else if (mark.kind === "fieldAnswer") {

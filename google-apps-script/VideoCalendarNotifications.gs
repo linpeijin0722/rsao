@@ -62,7 +62,7 @@ var ASAO_USER_ID = "Ue97f8c49e2eb2a1d5490480c736b67f8";
 
 // 三天內視訊結果內容檢查資料夾
 
-var FOLDER_ID = "18CDZkO9pM2UWHvhURQo1vc8CX2ms0mPf";
+var FOLDER_ID = "1HMRq4GScXbSsqSwT4ssSDQHKktS29R8K";
 
 var LIN_SHOU_JUN_FOLDER_ID = "1N--D6_R_Ldz2VyzGbPvgiKRoyw_K0iSq";
 
@@ -281,13 +281,41 @@ function sendVideoReminder(type) {
 // ---------- 三天內未回傳：改查檔案內容 ----------
 
 function checkThreeDaysBeforeVideoEvents() {
-  var today=startOfDay(new Date()),events=listVideoOrders(today,endOfDay(calendarDay(today,2)));
-  events.forEach(function(event){
-    var p=eventIdentity(event);
-    if(!folderHasFileContent(FOLDER_ID,p.name)){
-      pushToUsers(CHECK_REMIND_USER_IDS,"📌 諮詢結果回傳提醒\n\n請確認 "+eventReminderLine(event,true)+" 諮詢結果是否尚未回傳");
-    }
+  var properties=PropertiesService.getScriptProperties(),secret=properties.getProperty('BOOKING_CRON_SECRET');
+  var site=(properties.getProperty('BOOKING_SITE_URL')||'https://rsao-virid.vercel.app').replace(/\/$/,'');
+  if(!secret)throw new Error('請設定 BOOKING_CRON_SECRET，與網站 CRON_SECRET 相同；未確認資料回傳狀態前不發通知。');
+  var response=UrlFetchApp.fetch(site+'/api/cron/result-reminder-status',{headers:{Authorization:'Bearer '+secret},muteHttpExceptions:true});
+  if(response.getResponseCode()!==200)throw new Error('讀取資料回傳狀態失敗，本次未發通知。');
+  var orders=JSON.parse(response.getContentText()).orders;
+  if(!Array.isArray(orders))throw new Error('回傳狀態格式錯誤');
+  var files=returnedFolderFiles(DriveApp.getFolderById(FOLDER_ID)),pending=orders.filter(function(order){return !orderIsReturned(order,files)});
+  pending.sort(function(a,b){return new Date(a.slotStart)-new Date(b.slotStart)});
+  var heading='⚠️ 請確認「諮詢結果」是否已經回傳',lines=[];
+  pending.forEach(function(order){
+    var date=new Date(order.slotStart),hour=Number(Utilities.formatDate(date,TIME_ZONE,'H'));
+    var weekday=['日','一','二','三','四','五','六'][Number(Utilities.formatDate(date,TIME_ZONE,'u'))%7];
+    var time=Utilities.formatDate(date,TIME_ZONE,'M/d')+'（'+weekday+'）'+(hour<12?'上午':'下午')+' '+(hour%12||12)+':'+Utilities.formatDate(date,TIME_ZONE,'mm');
+    var line='⏰ '+time+' '+(order.lineName||order.name)+(order.lineName&&order.name?'（'+order.name+'）':'');
+    if((heading+'\n'+lines.concat(line).join('\n')).length>4500&&lines.length){pushToUsers(CHECK_REMIND_USER_IDS,heading+'\n'+lines.join('\n'));lines=[]}
+    lines.push(line);
   });
+  if(lines.length)pushToUsers(CHECK_REMIND_USER_IDS,heading+'\n'+lines.join('\n'));
+}
+
+function returnedFolderFiles(folder){
+ var files=listFiles(folder.getId()).filter(function(file){return !file.isTrashed()});
+ var children=folder.getFolders();while(children.hasNext())files=files.concat(returnedFolderFiles(children.next()));
+ return files;
+}
+function orderIsReturned(order,files){
+ // Match known document IDs first. Names alone must not match a different booking.
+ var ids=order.documentIds||[];
+ if(ids.length)return ids.every(function(id){return files.some(function(file){return file.getId()===id||(file.getMimeType()==='application/vnd.google-apps.shortcut'&&file.getTargetId()===id)})});
+ return files.some(function(file){
+  if(file.getName().indexOf(order.bookingNo)!==-1)return true;
+  if(file.getMimeType()!=='application/vnd.google-apps.document')return false;
+  return DocumentApp.openById(file.getId()).getBody().getText().indexOf(order.bookingNo)!==-1;
+ });
 }
 
 /**

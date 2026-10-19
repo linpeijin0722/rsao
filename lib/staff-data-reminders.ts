@@ -7,4 +7,10 @@ export function reminderEligible(b:{slot_start?:string|null;status?:string;payme
  return delta>=0&&delta<=4;
 }
 export function isReminderNoon(now=new Date()){return taipeiDateTimeInput(now).slice(11,13)==='12';}
-export function staffReminderText(b:any,site:string){const customer=Array.isArray(b.customers)?b.customers[0]:b.customers;return `【視訊諮詢資料未填寫】\n客人：${customer?.full_name||customer?.line_display_name||'未填姓名'}\n訂單：${b.booking_no}\n視訊時間：${taipeiDateTimeInput(b.slot_start).replace('T',' ')}（台灣時間）\n請客服確認此筆訂單，提醒客人填寫問事資料。\n${site.replace(/\/$/,'')}/staff`;}
+export function staffReminderText(input:any|any[],site:string){
+ const rows=(Array.isArray(input)?[...input]:[input]).sort((a,b)=>Date.parse(a.slot_start)-Date.parse(b.slot_start));
+ const name=(b:any)=>{const c=Array.isArray(b.customers)?b.customers[0]:b.customers;return c?.full_name||c?.line_display_name||'未填姓名'};
+ const time=(b:any)=>taipeiDateTimeInput(b.slot_start).replace(/-/g,'/').replace('T',' ');
+ const entries=rows.map((b,i)=>rows.length===1?`⏰ 視訊時間：${time(b)}\n👤 客人：${name(b)}\n❗ 尚未回傳問事資料`:`${['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'][i]||`${i+1}.`} ⏰ ${time(b)}\n   客人：${name(b)}\n   ❗ 問事資料未回傳`).join('\n\n');
+ return `🚨【視訊將至，資料尚未回傳】\n\n視訊時間快到了！以下客人仍未回傳問事資料，請聯繫催填：\n\n${entries}\n\n👉 前往後台確認\n${site.replace(/\/$/,'')}/staff`;
+}

@@ -968,9 +968,9 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
     const previousSameGroup = questionMeta.slice(0, index).filter((entry: any) =>
       entry.itemCode === meta.itemCode && entry.profileName === meta.profileName,
     ).length;
-    return { slotIndex: index, questionNumber: previousSameGroup + 1, question: meta.question, answer, itemCode: meta.itemCode || "", itemTitle: meta.itemTitle || "", profileName: meta.profileName || "", profileLines: meta.profileLines || [], manualOnly: true };
+    return { slotIndex: index, questionNumber: previousSameGroup + 1, question: meta.question, answer, itemCode: meta.itemCode || "", itemTitle: meta.itemTitle || "", profileName: meta.profileName || "", profileLines: meta.profileLines || [], manualOnly: false };
   });
-  if (!questionSlots.length) questionSlots = documentQuestionSlots.map((slot, index) => ({ ...slot, itemCode: externalItemCode, itemTitle: externalTitles[externalItemCode]||"", profileName: "", profileLines: [], manualOnly: !external }));
+  if (!questionSlots.length) questionSlots = documentQuestionSlots.map((slot, index) => ({ ...slot, itemCode: externalItemCode, itemTitle: externalTitles[externalItemCode]||"", profileName: "", profileLines: [], manualOnly: false }));
   if (!questionSlots.length) {
     const fallback = details
       .flatMap((detail: any) =>
@@ -989,9 +989,7 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
       itemTitle: questionMeta[slotIndex]?.itemTitle || "",
       profileName: questionMeta[slotIndex]?.profileName || "",
       profileLines: questionMeta[slotIndex]?.profileLines || [],
-      manualOnly: String(questionMeta[slotIndex]?.itemCode || "").startsWith(
-        "past-life-",
-      ),
+      manualOnly: false,
     }));
   }
   if (questionMeta.length > questionSlots.length) {
@@ -1315,7 +1313,7 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
           ...presentation,
         };
         if (["marriage-bazi", "past-life-relationship"].includes(itemCode) && relationshipTargets.length) {
-          return relationshipTargets.map((target) => {
+          const targetSections=relationshipTargets.map((target) => {
             const targetProfile = target.targetProfile;
             const targetName = clean(targetProfile?.name) || "未命名對象";
             const targetGender = clean(targetProfile?.gender);
@@ -1334,6 +1332,7 @@ async function context(bookingNo: string, requestedDocumentId = "", externalItem
               requestLines: [...compactTargetProfileLines, ...target.lines.filter((line: string) => !/^【對象：/.test(line) && !targetPresentation.profileLines.some((profileLine: string) => profileLine.replace(/^(?:姓名|農曆生日|居住地址)：/, "") === line))],
             };
           });
+          return itemCode==="past-life-relationship" ? [{...base,requestLines:[],targetName:"",targetDisplay:""},...targetSections] : targetSections;
         }
         return [{ ...base, requestLines }];
       });
@@ -1876,7 +1875,7 @@ export async function POST(request: NextRequest) {
       const current=currentSlots.find(entry=>entry.slotIndex===slot.slotIndex&&entry.label==="流年運勢");
       if(!current)throw new Error("文件區域已變動，請重新開啟快速回覆");
       const state=parseAnnual(current.answer),ages=annualAges(Number(Object.keys(state)[0]||0));
-      if(!ages.includes(age))return NextResponse.json({error:"這個年齡不在文件的15年範圍內"},{status:400});
+      if(!ages.includes(age))return NextResponse.json({error:"這個年齡不在文件的20年範圍內"},{status:400});
       state[age]={codes:asArray(body.codes).map(String).slice(0,120),text:normalizeConsultationReturnText(String(body.answer??"")).slice(0,5000),manual:body.manual===true};
       await upsertQuickConsultationSectionReplies(data.documentDetail.google_document_id,{[String(slot.slotIndex)]:annualText(ages,state)},{[String(slot.slotIndex)]:{state,dirtyAges:[age]}});
       // 文件是目前內容的來源；回讀後保存，避免把別年的舊草稿寫回去。
@@ -1898,7 +1897,7 @@ export async function POST(request: NextRequest) {
       const sections=data.sectionSlots.filter((entry:any)=>entry.itemCode===q.itemCode&&entry.profileName===q.profileName&&(!q.targetName||entry.targetName===q.targetName));
       const source=sections.map((entry:any)=>`【${entry.sectionLabel||entry.label}${entry.targetDisplay ? `／${entry.targetDisplay}` : ""}】\n${String(incoming[String(entry.slotIndex)]?.answer??entry.answer??"")}`).join("\n\n");
       const ownAnswer=String(body.currentAnswer||"").slice(0,2500);
-      return NextResponse.json({ok:true,...await generateQuestionChoices([{slotIndex:q.slotIndex,questionNumber:q.questionNumber,question:q.question,profileName:q.profileName||"",source:[source,ownAnswer?`【這題阿嫂已寫的回答】\n${ownAnswer}`:""].filter(Boolean).join("\n").slice(0,13000)}])});
+      return NextResponse.json({ok:true,...await generateQuestionChoices([{slotIndex:q.slotIndex,questionNumber:q.questionNumber,question:q.question,profileName:q.profileName||"",source:[source,ownAnswer?`【這題阿嫂已寫的回答】\n${ownAnswer}`:""].filter(Boolean).join("\n").slice(0,13000)}],body.direction)});
     }
     if (body.mode === "compose" || body.mode === "compose_section") {
       const selections =

@@ -238,7 +238,7 @@ export default function QuickConsultationReply({
           Object.fromEntries(
             (x.questions || []).map((q: Question) => [
               String(q.slotIndex),
-              x.recommendedByQuestion?.[String(q.slotIndex)]?.[0] ||
+              x.recommendedByQuestion?.[String(q.slotIndex)]?.find((code: string) => x.topics?.some((topic: Topic) => topic.code === code)) ||
                 x.topics?.[0]?.code ||
                 "",
             ]),
@@ -641,7 +641,7 @@ export default function QuickConsultationReply({
       answer: "",
       completed: false,
     },
-    categoryCode = activeCategory[questionKey] || "",
+    categoryCode = activeCategory[questionKey] || data?.recommendedByQuestion?.[questionKey]?.find(code => topicMap.has(code)) || data?.topics?.[0]?.code || "",
     category = topicMap.get(categoryCode),
     questionOptionGroups = useMemo(() => {
       const groups = new Map<string, Option[]>();
@@ -911,7 +911,7 @@ export default function QuickConsultationReply({
       ...c,
       [questionKey]: { ...draft, selections: next, completed: false },
     }));
-    if (nextCodes.length) void compose(next);
+    if (Object.values(next).some(values => values.length)) void compose(next);
     else
       setDrafts((c) => ({
         ...c,
@@ -1301,11 +1301,14 @@ export default function QuickConsultationReply({
       (r) => r.optionIds?.length && !r.answer?.trim(),
     ),
     sectionIsPending = Object.values(sectionPending).some(Boolean);
-  const aiForReply = (q:Question|undefined,manualKey?:string,questionText="") => {
+  const aiForReply = (q:Question|undefined,manualKey?:string,questionText="",boundSection?:Section) => {
     const key=q?String(q.slotIndex):manualKey||"";
+    const replySection=boundSection||section;
     const answer=q?drafts[key]?.answer||"":manualSectionReplies[key]||"";
-    return <AiAnswerChoices key={`ai:${key}`} fingerprint={JSON.stringify([Object.fromEntries(Object.entries(sectionDrafts).map(([k,row])=>[k,row.answer])),section?.slotIndex])} generate={()=>post({mode:"ai_question_choices",questionSlotIndex:q?.slotIndex,sectionSlotIndex:q?undefined:section?.slotIndex,question:questionText,currentAnswer:answer,sectionReplies:sectionDrafts})} onChoose={(_,next)=>{
-      if(answer.trim()&&!window.confirm("這題已有答案，是否用選取的 AI 回答替換？"))return false;
+    const relevant=sections.filter(entry=>entry.itemCode===(q?.itemCode||replySection?.itemCode)&&entry.profileName===(q?.profileName||replySection?.profileName)&&(!replySection?.targetName||entry.targetName===replySection.targetName));
+    const hasReference=[answer,...relevant.map(entry=>sectionDrafts[String(entry.slotIndex)]?.answer??entry.answer)].some(value=>Boolean(String(value||"").replace(/【[^】]*】|《[^》]*》|\d+歲\s*[:：]|[\s\u00a0\u200b]/g,"")));
+    return <AiAnswerChoices hasReference={hasReference} key={`ai:${key}`} fingerprint={JSON.stringify([Object.fromEntries(Object.entries(sectionDrafts).map(([k,row])=>[k,row.answer])),section?.slotIndex])} generate={(direction)=>post({mode:"ai_question_choices",direction,questionSlotIndex:q?.slotIndex,sectionSlotIndex:q?undefined:replySection?.slotIndex,question:questionText,currentAnswer:answer,sectionReplies:sectionDrafts})} onChoose={(_,next)=>{
+      if(q&&view==="question")setEditing(true);
       if(q)setDrafts(c=>({...c,[key]:{selections:c[key]?.selections||{},phraseIds:[],answer:next,completed:true}}));
       else setManualSectionReplies(c=>({...c,[key]:next}));
       setWritten(false);return true;
@@ -1315,6 +1318,7 @@ export default function QuickConsultationReply({
     const normalized = questionText.replace(/[？?。.!！\s]/g, "");
     const targetItemCode = scope?.itemCode || section?.itemCode || "";
     const targetProfileName = scope?.profileName || section?.profileName || "";
+    const replySection=section?.itemCode===targetItemCode&&section?.profileName===targetProfileName?section:sections.find(entry=>entry.itemCode===targetItemCode&&entry.profileName===targetProfileName);
     // 只要能對到既有 Qn，就直接更新 An；完全找不到 Qn 時，才建立
     // 「阿嫂回覆：」的自由回覆，交由回傳流程接續編成新的 Q&A。
     const adviceQuestion = normalized.length >= 2 ? data?.questions.find((entry) => {
@@ -1322,28 +1326,27 @@ export default function QuickConsultationReply({
       return (candidate === normalized || (targetItemCode === "overall-fortune" && candidate === `${label}建議`.replace(/[？?。.!！\s]/g,""))) && (!targetItemCode || entry.itemCode === targetItemCode) && (!targetProfileName || entry.profileName === targetProfileName);
     }) : undefined;
     if (!adviceQuestion) {
-      if (!allowSectionFallback) return null;
-      const manualKey = `manual:${sectionKey}:${label}:${questionText}`;
+      if (!replySection) return null;
+      const manualKey = `manual:${replySection.slotIndex}:${label}:${questionText}`;
       return (
         <div className="quickReplyInlineAdvice quickReplySectionManualReply">
-          <b>阿嫂回覆</b>
+          {aiForReply(undefined,manualKey,questionText||label,replySection)}
           <textarea
             rows={1}
             value={manualSectionReplies[manualKey] || ""}
-            placeholder="請輸入本項目的回覆"
+            placeholder={`請填寫「${label}」的回答`}
             onChange={(event) => {
               setManualSectionReplies((current) => ({ ...current, [manualKey]: event.target.value }));
               setWritten(false);
             }}
           />
-          {aiForReply(undefined,manualKey,questionText||label)}
         </div>
       );
     }
     const key = String(adviceQuestion.slotIndex);
     return (
       <div className="quickReplyInlineAdvice">
-        <b>阿嫂回覆</b>
+        {aiForReply(adviceQuestion)}
         <textarea
           rows={1}
           value={drafts[key]?.answer || ""}
@@ -1362,7 +1365,6 @@ export default function QuickConsultationReply({
             setWritten(false);
           }}
         />
-        {aiForReply(adviceQuestion)}
       </div>
     );
   };
@@ -1463,6 +1465,12 @@ export default function QuickConsultationReply({
         ) : (
           data && (
             <div className="quickReplyBody">
+              {sections.length > 0 && questionGroups.length > 0 && (
+                <nav className="quickReplySectionTabs" aria-label="回覆模式">
+                  <button type="button" className={view === "section" ? "selected" : ""} onClick={() => pickTarget("section", activeSection)}>項目快速回覆</button>
+                  <button type="button" className={view === "question" ? "selected" : ""} onClick={() => pickTarget("question", activeQuestion)}>客人問題快速回覆</button>
+                </nav>
+              )}
               {data.previousSummaries?.length > 0 && (
                 <section className="quickReplyPreviousSummary">
                   <h3>最近一次諮詢摘要</h3>
@@ -1513,7 +1521,7 @@ export default function QuickConsultationReply({
                   ))}
                   {section && currentSectionGroup && currentSectionGroup.indices.length>1 && <nav className="quickReplySectionTabs" aria-label="本項目回覆區域">{currentSectionGroup.indices.map(index=><button key={index} type="button" className={index===activeSection?"selected":""} onClick={()=>pickTarget("section",index)}>{sections[index].sectionLabel||sections[index].label}</button>)}</nav>}
                   {section && (
-                    <div className={section.label === "流年運勢" ? "annualReplyMode" : ""}>
+                    <div className={(section.sectionLabel||section.label) === "流年運勢" ? "annualReplyMode" : ""}>
                       <div ref={itemDetailRef} className="quickReplyItemAnchor" aria-hidden="true" />
                       {section.profileLines?.length > 0 && (
                         <section className="quickReplyProfileCard">
@@ -1523,7 +1531,7 @@ export default function QuickConsultationReply({
                           ))}
                         </section>
                       )}
-                      {section.label === "流年運勢" && <AnnualFortuneEditor key={sectionKey} startAge={Number(section.answer.match(/(\d+)歲\s*[:：]/)?.[1]||sectionDraft.answer.match(/(\d+)歲\s*[:：]/)?.[1]||section.profileLines.join(" ").match(/虛歲\s*[:：]\s*(\d+)/)?.[1]||0)} value={sectionDraft.answer} state={sectionDraft.annualState} disabled={busy} onSave={async(age)=>{const row=(sectionDraft.annualState||parseAnnual(sectionDraft.answer))[age]||{codes:[],text:""};setBusy(true);try{await post({mode:"write_annual",sectionSlotIndex:section.slotIndex,age,answer:row.text,codes:row.codes,manual:row.manual});setSectionDrafts(c=>({...c,[sectionKey]:{...c[sectionKey],annualDirtyAges:(c[sectionKey]?.annualDirtyAges||[]).filter(n=>n!==age)}}))}finally{setBusy(false)}}} onChange={(answer,annualState,age)=>{setSectionDrafts(c=>({...c,[sectionKey]:{...sectionDraft,answer,annualState,annualDirtyAges:Array.from(new Set([...(sectionDraft.annualDirtyAges||[]),age])),completed:true}}));setWritten(false)}}/>}
+                      {(section.sectionLabel||section.label) === "流年運勢" && <AnnualFortuneEditor health={section.itemCode === "health"} key={sectionKey} startAge={Number(section.answer.match(/(\d+)歲\s*[:：]/)?.[1]||sectionDraft.answer.match(/(\d+)歲\s*[:：]/)?.[1]||section.profileLines.join(" ").match(/虛歲\s*[:：]\s*(\d+)/)?.[1]||0)} value={sectionDraft.answer} state={sectionDraft.annualState} disabled={busy} onSave={async(age)=>{const row=(sectionDraft.annualState||parseAnnual(sectionDraft.answer))[age]||{codes:[],text:""};setBusy(true);try{await post({mode:"write_annual",sectionSlotIndex:section.slotIndex,age,answer:row.text,codes:row.codes,manual:row.manual});setSectionDrafts(c=>({...c,[sectionKey]:{...c[sectionKey],annualDirtyAges:(c[sectionKey]?.annualDirtyAges||[]).filter(n=>n!==age)}}))}finally{setBusy(false)}}} onChange={(answer,annualState,age)=>{setSectionDrafts(c=>({...c,[sectionKey]:{...sectionDraft,answer,annualState,annualDirtyAges:Array.from(new Set([...(sectionDraft.annualDirtyAges||[]),age])),completed:true}}));setWritten(false)}}/>}
                       {sectionTopic?.code !== "naming_result" && section.itemCode !== "infant-spirit" && (!embedded || section.requestLines.length > 0) && (
                           <section className="quickReplyInputCard">
                             <h3>{section.requestLines.length ? "用戶填寫的內容" : "用戶無填寫內容"}</h3>
@@ -1562,7 +1570,7 @@ export default function QuickConsultationReply({
                                 );
                               const label = split >= 0 ? line.slice(0, split) : "補充內容";
                               const value = split >= 0 ? line.slice(split + 1) : line;
-                              const shouldAnswer = /^問題\d*$/.test(label) || /想瞭解|會不會|要不要|可不可以|能不能|是否|是不是|好不好|適不適合|該不該|怎麼辦|如何|為什麼|什麼時候|哪時候|嗎|呢|[？?]/.test(`${label}${value}`);
+                              const shouldAnswer = true;
                               return (
                                 <div key={index} className={shouldAnswer ? "quickReplyInputQuestion" : ""}>
                                   <b>
@@ -1573,7 +1581,6 @@ export default function QuickConsultationReply({
                                 </div>
                               );
                               })}
-                              {!section.requestLines.some((line) => /^問題\d*：/.test(line) || /想瞭解|會不會|要不要|可不可以|能不能|是否|是不是|好不好|適不適合|該不該|怎麼辦|如何|為什麼|什麼時候|哪時候|嗎|呢|[？?]/.test(line)) && adviceFieldFor("", "本項目", true)}
                             </>}
                           </section>
                         )}
@@ -3298,15 +3305,23 @@ export default function QuickConsultationReply({
                               return <div key={index} className="quickReplyInputGroupHeading"><b>{heading[1]}</b></div>;
                             const label = split >= 0 ? line.slice(0, split) : "補充內容";
                             const value = split >= 0 ? line.slice(split + 1) : line;
-                            const shouldAnswer = /^問題\d*$/.test(label) || /想瞭解|會不會|要不要|可不可以|能不能|是否|是不是|好不好|適不適合|該不該|怎麼辦|如何|為什麼|什麼時候|哪時候|嗎|呢|[？?]/.test(`${label}${value}`);
+                            const shouldAnswer = true;
                             return (
                               <div key={index} className={shouldAnswer ? "quickReplyInputQuestion" : ""}>
                                 <b>{label}</b>
                                 <p>{value}</p>
-                                {shouldAnswer && adviceFieldFor(value, label, false, { itemCode: question.itemCode, profileName: question.profileName })}
+                                {shouldAnswer && adviceFieldFor(value, label, true, { itemCode: question.itemCode, profileName: question.profileName })}
                               </div>
                             );
                           })}
+                        </section>
+                      )}
+                      {!question.manualOnly && (
+                        <section className="quickReplyCategoryPicker quickReplyQuestionCategoryPicker">
+                          <h3>快速回覆分類</h3>
+                          <p>選擇分類，再點選下方的快速回覆按鈕。</p>
+                          <div>{(data.topics || []).map(topic => <button type="button" key={topic.code} className={categoryCode === topic.code ? "active" : ""} aria-pressed={categoryCode === topic.code} onClick={() => setActiveCategory(current => ({ ...current, [questionKey]: topic.code }))}>{topic.icon} {topic.title}</button>)}</div>
+                          {!data.topics?.length && <p role="status">目前沒有可用的快速回覆分類，請確認句庫設定。</p>}
                         </section>
                       )}
                       {!question.manualOnly && category && (
@@ -3317,27 +3332,32 @@ export default function QuickConsultationReply({
                           <p>每一個分類最多可複選 3 個選項。</p>
                           {questionOptionGroups.map(([groupLabel, options], groupIndex) => {
                             const panelKey = `question-${questionKey}-${category.code}-${groupLabel}`;
+                            const expanded = openPanels[panelKey] ?? groupIndex === 0;
                             const selectedCodes = asCodes(
                               draft.selections[category.code],
                             );
                             return (
-                              <div className={`quickReplySpecialField quickReplyQuestionGroup${openPanels[panelKey] ? " expanded" : ""}`} key={groupLabel}>
-                                <div
+                              <div className={`quickReplySpecialField quickReplyQuestionGroup${expanded ? " expanded" : ""}`} key={groupLabel}>
+                                <button
+                                  type="button"
+                                  aria-expanded={expanded}
                                   className="quickReplySpecialHeading"
                                   onClick={() =>
                                     setOpenPanels((current) => ({
                                       ...current,
-                                      [panelKey]: !current[panelKey],
+                                      [panelKey]: !(current[panelKey] ?? groupIndex === 0),
                                     }))
                                   }
                                 >
                                   <span>{["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧"][groupIndex] || groupIndex + 1}</span>
                                   <div><h4>{groupLabel}</h4></div>
-                                </div>
-                                {openPanels[panelKey] && (
+                                </button>
+                                {expanded && (
                                   <div className="quickReplySpecialChoices">
                                     {options.map((o) => (
                                       <button
+                                        type="button"
+                                        disabled={busy}
                                         key={o.code}
                                         className={
                                           selectedCodes.includes(o.code)
@@ -3357,6 +3377,7 @@ export default function QuickConsultationReply({
                               </div>
                             );
                           })}
+                          {!questionOptionGroups.length && <p role="status">此分類目前沒有快速回覆選項，請選擇其他分類或自行填寫回覆。</p>}
                           {asCodes(draft.selections[category.code]).length > 0 && (
                             <button
                               className="quickReplyRemoveCategory"
@@ -3369,9 +3390,9 @@ export default function QuickConsultationReply({
                       )}
                       <section className="quickReplyPreview">
                         <div>
-                          <h3>阿嫂回覆・Q{question.questionNumber}</h3>
+                          {aiForReply(question)}
                         </div>
-                        {editing || question.manualOnly ? (
+                        {editing || question.manualOnly || !draft.answer ? (
                           <textarea
                             value={draft.answer}
                             onChange={(e) => {
@@ -3393,7 +3414,6 @@ export default function QuickConsultationReply({
                               `${question.profileName || "諮詢者"}：${question.question}`}
                           </p>
                         )}
-                        {aiForReply(question)}
                         <div className="quickReplyPreviewActions">
                           {!question.manualOnly && (
                             <button

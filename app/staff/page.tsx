@@ -1,4 +1,9 @@
 "use client";
+import SubmissionStatus from "./SubmissionStatus";
+import LineWatchlist from "./LineWatchlist";
+import "./watchlist.css";
+import PendingWork, { ResultReturnStatus } from "./PendingWork";
+
 import { taipeiDateKey, taipeiDateTimeInput, taipeiYear } from "@/lib/taipei-time";
 import { useEffect, useMemo, useState } from "react";
 import StaffAnswerEditorV2 from "./StaffAnswerEditorV2";
@@ -122,7 +127,14 @@ const videoDateTimeText = (value: string) => {
 };
 export default function Staff() {
   const [password, setPassword] = useState(""),
+    [submissionActions,setSubmissionActions]=useState<any>(null),
+    [submissionBusy,setSubmissionBusy]=useState(false),
     [rows, setRows] = useState<any[]>([]),
+    [resultSyncWarning,setResultSyncWarning]=useState(""),
+    [manualResultBusy,setManualResultBusy]=useState(false),
+    [bookingsLoading,setBookingsLoading]=useState(false),
+    [showVideoReturn,setShowVideoReturn]=useState(false),
+    [showTextReturn,setShowTextReturn]=useState(false),
     [items, setItems] = useState<any[]>([]),
     [methods, setMethods] = useState<any[]>([]),
     [manualCustomers, setManualCustomers] = useState<any[]>([]),
@@ -279,13 +291,13 @@ export default function Staff() {
     if(!response.ok)return alert(result.error||"更改連結失敗");
     setDocumentLinkEdit(null);setDocumentLinkValue("");await load();alert("諮詢單連結已更新");
   }
-  function documentActions(x:any,showNumber=showDocumentNumber){
+  function documentActions(x:any,showNumber=showDocumentNumber,showReply=true){
     if(!isComplete(x))return <span className="sheetPending">—</span>;
     const links=sheetLinks(x),busy=generatingDocument===x.booking_no;
     return <span className="consultationSheetLinks">
       <button className="consultationSheetLink documentGenerateButton" disabled={busy} onClick={()=>links.length&&asArray(x.data_submissions).length>1?setDocumentVersionPicker(x):links.length?setDocumentRebuild(x):generateDocument(x)} title={links.length?"重新建立諮詢單":"建立諮詢單"} aria-label={links.length?"重新建立諮詢單":"建立諮詢單"}>{busy?"…":"📄"}</button>
       <button className="consultationSheetLink documentRelinkButton" onClick={()=>{setDocumentLinkEdit(x);setDocumentLinkValue(links[0]?.consultation_url||"")}} title="更改為現有 Google 文件連結" aria-label="更改諮詢單連結">🔄</button>
-      {links[0]?.google_document_id&&<button className="quickReplyLaunch" onClick={()=>setQuickReplyTarget({bookingNo:x.booking_no,documentId:links[0].google_document_id})} title="使用固定句庫建立諮詢回覆">✦ 回覆</button>}
+      {showReply&&links[0]?.google_document_id&&<button className="quickReplyLaunch" onClick={()=>setQuickReplyTarget({bookingNo:x.booking_no,documentId:links[0].google_document_id})} title="使用固定句庫建立諮詢回覆">✦ 回覆</button>}
       {links.map((detail:any)=><a key={detail.id} className="consultationSheetLink consultationDocumentLink" href={detail.consultation_url} target="_blank" rel="noreferrer" title={`開啟：${detail.item_title}`} aria-label={`開啟${detail.item_title}諮詢單`}>🔗{showNumber&&<small>{consultationNumberFor(x)}</small>}</a>)}
     </span>
   }
@@ -319,10 +331,28 @@ export default function Staff() {
     if(!response.ok)return alert(result.error||"修改價格失敗");
     setPriceEdit(null);setPriceValue("");setEditing(null);await load();alert("訂單價格已更新，並已發送 LINE 通知");
   }
+  async function markManualResult(booking:any) {
+    if(manualResultBusy || !window.confirm(`確認已將 ${booking.customers?.full_name||booking.customers?.line_display_name||"此用戶"} 的諮詢結果手動回傳？\n訂單：${booking.booking_no}\n註記後會移出待處理區，不會另外發送訊息。`))return;
+    setManualResultBusy(true);
+    try {
+      const response=await staffPost({action:"mark_manual_result",bookingNo:booking.booking_no}),result=await response.json();
+      if(!response.ok)throw Error(result.error||"更新失敗");
+      setRows(current=>current.map(row=>row.id===booking.id?{...row,consultation_result_manual_at:result.manualAt}:row));
+      await load();
+    } catch(error){alert(error instanceof Error?error.message:"更新失敗");}
+    finally{setManualResultBusy(false);}
+  }
+  function submissionStatus(booking:any) {
+    return <SubmissionStatus booking={booking} onView={openReturnedData} onMissing={setSubmissionActions}/>;
+  }
   async function load() {
-    const r = await fetch("/api/staff/bookings"),
-      j = await r.json();
-    if(r.ok){setRows(j.bookings);setManualCustomers(j.customers||[]);setCustomerProfiles(j.consultationProfiles||[]);setPaymentSettings(j.paymentSettings||null);setBankAccounts(j.bankAccounts||[])}else setError(j.error);
+    setBookingsLoading(true);
+    try {
+      const r = await fetch("/api/staff/bookings", { cache: "no-store" }), j = await r.json();
+      if(r.ok){setError("");setRows(j.bookings);setResultSyncWarning(j.resultSyncWarning||"");setManualCustomers(j.customers||[]);setCustomerProfiles(j.consultationProfiles||[]);setPaymentSettings(j.paymentSettings||null);setBankAccounts(j.bankAccounts||[])}
+      else {setError(j.error);setResultSyncWarning("訂單更新失敗，目前顯示上次載入資料");}
+    } catch {setError("訂單讀取失敗，請稍後重新整理");setResultSyncWarning("訂單更新失敗，目前顯示上次載入資料");}
+    finally {setBookingsLoading(false);}
   }
   useEffect(() => {
     const saved=localStorage.getItem("lin_a_sao_staff_password");if(saved){setPassword(saved);setRememberPassword(true)}
@@ -683,11 +713,14 @@ export default function Staff() {
     );
   return (
     <main className={`staffPage returned-edit-${returnedEditMode}`}>
+      {submissionActions&&<div className="modalBackdrop"><div className="modal" role="dialog" aria-modal="true" aria-label="資料回傳操作"><h2>資料回傳</h2><p>{submissionActions.customers?.full_name}・{submissionActions.booking_no}</p><p>若已在 LINE 收到問事資料，請選「已手動回傳」，系統便不再催填。</p><div className="returnedEditActions"><button disabled={submissionBusy} onClick={()=>{const x=submissionActions;setSubmissionActions(null);void remind(x.booking_no,x.customers)}}>發送填寫通知</button><button disabled={submissionBusy} onClick={async()=>{setSubmissionBusy(true);try{const r=await staffPost({action:"mark_manual_submission",bookingNo:submissionActions.booking_no}),data=await r.json();if(!r.ok)throw Error(data.error||"更新失敗");setSubmissionActions(null);await load()}catch(e){alert(e instanceof Error?e.message:"更新失敗")}finally{setSubmissionBusy(false)}}}>已手動回傳</button><button className="cancel" disabled={submissionBusy} onClick={()=>setSubmissionActions(null)}>取消</button></div></div></div>}
       <div className="staffPageHeading"><h1>預約工作後台</h1><div className="staffHeadingActions"><a className="lineAdminButton" href="https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/" target="_blank" rel="noreferrer">官方LINE後台</a><a className="videoCalendarButton" href={(()=>{const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(new Date());const year=parts.find((part)=>part.type==="year")?.value||String(taipeiYear());const month=parts.find((part)=>part.type==="month")?.value||String(Number(taipeiDateKey().slice(5,7)));return `https://calendar.google.com/calendar/u/4/r/month/${year}/${Number(month)}/1`;})()} target="_blank" rel="noreferrer" aria-label="開啟本月視訊諮詢 Google 行事曆">視訊諮詢行事曆</a><button className="manualBookingEntry" onClick={()=>setManualOpen(true)}>＋ 手動建立預約</button></div></div>
       {paymentSettings&&<details className="staffPaymentControl"><summary><h2>目前付款方式</h2><strong>{paymentSettings.payment_mode==="bank_transfer"?"銀行轉帳":paymentSettings.payment_mode==="auto"?"自動判斷":"藍新金流"}</strong><span><i>展開設定</i><i>收合設定</i></span></summary><div className="staffPaymentControlBody"><div className="paymentModeChoices">{[["bank_transfer","銀行轉帳"],["auto","自動判斷"],["newebpay","藍新金流"]].map(([value,label])=><button key={value} className={paymentSettings.payment_mode===value?"active":""} onClick={()=>void changePaymentMode(value)}>{label}</button>)}</div><div className="bankAccountManager"><div className="bankAccountManagerTitle"><div><h3>固定收款帳號</h3><p>選定的帳號會自動顯示在用戶付款頁，切換前會再次確認。</p></div></div><div className="bankAccountList">{bankAccounts.map(account=><article key={account.id} className={account.id===paymentSettings.bank_account_key?"active":""}><div><b>{account.label}</b>{account.id===paymentSettings.bank_account_key&&<em>目前使用</em>}<p>{account.bank_name}（{account.bank_code}）{account.branch_name?` ${account.branch_name}`:""}　{account.account_number}</p><p>戶名：{account.account_name}</p></div><div><button onClick={()=>void selectBankAccount(account)} disabled={account.id===paymentSettings.bank_account_key}>{account.id===paymentSettings.bank_account_key?"使用中":"切換使用"}</button></div></article>)}</div></div></div></details>}
       {bankEditorOpen&&<div className="modalBackdrop priorityModal" onClick={()=>setBankEditorOpen(false)}><div className="modal bankAccountEditor" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setBankEditorOpen(false)}>×</button><h2>{bankForm.id?"編輯收款帳號":"新增常用帳號"}</h2><div><label>帳號名稱<input value={bankForm.label||""} onChange={e=>setBankForm({...bankForm,label:e.target.value})} placeholder="例如：珮均常用帳號"/></label><label>銀行名稱<input value={bankForm.bank_name||""} onChange={e=>setBankForm({...bankForm,bank_name:e.target.value})} placeholder="例如：國泰世華"/></label><label>銀行代碼<input inputMode="numeric" maxLength={3} value={bankForm.bank_code||""} onChange={e=>setBankForm({...bankForm,bank_code:e.target.value.replace(/\D/g,"")})} placeholder="013"/></label><label>銀行帳號<input inputMode="numeric" value={bankForm.account_number||""} onChange={e=>setBankForm({...bankForm,account_number:e.target.value.replace(/\s/g,"")})}/></label><label>戶名<input value={bankForm.account_name||""} onChange={e=>setBankForm({...bankForm,account_name:e.target.value})}/></label><label>備註<input value={bankForm.note||""} onChange={e=>setBankForm({...bankForm,note:e.target.value})} placeholder="例如：媽媽的帳號"/></label></div><button className="bankAccountSave" onClick={()=>void saveBankAccount()}>儲存帳號</button></div></div>}
       {profileCopyToast&&<div className="profileCopyToast" role="status">✓ {profileCopyToast}</div>}
       {error && <div className="error">{error}</div>}
+      <LineWatchlist />
+      <PendingWork onPayment={setPaymentActions} bookings={rows} submissionStatus={submissionStatus} onManualResult={markManualResult} manualBusy={manualResultBusy} onViewUser={x=>setUserView({...x.customers,_booking:x})} documentActions={x=>documentActions(x,false,false)} onRefresh={load} warning={resultSyncWarning} loading={bookingsLoading}/>
       <section className="staffBookingSection videoBookingSection">
         <h2 className="staffSectionTitle">視訊預約</h2>
         <div className="textBookingTools videoBookingTools">
@@ -699,7 +732,7 @@ export default function Staff() {
           </div>
           <div className="staffSecondaryFilters">
             <div className="staffDateRange"><b>付款日期</b><label><span>從</span><input type="date" value={videoDateFrom} onChange={e=>setVideoDateFrom(e.target.value)}/></label><label><span>到</span><input type="date" value={videoDateTo} min={videoDateFrom||undefined} onChange={e=>setVideoDateTo(e.target.value)}/></label>{(videoDateFrom||videoDateTo)&&<button onClick={()=>{setVideoDateFrom("");setVideoDateTo("")}}>清除日期</button>}</div>
-            <div className="staffDisplayOptions"><b>表格顯示</b><label><input type="checkbox" checked={showVideoItems} onChange={e=>setShowVideoItems(e.target.checked)}/><span>預約項目</span></label><label><input type="checkbox" checked={showVideoAmount} onChange={e=>setShowVideoAmount(e.target.checked)}/><span>訂單金額</span></label></div>
+            <div className="staffDisplayOptions"><b>表格顯示</b><label><input type="checkbox" checked={showVideoItems} onChange={e=>setShowVideoItems(e.target.checked)}/><span>預約項目</span></label><label><input type="checkbox" checked={showVideoAmount} onChange={e=>setShowVideoAmount(e.target.checked)}/><span>訂單金額</span></label><label><input type="checkbox" checked={showVideoReturn} onChange={e=>setShowVideoReturn(e.target.checked)}/><span>諮詢結果回傳</span></label></div>
           </div>
         </div>
         <div className="staffMonthNav">
@@ -751,7 +784,7 @@ export default function Staff() {
         {(selectedDate || showUpcomingVideo || showNewVideo) && (
           <div className="dailyBookings">
             <h3>目前顯示：{showUpcomingVideo?"即將來臨的視訊":showNewVideo?"兩週內的新訂單":selectedDate}</h3>
-            <div className="staffBookingTable">
+            <div className={`staffBookingTable ${showVideoReturn?"showResultReturn":""}`}>
               <div className="staffTableHead">
                 <b>付款時間</b>
                 <b>視訊時間</b>
@@ -761,6 +794,7 @@ export default function Staff() {
                 <b>訂單編號</b>
                 <b>操作</b>
                 <b>諮詢單</b>
+                {showVideoReturn&&<b>諮詢結果回傳</b>}
               </div>
               {daily.map((x) => {
                 const complete = isComplete(x),
@@ -783,28 +817,11 @@ export default function Staff() {
                       <span>{[x.customers?.line_display_name,x.customers?.full_name].filter(Boolean).join("｜")}</span>
                     </button>
                     <button className={`staffState staffStateButton ${statusKey(x)} ${x.transfer_status==="reported"?"transferWaiting":""}`} onClick={()=>setPaymentActions(x)}><span>{x.transfer_status==="reported"?`待核帳｜末五碼 ${x.transfer_account_last5}`:x.status!=="cancelled" && paid && x.collection_source === "manual" ? "手動收款" : status}</span>{showVideoAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</button>
-                    {paid ? (
-                      complete ? (
-                        <button
-                          className="returned"
-                          onClick={() => openReturnedData(x)}
-                        >
-                          已回傳
-                        </button>
-                      ) : (
-                        <button
-                          className="missing"
-                          onClick={() => remind(x.booking_no,x.customers)}
-                        >
-                          尚未回傳
-                        </button>
-                      )
-                    ) : (
-                      <span>—</span>
-                    )}
+                    {submissionStatus(x)}
                     <div className="staffOrderCell"><small>{x.booking_no}</small>{showVideoItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-video-item-${index}`}>{line}</div>)}</div>}</div>
                     <button onClick={() => openEdit(x)}>修改</button>
                     {documentActions(x,false)}
+                    {showVideoReturn&&<ResultReturnStatus booking={x} warning={resultSyncWarning} onManual={markManualResult} busy={manualResultBusy}/>}
                   </article>
                 );
               })}
@@ -829,7 +846,7 @@ export default function Staff() {
             <div className="staffCustomerProfile">
               <div><span>姓名</span><b>{userView.full_name || "尚未填寫"}</b></div>
               <div><span>性別</span><b>{userView.gender || "尚未填寫"}</b></div>
-              <div><span>地址</span><b>{userView.full_address || "尚未填寫"}</b></div>
+              <div><span>連絡電話</span><b>{userView.phone || "尚未填寫"}</b></div><div><span>地址</span><b>{userView.full_address || "尚未填寫"}</b></div>
               <div><span>國曆生日</span><b>{userView.birth_date || "尚未填寫"}</b></div>
               <div><span>農曆生日</span><b>{userView.lunar_birth_text || "尚未填寫"}</b></div>
               <div><span>生肖</span><b>{userView.zodiac || "尚未填寫"}</b></div>
@@ -850,7 +867,7 @@ export default function Staff() {
           >
             <button className="staffModalClose" aria-label="關閉" onClick={() => {setDataView([]);setDataBooking(null)}}>×</button>
             <h2>已回傳的諮詢者資料</h2>
-            {dataViewMode==="menu"&&<div className="returnedActionMenu"><button className="refillDataButton" disabled={resendingData} onClick={()=>void remind(dataBooking.booking_no,dataBooking.customers,true)}>{resendingData?"通知傳送中…":"📨 傳送重新填寫通知給用戶"}</button><button disabled={!dataView.length} onClick={()=>setDataViewMode("user")}>修改用戶資料</button><button disabled={!dataView.some((p:any)=>Boolean(p.answerId))} onClick={()=>setDataViewMode("answers")}>修改問事資料</button>{!dataView.length&&<p className="staffEmptyReturnedAnswers">此訂單標示為已回傳，但資料庫內找不到可編輯的諮詢者資料。請重新整理；若仍出現此訊息，代表該筆舊資料未正確寫入。</p>}</div>}
+            {dataViewMode==="menu"&&<div className="returnedActionMenu"><button className="refillDataButton" disabled={resendingData} onClick={()=>void remind(dataBooking.booking_no,dataBooking.customers,true)}>{resendingData?"通知傳送中…":"📨 傳送重新填寫通知給用戶"}</button><button disabled={!dataView.length} onClick={()=>setDataViewMode("user")}>修改用戶資料</button><button disabled={!dataView.some((p:any)=>Boolean(p.answerId))} onClick={()=>setDataViewMode("answers")}>修改問事資料</button>{!dataView.length&&<p className="staffEmptyReturnedAnswers">此訂單已回傳，但沒有線上填單內容。若為已手動回傳，請查看 LINE 中客人提供的資料，並連結現有諮詢單。</p>}</div>}
             {dataViewMode!=="menu"&&<button className="returnedMenuBack" onClick={()=>setDataViewMode("menu")}>‹ 返回功能選單</button>}
             {dataViewMode==="user"&&<div className="staffProfileTags">{uniquePeople(dataView).map((p:any)=>{const category=p.relationship==="本人"&&!p.relationship_detail?"本人":p.profile_type==="person"?"親友":p.profile_type==="pet"?"往生寵物":"過世親友";return <button key={p.id} className="staffProfileTag" onClick={()=>setProfileEditor({...p})}>{p.profile_type==="pet"&&p.photo_data&&<img src={p.photo_data} alt=""/>}<span><b>{p.name}</b><small>{category}{p.relationship_detail?`・${p.relationship_detail}`:""}</small></span></button>})}</div>}
             {dataViewMode==="answers"&&!selectedSubmission&&<><p className="submissionVersionHint">請選擇要查看或修改的填寫版本</p><div className="submissionVersionList">{asArray(dataBooking.data_submissions).map((submission:any,index:number)=><button key={submission.id} onClick={()=>setSelectedSubmission(submission)}><span className="submissionVersionBadge">{asArray(dataBooking.data_submissions).length-index}</span><span><b>第 {asArray(dataBooking.data_submissions).length-index} 次填寫</b><small>{submissionTime(submission.submitted_at)}</small></span><span className="submissionVersionArrow">›</span></button>)}</div></>}
@@ -921,10 +938,10 @@ export default function Staff() {
           </div>
           <div className="staffSecondaryFilters">
             <div className="staffDateRange"><b>付款日期</b><label><span>從</span><input type="date" value={textDateFrom} onChange={e=>setTextDateFrom(e.target.value)}/></label><label><span>到</span><input type="date" value={textDateTo} min={textDateFrom||undefined} onChange={e=>setTextDateTo(e.target.value)}/></label>{(textDateFrom||textDateTo)&&<button onClick={()=>{setTextDateFrom("");setTextDateTo("")}}>清除日期</button>}</div>
-            <div className="staffDisplayOptions"><b>表格顯示</b><label><input type="checkbox" checked={showTextItems} onChange={e=>setShowTextItems(e.target.checked)}/><span>預約項目</span></label><label><input type="checkbox" checked={showTextAmount} onChange={e=>setShowTextAmount(e.target.checked)}/><span>訂單金額</span></label><label><input type="checkbox" checked={showDocumentNumber} onChange={e=>setShowDocumentNumber(e.target.checked)}/><span>諮詢單編號</span></label></div>
+            <div className="staffDisplayOptions"><b>表格顯示</b><label><input type="checkbox" checked={showTextItems} onChange={e=>setShowTextItems(e.target.checked)}/><span>預約項目</span></label><label><input type="checkbox" checked={showTextAmount} onChange={e=>setShowTextAmount(e.target.checked)}/><span>訂單金額</span></label><label><input type="checkbox" checked={showDocumentNumber} onChange={e=>setShowDocumentNumber(e.target.checked)}/><span>諮詢單編號</span></label><label><input type="checkbox" checked={showTextReturn} onChange={e=>setShowTextReturn(e.target.checked)}/><span>諮詢結果回傳</span></label></div>
           </div>
         </div>
-        <div className="staffBookingTable">
+        <div className={`staffBookingTable ${showTextReturn?"showResultReturn":""}`}>
           <div className="staffTableHead">
             <b>付款時間</b>
             <b>用戶</b>
@@ -933,6 +950,7 @@ export default function Staff() {
             <b>訂單編號</b>
             <b>操作</b>
             <b>諮詢單</b>
+            {showTextReturn&&<b>諮詢結果回傳</b>}
           </div>
           {visibleText.map((x) => {
             const complete = isComplete(x),
@@ -954,28 +972,11 @@ export default function Staff() {
                   <span>{[x.customers?.line_display_name,x.customers?.full_name].filter(Boolean).join("｜")}</span>
                 </button>
                 <button className={`staffState staffStateButton ${statusKey(x)} ${x.transfer_status==="reported"?"transferWaiting":""}`} onClick={()=>setPaymentActions(x)}><span>{x.transfer_status==="reported"?`待核帳｜末五碼 ${x.transfer_account_last5}`:x.status!=="cancelled" && paid && x.collection_source === "manual" ? "手動收款" : statusText(x)}</span>{showTextAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</button>
-                {paid ? (
-                  complete ? (
-                    <button
-                      className="returned"
-                      onClick={() => openReturnedData(x)}
-                    >
-                      已回傳
-                    </button>
-                  ) : (
-                    <button
-                      className="missing"
-                      onClick={() => remind(x.booking_no,x.customers)}
-                    >
-                      尚未回傳
-                    </button>
-                  )
-                ) : (
-                  <span>—</span>
-                )}
+                {submissionStatus(x)}
                 <div className="staffOrderCell"><small>{x.booking_no}</small>{showTextItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-item-${index}`}>{line}</div>)}</div>}</div>
                 <button onClick={() => openEdit(x)}>修改</button>
                 {documentActions(x)}
+                {showTextReturn&&<ResultReturnStatus booking={x} warning={resultSyncWarning} onManual={markManualResult} busy={manualResultBusy}/>}
               </article>
             );
           })}

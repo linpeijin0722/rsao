@@ -1,4 +1,7 @@
 "use client";
+import TimeOffEditor from "./TimeOffEditor";
+import { overlapsTimeOff, type VideoTimeOff } from "@/lib/video-time-off";
+import { earliestVideoBookingDate, videoBookingDateLabel, validVideoLeadDays } from "@/lib/video-booking-window";
 import { useEffect, useMemo, useState, useRef } from "react";
 type H = { holiday_date: string; note: string | null };
 type TextDateOverride = { release_date: string; release_count: number | string; note: string | null };
@@ -25,6 +28,7 @@ export default function Admin() {
     [rememberPassword, setRememberPassword] = useState(false),
     [error, setError] = useState(""),
     [holidays, setHolidays] = useState<H[]>([]),
+    [timeOffs, setTimeOffs] = useState<VideoTimeOff[]>([]),
     [methodId, setMethodId] = useState(""),
     [month, setMonth] = useState(today().slice(0, 7)),
     [date, setDate] = useState(today()),
@@ -63,6 +67,28 @@ export default function Admin() {
         release_count: 0,
       })),
     );
+  const [leadDays, setLeadDays] = useState(3), [leadDraft, setLeadDraft] = useState("3"), [leadSaving, setLeadSaving] = useState(false), [leadMessage, setLeadMessage] = useState("");
+  const leadPrompting = useRef(false);
+  const [previewNow, setPreviewNow] = useState(() => new Date());
+  useEffect(() => { const timer = window.setInterval(() => setPreviewNow(new Date()), 1000); return () => window.clearInterval(timer); }, []);
+  const leadValid = /^\d+$/.test(leadDraft) && validVideoLeadDays(Number(leadDraft));
+  const leadPreview = leadValid ? videoBookingDateLabel(earliestVideoBookingDate(previewNow, Number(leadDraft))) : "—";
+  async function confirmLeadDays() {
+    if (leadPrompting.current || leadSaving || !leadValid || Number(leadDraft) === leadDays) return;
+    leadPrompting.current = true;
+    const next = Number(leadDraft);
+    if (!window.confirm(`確定儲存為僅開放 ${next} 天後預約？\n最早可預約 ${videoBookingDateLabel(earliestVideoBookingDate(new Date(), next))} 的時段（台灣時間）。\n確認後立即生效，既有預約不受影響。`)) {
+      setLeadDraft(String(leadDays)); leadPrompting.current = false; return;
+    }
+    setLeadSaving(true); setLeadMessage("");
+    try {
+      const response = await fetch("/api/admin/schedule", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "set_video_booking_lead_days", days: next }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "儲存失敗");
+      setLeadDays(result.days); setLeadDraft(String(result.days)); setLeadMessage("已儲存，立即生效");
+    } catch (error) { setLeadMessage(error instanceof Error ? error.message : "儲存失敗，請重試"); }
+    finally { setLeadSaving(false); leadPrompting.current = false; }
+  }
   const selectedDateRef=useRef(date),dayRequestRef=useRef(0);
   selectedDateRef.current=date;
   async function load() {
@@ -76,8 +102,10 @@ export default function Admin() {
     }
     setLogin(true);
     setHolidays(j.holidays);
+    setTimeOffs(j.timeOffs || []);
     setMethodId(j.methodId);
     setVideoBookingEnabled(j.videoBookingEnabled !== false);
+    setLeadDays(j.videoBookingLeadDays); setLeadDraft(String(j.videoBookingLeadDays));
 
     fetch("/api/admin/text-capacity").then(async (x) => {
       if (x.ok) {
@@ -241,6 +269,7 @@ export default function Admin() {
   }
   function slotBlockReason(t:string){
     const candidate=new Date(`${date}T${t}:00+08:00`).getTime();
+    if(timeOffs.some(off=>overlapsTimeOff(candidate,candidate+50*60000,off)))return "休假／前後一小時";
     const booking=dayBookings.find(b=>candidate<new Date(b.bufferEnd).getTime()&&candidate+50*60000>new Date(b.start).getTime());
     if(!booking)return "";
     return candidate<new Date(booking.start).getTime()?"與預約重疊":candidate<new Date(booking.end).getTime()?"已預約":"預約緩衝時間";
@@ -461,6 +490,7 @@ export default function Admin() {
       </div>
       <section className="adminCard">
         <h2>特定休假日</h2>
+        <h3>整天休假</h3>
         <div className="adminGrid">
           <input
             type="date"
@@ -493,6 +523,7 @@ export default function Admin() {
               </div>
             </div>
           ))}
+        <TimeOffEditor entries={timeOffs} onChanged={async()=>{await load();await Promise.all([dayLoad(),monthLoad()]);}}/>
       </section>
       {holidayEdit && (
         <div className="adminModalBackdrop" onClick={() => !holidayEditSaving && setHolidayEdit(null)}>
@@ -506,7 +537,11 @@ export default function Admin() {
         </div>
       )}
       <section className="adminCard scheduleDayCard">
-        <h2>個別日期時段</h2>
+        <div className="scheduleDayHeading"><h2>個別日期時段</h2><div className="videoLeadControl">
+          <label>僅開放 <input aria-label="視訊預約等待天數" aria-describedby="videoLeadHelp" inputMode="numeric" pattern="[0-9]*" maxLength={5} value={leadDraft} disabled={leadSaving} onChange={e => { if (/^\d*$/.test(e.target.value)) { setLeadDraft(e.target.value); setLeadMessage(""); setPreviewNow(new Date()); } }} onMouseLeave={() => void confirmLeadDays()} onBlur={() => void confirmLeadDays()} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); void confirmLeadDays(); } }} /> 天後，最早可預約 <strong aria-live="polite">{leadPreview}</strong> 的時段</label>
+          <small id="videoLeadHelp">依台灣時間計算，今日與其後指定天數不開放。離開欄位後確認儲存。</small>
+          <small role="status">{leadSaving ? "儲存中…" : !leadValid ? "請填入 0～36500 的整數天數" : leadMessage}</small>
+        </div></div>
         <div className="monthNav">
           <button
             disabled={month <= today().slice(0, 7)}

@@ -135,9 +135,55 @@ annualFortuneGroups[annualFortuneGroups.length-1].options.push(
  direct("eye_tired","眼睛容易疲勞","這一年眼睛容易疲勞，視力與眼部不適要留意。"),
  direct("recovery_slow","體力恢復慢","這一年體力恢復比較慢，忙完容易一直疲累。"),
 );
-export const annualExclusiveFamilies=[['promotion','no_promotion'],['job_success','job_fail'],['job_stay','job_leave'],['interview_pass','interview_fail'],['exam_pass','exam_fail'],['business_ok','business_down'],['romance_meet','romance_none'],['romance_stable','romance_break'],['marry','marry_block'],['legal_win','legal_lose'],['settle_yes','settle_no'],['move_good','move_bad'],['travel_smooth','travel_delay'],['income_stable','income_down']];
+// 新增的具體判斷只在阿嫂選取後加入，不按年齡自動判定。
+annualFortuneGroups.push({title:"家庭、房產與契約",options:[
+ direct("home_buy","買房能成","這一年買房能成，談好的條件能落實。"),
+ direct("home_block","買房談不成","這一年買房會卡關，價格或貸款條件談不攏。"),
+ direct("home_sell","房子能賣出","這一年房子能賣出，會找到願意成交的買方。"),
+ direct("home_unsold","房子賣不動","這一年房子賣不動，開價與買方期待有落差。"),
+ direct("family_money_argument","家人為錢爭執","這一年家人會為錢爭執，借錢與分配問題要先講清楚。"),
+ direct("family_support","家人出手相助","這一年遇到困難，家人會出手相助。"),
+ direct("family_opposition","家人反對決定","這一年重要決定會遭家人反對，意見不容易一致。"),
+ direct("contract_ok","契約能談成","這一年契約能談成，雙方能達成共識。"),
+ direct("contract_break","合作臨時變卦","這一年合作會臨時變卦，口頭承諾留不住。"),
+ direct("guarantee_loss","替人擔保會破財","這一年替人擔保會破財，不要替別人扛債務。"),
+ direct("rent_dispute","租屋會有糾紛","這一年租屋會有糾紛，租金、押金與修繕責任要白紙黑字。"),
+ direct("inheritance_dispute","繼承分配起爭執","這一年繼承或財產分配會起爭執，家人意見不合。"),
+]});
+annualFortuneGroups.find(g=>g.title==="財運")!.options.push(
+ direct("loan_return","借出的錢收得回","這一年借出的錢收得回，對方會處理還款。"),
+ direct("loan_stuck","借出的錢難收回","這一年借出的錢難收回，催款容易拖延。"),
+ direct("sales_up","業績會增加","這一年業績會增加，客源與成交量能往上走。"),
+ direct("sales_down","業績會下滑","這一年業績會下滑，客源與成交量留不住。"),
+ direct("scam_loss","輕信他人會破財","這一年輕信別人的賺錢說法會破財，別把錢交給不熟的人。"),
+ direct("pay_raise_block","加薪談不成","這一年加薪談不成，薪資條件暫時不會照期待調整。"),
+ direct("partner_money","合夥為錢翻臉","這一年合夥會為錢翻臉，帳目與分潤會成為爭執點。"),
+ direct("family_spend","家中支出增加","這一年家中支出會增加，長輩、房屋或家庭事情需要花錢。"),
+);
+const healthBase=annualFortuneGroups.find(g=>g.title.startsWith("健康提醒"))!;
+healthBase.options.push(
+ direct("sleep_pressure","壓力影響睡眠","這一年要注意壓力影響睡眠，精神容易一直緊繃。"),
+ direct("stomach_food","飲食影響腸胃","這一年腸胃要保養，飲食不規律時容易不舒服。"),
+ direct("health_steady","身體大致平順","這一年身體大致平順，維持日常保養即可。"),
+ direct("overwork","過勞、體力透支","這一年要注意過勞與體力透支，忙完容易長時間疲累。"),
+ direct("muscle","肌肉容易拉傷","這一年活動要注意肌肉拉傷，不宜一下子勉強增加負荷。"),
+ direct("tooth","牙齒、牙齦要保養","這一年牙齒與牙齦要保養，有不適要及早處理。"),
+ direct("leg","腿腳容易痠痛","這一年腿腳要留意，站久或走久容易痠痛。"),
+ direct("allergy_repeat","過敏容易反覆","這一年過敏容易反覆，皮膚與呼吸道要留意。"),
+ direct("checkup_follow","檢查需持續追蹤","這一年身體檢查需持續追蹤，不宜忽略已經出現的不適。"),
+);
+export const annualHealthGroups=[
+ {title:"整體體力與作息",codes:['health_steady','tired','overwork','recovery_slow','sleep','sleep_pressure']},
+ {title:"肝膽、脾胃與腸道",codes:['liver','stomach','spleen','liver_stomach','acid','bowel','appetite','stomach_food']},
+ {title:"心肺、血氣與神經",codes:['heartlung','chest','blood','cardiovascular','head','nerves','dizzy','breath']},
+ {title:"腎、泌尿與水腫",codes:['kidney','urinary','stones']},
+ {title:"眼睛、皮膚與過敏",codes:['eyes','eye_tired','skin','skin_allergy','allergy_repeat']},
+ {title:"筋骨、牙齒與外傷",codes:['neck','back','joints','muscle','leg','tooth','fall','traffic']},
+ {title:"其他保養提醒",codes:['cold','surgery','checkup_follow','trial']},
+].map(g=>({title:g.title,options:annualFortuneGroups.flatMap(row=>row.options).filter(o=>g.codes.includes(o.code))})).filter(g=>g.options.length);
+export const annualExclusiveFamilies=[['promotion','no_promotion'],['job_success','job_fail'],['job_stay','job_leave'],['interview_pass','interview_fail'],['exam_pass','exam_fail'],['business_ok','business_down'],['romance_meet','romance_none'],['romance_stable','romance_break'],['marry','marry_block'],['legal_win','legal_lose'],['settle_yes','settle_no'],['move_good','move_bad'],['travel_smooth','travel_delay'],['income_stable','income_down'],['home_buy','home_block'],['home_sell','home_unsold'],['contract_ok','contract_break'],['loan_return','loan_stuck'],['sales_up','sales_down'],['salary_up','pay_raise_block']];
 export function toggleAnnualCodes(codes:string[],code:string){if(codes.includes(code))return codes.filter(c=>c!==code);const family=annualExclusiveFamilies.find(group=>group.includes(code))||[];return [...codes.filter(c=>!family.includes(c)),code];}
-export function annualAges(start:number){return Number.isInteger(start)&&start>0?Array.from({length:Math.max(0,Math.min(15,100-start))},(_,i)=>start+i):[];}
+export function annualAges(start:number){return Number.isInteger(start)&&start>0?Array.from({length:Math.max(0,Math.min(20,100-start))},(_,i)=>start+i):[];}
 export function composeAnnual(codes:string[],variant=0){return annualFortuneGroups.flatMap(g=>g.options).filter(o=>codes.includes(o.code)).map((o,i)=>o.phrases[(variant+i)%o.phrases.length].replace(i>0?/^這一年|^今年|^這一歲/:/$^/,"")).join("");}
 export function parseAnnual(text:string):AnnualState {const result:AnnualState={};const pattern=/(?:^|\n)(\d+)歲\s*[:：]([\s\S]*?)(?=\n\d+歲\s*[:：]|$)/g;for(const match of text.matchAll(pattern))result[match[1]]={codes:[],text:match[2].trim(),manual:Boolean(match[2].trim())};return result;}
 export function annualText(ages:number[],state:AnnualState){return ages.map(age=>`${age}歲：${state[String(age)]?.text.replace(/\s*\n\s*/g," ")||""}`).join("\n");}

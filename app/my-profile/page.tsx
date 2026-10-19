@@ -22,6 +22,7 @@ const empty = {
   full_name: "",
   gender: "",
   full_address: "",
+  phone: "",
   birth_date: "",
   lunar_birth_text: "",
   zodiac: "",
@@ -161,6 +162,7 @@ export default function MyProfile() {
             <option>其他</option>
           </select>
         </label>
+        <label><span>連絡電話</span><input type="tel" autoComplete="tel" maxLength={50} value={form.phone || ""} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="可填手機或含國碼的電話" /></label>
         <label className="profileAddress">
             <span>地址</span>
             <textarea

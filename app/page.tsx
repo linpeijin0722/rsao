@@ -78,11 +78,12 @@ const money = (v: number) =>
   };
 export default function Page() {
   const today = taiwanToday(),
-    earliestVideoDate = addCalendarDays(today, 4),
+    [earliestVideoDate, setEarliestVideoDate] = useState(addCalendarDays(today, 4)),
     maxDate = addMonths(today, 2),
     firstMonth = today.slice(0, 7),
     lastMonth = maxDate.slice(0, 7),
     [auth, setAuth] = useState("loading"),
+    [publicBrowsing, setPublicBrowsing] = useState(false),
     [profile, setProfile] = useState<{
       pictureUrl?: string;
       full_name?: string;
@@ -124,6 +125,11 @@ export default function Page() {
   useEffect(() => {
     (async () => {
       try {
+        if (location.pathname.replace(/\/$/, "") === "/booking") {
+          setPublicBrowsing(true);
+          setAuth("ready");
+          return;
+        }
         const liffId=bookingLiffId;
         if(liffId&&location.hostname!=="localhost"){
           await liff.init({liffId});
@@ -305,10 +311,11 @@ export default function Page() {
       const r = await fetch(`/api/slots?methodId=${selected.id}`),
         j = await r.json();
       if (!r.ok) throw Error(j.error);
+      setEarliestVideoDate(j.earliestDate);
       const loadedSlots: Slot[] = Array.isArray(j.slots) ? j.slots : [];
       const selectableDates = loadedSlots
         .map((item) => dk(item.slot_start))
-        .filter((day) => day >= earliestVideoDate && day <= maxDate)
+        .filter((day) => day >= j.earliestDate && day <= maxDate)
         .sort();
       setSlots(loadedSlots);
       // 當本月沒有可預約時段時，直接顯示最近一個有時段的月份。
@@ -435,6 +442,10 @@ export default function Page() {
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent("林阿嫂視訊諮詢")}&dates=${stamp(start)}/${stamp(end)}&details=${encodeURIComponent(`預約編號：${no}`)}`;
   }
   async function submit() {
+    if (location.pathname.replace(/\/$/, "") === "/booking") {
+      setAlertMessage("正式預約請點選右下角 LINE 圖示，前往官方帳號。");
+      return;
+    }
     setBusy(true);
     try {
       const liffId = bookingLiffId;
@@ -484,6 +495,7 @@ export default function Page() {
         const refreshed=await fetch(`/api/slots?methodId=${method?.id}&_=${Date.now()}`,{cache:"no-store"});
         const refreshedData=await refreshed.json();
         setSlots(refreshed.ok&&Array.isArray(refreshedData.slots)?refreshedData.slots:[]);
+        if(refreshed.ok) setEarliestVideoDate(refreshedData.earliestDate);
         setAlertMessage(j.error||"此時段已被預約，請重新選擇");
         return;
       }
@@ -547,6 +559,9 @@ export default function Page() {
   return (
     <main className="shell">
       <section className="app">
+        {publicBrowsing && <a href="https://line.me/R/ti/p/@405unxzn" target="_blank" rel="noopener noreferrer" aria-label="前往林阿嫂 LINE 官方帳號" style={{position:"fixed",right:18,bottom:"calc(18px + env(safe-area-inset-bottom, 0px))",width:48,height:48,borderRadius:"50%",background:"#06c755",display:"grid",placeItems:"center",boxShadow:"0 2px 8px #0003",zIndex:100}}>
+          <svg width="36" height="36" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="white" d="M34 18c0-7-6.3-12-14-12S6 11 6 18c0 6.1 5.1 11.1 11.8 11.9.5.1 1.2.3 1.4.7.2.4.1 1.1.1 1.6l-.2 1.4c-.1.4-.3 1.5 1.3.8 1.7-.7 9-5.3 12.2-9.1A11 11 0 0 0 34 18Z"/><text x="20" y="21" textAnchor="middle" fill="#06c755" fontSize="9" fontWeight="800" fontFamily="Arial,sans-serif">LINE</text></svg>
+        </a>}
         <nav className="stepBar">
           <div className="stepTrail">
             {stepStart > 0 && <i className="stepLead">›</i>}
@@ -565,7 +580,7 @@ export default function Page() {
             })}
             {stepStart + 3 < steps.length && <i className="stepMore">…</i>}
           </div>
-          <div className="account">
+          <div className="account" hidden={publicBrowsing}>
             <button onClick={() => setMenu(!menu)}>
               {profile?.pictureUrl ? (
                 <img src={profile.pictureUrl} alt="我的帳號" />

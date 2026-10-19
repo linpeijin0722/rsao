@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminSupabase, publicSupabase } from "@/lib/supabase";
 import { verifyLineSession } from "@/lib/line-session";
 import { cookies } from "next/headers";
-import { isAllowedVideoSlot } from "@/lib/video-booking-window";
+import { isAllowedVideoSlot, earliestVideoBookingDate, videoBookingDateLabel } from "@/lib/video-booking-window";
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,15 +39,15 @@ export async function POST(request: NextRequest) {
       .single();
     if (methodError) throw methodError;
     if (method?.code === "video") {
-      const { data: settings, error: settingsError } = await adminSupabase().from("booking_system_settings").select("video_booking_enabled").eq("id", true).maybeSingle();
+      const { data: settings, error: settingsError } = await adminSupabase().from("booking_system_settings").select("video_booking_enabled,video_booking_lead_days").eq("id", true).maybeSingle();
       if (settingsError) throw settingsError;
       if (settings?.video_booking_enabled === false)
         return NextResponse.json({ error: "目前視訊諮詢時段皆已額滿，暫不開放預約。" }, { status: 409 });
       if (!body.slotStart)
         return NextResponse.json({ error: "請選擇視訊日期與時段" }, { status: 400 });
-      if (!isAllowedVideoSlot(body.slotStart))
+      if (!isAllowedVideoSlot(body.slotStart, new Date(), settings?.video_booking_lead_days ?? 3))
         return NextResponse.json(
-          { error: "視訊諮詢最早只能預約 4 天後的日期，請重新選擇時段" },
+          { error: `預約設定已更新，最早可預約 ${videoBookingDateLabel(earliestVideoBookingDate(new Date(), settings?.video_booking_lead_days ?? 3))} 的時段，請重新選擇`, code: "SLOT_UNAVAILABLE" },
           { status: 400 },
         );
     }

@@ -14,6 +14,7 @@ export async function POST(r: NextRequest) {
       .eq("booking_no", bookingNo)
       .single();
   if (!b) return NextResponse.json({ error: "找不到訂單" }, { status: 404 });
+  if(b.data_submitted_at&&!reopen)return NextResponse.json({error:"資料已回傳，未重複發送填寫通知"},{status:409});
   if (b.payment_status !== "paid") return NextResponse.json({ error: "尚未付款，無法傳送填寫通知" }, { status: 400 });
   const c = b.customers as unknown as { line_user_id: string },
     site = process.env.NEXT_PUBLIC_SITE_URL || r.nextUrl.origin;
@@ -26,7 +27,7 @@ export async function POST(r: NextRequest) {
   const method = Array.isArray(b.consultation_methods) ? b.consultation_methods[0] : b.consultation_methods,
     items = (b.booking_details || []).map((detail: any) => [detail.item_title, ...(detail.booking_detail_sub_items || []).map((sub: any) => sub.sub_item_title)].filter(Boolean).join("｜"));
   try {
-    await pushLineFlex(c.line_user_id, "請填寫諮詢者資料", bookingStatusFlex({ status: "data_required", bookingNo: b.booking_no, method: method?.code || "text", total: Number(b.total_price), slotStart: b.slot_start || undefined, items, site }));
+    await pushLineFlex(c.line_user_id, "請完成問事資料填寫｜點擊下方按鈕", bookingStatusFlex({ status: "data_required", bookingNo: b.booking_no, method: method?.code || "text", total: Number(b.total_price), slotStart: b.slot_start || undefined, items, site }));
   } catch (error) {
     if (reopen && b.data_submitted_at) await db.from("bookings").update({ data_submitted_at: b.data_submitted_at }).eq("id", b.id);
     throw error;

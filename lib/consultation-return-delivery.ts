@@ -17,7 +17,7 @@ export type PreparedConsultationReturn = {
   videoSlotStart?: string | null;
   skipCarousel: boolean;
   items: Array<{
-    index: number; itemTitle: string; content: string;
+    index: number; itemTitle: string; content: string; sourceContent?:string;
     bookingDetailId?: string; itemId?: string; profileId?: string; targetProfileId?: string | null; consultationCreatedAt?: string | null;
   }>;
 };
@@ -33,11 +33,16 @@ const itemKind = (detail: any) => {
   };
 };
 
-async function returnItemBindings(bookingId: string) {
+export async function returnItemBindings(bookingId: string, pageCount?:number) {
   const { data, error } = await adminSupabase().from("booking_details").select(
-    "id,item_id,item_title,created_at,google_document_created_at,booking_items(code),booking_detail_sub_items(sub_item_title),booking_consultation_answers(profile_id,booking_answer_participants(profile_id,position))",
+    "id,item_id,item_title,created_at,google_document_created_at,booking_items(code),booking_detail_sub_items(sub_item_title),booking_consultation_answers(profile_id,consultation_profiles(name),booking_answer_participants(profile_id,position,consultation_profiles(name)))",
   ).eq("booking_id", bookingId).order("created_at", { ascending: true });
   if (error) throw error;
+  const expandedCount=(data||[]).reduce((count:number,detail:any)=>{
+    const answer=one(detail.booking_consultation_answers);if(!answer)return count;
+    const targets=(answer.booking_answer_participants||[]).filter((entry:any)=>String(entry.profile_id||"")!==String(answer.profile_id||""));
+    const kind=itemKind(detail);return count+(kind.relation?1+targets.length:kind.marriage&&targets.length?targets.length:1);
+  },0);
   return (data || []).flatMap((detail: any) => {
     const answer = one(detail.booking_consultation_answers);
     if (!answer) return [];
@@ -46,9 +51,10 @@ async function returnItemBindings(bookingId: string) {
     const targets = (answer.booking_answer_participants || []).slice()
       .sort((a: any, b: any) => Number(a.position) - Number(b.position))
       .filter((entry: any) => String(entry.profile_id || "") !== primaryId);
-    const pages = (kind.relation || kind.marriage) && targets.length ? targets : [null];
+    const pages = kind.relation&&pageCount===expandedCount ? [null,...targets] : (kind.relation || kind.marriage) && targets.length ? targets : [null];
     return pages.map((target: any) => ({
       bookingDetailId: detail.id, itemId: detail.item_id, profileId: primaryId,
+      headingName: kind.marriage ? "" : String(one(target?.consultation_profiles)?.name || one(answer.consultation_profiles)?.name || ""),
       targetProfileId: target?.profile_id || null, consultationCreatedAt: detail.google_document_created_at || detail.created_at,
     }));
   });
@@ -81,7 +87,7 @@ export async function bookingForConsultationReturn(bookingNo: string, requestedD
     return { ...detail, google_document_id: detail.google_document_id || urlId };
   }).filter((detail: any) => detail.google_document_id);
   const detail = requestedDocumentId
-    ? documents.find((entry: any) => entry.google_document_id === requestedDocumentId) || documents[0]
+    ? documents.find((entry: any) => entry.google_document_id === requestedDocumentId)
     : documents[0];
   if (!detail) throw new Error("找不到這筆訂單的 Google 諮詢單");
   return { booking, detail, customer: one(booking.customers), method: one(booking.consultation_methods) };
@@ -93,6 +99,7 @@ export async function prepareConsultationReturn(args: {
   selectedIndexes: unknown;
   editedItems: unknown;
   skipCarousel: boolean;
+  sourceItems?: {index:number;content:string}[];
 }) {
   const selected = Array.isArray(args.selectedIndexes)
     ? [...new Set(args.selectedIndexes.map((value: unknown) => Number(value)).filter((value: number) => Number.isInteger(value) && value > 0))]
@@ -102,9 +109,17 @@ export async function prepareConsultationReturn(args: {
   const { booking, detail, customer, method } = await bookingForConsultationReturn(args.bookingNo, args.documentId);
   if (!customer?.line_user_id) throw new Error("這位用戶沒有 LINE UID，無法回傳");
   const freshItems = await getConsultationReturnPreview(detail.google_document_id);
-  const bindings = await returnItemBindings(booking.id);
-  const items = freshItems.filter((item) => selected.includes(item.index)).map((item) => ({
+  const unreadable = freshItems.find(item => selected.includes(item.index) && item.parseWarning);
+  if (unreadable) throw new Error(unreadable.parseWarning);
+  const bindings = await returnItemBindings(booking.id,freshItems.length);
+  const authoritative=correctReturnHeadings(freshItems,bindings);
+  if(args.sourceItems)for(const index of selected){
+   const previous=args.sourceItems.find(row=>row.index===index),current=authoritative.find(row=>row.index===index);
+   if(!previous||!current||normalizeConsultationReturnText(previous.content)!==normalizeConsultationReturnText(current.content))throw Error(`項目 ${index} 的文件已更新，請重新整理後核對，未傳送。`);
+  }
+  const items = correctReturnHeadings(freshItems, bindings).filter((item) => selected.includes(item.index)).map((item) => ({
     ...item,
+    sourceContent:item.content,
     content: normalizeConsultationReturnText(
       Object.prototype.hasOwnProperty.call(editedItems, String(item.index))
         ? String(editedItems[String(item.index)] || "")
@@ -113,6 +128,7 @@ export async function prepareConsultationReturn(args: {
     ...(bindings[item.index - 1] || {}),
   }));
   if (!items.length) throw new Error("找不到選取的諮詢結果");
+  assertReturnIdentity(items,correctReturnHeadings(freshItems,bindings));
   return {
     bookingNo: args.bookingNo,
     documentId: detail.google_document_id,
@@ -125,6 +141,11 @@ export async function prepareConsultationReturn(args: {
 }
 
 export async function deliverPreparedConsultationReturn(payload: PreparedConsultationReturn, site: string) {
+  // Validate every item before the first LINE message, including saved schedule payloads.
+  const {booking,customer}=await bookingForConsultationReturn(payload.bookingNo,payload.documentId);
+  if(customer?.line_user_id!==payload.lineUserId)throw Error('回傳用戶與訂單不符，未傳送');
+  const latest=await getConsultationReturnPreview(payload.documentId);
+  assertReturnIdentity(payload.items,correctReturnHeadings(latest,await returnItemBindings(booking.id,latest.length)));
   let messageCount = 0;
   for (const item of payload.items) {
     const chunks = splitLineText(item.content);
@@ -169,4 +190,31 @@ export async function deliverPreparedConsultationReturn(payload: PreparedConsult
   try { await moveConsultationDocumentToReturnedFolder(payload.documentId); }
   catch (moveError) { console.error("移動 Google 諮詢單到已回傳資料夾失敗", moveError); }
   return { returnedAt, messageCount };
+}
+
+export function assertReturnIdentity(items:{index:number;content:string;sourceContent?:string}[],fresh:{index:number;content:string;parseWarning?:string}[]){
+ const headings=(value:string)=>Array.from(value.matchAll(/^\s*([^\n【《]+)【([^】\n]+)】/gm),match=>match[1].trim()+'【'+match[2].trim()+'】');
+ for(const item of items){
+  const source=fresh.find(row=>row.index===item.index);
+  if(!source||source.parseWarning)throw Error(`項目 ${item.index} 的文件對應已改變，請重新整理並核對，未傳送。`);
+  const expected=headings(source.content),actual=headings(item.content);
+  if(expected.length===0||JSON.stringify(expected)!==JSON.stringify(actual))throw Error(`項目 ${item.index} 姓名或項目標籤與 Google 文件不符，未傳送。請改用最新文件版本。`);
+  if(item.sourceContent!==undefined&&normalizeConsultationReturnText(item.sourceContent)!==normalizeConsultationReturnText(source.content))throw Error(`項目 ${item.index} 的 Google 文件已更新，請取消舊排程並重新核對內容，未傳送。`);
+ }
+ for(let i=0;i<items.length;i++)for(let j=0;j<i;j++){
+  if(normalizeConsultationReturnText(items[i].content)===normalizeConsultationReturnText(items[j].content))throw Error('不同項目的回傳內容完全相同，請核對是否誤用了另一項草稿，未傳送。');
+ }
+}
+
+export function correctReturnHeadings<T extends {index:number;itemTitle:string;content:string}>(items:T[], bindings:{headingName?:string}[]):T[] {
+  return items.map(item=>{
+    const name=bindings[item.index-1]?.headingName;
+    if(!name)return item;
+    const fix=(value:string)=>value.replace(/^([^\n【]+)【([^】]*前世[^】]*)】/gm,(heading,names,label)=>{
+      const prefix=names.trim();
+      const repeated=prefix.length>name.length&&prefix.length%name.length===0&&name.repeat(prefix.length/name.length)===prefix;
+      return repeated||prefix.split(/[&＆]/).map((entry:string)=>entry.trim()).includes(name)?name+"【"+label+"】":heading;
+    });
+    return {...item,itemTitle:fix(item.itemTitle),content:fix(item.content)};
+  });
 }
