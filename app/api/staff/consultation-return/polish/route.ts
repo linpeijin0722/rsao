@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
     if(!plan.segments.length)return NextResponse.json({ok:true,polished:mergeConsultationPolish(plan,[]),changeSummary:plan.removedEmptyAges.length?["移除未填寫的流年年齡列"]:[],suspectedIssues:[]});
     const started=Date.now();
     const model=process.env.OPENAI_POLISH_MODEL || "gpt-5-mini";
+<<<<<<< HEAD
     let parsed: any;
     for (let attempt = 0; attempt < 2; attempt++) {
       const response = await fetch("https://api.openai.com/v1/responses", {
@@ -112,6 +113,39 @@ export async function POST(request: NextRequest) {
         throw new Error("AI 回覆內容不完整，已保留原始版本，請稍後再試。");
       break;
     }
+=======
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        model,
+        ...(/^gpt-5(?:-mini|-nano)?(?:-\d{4}-\d{2}-\d{2})?$/.test(model)?{reasoning:{effort:"low"}}:{}),
+        instructions: polishInstructions,
+        input: JSON.stringify({segments:plan.segments}),
+        text: { format: {
+          type: "json_schema", name: "consultation_polish_result", strict: true,
+          schema: {
+            type: "object", additionalProperties: false,
+            properties: {
+              segments: { type:"array", minItems:plan.segments.length,maxItems:plan.segments.length,items:{type:"object",additionalProperties:false,properties:{id:{type:"integer"},content:{type:"string"}},required:["id","content"]} },
+              changeSummary: { type: "array", items: { type: "string" } },
+              suspectedIssues: { type: "array", items: {
+                type: "object", additionalProperties: false,
+                properties: { originalText: { type: "string" }, action: { type: "string", enum: ["removed", "kept"] }, reason: { type: "string" } },
+                required: ["originalText", "action", "reason"],
+              } },
+            },
+            required: ["segments", "changeSummary", "suspectedIssues"],
+          },
+        } },
+        max_output_tokens: 7000,
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result?.error?.message || "AI 潤飾失敗");
+    const outputText = (result.output || []).flatMap((entry: any) => Array.isArray(entry.content) ? entry.content : []).filter((entry: any) => entry.type === "output_text" && typeof entry.text === "string").map((entry: any) => entry.text).join("").trim();
+    const parsed = JSON.parse(outputText || "{}");
+>>>>>>> 7f2e65aae8e782ce1f676e9e823ce6c5635078f0
     const retainedIds:number[]=[];
     let polished = mergeConsultationPolish(plan,parsed.segments,retainedIds);
     if(JSON.stringify(consultationStructure(content))!==JSON.stringify(consultationStructure(polished))){
