@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       ItemDesc: "林阿嫂線上諮詢預約",
       ReturnURL: `${origin}/api/newebpay/return`,
       NotifyURL: `${origin}/api/newebpay/notify`,
-      ClientBackURL: origin,
+      ClientBackURL: lineUid.startsWith("WEB_") ? `${origin}/payment-complete?order=${encodeURIComponent(booking.booking_no)}&public=1` : origin,
       ...(booking.payment_method === "credit_card" ? { CREDIT: "1" } : { VACC: "1" }),
     });
     const tradeInfo = encryptTradeInfo(

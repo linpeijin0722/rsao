@@ -46,7 +46,7 @@ async function confirmBookingPayment(bookingNo: string, paymentMethod: string, s
         .trim();
       return `${detail.item_title}${cleanSub ? `｜${cleanSub}` : ""} x${Math.max(1, Number(detail.quantity) || 1)}`;
     });
-    try {
+    if (!String(customer?.line_user_id || "").startsWith("WEB_")) try {
       await pushLineFlex(customer.line_user_id, "已付款｜請填寫問事資料", bookingFlex({ bookingNo, total: booking.total_price, method: method.code, slot, slotStart: booking.slot_start || undefined, items, site }));
       await db.from("bookings").update({ payment_notified_at: new Date().toISOString() }).eq("booking_no", bookingNo);
     } catch (error) {

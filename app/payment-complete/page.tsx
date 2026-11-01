@@ -2,10 +2,13 @@
 import { useEffect, useState } from "react";
 export default function Complete() {
   const [order, setOrder] = useState("");
+  const [publicBooking, setPublicBooking] = useState(false);
   const lineUrl = process.env.NEXT_PUBLIC_LINE_OFFICIAL_ACCOUNT_URL || "https://line.me/R/ti/p/@405unxzn";
   useEffect(() => {
-    setOrder(new URLSearchParams(location.search).get("order") || "");
-    if (!lineUrl) return;
+    const params=new URLSearchParams(location.search),isPublic=params.get("public")==="1";
+    setOrder(params.get("order") || "");
+    setPublicBooking(isPublic);
+    if (!lineUrl || isPublic) return;
     const timer = window.setTimeout(
       () => window.location.assign(lineUrl),
       3500,
@@ -16,13 +19,13 @@ export default function Complete() {
     <main className="dataPage">
       <section style={{ textAlign: "center" }}>
         <h1>預約已送出</h1>
-        <p>付款結果正在確認，完成後會由 LINE 發送通知。</p>
+        <p>{publicBooking?"付款結果正在確認，請保留訂單編號並繼續填寫諮詢者資料。":"付款結果正在確認，完成後會由 LINE 發送通知。"}</p>
         <p>訂單編號</p>
         <h2>{order}</h2>
         <a href={`/booking-data?order=${encodeURIComponent(order)}`}>
           填寫諮詢者資料（必填）
         </a>
-        {lineUrl && (
+        {lineUrl && !publicBooking && (
           <>
             <p>即將返回 LINE 官方帳號…</p>
             <a href={lineUrl}>立即返回 LINE</a>
