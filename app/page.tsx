@@ -92,6 +92,8 @@ export default function Page() {
     [screen, setScreen] = useState<Screen>("method"),
     [methods, setMethods] = useState<Method[]>(FIXED_METHODS),
     [items, setItems] = useState<Item[]>([]),
+    [publicCatalogLoading, setPublicCatalogLoading] = useState(false),
+    [publicCatalogError, setPublicCatalogError] = useState(""),
     [textFull, setTextFull] = useState(false),
     [method, setMethod] = useState<Method | null>(null),
     [slots, setSlots] = useState<Slot[]>([]),
@@ -253,6 +255,28 @@ export default function Page() {
     document.addEventListener("pointerdown", closeMenu);
     return () => document.removeEventListener("pointerdown", closeMenu);
   }, []);
+  useEffect(() => {
+    if (!publicBrowsing) return;
+    let active = true;
+    setPublicCatalogLoading(true);
+    fetch("/api/catalog", { cache: "no-store" })
+      .then(async (response) => {
+        const catalog = await response.json();
+        if (!response.ok) throw Error(catalog.error || "無法載入服務項目");
+        if (!active) return;
+        setMethods(Array.isArray(catalog.methods) ? catalog.methods : FIXED_METHODS);
+        setItems(Array.isArray(catalog.items) ? catalog.items : []);
+        setTextFull(Boolean(catalog.textFull));
+        setPublicCatalogError("");
+      })
+      .catch((catalogError) => {
+        if (active) setPublicCatalogError(catalogError instanceof Error ? catalogError.message : "無法載入服務項目");
+      })
+      .finally(() => {
+        if (active) setPublicCatalogLoading(false);
+      });
+    return () => { active = false; };
+  }, [publicBrowsing]);
   const availableDates = useMemo(
       () =>
         new Set(
@@ -558,10 +582,18 @@ export default function Page() {
     );
   return (
     <main className="shell">
-      <section className="app">
-        {publicBrowsing && <a href="https://line.me/R/ti/p/@405unxzn" target="_blank" rel="noopener noreferrer" aria-label="前往林阿嫂 LINE 官方帳號" style={{position:"fixed",right:18,bottom:"calc(18px + env(safe-area-inset-bottom, 0px))",width:48,height:48,borderRadius:"50%",background:"#06c755",display:"grid",placeItems:"center",boxShadow:"0 2px 8px #0003",zIndex:100}}>
+      <section className={`app${publicBrowsing ? " publicBookingApp" : ""}`}>
+        {publicBrowsing && <a className="publicLineFloat" href="https://line.me/R/ti/p/@405unxzn" target="_blank" rel="noopener noreferrer" aria-label="聯絡林阿嫂 LINE 官方帳號">
           <svg width="36" height="36" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="white" d="M34 18c0-7-6.3-12-14-12S6 11 6 18c0 6.1 5.1 11.1 11.8 11.9.5.1 1.2.3 1.4.7.2.4.1 1.1.1 1.6l-.2 1.4c-.1.4-.3 1.5 1.3.8 1.7-.7 9-5.3 12.2-9.1A11 11 0 0 0 34 18Z"/><text x="20" y="21" textAnchor="middle" fill="#06c755" fontSize="9" fontWeight="800" fontFamily="Arial,sans-serif">LINE</text></svg>
+          <span>LINE 客服</span>
         </a>}
+        {publicBrowsing && screen === "method" && <section className="publicStoreHero" aria-labelledby="public-store-title">
+          <small>線上命理諮詢服務</small>
+          <h1 id="public-store-title">林阿嫂線上諮詢</h1>
+          <p>林阿嫂線上命理諮詢提供視訊及文字諮詢服務，包含整體運勢、感情、工作、財運、命名、擇日等項目。客戶可透過網站查看服務內容與價格，並由 LINE 官方帳號進入正式預約及線上付款流程，依預約時間或所示期限接受諮詢服務。</p>
+          <dl><div><dt>商店地址</dt><dd>新北市林口區粉寮路二段88巷22號之一</dd></div><div><dt>客服方式</dt><dd>LINE 官方帳號 @405unxzn</dd></div></dl>
+          <a className="publicLinePrimary" href="https://line.me/R/ti/p/@405unxzn" target="_blank" rel="noopener noreferrer">加入 LINE 官方帳號／聯絡客服</a>
+        </section>}
         <nav className="stepBar">
           <div className="stepTrail">
             {stepStart > 0 && <i className="stepLead">›</i>}
@@ -826,6 +858,34 @@ export default function Page() {
             </div>
           )}
         </div>
+        {publicBrowsing && screen === "method" && <section className="publicCommerceInfo" aria-label="商店服務與消費資訊">
+          <article className="publicInfoCard publicServiceCatalog">
+            <div className="publicSectionHeading"><small>Services &amp; Prices</small><h2>服務項目與公開售價</h2><p>以下價格均為新臺幣。正式結帳金額會依選擇的諮詢方式、服務項目、數量與加選內容計算，付款前會再次顯示明細。</p></div>
+            <div className="publicMethodSummary"><div><b>視訊諮詢</b><strong>{money(methods.find((entry) => entry.code === "video")?.base_price || 1200)} 起</strong><span>每次25分鐘；基本費另加所選諮詢項目費用，依預約時間由老師主動發送通話邀請。</span></div><div><b>文字諮詢</b><strong>依項目計價</strong><span>完成付款及資料填寫後，約7–30天內由 LINE 回傳結果；收到結果後8小時內可提出2個補充問題。</span></div></div>
+            {publicCatalogLoading && <p className="publicCatalogState">正在載入目前服務價格…</p>}
+            {publicCatalogError && <p className="publicCatalogState error">服務價格暫時無法載入，請重新整理頁面或聯絡 LINE 客服。</p>}
+            {!publicCatalogLoading && !publicCatalogError && <div className="publicPriceList">{items.map((item) => <details key={item.id} open={item.sub_items.length > 0}><summary><span><b>{item.title}</b><small>{item.description || "線上命理諮詢服務"}</small></span><strong>{item.price > 0 ? money(item.price) : item.sub_items.length > 0 ? "依選項計價" : money(0)}</strong></summary>{item.sub_items.length > 0 && <div className="publicSubPrices"><p>可選內容與售價</p>{item.sub_items.map((sub) => <div key={sub.id}><span>{sub.title}</span><b>{money(sub.price)}</b></div>)}</div>}</details>)}</div>}
+          </article>
+
+          <article className="publicInfoCard">
+            <div className="publicSectionHeading"><small>Booking Process</small><h2>預約、付款與服務流程</h2></div>
+            <ol className="publicProcess"><li><b>查看服務</b><span>於本頁查看諮詢方式、項目說明及售價。</span></li><li><b>由 LINE 進入正式預約</b><span>加入 LINE 官方帳號後，透過圖文選單進入預約系統，選擇項目與時間。</span></li><li><b>確認訂單並付款</b><span>付款前會顯示服務內容、數量、預約時間與總金額；完成付款後訂單才成立。</span></li><li><b>接受線上服務</b><span>視訊諮詢依預約時間進行；文字諮詢於資料完整送出後約7–30天內回傳。本站提供線上服務，沒有實體商品寄送。</span></li></ol>
+          </article>
+
+          <article className="publicInfoCard publicPolicies">
+            <div className="publicSectionHeading"><small>Consumer Information</small><h2>消費者權益與重要政策</h2><p>預約及付款前請先閱讀以下內容。</p></div>
+            <details open><summary>取消、改期與退款政策</summary><div className="publicPolicyBody"><ul><li>視訊諮詢如需取消或改期，請於預約時間24小時前透過 LINE 客服提出；可免費改期一次。於服務開始前申請取消，可辦理退款。</li><li>預約時間前未提出取消或改期，且未依約上線者，因該時段已為客戶保留，原則上視同服務完成，不予退款。</li><li>文字諮詢在客戶尚未提交完整資料、老師尚未開始分析前，可申請取消及退款；開始分析後取消，將依已提供的服務比例扣除費用後退回餘額；結果已完整交付後不再受理退款。</li><li>如因本商店因素無法按約提供服務，客戶可選擇免費改期或全額退款。</li><li>退款請透過 LINE 官方帳號申請。信用卡退款退回原信用卡；ATM或銀行轉帳付款需提供本人退款帳戶。退款作業約7–14個工作天，實際入帳時間依發卡銀行或金融機構為準。</li></ul></div></details>
+            <details><summary>資料正確性與服務範圍</summary><div className="publicPolicyBody"><p>客戶應確認姓名、出生日期、時辰、諮詢對象及聯絡資料正確。因資料錯誤、不完整或後續更換諮詢對象而需重新分析時，可能需要重新預約或支付額外費用。</p><p>命理諮詢係依客戶提供的資料進行分析，內容僅供個人參考，不保證特定結果，亦不得取代醫療、心理、法律、投資或其他專業意見；客戶仍應依自身情況審慎判斷。</p></div></details>
+            <details><summary>隱私權與個人資料使用</summary><div className="publicPolicyBody"><p>本商店為辦理預約、身分確認、付款、客服聯絡及提供諮詢服務，可能蒐集姓名、LINE帳號資料、聯絡方式、出生資料、諮詢內容及交易紀錄。資料僅於上述目的及依法令所需範圍內使用，不會任意提供給無關第三方。</p><p>付款資料由藍新金流及相關金融機構依其安全機制處理；本商店不會在網站中保存完整信用卡卡號。資料於服務、客服及依法保存目的消失後，將依規定刪除或停止使用。若需查詢、更正或申請刪除個人資料，請聯絡 LINE 客服。</p></div></details>
+            <details><summary>服務條款</summary><div className="publicPolicyBody"><p>完成付款即表示客戶已確認訂單內容及同意本頁所列服務說明與政策。預約名額以付款完成時為準；未完成付款的選擇不代表時段已保留。若遇不可抗力、系統異常或其他影響服務的情況，本商店將主動聯繫並協助改期或退款。</p></div></details>
+          </article>
+
+          <article className="publicInfoCard publicContactCard">
+            <div><small>Customer Service</small><h2>客服與消費爭議聯絡</h2><p>預約、付款、改期、退款或個人資料相關問題，請透過林阿嫂 LINE 官方帳號聯絡。客服資訊與回覆均以官方帳號為準。</p><b>LINE ID：@405unxzn</b><span>官方客服連結：line.me/R/ti/p/@405unxzn</span></div>
+            <a href="https://line.me/R/ti/p/@405unxzn" target="_blank" rel="noopener noreferrer">開啟 LINE 客服</a>
+          </article>
+          <p className="publicUpdatedAt">商店資訊與政策更新日期：2026年11月1日</p>
+        </section>}
         {screen !== "done" && (
           <footer>
             {screen !== "method" && (

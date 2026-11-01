@@ -61,37 +61,57 @@ export async function POST(request: NextRequest) {
     if(!plan.segments.length)return NextResponse.json({ok:true,polished:mergeConsultationPolish(plan,[]),changeSummary:plan.removedEmptyAges.length?["移除未填寫的流年年齡列"]:[],suspectedIssues:[]});
     const started=Date.now();
     const model=process.env.OPENAI_POLISH_MODEL || "gpt-5-mini";
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        model,
-        ...(/^gpt-5(?:-mini|-nano)?(?:-\d{4}-\d{2}-\d{2})?$/.test(model)?{reasoning:{effort:"low"}}:{}),
-        instructions: polishInstructions,
-        input: JSON.stringify({segments:plan.segments}),
-        text: { format: {
-          type: "json_schema", name: "consultation_polish_result", strict: true,
-          schema: {
-            type: "object", additionalProperties: false,
-            properties: {
-              segments: { type:"array", minItems:plan.segments.length,maxItems:plan.segments.length,items:{type:"object",additionalProperties:false,properties:{id:{type:"integer"},content:{type:"string"}},required:["id","content"]} },
-              changeSummary: { type: "array", items: { type: "string" } },
-              suspectedIssues: { type: "array", items: {
-                type: "object", additionalProperties: false,
-                properties: { originalText: { type: "string" }, action: { type: "string", enum: ["removed", "kept"] }, reason: { type: "string" } },
-                required: ["originalText", "action", "reason"],
-              } },
+    let parsed: any;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          model,
+          ...(/^gpt-5(?:-mini|-nano)?(?:-\d{4}-\d{2}-\d{2})?$/.test(model)?{reasoning:{effort:"low"}}:{}),
+          instructions: polishInstructions,
+          input: JSON.stringify({segments:plan.segments}),
+          text: { format: {
+            type: "json_schema", name: "consultation_polish_result", strict: true,
+            schema: {
+              type: "object", additionalProperties: false,
+              properties: {
+                segments: { type:"array", minItems:plan.segments.length,maxItems:plan.segments.length,items:{type:"object",additionalProperties:false,properties:{id:{type:"integer"},content:{type:"string"}},required:["id","content"]} },
+                changeSummary: { type: "array", items: { type: "string" } },
+                suspectedIssues: { type: "array", items: {
+                  type: "object", additionalProperties: false,
+                  properties: { originalText: { type: "string" }, action: { type: "string", enum: ["removed", "kept"] }, reason: { type: "string" } },
+                  required: ["originalText", "action", "reason"],
+                } },
+              },
+              required: ["segments", "changeSummary", "suspectedIssues"],
             },
-            required: ["segments", "changeSummary", "suspectedIssues"],
-          },
-        } },
-        max_output_tokens: 7000,
-      }),
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result?.error?.message || "AI 潤飾失敗");
-    const outputText = (result.output || []).flatMap((entry: any) => Array.isArray(entry.content) ? entry.content : []).filter((entry: any) => entry.type === "output_text" && typeof entry.text === "string").map((entry: any) => entry.text).join("").trim();
-    const parsed = JSON.parse(outputText || "{}");
+          } },
+          max_output_tokens: attempt === 0 ? 14000 : 24000,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error?.message || "AI 潤飾失敗");
+      const entries = (Array.isArray(result.output) ? result.output : []).flatMap((entry: any) => Array.isArray(entry.content) ? entry.content : []);
+      if (entries.some((entry: any) => entry.type === "refusal"))
+        throw new Error("AI 無法整理這段內容，已保留原始版本，可直接編輯原文後回傳。");
+      if (result.status === "incomplete") {
+        if (attempt === 0 && result.incomplete_details?.reason === "max_output_tokens") continue;
+        throw new Error("AI 回覆尚未完成，已保留原始版本，請將內容分項潤飾或直接編輯原文後回傳。");
+      }
+      if (result.status && result.status !== "completed")
+        throw new Error("AI 整理未完成，已保留原始版本，請稍後再試。");
+      const outputText = entries.filter((entry: any) => entry.type === "output_text" && typeof entry.text === "string").map((entry: any) => entry.text).join("").trim();
+      try {
+        parsed = JSON.parse(outputText);
+      } catch {
+        if (attempt === 0) continue;
+        throw new Error("AI 回覆格式不完整，已保留原始版本，請稍後再試或直接編輯原文後回傳。");
+      }
+      if (!parsed || !Array.isArray(parsed.segments) || !Array.isArray(parsed.changeSummary) || !Array.isArray(parsed.suspectedIssues))
+        throw new Error("AI 回覆內容不完整，已保留原始版本，請稍後再試。");
+      break;
+    }
     const retainedIds:number[]=[];
     let polished = mergeConsultationPolish(plan,parsed.segments,retainedIds);
     if(JSON.stringify(consultationStructure(content))!==JSON.stringify(consultationStructure(polished))){
@@ -111,6 +131,6 @@ export async function POST(request: NextRequest) {
       ],
     });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "AI 潤飾失敗" }, { status: 400 });
+    return NextResponse.json({ error: error instanceof SyntaxError ? "資料格式不完整，已保留原始版本，請稍後再試。" : error instanceof Error ? error.message : "AI 潤飾失敗" }, { status: 400 });
   }
 }
