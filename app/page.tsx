@@ -86,7 +86,8 @@ export default function Page() {
     [publicBrowsing, setPublicBrowsing] = useState(false),
     [publicInfoStep, setPublicInfoStep] = useState(0),
     [publicInfoComplete, setPublicInfoComplete] = useState(false),
-    [formalInfoOpen, setFormalInfoOpen] = useState<"process"|"refund"|null>(null),
+    [formalInfoOpen, setFormalInfoOpen] = useState<"process"|"refund"|"privacy"|"contact"|null>(null),
+    [formalInfoComplete, setFormalInfoComplete] = useState(false),
     [publicContactOpen, setPublicContactOpen] = useState(false),
     [publicCustomerName, setPublicCustomerName] = useState(""),
     [publicCustomerPhone, setPublicCustomerPhone] = useState(""),
@@ -568,6 +569,19 @@ export default function Page() {
         {auth === "friend-required"&&<a className="addLineFriend" href={officialLineUrl}>前往加入／解除封鎖</a>}
       </main>
     );
+  if(!publicBrowsing&&!formalInfoComplete)
+    return <main className="formalIntroPage">
+      <section className="formalStoreIntro" aria-label="預約前服務資訊">
+        <div className="formalStoreHero"><small>線上命理諮詢服務</small><h1>林阿嫂線上諮詢</h1><p>提供視訊及文字諮詢服務，包含整體運勢、感情、工作、財運、命名、擇日等項目。請先閱讀下方服務資訊，再進入預約。</p></div>
+        <div className="formalInfoAccordion">
+          <article className={formalInfoOpen==="process"?"open":""}><button type="button" aria-expanded={formalInfoOpen==="process"} onClick={()=>setFormalInfoOpen(value=>value==="process"?null:"process")}><span>預約服務流程</span><i>{formalInfoOpen==="process"?"−":"＋"}</i></button>{formalInfoOpen==="process"&&<div><a className="formalPriceLink" href="https://sites.google.com/view/rsao820/%E5%B8%B8%E8%A6%8B%E5%95%8F%E9%A1%8C/%E8%AB%AE%E8%A9%A2%E9%A0%85%E7%9B%AE%E8%A1%A8%E6%94%B6%E8%B2%BB%E6%A8%99%E6%BA%96" target="_blank" rel="noopener noreferrer">查看諮詢項目表與收費標準</a><ol className="publicProcess"><li><b>查看諮詢項目</b><span>確認服務內容與價格。</span></li><li><b>選擇預約內容</b><span>選擇視訊或文字諮詢、服務項目與預約時間。</span></li><li><b>確認訂單並付款</b><span>核對服務內容、時間與金額後完成付款。</span></li><li><b>接受線上服務</b><span>視訊諮詢依預約時間進行；文字諮詢於完整資料送出後約3–14個工作天內完成。付款完成頁面會提供諮詢資料填寫入口。</span></li></ol></div>}</article>
+          <article className={formalInfoOpen==="refund"?"open":""}><button type="button" aria-expanded={formalInfoOpen==="refund"} onClick={()=>setFormalInfoOpen(value=>value==="refund"?null:"refund")}><span>取消、改期與退款政策</span><i>{formalInfoOpen==="refund"?"−":"＋"}</i></button>{formalInfoOpen==="refund"&&<div className="formalPolicy"><ul><li>視訊諮詢如需取消或改期，請於預約時間24小時前透過LINE客服提出；可免費改期一次。於服務開始前申請取消，可辦理退款，扣除5%手續費後退款。</li><li>預約時間前未提出取消或改期，且未依約上線者，原則上視同服務完成，不予退款。</li><li>文字諮詢於資料尚未提交完整、老師尚未開始分析前，可申請取消及退款；開始分析後依已提供的服務比例扣除費用，完整交付後不再受理退款。</li><li>如因本商店因素無法按約提供服務，可選擇免費改期或全額退款。</li><li>如需退款，請至LINE客服提供退款收款帳號，由客服確認訂單後以人工方式辦理退款。退款作業約1–7個工作天，實際入帳時間依金融機構作業為準。</li></ul><a href={officialLineUrl} target="_blank" rel="noopener noreferrer">聯絡 LINE 客服</a></div>}</article>
+          <article className={formalInfoOpen==="privacy"?"open":""}><button type="button" aria-expanded={formalInfoOpen==="privacy"} onClick={()=>setFormalInfoOpen(value=>value==="privacy"?null:"privacy")}><span>隱私權與服務條款</span><i>{formalInfoOpen==="privacy"?"−":"＋"}</i></button>{formalInfoOpen==="privacy"&&<div className="formalTerms"><h2>個人資料使用</h2><p>本商店為辦理預約、身分確認、付款、客服聯絡及提供諮詢服務，可能蒐集姓名、手機號碼、出生資料、諮詢內容及交易紀錄。資料僅於上述目的及依法令所需範圍內使用，不會任意提供給無關第三方。</p><p>付款資料由藍新金流及相關金融機構依其安全機制處理；本商店不會保存完整信用卡卡號。如需查詢、更正或申請刪除個人資料，請透過LINE客服聯絡。</p><h2>服務條款</h2><p>完成付款即表示已確認訂單內容並同意本頁服務說明與政策。預約名額以付款完成時為準；未完成付款不代表時段已保留。若遇不可抗力、系統異常或其他影響服務的情況，本商店將主動聯繫並協助改期或退款。</p></div>}</article>
+          <article className={formalInfoOpen==="contact"?"open":""}><button type="button" aria-expanded={formalInfoOpen==="contact"} onClick={()=>setFormalInfoOpen(value=>value==="contact"?null:"contact")}><span>客服聯絡</span><i>{formalInfoOpen==="contact"?"−":"＋"}</i></button>{formalInfoOpen==="contact"&&<div className="formalContact"><p>預約、付款、改期、退款、消費爭議或個人資料相關問題，請透過林阿嫂LINE官方帳號聯絡。</p><a href={officialLineUrl} target="_blank" rel="noopener noreferrer">開啟 LINE 客服（@405unxzn）</a></div>}</article>
+        </div>
+      </section>
+      <div className="formalIntroContinue"><button type="button" onClick={()=>{setFormalInfoOpen(null);setFormalInfoComplete(true);window.scrollTo({top:0,behavior:"smooth"})}}>已閱讀，進入預約</button></div>
+    </main>;
   return (
     <main className="shell">
       <section className={`app${publicBrowsing ? " publicBookingApp" : ""}${publicBrowsing&&!publicInfoComplete ? " publicInfoPending" : ""}`}>
@@ -581,13 +595,6 @@ export default function Page() {
           <p>林阿嫂線上命理諮詢提供視訊及文字諮詢服務，包含整體運勢、感情、工作、財運、命名、擇日等項目。客戶閱讀完本頁服務資訊後，即可直接進入預約及線上付款流程，依預約時間或所示期限接受諮詢服務。</p>
           <dl><div><dt>商店地址</dt><dd>新北市林口區粉寮路二段88巷22號之一</dd></div><div><dt>客服方式</dt><dd>LINE 官方帳號 @405unxzn</dd></div></dl>
           <a className="publicLinePrimary" href={officialLineUrl} target="_blank" rel="noopener noreferrer">開啟 LINE 客服</a>
-        </section>}
-        {!publicBrowsing&&screen==="method"&&<section className="formalStoreIntro" aria-label="林阿嫂線上諮詢服務資訊">
-          <div className="formalStoreHero"><small>線上命理諮詢服務</small><h1>林阿嫂線上諮詢</h1><p>提供視訊及文字諮詢服務，包含整體運勢、感情、工作、財運、命名、擇日等項目。完成付款後，依預約時間或所示期限接受諮詢服務。</p></div>
-          <div className="formalInfoAccordion">
-            <article className={formalInfoOpen==="process"?"open":""}><button type="button" aria-expanded={formalInfoOpen==="process"} onClick={()=>setFormalInfoOpen(value=>value==="process"?null:"process")}><span>預約、付款與服務流程</span><i>{formalInfoOpen==="process"?"−":"＋"}</i></button>{formalInfoOpen==="process"&&<div><a className="formalPriceLink" href="https://sites.google.com/view/rsao820/%E5%B8%B8%E8%A6%8B%E5%95%8F%E9%A1%8C/%E8%AB%AE%E8%A9%A2%E9%A0%85%E7%9B%AE%E8%A1%A8%E6%94%B6%E8%B2%BB%E6%A8%99%E6%BA%96" target="_blank" rel="noopener noreferrer">查看諮詢項目表與收費標準</a><ol className="publicProcess"><li><b>查看諮詢項目</b><span>確認服務內容與價格。</span></li><li><b>選擇預約內容</b><span>選擇視訊或文字諮詢、服務項目與預約時間。</span></li><li><b>確認訂單並付款</b><span>核對服務內容、時間與金額後完成付款。</span></li><li><b>接受線上服務</b><span>視訊諮詢依預約時間進行；文字諮詢於完整資料送出後約3–14個工作天內完成。付款完成頁面會提供諮詢資料填寫入口。</span></li></ol></div>}</article>
-            <article className={formalInfoOpen==="refund"?"open":""}><button type="button" aria-expanded={formalInfoOpen==="refund"} onClick={()=>setFormalInfoOpen(value=>value==="refund"?null:"refund")}><span>取消、改期與退款政策</span><i>{formalInfoOpen==="refund"?"−":"＋"}</i></button>{formalInfoOpen==="refund"&&<div className="formalPolicy"><ul><li>視訊諮詢如需取消或改期，請於預約時間24小時前透過LINE客服提出；可免費改期一次。於服務開始前申請取消，可辦理退款，扣除5%手續費後退款。</li><li>預約時間前未提出取消或改期，且未依約上線者，原則上視同服務完成，不予退款。</li><li>文字諮詢於資料尚未提交完整、老師尚未開始分析前，可申請取消及退款；開始分析後依已提供的服務比例扣除費用，完整交付後不再受理退款。</li><li>如因本商店因素無法按約提供服務，可選擇免費改期或全額退款。</li><li>如需退款，請至LINE客服提供退款收款帳號，由客服確認訂單後以人工方式辦理退款。退款作業約1–7個工作天，實際入帳時間依金融機構作業為準。</li></ul><a href={officialLineUrl} target="_blank" rel="noopener noreferrer">聯絡 LINE 客服</a></div>}</article>
-          </div>
         </section>}
         <nav className="stepBar">
           <div className="stepTrail">
