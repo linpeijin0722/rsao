@@ -6,6 +6,10 @@
    - rsao_site_url = https://rsao-virid.vercel.app
    - rsao_cron_secret = 與 Vercel CRON_SECRET 完全相同
 3. 再將本專案部署到 Vercel Production。
+4. Vercel 可設定 NEWEBPAY_ENABLED_METHODS：
+   - 目前只開信用卡：CREDIT
+   - 未來也開通 LINE PAY：CREDIT,LINEPAY
+   請勿填入尚未在藍新商店啟用的付款工具。
 
 本次功能
 - 所有訂單先進入固定帳號轉帳頁。

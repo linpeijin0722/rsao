@@ -31,6 +31,10 @@ export async function POST(request: NextRequest) {
 
     const config = newebpayConfig();
     const origin = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin;
+    const supportedMethods=new Set(["CREDIT","LINEPAY"]);
+    const enabledMethods=String(process.env.NEWEBPAY_ENABLED_METHODS||"CREDIT").split(",").map(value=>value.trim().toUpperCase()).filter(value=>supportedMethods.has(value));
+    if(!enabledMethods.length)enabledMethods.push("CREDIT");
+    const methodFlags=Object.fromEntries(enabledMethods.map(method=>[method,"1"]));
     const params = new URLSearchParams({
       MerchantID: config.merchantId,
       RespondType: "JSON",
@@ -42,8 +46,7 @@ export async function POST(request: NextRequest) {
       ReturnURL: `${origin}/api/newebpay/return`,
       NotifyURL: `${origin}/api/newebpay/notify`,
       ClientBackURL: lineUid.startsWith("WEB_") ? `${origin}/payment-complete?order=${encodeURIComponent(booking.booking_no)}&public=1` : origin,
-      CREDIT: "1",
-      LINEPAY: "1",
+      ...methodFlags,
     });
     const tradeInfo = encryptTradeInfo(
       params.toString(),

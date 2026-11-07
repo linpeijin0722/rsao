@@ -12,10 +12,10 @@ test('checkout always opens the fixed-account payment page first',()=>{
   assert.doesNotMatch(pay,/effective_mode==="newebpay"/);
 });
 
-test('NewebPay online checkout enables non-transfer methods only',()=>{
+test('NewebPay online checkout enables only configured non-transfer methods',()=>{
   const route=load('app/api/newebpay/route.ts');
-  assert.match(route,/CREDIT: "1"/);
-  assert.match(route,/LINEPAY: "1"/);
+  assert.match(route,/NEWEBPAY_ENABLED_METHODS\|\|"CREDIT"/);
+  assert.match(route,/new Set\(\["CREDIT","LINEPAY"\]\)/);
   assert.doesNotMatch(route,/VACC: "1"/);
 });
 
