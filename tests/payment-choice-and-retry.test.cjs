@@ -14,8 +14,9 @@ test('checkout always opens the fixed-account payment page first',()=>{
 
 test('NewebPay online checkout enables only configured non-transfer methods',()=>{
   const route=load('app/api/newebpay/route.ts');
-  assert.match(route,/NEWEBPAY_ENABLED_METHODS\|\|"CREDIT,APPLEPAY,ANDROIDPAY,SAMSUNGPAY,ESUNWALLET,CVS,BARCODE"/);
-  assert.match(route,/new Set\(\["CREDIT","APPLEPAY","ANDROIDPAY","SAMSUNGPAY","ESUNWALLET","CVS","BARCODE"\]\)/);
+  assert.match(route,/NEWEBPAY_ENABLED_METHODS\|\|"CREDIT,APPLEPAY,SAMSUNGPAY,ESUNWALLET,CVS,BARCODE"/);
+  assert.match(route,/new Set\(\["CREDIT","APPLEPAY","SAMSUNGPAY","ESUNWALLET","CVS","BARCODE"\]\)/);
+  assert.doesNotMatch(route,/"ANDROIDPAY"/);
   assert.doesNotMatch(route,/"LINEPAY"/);
   assert.doesNotMatch(route,/VACC: "1"/);
 });

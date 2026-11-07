@@ -9,9 +9,8 @@
    - rsao_cron_secret = 與 Vercel CRON_SECRET 完全相同
 3. 再將本專案部署到 Vercel Production。
 4. Vercel 可設定 NEWEBPAY_ENABLED_METHODS：
-   - 目前已啟用：CREDIT,APPLEPAY,ANDROIDPAY,SAMSUNGPAY,ESUNWALLET,CVS,BARCODE
-   - ANDROIDPAY 代表藍新金流的 Google Pay 參數。
-   - 請勿加入尚未啟用的 LINEPAY、TAIWANPAY、WEBATM、VACC，避免付款跳轉失敗。
+   - 目前已啟用：CREDIT,APPLEPAY,SAMSUNGPAY,ESUNWALLET,CVS,BARCODE
+   - 請勿加入已關閉的 ANDROIDPAY（Google Pay），也勿加入尚未啟用的 LINEPAY、TAIWANPAY、WEBATM、VACC，避免付款跳轉失敗。
    - 若未設定此環境變數，系統也會使用上述目前已啟用清單。
 
 本次功能
@@ -25,5 +24,5 @@
 - 待付款訂單可再次傳送付款訊息，期限從傳送時間重新計算12小時。
 
 藍新設定
-- 系統只送出信用卡、Apple Pay、Google Pay、Samsung Pay、玉山 Wallet、超商代碼與超商條碼。
+- 系統只送出信用卡、Apple Pay、Samsung Pay、玉山 Wallet、超商代碼與超商條碼。
 - 系統不送出 LINE PAY、台灣 Pay、VACC 或 WebATM。
