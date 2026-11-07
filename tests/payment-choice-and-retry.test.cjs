@@ -14,15 +14,16 @@ test('checkout always opens the fixed-account payment page first',()=>{
 
 test('NewebPay online checkout enables only configured non-transfer methods',()=>{
   const route=load('app/api/newebpay/route.ts');
-  assert.match(route,/NEWEBPAY_ENABLED_METHODS\|\|"CREDIT"/);
-  assert.match(route,/new Set\(\["CREDIT","LINEPAY"\]\)/);
+  assert.match(route,/NEWEBPAY_ENABLED_METHODS\|\|"CREDIT,APPLEPAY,ANDROIDPAY,SAMSUNGPAY,ESUNWALLET,CVS,BARCODE"/);
+  assert.match(route,/new Set\(\["CREDIT","APPLEPAY","ANDROIDPAY","SAMSUNGPAY","ESUNWALLET","CVS","BARCODE"\]\)/);
+  assert.doesNotMatch(route,/"LINEPAY"/);
   assert.doesNotMatch(route,/VACC: "1"/);
 });
 
 test('bank transfers are never auto-confirmed and LINE failures are queued',()=>{
   const confirm=load('lib/payment-confirm.ts'),notification=load('lib/payment-notification.ts');
-  assert.match(confirm,/\["VACC","WEBATM","CVS","BARCODE"\]/);
-  assert.match(confirm,/normalized\.includes\("LINEPAY"\) \? "line_pay"/);
+  assert.match(confirm,/\["VACC","WEBATM"\]/);
+  assert.match(confirm,/normalized\.includes\("LINEPAY"\)\?"line_pay"/);
   assert.match(notification,/payment_notification_status:attempts>=10\?"failed":"pending"/);
   assert.match(notification,/payment_notification_next_retry_at/);
 });

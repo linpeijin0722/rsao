@@ -5,6 +5,7 @@ import "./watchlist.css";
 import PendingWork, { ResultReturnStatus } from "./PendingWork";
 
 import { taipeiDateKey, taipeiDateTimeInput, taipeiYear } from "@/lib/taipei-time";
+import { paymentProviderLabel } from "@/lib/payment-label";
 import { useEffect, useMemo, useState } from "react";
 import StaffAnswerEditorV2 from "./StaffAnswerEditorV2";
 import QuickConsultationReply from "./QuickConsultationReply";
@@ -99,7 +100,7 @@ const statusText = (x: any) =>
   x.status === "cancelled"
     ? (x.cancellation_reason === "手動取消" || x.cancellation_reason === "手動退款" ? "手動退款" : "取消訂單")
     : ({ paid: "已付款", pending: "待付款", expired: "已失效" } as Record<string,string>)[statusKey(x)];
-const paymentMethodText=(x:any)=>x.payment_method==="line_pay"?"LINE PAY":x.payment_method==="credit_card"?"信用卡":x.payment_method==="transfer"?(x.payment_provider==="newebpay"?"藍新轉帳":"銀行轉帳"):"未記錄";
+const paymentMethodText=(x:any)=>x.payment_method==="transfer"&&x.payment_provider==="newebpay"?"藍新轉帳":paymentProviderLabel(x.payment_provider_type,x.payment_method);
 const shortText = (value: unknown, limit = 20) => {
   const chars = Array.from(String(value || ""));
   return chars.length > limit ? `${chars.slice(0, limit).join("")}…` : chars.join("");

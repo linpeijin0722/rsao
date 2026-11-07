@@ -1,19 +1,22 @@
 付款流程更新（2026-11-07）
 
 部署順序（請勿顛倒）
-1. 到 Supabase SQL Editor 執行：supabase/054_payment_confirmation_and_line_retry.sql
+1. 到 Supabase SQL Editor 依序執行：
+   - supabase/054_payment_confirmation_and_line_retry.sql
+   - supabase/055_newebpay_payment_methods.sql
 2. 確認 Supabase Vault 已有：
    - rsao_site_url = https://rsao-virid.vercel.app
    - rsao_cron_secret = 與 Vercel CRON_SECRET 完全相同
 3. 再將本專案部署到 Vercel Production。
 4. Vercel 可設定 NEWEBPAY_ENABLED_METHODS：
-   - 目前只開信用卡：CREDIT
-   - 未來也開通 LINE PAY：CREDIT,LINEPAY
-   請勿填入尚未在藍新商店啟用的付款工具。
+   - 目前已啟用：CREDIT,APPLEPAY,ANDROIDPAY,SAMSUNGPAY,ESUNWALLET,CVS,BARCODE
+   - ANDROIDPAY 代表藍新金流的 Google Pay 參數。
+   - 請勿加入尚未啟用的 LINEPAY、TAIWANPAY、WEBATM、VACC，避免付款跳轉失敗。
+   - 若未設定此環境變數，系統也會使用上述目前已啟用清單。
 
 本次功能
 - 所有訂單先進入固定帳號轉帳頁。
-- 轉帳頁底部可選擇「其他付款方式」，前往藍新使用信用卡或 LINE PAY。
+- 轉帳頁底部可選擇「其他付款方式」，前往藍新自行選擇已啟用的付款工具。
 - 固定帳號轉帳只由後台人工核帳，不會自動判定付款。
 - 藍新非轉帳付款成功後，後台自動顯示已付款及實際付款方式。
 - 付款入帳後自動傳送填單訊息；LINE 失敗不影響付款狀態。
@@ -22,5 +25,5 @@
 - 待付款訂單可再次傳送付款訊息，期限從傳送時間重新計算12小時。
 
 藍新設定
-- 請確認正式商店已啟用信用卡與 LINE PAY。
-- 系統不向藍新開啟 VACC、WebATM、超商代碼或條碼付款，避免轉帳被自動核帳。
+- 系統只送出信用卡、Apple Pay、Google Pay、Samsung Pay、玉山 Wallet、超商代碼與超商條碼。
+- 系統不送出 LINE PAY、台灣 Pay、VACC 或 WebATM。

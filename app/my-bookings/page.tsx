@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { paymentProviderLabel } from "@/lib/payment-label";
 const status = (x: any) =>
   x.status === "cancelled"
     ? x.cancellation_reason === "自行取消"
@@ -108,13 +109,7 @@ export default function Mine() {
             <div>
               <small>付款方式</small>
               <b>
-                {x.payment_status === "paid"
-                  ? x.payment_method === "credit_card"
-                    ? "信用卡"
-                    : x.payment_method === "line_pay"
-                      ? "LINE PAY"
-                      : x.payment_provider === "newebpay" ? "藍新轉帳" : "銀行轉帳"
-                  : "尚未付款"}
+                {x.payment_status === "paid" ? paymentProviderLabel(x.payment_provider_type,x.payment_method) : "尚未付款"}
               </b>
             </div>
           </div>

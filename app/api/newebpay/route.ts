@@ -31,8 +31,8 @@ export async function POST(request: NextRequest) {
 
     const config = newebpayConfig();
     const origin = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin;
-    const supportedMethods=new Set(["CREDIT","LINEPAY"]);
-    const enabledMethods=String(process.env.NEWEBPAY_ENABLED_METHODS||"CREDIT").split(",").map(value=>value.trim().toUpperCase()).filter(value=>supportedMethods.has(value));
+    const supportedMethods=new Set(["CREDIT","APPLEPAY","ANDROIDPAY","SAMSUNGPAY","ESUNWALLET","CVS","BARCODE"]);
+    const enabledMethods=String(process.env.NEWEBPAY_ENABLED_METHODS||"CREDIT,APPLEPAY,ANDROIDPAY,SAMSUNGPAY,ESUNWALLET,CVS,BARCODE").split(",").map(value=>value.trim().toUpperCase()).filter(value=>supportedMethods.has(value));
     if(!enabledMethods.length)enabledMethods.push("CREDIT");
     const methodFlags=Object.fromEntries(enabledMethods.map(method=>[method,"1"]));
     const params = new URLSearchParams({

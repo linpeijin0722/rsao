@@ -17,11 +17,12 @@ export async function confirmPayment(fields: Record<string, string>, site: strin
 export async function confirmNewebPayment(bookingNo: string, paymentType: string, site: string, tradeNo = "", amount?: number) {
   if (!bookingNo) return "";
   const normalized=paymentType.toUpperCase();
-  // 固定帳戶與所有轉帳都必須由後台人工核帳；藍新回傳轉帳代碼時不可自動設為付款。
-  if (["VACC","WEBATM","CVS","BARCODE"].some(code=>normalized.includes(code))) return "";
+  // 固定帳戶與藍新的銀行轉帳類型必須由後台人工核帳；其他藍新付款成功後自動入帳。
+  if (["VACC","WEBATM"].some(code=>normalized.includes(code))) return "";
+  const confirmedMethod=normalized.includes("LINEPAY")?"line_pay":normalized.includes("CREDIT")?"credit_card":"other";
   return confirmBookingPayment(
     bookingNo,
-    normalized.includes("LINEPAY") ? "line_pay" : "credit_card",
+    confirmedMethod,
     site,
     {provider:"newebpay",providerType:paymentType,tradeNo,amount},
   );
