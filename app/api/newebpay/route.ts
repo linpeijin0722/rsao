@@ -11,8 +11,8 @@ export async function POST(request: NextRequest) {
     if (!lineUid)
       return NextResponse.json({ error: "LINE 登入已失效" }, { status: 401 });
     const payment=await paymentSettings();
-    if(payment.effective_mode==="bank_transfer")return NextResponse.json({mode:"bank_transfer"});
-    const { bookingNo } = await request.json();
+    const { bookingNo, onlinePayment = false } = await request.json();
+    if(!onlinePayment)return NextResponse.json({mode:"bank_transfer"});
     const db = adminSupabase();
     const { data: customer } = await db
       .from("customers")
@@ -21,14 +21,13 @@ export async function POST(request: NextRequest) {
       .single();
     const { data: booking, error } = await db
       .from("bookings")
-      .select("booking_no,total_price,payment_method")
+      .select("booking_no,total_price,payment_method,payment_status")
       .eq("booking_no", bookingNo)
       .eq("customer_id", customer?.id || "00000000-0000-0000-0000-000000000000")
       .single();
     if (error || !booking)
       return NextResponse.json({ error: "找不到這筆預約" }, { status: 404 });
-    if (!["credit_card", "transfer"].includes(booking.payment_method))
-      return NextResponse.json({ error: "此付款方式不使用藍新金流" }, { status: 400 });
+    if(booking.payment_status==="paid")return NextResponse.json({error:"此訂單已付款"},{status:409});
 
     const config = newebpayConfig();
     const origin = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin;
@@ -43,7 +42,8 @@ export async function POST(request: NextRequest) {
       ReturnURL: `${origin}/api/newebpay/return`,
       NotifyURL: `${origin}/api/newebpay/notify`,
       ClientBackURL: lineUid.startsWith("WEB_") ? `${origin}/payment-complete?order=${encodeURIComponent(booking.booking_no)}&public=1` : origin,
-      ...(booking.payment_method === "credit_card" ? { CREDIT: "1" } : { VACC: "1" }),
+      CREDIT: "1",
+      LINEPAY: "1",
     });
     const tradeInfo = encryptTradeInfo(
       params.toString(),

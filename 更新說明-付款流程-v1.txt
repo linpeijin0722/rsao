@@ -1,0 +1,22 @@
+付款流程更新（2026-11-07）
+
+部署順序（請勿顛倒）
+1. 到 Supabase SQL Editor 執行：supabase/054_payment_confirmation_and_line_retry.sql
+2. 確認 Supabase Vault 已有：
+   - rsao_site_url = https://rsao-virid.vercel.app
+   - rsao_cron_secret = 與 Vercel CRON_SECRET 完全相同
+3. 再將本專案部署到 Vercel Production。
+
+本次功能
+- 所有訂單先進入固定帳號轉帳頁。
+- 轉帳頁底部可選擇「其他付款方式」，前往藍新使用信用卡或 LINE PAY。
+- 固定帳號轉帳只由後台人工核帳，不會自動判定付款。
+- 藍新非轉帳付款成功後，後台自動顯示已付款及實際付款方式。
+- 付款入帳後自動傳送填單訊息；LINE 失敗不影響付款狀態。
+- LINE 失敗原因、嘗試次數與下次重試時間會顯示於後台付款狀態視窗。
+- 系統每5分鐘重試失敗的付款後 LINE 訊息，最多10次；後台也可立即手動重試。
+- 待付款訂單可再次傳送付款訊息，期限從傳送時間重新計算12小時。
+
+藍新設定
+- 請確認正式商店已啟用信用卡與 LINE PAY。
+- 系統不向藍新開啟 VACC、WebATM、超商代碼或條碼付款，避免轉帳被自動核帳。

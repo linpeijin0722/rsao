@@ -550,34 +550,8 @@ export default function Page() {
       } catch (error) {
         console.error("待付款 Flex 發送失敗",error);
       }
-      {
-        const paymentResponse = await fetch("/api/newebpay", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ bookingNo: j.booking.booking_no, publicBooking: publicBrowsing }),
-          }),
-          paymentResult = await paymentResponse.json();
-        if (!paymentResponse.ok) throw Error(paymentResult.error);
-        if(paymentResult.mode==="bank_transfer"){
-          location.href=`/pay?order=${encodeURIComponent(j.booking.booking_no)}`;
-          return;
-        }
-        const form = document.createElement("form");
-        form.method = "POST";
-        form.action = paymentResult.action;
-        Object.entries(paymentResult.fields as Record<string, string>).forEach(
-          ([name, value]) => {
-            const input = document.createElement("input");
-            input.type = "hidden";
-            input.name = name;
-            input.value = value;
-            form.appendChild(input);
-          },
-        );
-        document.body.appendChild(form);
-        form.submit();
-        return;
-      }
+      location.href=`/pay?order=${encodeURIComponent(j.booking.booking_no)}`;
+      return;
     } catch (e) {
       setError(e instanceof Error ? e.message : "預約失敗");
     } finally {

@@ -42,28 +42,7 @@ export default function Mine() {
     void load();
   }, []);
   async function pay(no: string) {
-    const r = await fetch("/api/newebpay", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ bookingNo: no }),
-      }),
-      j = await r.json();
-    if (!r.ok) return setError(j.error);
-    if(j.mode==="bank_transfer")return location.href=`/pay?order=${encodeURIComponent(no)}`;
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = j.action;
-    Object.entries(j.fields as Record<string, string>).forEach(
-      ([name, value]) => {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = name;
-        input.value = value;
-        form.appendChild(input);
-      },
-    );
-    document.body.appendChild(form);
-    form.submit();
+    location.href=`/pay?order=${encodeURIComponent(no)}`;
   }
   async function cancel(no: string) {
     const current = rows.find((x) => x.booking_no === no), paid = current?.payment_status === "paid";
@@ -132,7 +111,9 @@ export default function Mine() {
                 {x.payment_status === "paid"
                   ? x.payment_method === "credit_card"
                     ? "信用卡"
-                    : "轉帳"
+                    : x.payment_method === "line_pay"
+                      ? "LINE PAY"
+                      : x.payment_provider === "newebpay" ? "藍新轉帳" : "銀行轉帳"
                   : "尚未付款"}
               </b>
             </div>

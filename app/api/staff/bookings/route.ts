@@ -8,6 +8,7 @@ import { adminSupabase } from "@/lib/supabase";
 import { bookingStatusFlex, pushLineFlex } from "@/lib/line-message";
 import { createConsultationDocuments, markConsultationOrderCancelled, wasDocumentEditedBy } from "@/lib/google-consultation-docs";
 import { syncBookingCalendar } from "@/lib/google-calendar";
+import { sendPaidBookingNotification } from "@/lib/payment-notification";
 export async function GET() {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
@@ -15,7 +16,7 @@ export async function GET() {
   const [{ data, error }, { data: customers, error: customerError }, { data: consultationProfiles, error: profileError }, {data:paymentSettings},{data:bankAccounts}] = await Promise.all([db
     .from("bookings")
     .select(
-      "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,transfer_account_last5,transfer_reported_at,transfer_time,transfer_amount,transfer_status,data_submitted_at,data_submission_source,consultation_result_returned_at,consultation_result_detected_at,consultation_result_manual_at,status,cancellation_reason,paid_at,created_at,google_calendar_event_id,customers(id,line_user_id,line_display_name,line_picture_url,full_name,phone,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,unit_price,quantity,line_total,google_document_id,google_document_url,google_document_created_at,google_sheet_url,booking_items(code),booking_detail_sub_items(sub_item_id,sub_item_title,unit_price,quantity,line_total),booking_detail_profiles(profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)),booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data),booking_answer_participants(position,profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data))))",
+      "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,payment_provider,payment_provider_trade_no,payment_provider_type,payment_notification_status,payment_notification_error,payment_notification_attempts,payment_notification_last_attempt_at,payment_notification_next_retry_at,transfer_account_last5,transfer_reported_at,transfer_time,transfer_amount,transfer_status,data_submitted_at,data_submission_source,consultation_result_returned_at,consultation_result_detected_at,consultation_result_manual_at,status,cancellation_reason,paid_at,created_at,google_calendar_event_id,customers(id,line_user_id,line_display_name,line_picture_url,full_name,phone,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,unit_price,quantity,line_total,google_document_id,google_document_url,google_document_created_at,google_sheet_url,booking_items(code),booking_detail_sub_items(sub_item_id,sub_item_title,unit_price,quantity,line_total),booking_detail_profiles(profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)),booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data),booking_answer_participants(position,profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data))))",
     )
     .order("created_at", { ascending: false }), db
     .from("customers")
@@ -309,6 +310,27 @@ export async function POST(request: NextRequest) {
     else lineError="此用戶沒有 LINE UID，無法傳送通知";
     return NextResponse.json({ok:true,status:"cancelled",cancellationReason:reason,lineNotified,lineError});
   }
+  if(action==="retry_payment_notification"){
+    const site=process.env.NEXT_PUBLIC_SITE_URL||request.nextUrl.origin;
+    const result=await sendPaidBookingNotification(String(bookingNo||""),site);
+    return NextResponse.json({ok:true,...result});
+  }
+  if(action==="resend_payment"){
+    const db=adminSupabase(),expiresAt=new Date(Date.now()+12*60*60*1000).toISOString();
+    const {data:booking,error}=await db.from("bookings").select("id,booking_no,total_price,slot_start,payment_status,status,customers(line_user_id),consultation_methods(code),booking_details(item_title,booking_detail_sub_items(sub_item_title))").eq("booking_no",bookingNo).single();
+    if(error||!booking)return NextResponse.json({error:error?.message||"找不到訂單"},{status:404});
+    if(booking.payment_status==="paid")return NextResponse.json({error:"此訂單已付款，不可再次傳送付款訊息"},{status:409});
+    if(["cancelled","canceled","refunded","expired"].includes(String(booking.status)))return NextResponse.json({error:"此訂單已取消或失效，請先確認時段後再建立新訂單"},{status:409});
+    const customer=Array.isArray(booking.customers)?booking.customers[0]:booking.customers;
+    if(!customer?.line_user_id)return NextResponse.json({error:"此用戶沒有 LINE UID"},{status:400});
+    const method=Array.isArray(booking.consultation_methods)?booking.consultation_methods[0]:booking.consultation_methods;
+    const items=(booking.booking_details||[]).map((detail:any)=>[detail.item_title,...(detail.booking_detail_sub_items||[]).map((sub:any)=>sub.sub_item_title)].filter(Boolean).join("｜"));
+    await db.from("bookings").update({expires_at:expiresAt,updated_at:new Date().toISOString()}).eq("id",booking.id);
+    const site=process.env.NEXT_PUBLIC_SITE_URL||request.nextUrl.origin;
+    try{await pushLineFlex(customer.line_user_id,"提醒您｜訂單尚未付款",bookingStatusFlex({status:"pending",headerLabel:"提醒您｜訂單尚未付款",bookingNo:booking.booking_no,method:method?.code||"text",total:Number(booking.total_price),slotStart:booking.slot_start||undefined,items,expiresAt,site}));}
+    catch(notifyError){return NextResponse.json({error:`付款期限已更新，但 LINE 訊息發送失敗：${notifyError instanceof Error?notifyError.message:"未知錯誤"}`,expiresAt},{status:502})}
+    return NextResponse.json({ok:true,expiresAt});
+  }
   if (action !== "mark_paid") return NextResponse.json({ error: "不支援的操作" }, { status: 400 });
   const db = adminSupabase();
   const { data: current, error: currentError } = await db.from("bookings").select(
@@ -320,43 +342,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "這筆訂單已是已付款狀態" }, { status: 400 });
   const { data, error } = await db.from("bookings").update({
     payment_status: "paid",
+    payment_method:"transfer",
     status: "confirmed",
     collection_source: "manual",
+    payment_provider:"manual",
+    payment_provider_type:"fixed_bank_transfer",
+    payment_notification_status:"pending",
+    payment_notification_error:null,
+    payment_notification_next_retry_at:new Date().toISOString(),
     transfer_status: "confirmed",
     paid_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }).eq("booking_no", bookingNo).neq("payment_status", "paid").select("booking_no").single();
   if (error || !data) return NextResponse.json({ error: error?.message || "找不到訂單" }, { status: 400 });
   try{await syncBookingCalendar(bookingNo)}catch(calendarError){console.error("手動收款 Calendar 同步失敗",calendarError)}
-  const customer = Array.isArray(current.customers) ? current.customers[0] : current.customers;
-  const method = Array.isArray(current.consultation_methods) ? current.consultation_methods[0] : current.consultation_methods;
-  const details = Array.isArray(current.booking_details) ? current.booking_details : [];
-  const items = details.flatMap((detail: any) => {
-    const subs = Array.isArray(detail.booking_detail_sub_items) ? detail.booking_detail_sub_items : [];
-    const title = [detail.item_title, subs.map((sub: any) => sub.sub_item_title).filter(Boolean).join("、")].filter(Boolean).join("｜");
-    return Array.from({ length: Math.max(1, Number(detail.quantity) || 1) }, () => title);
-  }).filter(Boolean);
-  let lineNotified = false;
-  let lineError = "";
-  if (customer?.line_user_id) {
-    try {
-      const site = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin;
-      await pushLineFlex(customer.line_user_id, "已付款｜請填寫問事資料", bookingStatusFlex({
-        status: "paid",
-        bookingNo: current.booking_no,
-        method: method?.code || "text",
-        total: Number(current.total_price || 0),
-        slotStart: current.slot_start || undefined,
-        items,
-        site,
-      }));
-      lineNotified = true;
-    } catch (notifyError) {
-      lineError = notifyError instanceof Error ? notifyError.message : "LINE 通知失敗";
-      console.error("手動收款 LINE 通知失敗", notifyError);
-    }
-  } else lineError = "此用戶沒有 LINE UID，無法傳送通知";
-  return NextResponse.json({ ok: true, lineNotified, lineError });
+  const notification=await sendPaidBookingNotification(bookingNo,process.env.NEXT_PUBLIC_SITE_URL||request.nextUrl.origin);
+  return NextResponse.json({ok:true,lineNotified:Boolean(notification.sent),lineError:notification.error||"",notificationQueued:Boolean(notification.queued)});
 }
 export async function PATCH(request: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
