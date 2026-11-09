@@ -809,7 +809,62 @@ function teacherFormReplies(document:any) {
 export async function getConsultationNotebookText(documentId:string) {
   const token=await accessToken();
   const document=await google(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,token);
-  return consultationNotebookText(document);
+  return completeConsultationNotebook(document,documentId);
+}
+
+/** Build from every numbered item, never from a possibly incomplete cached red list. */
+export function completeConsultationNotebook(document:any,documentId:string) {
+  const plain=documentPlainText(document),marker=/項目\s*(\d+)\s*[（(]共\s*(\d+)\s*個項目[）)]/g;
+  const matches=Array.from(plain.matchAll(marker));
+  if(!matches.length)throw Error("找不到完整項目清單，未更新記事本；請確認文件格式。");
+  const labels=matches.map((match,index)=>{
+    if(Number(match[1])!==index+1||Number(match[2])!==matches.length)throw Error("文件項目數量或順序不完整，未更新記事本。");
+    const section=plain.slice((match.index||0)+match[0].length,matches[index+1]?.index??plain.length);
+    const labels=Array.from(section.matchAll(/^[ \t　]*([^\n【《]+)[【]([^】\n]+)】[ \t　]*$/gm),row=>row[1].trim()+"【"+row[2].trim()+"】");
+    const unique=[...new Set(labels)];
+    if(unique.length!==1)throw Error(`項目 ${index+1} 找不到唯一的姓名與項目標籤，未更新記事本。`);
+    return unique[0];
+  });
+  return labels.join("\n")+`\nhttps://docs.google.com/document/d/${documentId}/edit`;
+}
+
+export function consultationNotebookUpdate(document:any,documentId:string) {
+  const text=completeConsultationNotebook(document,documentId),requests:any[]=[],ranges:{startIndex:number;endIndex:number}[]=[];
+  const isEntry=(line:string)=>/^[^\n【《]+【[^】\n]+】$/u.test(line)||/^https:\/\/docs\.google\.com\/document\/d\/[\w-]+(?:\/[^\s]*)?$/u.test(line);
+  const old:string[]=[];
+  for(const block of document.body?.content||[]){
+    if(block.table)throw Error("清單前方包含表格，為保護原文請先人工確認，未更新清單。");
+    const elements=block.paragraph?.elements||[],line=elements.map((e:any)=>e.textRun?.content||"").join("").trim();
+    if(/項目\s*\d+\s*[（(]共/u.test(line))break;
+    const lines=line.split("\n").map((value:string)=>value.trim()).filter(Boolean);
+    if(!lines.some(isEntry))continue;
+    const runs=elements.filter((e:any)=>e.textRun?.content?.trim());
+    if(!runs.length||!runs.every((e:any)=>{const rgb=e.textRun.textStyle?.foregroundColor?.color?.rgbColor;return rgb&&(rgb.red||0)>.7&&(rgb.green||0)<.3&&(rgb.blue||0)<.3;}))continue;
+    if(!lines.every(isEntry))throw Error("紅字清單與人工備註位於同一段落，請先分段，未更新清單。");
+    const startIndex=Number(block.startIndex??elements[0]?.startIndex),endIndex=Number(block.endIndex??elements.at(-1)?.endIndex);
+    if(!Number.isInteger(startIndex)||!Number.isInteger(endIndex)||startIndex<1||endIndex<=startIndex)throw Error("無法確認紅字位置，未更新清單。");
+    old.push(...lines);ranges.push({startIndex,endIndex});
+  }
+  if(old.join("\n")===text)return {text,requests};
+  if(!document.revisionId)throw Error("無法取得文件版本，未更新清單，請稍後重試。");
+  for(const range of ranges.sort((a,b)=>b.startIndex-a.startIndex))requests.push({deleteContentRange:{range}});
+  requests.push({insertText:{location:{index:1},text:text+"\n"}});
+  requests.push({updateTextStyle:{range:{startIndex:1,endIndex:1+text.length},textStyle:{foregroundColor:{color:{rgbColor:{red:1,green:0,blue:0}}},backgroundColor:{color:{rgbColor:{red:1,green:1,blue:1}}},bold:false,underline:false,fontSize:{magnitude:12,unit:"PT"},link:{}},fields:"foregroundColor,backgroundColor,bold,underline,fontSize,link"}});
+  const linkStart=1+text.lastIndexOf("\n")+1;
+  requests.push({updateTextStyle:{range:{startIndex:linkStart,endIndex:1+text.length},textStyle:{link:{url:`https://docs.google.com/document/d/${documentId}/edit`}},fields:"link"}});
+  return {text,requests};
+}
+
+export async function refreshConsultationNotebook(documentId:string) {
+  const token=await accessToken(),url=`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`;
+  const document=await google(url,token),plan=consultationNotebookUpdate(document,documentId);
+  if(plan.requests.length)await google(url+":batchUpdate",token,{method:"POST",body:JSON.stringify({requests:plan.requests,writeControl:{requiredRevisionId:document.revisionId}})});
+  const verified=plan.requests.length?await google(url,token):document;
+  const redLines=consultationNotebookText(verified).split("\n").map(line=>line.trim());
+  const expected=plan.text.split("\n");let offset=0;
+  for(const line of redLines)if(line===expected[offset])offset++;
+  if(completeConsultationNotebook(verified,documentId)!==plan.text||offset!==expected.length)throw Error("文件清單更新後核對未通過，未準備 LINE 記事本，請重新讀取確認。");
+  return plan.text;
 }
 
 export function consultationNotebookText(document:any) {
