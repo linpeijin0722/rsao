@@ -84,6 +84,14 @@ export default function Page() {
     lastMonth = maxDate.slice(0, 7),
     [auth, setAuth] = useState("loading"),
     [publicBrowsing, setPublicBrowsing] = useState(false),
+    [publicInfoStep, setPublicInfoStep] = useState(0),
+    [publicInfoComplete, setPublicInfoComplete] = useState(false),
+    [formalInfoOpen, setFormalInfoOpen] = useState<"process"|"refund"|"privacy"|"contact"|null>("process"),
+    [formalInfoComplete, setFormalInfoComplete] = useState(false),
+    [publicContactOpen, setPublicContactOpen] = useState(false),
+    [publicCustomerName, setPublicCustomerName] = useState(""),
+    [publicCustomerPhone, setPublicCustomerPhone] = useState(""),
+    [publicTermsAccepted, setPublicTermsAccepted] = useState(false),
     [profile, setProfile] = useState<{
       pictureUrl?: string;
       full_name?: string;
@@ -92,6 +100,8 @@ export default function Page() {
     [screen, setScreen] = useState<Screen>("method"),
     [methods, setMethods] = useState<Method[]>(FIXED_METHODS),
     [items, setItems] = useState<Item[]>([]),
+    [publicCatalogLoading, setPublicCatalogLoading] = useState(false),
+    [publicCatalogError, setPublicCatalogError] = useState(""),
     [textFull, setTextFull] = useState(false),
     [method, setMethod] = useState<Method | null>(null),
     [slots, setSlots] = useState<Slot[]>([]),
@@ -253,6 +263,28 @@ export default function Page() {
     document.addEventListener("pointerdown", closeMenu);
     return () => document.removeEventListener("pointerdown", closeMenu);
   }, []);
+  useEffect(() => {
+    if (!publicBrowsing) return;
+    let active = true;
+    setPublicCatalogLoading(true);
+    fetch("/api/catalog", { cache: "no-store" })
+      .then(async (response) => {
+        const catalog = await response.json();
+        if (!response.ok) throw Error(catalog.error || "無法載入服務項目");
+        if (!active) return;
+        setMethods(Array.isArray(catalog.methods) ? catalog.methods : FIXED_METHODS);
+        setItems(Array.isArray(catalog.items) ? catalog.items : []);
+        setTextFull(Boolean(catalog.textFull));
+        setPublicCatalogError("");
+      })
+      .catch((catalogError) => {
+        if (active) setPublicCatalogError(catalogError instanceof Error ? catalogError.message : "無法載入服務項目");
+      })
+      .finally(() => {
+        if (active) setPublicCatalogLoading(false);
+      });
+    return () => { active = false; };
+  }, [publicBrowsing]);
   const availableDates = useMemo(
       () =>
         new Set(
@@ -428,7 +460,8 @@ export default function Page() {
         setAlertMessage("請至少選擇一個諮詢項目");
         return;
       }
-      submit();
+      if (publicBrowsing) setPublicContactOpen(true);
+      else submit();
     }
   }
   function calUrl(no: string) {
@@ -442,38 +475,43 @@ export default function Page() {
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent("林阿嫂視訊諮詢")}&dates=${stamp(start)}/${stamp(end)}&details=${encodeURIComponent(`預約編號：${no}`)}`;
   }
   async function submit() {
-    if (location.pathname.replace(/\/$/, "") === "/booking") {
-      setAlertMessage("正式預約請點選右下角 LINE 圖示，前往官方帳號。");
-      return;
-    }
     setBusy(true);
     try {
-      const liffId = bookingLiffId;
-      if (!liffId) throw Error("尚未設定 LIFF ID");
-      await liff.init({ liffId });
-      if (!liff.isInClient() || sessionStorage.getItem("lin_a_sao_verified_liff_entry") !== "1") {
-        location.replace(officialLineUrl);
-        throw Error("請從 LINE 官方帳號圖文選單重新進入預約頁面。");
+      if (publicBrowsing) {
+        if (publicCustomerName.trim().length < 2) throw Error("請填寫預約人姓名");
+        if (!/^09\d{8}$/.test(publicCustomerPhone)) throw Error("請填寫正確的台灣手機號碼");
+        if (!publicTermsAccepted) throw Error("請先勾選同意服務條款與退款政策");
+      } else {
+        const liffId = bookingLiffId;
+        if (!liffId) throw Error("尚未設定 LIFF ID");
+        await liff.init({ liffId });
+        if (!liff.isInClient() || sessionStorage.getItem("lin_a_sao_verified_liff_entry") !== "1") {
+          location.replace(officialLineUrl);
+          throw Error("請從 LINE 官方帳號圖文選單重新進入預約頁面。");
+        }
       }
       const bookingPayload = {
         methodId: method?.id,
         slotStart: slot || null,
         paymentMethod: "credit_card",
+        ...(publicBrowsing ? { publicBooking: true, customerName: publicCustomerName.trim(), customerPhone: publicCustomerPhone } : {}),
         items: cart.map((l) => ({
           item_id: l.itemId,
           quantity: l.qty,
           sub_item_ids: l.subId ? [l.subId] : [],
         })),
       };
-      const friendshipResponse=await fetch("/api/line/session",{cache:"no-store"}),friendship=await friendshipResponse.json().catch(()=>({}));
-      if(!friendshipResponse.ok||!friendship.isFriend)throw Error("請先加入 LINE 官方帳號好友；若曾封鎖，請先解除封鎖後再進行預約。");
+      if(!publicBrowsing){
+        const friendshipResponse=await fetch("/api/line/session",{cache:"no-store"}),friendship=await friendshipResponse.json().catch(()=>({}));
+        if(!friendshipResponse.ok||!friendship.isFriend)throw Error("請先加入 LINE 官方帳號好友；若曾封鎖，請先解除封鎖後再進行預約。");
+      }
       const createBooking = () => fetch("/api/bookings", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(bookingPayload),
         });
       let r = await createBooking();
-      if (r.status === 401) {
+      if (r.status === 401 && !publicBrowsing) {
         const liffId = bookingLiffId;
         if (!liffId) throw Error("LINE 登入已失效，請重新開啟預約頁面");
         await liff.init({ liffId });
@@ -501,46 +539,21 @@ export default function Page() {
       }
       if (!r.ok) throw Error(j.error);
       setBookingNo(j.booking.booking_no);
+      setPublicContactOpen(false);
       try {
         const liffId=bookingLiffId;
-        if(liffId){await liff.init({liffId});if(liff.isInClient())await liff.sendMessages([{type:"text",text:`我已送出預約，訂單待付款。姓名：${profile?.full_name || ""}`}])}
+        if(!publicBrowsing&&liffId){await liff.init({liffId});if(liff.isInClient())await liff.sendMessages([{type:"text",text:`我已送出預約，訂單待付款。姓名：${profile?.full_name || ""}`}])}
       } catch (error) {
         console.error("LIFF 用戶訊息發送失敗",error);
       }
-      try {
+      if(!publicBrowsing)try {
         const notifyResponse=await fetch("/api/bookings/notify",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({bookingNo:j.booking.booking_no})});
         if(!notifyResponse.ok)console.error("待付款 Flex 發送失敗",await notifyResponse.text());
       } catch (error) {
         console.error("待付款 Flex 發送失敗",error);
       }
-      {
-        const paymentResponse = await fetch("/api/newebpay", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ bookingNo: j.booking.booking_no }),
-          }),
-          paymentResult = await paymentResponse.json();
-        if (!paymentResponse.ok) throw Error(paymentResult.error);
-        if(paymentResult.mode==="bank_transfer"){
-          location.href=`/pay?order=${encodeURIComponent(j.booking.booking_no)}`;
-          return;
-        }
-        const form = document.createElement("form");
-        form.method = "POST";
-        form.action = paymentResult.action;
-        Object.entries(paymentResult.fields as Record<string, string>).forEach(
-          ([name, value]) => {
-            const input = document.createElement("input");
-            input.type = "hidden";
-            input.name = name;
-            input.value = value;
-            form.appendChild(input);
-          },
-        );
-        document.body.appendChild(form);
-        form.submit();
-        return;
-      }
+      location.href=`/pay?order=${encodeURIComponent(j.booking.booking_no)}`;
+      return;
     } catch (e) {
       setError(e instanceof Error ? e.message : "預約失敗");
     } finally {
@@ -556,12 +569,33 @@ export default function Page() {
         {auth === "friend-required"&&<a className="addLineFriend" href={officialLineUrl}>前往加入／解除封鎖</a>}
       </main>
     );
+  if(!publicBrowsing&&!formalInfoComplete)
+    return <main className="formalIntroPage">
+      <section className="formalStoreIntro" aria-label="預約前服務資訊">
+        <div className="formalStoreHero"><small>線上命理諮詢服務</small><h1>林阿嫂線上諮詢</h1><p>提供視訊及文字諮詢服務，包含整體運勢、感情、工作、財運、命名、擇日等項目。請先閱讀下方服務資訊，再進入預約。</p></div>
+        <div className="formalInfoAccordion">
+          <article className={formalInfoOpen==="process"?"open":""}><button type="button" aria-expanded={formalInfoOpen==="process"} onClick={()=>setFormalInfoOpen(value=>value==="process"?null:"process")}><span>查看預約流程</span><i>{formalInfoOpen==="process"?"−":"＋"}</i></button>{formalInfoOpen==="process"&&<div><ol className="publicProcess"><li><b>查看諮詢項目</b><span>確認服務內容與價格。</span></li><li><b>選擇預約內容</b><span>選擇視訊或文字諮詢、服務項目與預約時間。</span></li><li><b>確認訂單並付款</b><span>核對服務內容、時間與金額後完成付款。</span></li><li><b>填寫諮詢資料</b><span>付款完成後，LINE會提供諮詢資料填寫入口。</span></li><li><b>接受諮詢服務</b><span>視訊諮詢：依預約時間與阿嫂老師一對一視訊諮詢；文字諮詢：阿嫂老師將於諮詢者送出填寫資料後約3–14個工作天內，於 LINE 回傳諮詢結果。</span></li></ol></div>}</article>
+          <article className={formalInfoOpen==="refund"?"open":""}><button type="button" aria-expanded={formalInfoOpen==="refund"} onClick={()=>setFormalInfoOpen(value=>value==="refund"?null:"refund")}><span>取消、改期與退款政策</span><i>{formalInfoOpen==="refund"?"−":"＋"}</i></button>{formalInfoOpen==="refund"&&<div className="formalPolicy"><ul><li>視訊諮詢如需取消或改期，請於預約時間24小時前透過LINE客服提出；可免費改期一次。於服務開始前申請取消，可辦理退款，扣除5%手續費後退款。</li><li>預約時間前未提出取消或改期，且未依約上線者，原則上視同服務完成，不予退款。</li><li>文字諮詢於資料尚未提交完整、老師尚未開始分析前，可申請取消及退款；開始分析後依已提供的服務比例扣除費用，完整交付後不再受理退款。</li><li>如因本商店因素無法按約提供服務，可選擇免費改期或全額退款。</li><li>如需退款，請至LINE客服提供退款收款帳號，由客服確認訂單後以人工方式辦理退款。退款作業約1–7個工作天，實際入帳時間依金融機構作業為準。</li></ul></div>}</article>
+          <article className={formalInfoOpen==="privacy"?"open":""}><button type="button" aria-expanded={formalInfoOpen==="privacy"} onClick={()=>setFormalInfoOpen(value=>value==="privacy"?null:"privacy")}><span>隱私權與服務條款</span><i>{formalInfoOpen==="privacy"?"−":"＋"}</i></button>{formalInfoOpen==="privacy"&&<div className="formalTerms"><h2>個人資料使用</h2><p>本商店為辦理預約、身分確認、付款、客服聯絡及提供諮詢服務，可能蒐集姓名、手機號碼、出生資料、諮詢內容及交易紀錄。資料僅於上述目的及依法令所需範圍內使用，不會任意提供給無關第三方。</p><p>付款資料由藍新金流及相關金融機構依其安全機制處理；本商店不會保存完整信用卡卡號。如需查詢、更正或申請刪除個人資料，請透過LINE客服聯絡。</p><h2>服務條款</h2><p>完成付款即表示已確認訂單內容並同意本頁服務說明與政策。預約名額以付款完成時為準；未完成付款不代表時段已保留。若遇不可抗力、系統異常或其他影響服務的情況，本商店將主動聯繫並協助改期或退款。</p></div>}</article>
+          <article className={formalInfoOpen==="contact"?"open":""}><button type="button" aria-expanded={formalInfoOpen==="contact"} onClick={()=>setFormalInfoOpen(value=>value==="contact"?null:"contact")}><span>客服聯絡</span><i>{formalInfoOpen==="contact"?"−":"＋"}</i></button>{formalInfoOpen==="contact"&&<div className="formalContact"><p>預約、付款、改期、退款、消費爭議或個人資料相關問題，請透過林阿嫂LINE官方帳號聯絡。</p><a href={officialLineUrl} target="_blank" rel="noopener noreferrer">開啟 LINE 客服</a></div>}</article>
+        </div>
+      </section>
+      <div className="formalIntroContinue"><button type="button" onClick={()=>{setFormalInfoOpen(null);setFormalInfoComplete(true);window.scrollTo({top:0,behavior:"smooth"})}}>已閱讀，進入預約</button></div>
+    </main>;
   return (
     <main className="shell">
-      <section className="app">
-        {publicBrowsing && <a href="https://line.me/R/ti/p/@405unxzn" target="_blank" rel="noopener noreferrer" aria-label="前往林阿嫂 LINE 官方帳號" style={{position:"fixed",right:18,bottom:"calc(18px + env(safe-area-inset-bottom, 0px))",width:48,height:48,borderRadius:"50%",background:"#06c755",display:"grid",placeItems:"center",boxShadow:"0 2px 8px #0003",zIndex:100}}>
-          <svg width="36" height="36" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="white" d="M34 18c0-7-6.3-12-14-12S6 11 6 18c0 6.1 5.1 11.1 11.8 11.9.5.1 1.2.3 1.4.7.2.4.1 1.1.1 1.6l-.2 1.4c-.1.4-.3 1.5 1.3.8 1.7-.7 9-5.3 12.2-9.1A11 11 0 0 0 34 18Z"/><text x="20" y="21" textAnchor="middle" fill="#06c755" fontSize="9" fontWeight="800" fontFamily="Arial,sans-serif">LINE</text></svg>
+      <section className={`app${publicBrowsing ? " publicBookingApp" : ""}${publicBrowsing&&!publicInfoComplete ? " publicInfoPending" : ""}`}>
+        {publicBrowsing && <a className="publicLineFloat" href={officialLineUrl} target="_blank" rel="noopener noreferrer" aria-label="開啟林阿嫂 LINE 客服">
+          <b aria-hidden="true">LINE</b>
+          <span>LINE 客服</span>
         </a>}
+        {publicBrowsing && !publicInfoComplete && <section className="publicStoreHero" aria-labelledby="public-store-title">
+          <small>線上命理諮詢服務</small>
+          <h1 id="public-store-title">林阿嫂線上諮詢</h1>
+          <p>林阿嫂線上命理諮詢提供視訊及文字諮詢服務，包含整體運勢、感情、工作、財運、命名、擇日等項目。客戶閱讀完本頁服務資訊後，即可直接進入預約及線上付款流程，依預約時間或所示期限接受諮詢服務。</p>
+          <dl><div><dt>商店地址</dt><dd>新北市林口區粉寮路二段88巷22號之一</dd></div><div><dt>客服方式</dt><dd>LINE 官方帳號 @405unxzn</dd></div></dl>
+          <a className="publicLinePrimary" href={officialLineUrl} target="_blank" rel="noopener noreferrer">開啟 LINE 客服</a>
+        </section>}
         <nav className="stepBar">
           <div className="stepTrail">
             {stepStart > 0 && <i className="stepLead">›</i>}
@@ -628,7 +662,7 @@ export default function Page() {
                             ? "目前預約已額滿"
                             : "不指定時間，請詳看下一頁說明"}
                         </p>
-                        {!textFull && <small>約7–30天內收到結果</small>}
+                        {!textFull && <small>約3–14個工作天內收到結果</small>}
                       </>
                     )}
                   </button>
@@ -648,7 +682,7 @@ export default function Page() {
               {method?.code === "text" ? (
                 <div className="textConsultationInfo progressiveTextFlow" aria-live="polite">
                   <article data-text-step="1" className="textFlowStep active"><b>1</b><div><h3>付款完成後，依 LINE 提示提交資料</h3><p>完成付款後，我們會透過 LINE 傳送資料填寫連結；收到訊息後再點入填寫即可。</p></div></article>
-                  {textInfoStep >= 2 && <article data-text-step="2" className="textFlowStep active"><b>2</b><div><h3>等待分析結果</h3><p>送單後，阿嫂老師將於 7–30 天內經由 LINE 回傳文字諮詢結果。</p></div></article>}
+                  {textInfoStep >= 2 && <article data-text-step="2" className="textFlowStep active"><b>2</b><div><h3>等待分析結果</h3><p>完整資料送出後，阿嫂老師將於 3–14 個工作天內經由 LINE 回傳文字諮詢結果。</p></div></article>}
                   {textInfoStep >= 3 && <article data-text-step="3" className="textFlowStep active"><b>3</b><div><h3>補充提問</h3><p>收到結果後 8 小時內，可再提出 2 個補充問題。</p></div></article>}
                   <div className="textFlowProgress"><span style={{width:`${textInfoStep/3*100}%`}} /></div>
                   <small>目前顯示第 {textInfoStep} 步，共 3 步</small>
@@ -826,6 +860,19 @@ export default function Page() {
             </div>
           )}
         </div>
+        {publicBrowsing && !publicInfoComplete && <section className="publicCommerceInfo publicReviewFlow" aria-label="預約前商店與消費資訊">
+          <div className="publicReviewProgress" aria-label={`閱讀進度，第${publicInfoStep+1}頁，共4頁`}><span>預約前請先閱讀</span><div>{[0,1,2,3].map(index=><i key={index} className={index<=publicInfoStep?"active":""}>{index+1}</i>)}</div><b>第 {publicInfoStep+1}／4 頁</b></div>
+
+          {publicInfoStep===0&&<article className="publicInfoCard publicReviewPage"><div className="publicReviewBody publicPriceLinkBody"><a className="publicPriceLink" href="https://sites.google.com/view/rsao820/%E5%B8%B8%E8%A6%8B%E5%95%8F%E9%A1%8C/%E8%AB%AE%E8%A9%A2%E9%A0%85%E7%9B%AE%E8%A1%A8%E6%94%B6%E8%B2%BB%E6%A8%99%E6%BA%96" target="_blank" rel="noopener noreferrer"><b>查看諮詢項目表與收費標準</b></a></div><div className="publicSectionHeading publicProcessHeading"><small>Booking Process</small><h2>預約、付款與服務流程</h2></div><ol className="publicProcess"><li><b>查看諮詢項目</b><span>開啟上方收費標準，確認服務內容與價格。</span></li><li><b>直接進入預約</b><span>閱讀完全部說明後，在本網站直接選擇視訊或文字諮詢、服務項目與預約時間。</span></li><li><b>填寫聯絡資料</b><span>送出訂單前填寫預約人姓名及手機號碼，供訂單識別與必要聯絡使用。</span></li><li><b>確認訂單並付款</b><span>付款前會顯示服務內容、數量、預約時間與總金額；完成付款後訂單才成立。</span></li><li><b>接受線上服務</b><span>視訊諮詢依預約時間進行；文字諮詢於完整資料送出後約3–14個工作天內完成。付款完成頁面會提供諮詢資料填寫入口。</span></li></ol></article>}
+
+          {publicInfoStep===1&&<article className="publicInfoCard publicPolicies publicReviewPage"><div className="publicSectionHeading"><small>Cancellation &amp; Refund</small><h2>取消、改期與退款政策</h2><p>預約及付款前請完整閱讀。</p></div><div className="publicPolicyBody"><ul><li>視訊諮詢如需取消或改期，請於預約時間24小時前透過LINE客服提出；可免費改期一次。於服務開始前申請取消，可辦理退款，扣除5%手續費後退款。</li><li>預約時間前未提出取消或改期，且未依約上線者，因該時段已為客戶保留，原則上視同服務完成，不予退款。</li><li>文字諮詢在客戶尚未提交完整資料、老師尚未開始分析前，可申請取消及退款；開始分析後取消，將依已提供的服務比例扣除費用後退回餘額；結果已完整交付後不再受理退款。</li><li>如因本商店因素無法按約提供服務，客戶可選擇免費改期或全額退款。</li><li>如需退款，請至LINE客服提供退款收款帳號，由客服確認訂單後以人工方式辦理退款。退款作業約1–7個工作天，實際入帳時間依金融機構作業為準。</li></ul></div></article>}
+
+          {publicInfoStep===2&&<article className="publicInfoCard publicPolicies publicReviewPage"><div className="publicSectionHeading"><small>Service Information</small><h2>資料正確性與服務範圍</h2></div><div className="publicPolicyBody"><p>客戶應確認姓名、出生日期、時辰、諮詢對象及聯絡資料正確。因資料錯誤、不完整或後續更換諮詢對象而需重新分析時，可能需要重新預約或支付額外費用。</p><p>命理諮詢係依客戶提供的資料進行分析，內容僅供個人參考，不保證特定結果，亦不得取代醫療、心理、法律、投資或其他專業意見；客戶仍應依自身情況審慎判斷。</p></div></article>}
+
+          {publicInfoStep===3&&<><article className="publicInfoCard publicPolicies publicReviewPage"><div className="publicSectionHeading"><small>Privacy &amp; Terms</small><h2>隱私權與服務條款</h2></div><details open><summary>個人資料使用</summary><div className="publicPolicyBody"><p>本商店為辦理預約、身分確認、付款、客服聯絡及提供諮詢服務，可能蒐集姓名、手機號碼、出生資料、諮詢內容及交易紀錄。資料僅於上述目的及依法令所需範圍內使用，不會任意提供給無關第三方。</p><p>付款資料由藍新金流及相關金融機構依其安全機制處理；本商店不會在網站中保存完整信用卡卡號。資料於服務、客服及依法保存目的消失後，將依規定刪除或停止使用。若需查詢、更正或申請刪除個人資料，請透過LINE客服聯絡。</p></div></details><details open><summary>服務條款</summary><div className="publicPolicyBody"><p>完成付款即表示客戶已確認訂單內容及同意本頁所列服務說明與政策。預約名額以付款完成時為準；未完成付款的選擇不代表時段已保留。若遇不可抗力、系統異常或其他影響服務的情況，本商店將主動聯繫並協助改期或退款。</p></div></details></article><article className="publicInfoCard publicContactCard"><div><small>Customer Service</small><h2>客服與消費爭議聯絡</h2><p>預約、付款、改期、退款、消費爭議或個人資料相關問題，請透過LINE官方帳號聯絡。</p><div className="publicContactMethods"><a href={officialLineUrl} target="_blank" rel="noopener noreferrer"><span aria-hidden="true">LINE</span><b>開啟 LINE 客服（@405unxzn）</b></a></div></div></article><p className="publicUpdatedAt">商店資訊與政策更新日期：2026年10月27日</p></>}
+
+          <div className="publicReviewActions">{publicInfoStep>0&&<button className="back" onClick={()=>{setPublicInfoStep(value=>Math.max(0,value-1));window.scrollTo({top:0,behavior:"smooth"})}}>上一頁</button>}<button className="next burgundy" onClick={()=>{if(publicInfoStep<3)setPublicInfoStep(value=>value+1);else setPublicInfoComplete(true);window.scrollTo({top:0,behavior:"smooth"})}}>{publicInfoStep<3?"已閱讀，下一頁":"我已閱讀，開始預約"}</button></div>
+        </section>}
         {screen !== "done" && (
           <footer>
             {screen !== "method" && (
@@ -858,12 +905,13 @@ export default function Page() {
             </button>
           </footer>
         )}
+        {publicContactOpen&&<div className="modalBackdrop"><div className="modal publicContactModal"><h2>填寫預約聯絡資料</h2><p>請填寫可聯絡的真實資料，送出後將直接建立訂單並前往付款。</p><label>預約人姓名<input autoFocus value={publicCustomerName} onChange={event=>setPublicCustomerName(event.target.value)} maxLength={80} placeholder="請輸入姓名" autoComplete="name"/></label><label>手機號碼<input value={publicCustomerPhone} onChange={event=>setPublicCustomerPhone(event.target.value.replace(/\D/g,"").slice(0,10))} inputMode="numeric" maxLength={10} placeholder="例如：0912345678" autoComplete="tel"/></label><label className="publicTermsCheck"><input type="checkbox" checked={publicTermsAccepted} onChange={event=>setPublicTermsAccepted(event.target.checked)}/><span>我已閱讀並同意本頁的服務條款、取消改期與退款政策及隱私權說明。</span></label><button disabled={busy} onClick={()=>void submit()}>{busy?"正在建立訂單…":"確認資料並前往付款"}</button><button className="cancel" disabled={busy} onClick={()=>setPublicContactOpen(false)}>返回修改項目</button></div></div>}
         {notice && (
           <div className="modalBackdrop">
             <div className="modal">
               <h2>文字諮詢說明</h2>
               <ul>
-                <li>約7–30天內收到諮詢結果。</li>
+                <li>約3–14個工作天內收到諮詢結果。</li>
                 <li>確認資料時，每項預約可提出3個問題。</li>
                 <li>收到結果後8小時內，每項預約可提出2個補充問題。</li>
               </ul>

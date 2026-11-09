@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
         bookingNoFromNewebpayOrderNo(String(bookingNo)),
         String(payload?.Result?.PaymentType || ""),
         process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin,
+        String(payload?.Result?.TradeNo || ""),
+        Number(payload?.Result?.Amt),
       );
     }
     return new NextResponse("SUCCESS");

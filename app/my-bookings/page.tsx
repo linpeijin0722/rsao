@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { paymentProviderLabel } from "@/lib/payment-label";
 const status = (x: any) =>
   x.status === "cancelled"
     ? x.cancellation_reason === "自行取消"
@@ -42,28 +43,7 @@ export default function Mine() {
     void load();
   }, []);
   async function pay(no: string) {
-    const r = await fetch("/api/newebpay", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ bookingNo: no }),
-      }),
-      j = await r.json();
-    if (!r.ok) return setError(j.error);
-    if(j.mode==="bank_transfer")return location.href=`/pay?order=${encodeURIComponent(no)}`;
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = j.action;
-    Object.entries(j.fields as Record<string, string>).forEach(
-      ([name, value]) => {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = name;
-        input.value = value;
-        form.appendChild(input);
-      },
-    );
-    document.body.appendChild(form);
-    form.submit();
+    location.href=`/pay?order=${encodeURIComponent(no)}`;
   }
   async function cancel(no: string) {
     const current = rows.find((x) => x.booking_no === no), paid = current?.payment_status === "paid";
@@ -129,11 +109,7 @@ export default function Mine() {
             <div>
               <small>付款方式</small>
               <b>
-                {x.payment_status === "paid"
-                  ? x.payment_method === "credit_card"
-                    ? "信用卡"
-                    : "轉帳"
-                  : "尚未付款"}
+                {x.payment_status === "paid" ? paymentProviderLabel(x.payment_provider_type,x.payment_method) : "尚未付款"}
               </b>
             </div>
           </div>

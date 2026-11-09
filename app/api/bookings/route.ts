@@ -1,25 +1,40 @@
 import { parseTaipeiDateTime } from "@/lib/taipei-time";
 import { NextRequest, NextResponse } from "next/server";
 import { adminSupabase, publicSupabase } from "@/lib/supabase";
-import { verifyLineSession } from "@/lib/line-session";
+import { signLineSession, verifyLineSession } from "@/lib/line-session";
 import { cookies } from "next/headers";
 import { isAllowedVideoSlot, earliestVideoBookingDate, videoBookingDateLabel } from "@/lib/video-booking-window";
+import { randomUUID } from "crypto";
 
 export async function POST(request: NextRequest) {
   try {
-    const lineUid = verifyLineSession(
+    const body = await request.json();
+    if (!body.methodId || !Array.isArray(body.items) || body.items.length === 0 || !body.paymentMethod)
+      return NextResponse.json({ error: "請完整選擇諮詢項目與付款方式" }, { status: 400 });
+    const publicBooking = body.publicBooking === true;
+    let lineUid = publicBooking ? null : verifyLineSession(
       (await cookies()).get("line_session")?.value,
     );
+    let guestCreated = false;
+    if (!lineUid && publicBooking) {
+      const customerName=String(body.customerName||"").trim().slice(0,80),customerPhone=String(body.customerPhone||"").trim();
+      if(customerName.length<2||!/^09\d{8}$/.test(customerPhone))return NextResponse.json({error:"請填寫正確的預約人姓名與手機號碼"},{status:400});
+      lineUid=`WEB_${randomUUID()}`;
+      const {error:guestError}=await adminSupabase().from("customers").insert({line_user_id:lineUid,name:customerName,full_name:customerName,phone:customerPhone,line_display_name:`網站預約｜${customerName}`});
+      if(guestError)throw guestError;
+      guestCreated=true;
+    }
     if (!lineUid)
       return NextResponse.json(
         { error: "LINE 登入已失效，請重新登入" },
         { status: 401 },
       );
-    const channelToken=process.env.LINE_MESSAGING_CHANNEL_ACCESS_TOKEN;
-    if(!channelToken)return NextResponse.json({error:"系統尚未完成 LINE 官方帳號設定"},{status:503});
-    const friendship=await fetch(`https://api.line.me/v2/bot/profile/${encodeURIComponent(lineUid)}`,{headers:{Authorization:`Bearer ${channelToken}`},cache:"no-store"});
-    if(!friendship.ok)return NextResponse.json({error:"請先加入 LINE 官方帳號好友；若曾封鎖，請先解除封鎖後再進行預約。"},{status:403});
-    const body = await request.json();
+    if(!lineUid.startsWith("WEB_")){
+      const channelToken=process.env.LINE_MESSAGING_CHANNEL_ACCESS_TOKEN;
+      if(!channelToken)return NextResponse.json({error:"系統尚未完成 LINE 官方帳號設定"},{status:503});
+      const friendship=await fetch(`https://api.line.me/v2/bot/profile/${encodeURIComponent(lineUid)}`,{headers:{Authorization:`Bearer ${channelToken}`},cache:"no-store"});
+      if(!friendship.ok)return NextResponse.json({error:"請先加入 LINE 官方帳號好友；若曾封鎖，請先解除封鎖後再進行預約。"},{status:403});
+    }
     if(body.slotStart){const parsed=parseTaipeiDateTime(String(body.slotStart));if(!Number.isFinite(parsed.getTime()))return NextResponse.json({error:"預約時間不正確"},{status:400});body.slotStart=parsed.toISOString();}
     if (
       !body.methodId ||
@@ -61,11 +76,14 @@ export async function POST(request: NextRequest) {
       p_items: body.items,
     });
     if (error) {
+      if(guestCreated)await adminSupabase().from("customers").delete().eq("line_user_id",lineUid);
       if (["23P01","23505","40001","40P01"].includes(error.code||"")||/此時段|時段.*重疊/.test(error.message||""))
         return NextResponse.json({error:"此時段已被預約或無法安排完整諮詢時間，請重新選擇",code:"SLOT_UNAVAILABLE"},{status:409});
       throw error;
     }
-    return NextResponse.json({ booking: data });
+    const response=NextResponse.json({ booking: data });
+    if(guestCreated)response.cookies.set("line_session",signLineSession(lineUid),{httpOnly:true,sameSite:"lax",secure:process.env.NODE_ENV==="production",path:"/",maxAge:60*60*24*7});
+    return response;
   } catch (error) {
     const message =
       error instanceof Error

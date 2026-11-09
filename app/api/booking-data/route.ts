@@ -80,6 +80,7 @@ export async function POST(r: NextRequest) {
     return NextResponse.json({ error: "完成付款後才能填寫問事資料" }, { status: 400 });
   if (body.action === "notify_submitted") {
     if (!x.b.data_submitted_at) return NextResponse.json({ error: "尚未完成填單" }, { status: 400 });
+    if(String(x.c.line_user_id||"").startsWith("WEB_"))return NextResponse.json({ok:true,officialLineSent:false,webBooking:true});
     try {
       await pushDataReceivedCarousel(x.c.line_user_id, r.nextUrl.origin);
       return NextResponse.json({ ok: true, officialLineSent: true });
