@@ -244,6 +244,10 @@ export default function BookingData() {
     [lineSendWarning, setLineSendWarning] = useState(""),
     [missingItems, setMissingItems] = useState<string[]>([]),
     [loading, setLoading] = useState(true);
+  const inlineProfileRequest=useRef<any>(null);
+  const [inlineKinds,setInlineKinds]=useState<string[]|null>(null);
+  function closeProfileForm(){if(saving)return;const request=inlineProfileRequest.current;inlineProfileRequest.current=null;setInlineKinds(null);setShowForm(false);request?.trigger?.focus();}
+  function openInlineProfile(request:any){inlineProfileRequest.current=request;setInlineKinds(request.allowedKinds);setEditingId("");setPetFields(false);setForm({...empty,profile_type:"person",relationship:"親友"});setMsg("");setShowForm(true);}
   async function restoreLineLogin() {
     const liffId = process.env.NEXT_PUBLIC_LIFF_ID || "2011674988-QKCQBn9L";
     if (!liffId) return false;
@@ -340,28 +344,28 @@ export default function BookingData() {
     image.src = url;
   }
   async function add() {
+    if(saving)return;
+    const request=inlineProfileRequest.current;
+    if(request&&!request.allowedKinds.includes(form.profile_type)){setMsg("此項目不能選擇這種類型的對象");return;}
+    if(request&&(data?.profiles||[]).some((profile:any)=>profileKey(profile)===profileKey(form))){setMsg("已有相同姓名與關係的資料，請先確認現有資料，避免重複新增。");return;}
     setSaving(true);
-    const payload = editingId
-        ? {
-            order,
-            action: "update_profile",
-            profileId: editingId,
-            profile: form,
-          }
-        : { order, profile: form },
-      r = await fetch("/api/booking-data", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      }),
-      j = await r.json();
-    setSaving(false);
-    if (!r.ok) return setMsg(j.error);
-    setForm(empty);
-    setEditingId("");
-    setShowForm(false);
-    setMsg("資料已儲存，下次可直接選取");
-    void load();
+    try{
+      const payload=editingId?{order,action:"update_profile",profileId:editingId,profile:form}:{order,profile:form};
+      const response=await fetch("/api/booking-data",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
+      const result=await response.json();
+      if(!response.ok)throw Error(result.error||"資料儲存失敗，請稍後重試");
+      if(request){
+        if(!result.profileId)throw Error("資料已送出，但未取得人物編號，請先重新整理確認，避免重複新增。");
+        const created={...form,id:result.profileId};
+        setData((previous:any)=>({...previous,profiles:[...(previous?.profiles||[]),created]}));
+        request.onCreated(created);
+        inlineProfileRequest.current=null;setInlineKinds(null);
+        setMsg(`已新增並選取：${created.name}`);
+        request.trigger?.focus();
+      }else{setMsg("資料已儲存，下次可直接選取");void load();}
+      setForm(empty);setEditingId("");setShowForm(false);
+    }catch(error){setMsg(error instanceof Error?error.message:"資料儲存失敗，請稍後重試");}
+    finally{setSaving(false);}
   }
   async function removeProfile(id: string) {
     const r = await fetch("/api/booking-data", {
@@ -544,6 +548,7 @@ export default function BookingData() {
           </div>
           <button
             onClick={() => {
+              inlineProfileRequest.current=null;setInlineKinds(null);
               setEditingId("");
               setForm(empty);
               setShowForm(true);
@@ -558,6 +563,7 @@ export default function BookingData() {
               role="button"
               tabIndex={0}
               onClick={() => {
+                inlineProfileRequest.current=null;setInlineKinds(null);
                 setEditingId(p.id);
                 setForm({ ...empty, ...p });
                 setPetFields(p.profile_type === "pet");
@@ -589,13 +595,16 @@ export default function BookingData() {
       {showForm && (
         <div className="modalBackdrop">
           <div className="modal profileModal">
-            <button className="closeProfile" onClick={() => setShowForm(false)}>
+            <button className="closeProfile" disabled={saving} onClick={closeProfileForm}>
               ×
             </button>
-            <h2>{editingId ? "編輯諮詢者資料" : "新增可快速選取的資料"}</h2>
+            <h2>{editingId ? "編輯諮詢者資料" : inlineKinds ? "新增對象資料" : "新增可快速選取的資料"}</h2>
+            {inlineKinds&&<p>儲存後會自動選取這位對象，並加入上方諮詢者資料。</p>}
+            {inlineKinds&&msg&&<p role="alert">{msg}</p>}
             <div className="profileKinds">
               <button
                 className={form.profile_type === "person" ? "selected" : ""}
+                disabled={saving||Boolean(inlineKinds&&!inlineKinds.includes("person"))}
                 onClick={() => {
                   setPetFields(false);
                   setForm({
@@ -609,6 +618,7 @@ export default function BookingData() {
               </button>
               <button
                 className={form.profile_type === "deceased" ? "selected" : ""}
+                disabled={saving||Boolean(inlineKinds&&!inlineKinds.includes("deceased"))}
                 onClick={() => {
                   setPetFields(false);
                   setForm({
@@ -622,6 +632,7 @@ export default function BookingData() {
               </button>
               <button
                 className={form.profile_type === "pet" ? "selected" : ""}
+                disabled={saving||Boolean(inlineKinds&&!inlineKinds.includes("pet"))}
                 onClick={() => {
                   setPetFields(false);
                   setForm({
@@ -916,6 +927,7 @@ export default function BookingData() {
               }
               initialQuestions={old?.questions || []}
               locked={Boolean(data?.booking?.data_submitted_at)}
+              onAddProfile={openInlineProfile}
               save={assign}
             />
           );
@@ -1016,6 +1028,7 @@ function Answer({
   initialQuestions,
   save,
   locked,
+  onAddProfile,
 }: any) {
   const initialQuestionCount = Math.max(
     1,
@@ -1045,6 +1058,7 @@ function Answer({
     ),
     [saved, setSaved] = useState(Boolean(initialProfile)),
     [open, setOpen] = useState(!initialProfile);
+  const [addedTargetNotice,setAddedTargetNotice]=useState("");
   const code = detail.booking_items?.code || "",
     sub =
       detail.booking_detail_sub_items
@@ -1218,6 +1232,7 @@ function Answer({
         disabled={locked}
         value={id || ""}
         onChange={(e) => {
+          setAddedTargetNotice("");
           setProfileIds((previous) =>
             Array.from({ length: count }, (_, index) =>
               index === i ? e.target.value : previous[index] || "",
@@ -1245,11 +1260,17 @@ function Answer({
           ))}
       </select>
     ),
-    targetSlot = (index: number) => (
-      <span key={`${detail.id}-target-${index}`}>
-        {chooser(ids[index] || "", index)}
-      </span>
-    );
+    targetSlot = (index: number) => {
+      const available=profiles.filter((p:any)=>(p.profile_type==="person"||(relation&&["deceased","pet"].includes(p.profile_type)))&&p.id!==primaryId&&!ids.some((id,i)=>i!==index&&id===p.id));
+      return <div key={`${detail.id}-target-${index}`} className="targetProfileSlot">
+        <label>第 {index+1} 位對象{chooser(ids[index] || "", index)}</label>
+        {!available.length&&!ids[index]&&<p className="targetProfileHint">尚未新增可選的對象資料，請先新增。</p>}
+        {!locked&&<button type="button" className="addTargetProfile" onClick={event=>onAddProfile({
+          trigger:event.currentTarget,allowedKinds:relation?["person","deceased","pet"]:["person"],
+          onCreated:(profile:any)=>{setProfileIds(previous=>Array.from({length:count},(_,i)=>i===index?profile.id:previous[i]||""));setSaved(false);setAddedTargetNotice(`已新增並選取第 ${index+1} 位對象：${profile.name}`);}
+        })}>＋新增對象資料</button>}
+      </div>;
+    };
   const complete = isAnswerComplete({
     profileId: primaryId,
     ids,
@@ -1351,6 +1372,7 @@ function Answer({
           {targetSlot(0)}
           {count >= 2 && targetSlot(1)}
           {count >= 3 && targetSlot(2)}
+          {addedTargetNotice&&<p role="status">{addedTargetNotice}</p>}
           {hasDuplicate && <em>同一位人不能重複選擇</em>}
         </div>
       ) : newbornNaming ? (
