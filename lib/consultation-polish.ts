@@ -35,6 +35,21 @@ export function mergeConsultationPolish(plan:PolishPlan,rows:{id:number;content:
  return normalizeConsultationText(plan.parts.map(part=>'literal' in part?part.literal:values.get(part.id)||'').join(''));
 }
 export type IssueRange={start:number;end:number;issueIndex:number};
+/** General editing notes belong in the summary, not in full-document highlights. */
+export function summarizeConsultationPolish<T extends {originalText:string;action:string;reason?:string;restored?:boolean}>(content:string,summary:string[],issues:T[]){
+ const changeSummary=[...summary],suspectedIssues:T[]=[];
+ for(const issue of issues){
+  const quote=issue.originalText.trim(),reason=issue.reason||'';
+  const formatting=/標點|斷句|分段|換行|空白|排版/.test(reason)&&!/錯字|語音|刪除|人名|人物|標題|問題|意思|語意|日期|年齡|地址|稱謂/.test(reason);
+  const broad=quote.length>240||(quote.length>100&&quote.length>=content.length*.6);
+  // Removed passages must remain available for the existing restore action.
+  if(issue.action!=='removed'&&(formatting||broad)){
+   const note=formatting?'已整理標點、斷句或段落；一般格式調整不逐句標示。':`段落確認提醒：${reason||'此提醒涵蓋較長內容，請核對原始版本；不以整篇反白顯示。'}`;
+   if(!changeSummary.includes(note))changeSummary.push(note);
+  }else if(quote)suspectedIssues.push(issue);
+ }
+ return {changeSummary,suspectedIssues};
+}
 /** Map exact or punctuation/spacing-normalized quotes back to visible text positions. */
 export function consultationIssueRanges(content:string,issues:{originalText:string;action:string;restored?:boolean}[]):IssueRange[]{
  const ranges:IssueRange[]=[];

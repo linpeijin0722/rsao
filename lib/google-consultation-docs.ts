@@ -849,7 +849,7 @@ export function consultationNotebookUpdate(document:any,documentId:string) {
   if(!document.revisionId)throw Error("無法取得文件版本，未更新清單，請稍後重試。");
   for(const range of ranges.sort((a,b)=>b.startIndex-a.startIndex))requests.push({deleteContentRange:{range}});
   requests.push({insertText:{location:{index:1},text:text+"\n"}});
-  requests.push({updateTextStyle:{range:{startIndex:1,endIndex:1+text.length},textStyle:{foregroundColor:{color:{rgbColor:{red:1,green:0,blue:0}}},backgroundColor:{color:{rgbColor:{red:1,green:1,blue:1}}},bold:false,underline:false,fontSize:{magnitude:12,unit:"PT"},link:{}},fields:"foregroundColor,backgroundColor,bold,underline,fontSize,link"}});
+  requests.push({updateTextStyle:{range:{startIndex:1,endIndex:1+text.length},textStyle:{foregroundColor:{color:{rgbColor:{red:1,green:0,blue:0}}},backgroundColor:{color:{rgbColor:{red:1,green:1,blue:1}}},bold:false,underline:false,fontSize:{magnitude:12,unit:"PT"}},fields:"foregroundColor,backgroundColor,bold,underline,fontSize,link"}});
   const linkStart=1+text.lastIndexOf("\n")+1;
   requests.push({updateTextStyle:{range:{startIndex:linkStart,endIndex:1+text.length},textStyle:{link:{url:`https://docs.google.com/document/d/${documentId}/edit`}},fields:"link"}});
   return {text,requests};
