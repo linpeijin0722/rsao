@@ -1,0 +1,13 @@
+"use client";
+import {useEffect,useState} from 'react';
+import {taipeiDateKey} from '@/lib/taipei-time';
+export default function MonthlyRevenue(){
+ const current=taipeiDateKey().slice(0,7),currentYear=Number(current.slice(0,4));
+ const [month,setMonth]=useState(current),[exclude,setExclude]=useState(false),[data,setData]=useState<any>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true),[retry,setRetry]=useState(0);
+ useEffect(()=>{const controller=new AbortController();setLoading(true);setError('');setData(null);
+  (async()=>{try{const response=await fetch('/api/staff/monthly-revenue?'+new URLSearchParams({month,excludeVideoFee:exclude?'1':'0'}),{cache:'no-store',signal:controller.signal}),result=await response.json();if(!response.ok)throw Error(result.error||'營收讀取失敗');if(!controller.signal.aborted)setData(result);}catch(e){if(!controller.signal.aborted)setError(e instanceof Error?e.message:'營收讀取失敗');}finally{if(!controller.signal.aborted)setLoading(false);}})();return()=>controller.abort();
+ },[month,exclude,retry]);
+ const money=(value:number)=>'NT$ '+Number(value||0).toLocaleString('zh-TW');
+ const years=Array.from({length:Math.max(1,currentYear-2026+1)},(_,index)=>currentYear-index);
+ return <section className="monthlyRevenue" aria-labelledby="monthlyRevenueTitle"><header><div><h2 id="monthlyRevenueTitle">每月營收一覽</h2><p>依台灣付款月份統計，已排除 Nnn、Peggy 測試預約及未付款、取消、退款訂單。</p></div><div className="monthlyRevenuePicker"><strong>{month.slice(0,4)}年</strong><label>選擇月份<select value={month} onChange={event=>setMonth(event.target.value)}>{years.map(year=><optgroup key={year} label={`${year}年`}>{Array.from({length:12},(_,index)=>{const value=`${year}-${String(index+1).padStart(2,'0')}`;return <option key={value} value={value}>{index+1}月</option>;})}</optgroup>)}</select></label></div></header><label className="monthlyRevenueExclude"><input type="checkbox" checked={exclude} onChange={event=>setExclude(event.target.checked)}/>不計入視訊費用</label><div aria-live="polite" aria-busy={loading}>{loading?<p>正在計算營收…</p>:error?<p role="alert">{error}<button onClick={()=>setRetry(value=>value+1)}>重試</button></p>:data&&<><div className="monthlyRevenueTotals"><article><span>文字諮詢</span><strong>{money(data.text)}</strong><small>{data.textCount} 筆</small></article><article><span>視訊諮詢</span><strong>{money(data.video)}</strong><small>{data.videoCount} 筆{exclude?`・已扣除視訊費用 ${money(data.deducted)}`:''}</small></article><article className="monthlyRevenueTotal"><span>合計營收</span><strong>{money(data.total)}</strong><small>{month.slice(0,4)}年 {Number(month.slice(5))}月</small></article></div>{data.legacyDateCount>0&&<small>其中 {data.legacyDateCount} 筆舊訂單未記錄付款日期，暫以建立月份計算。</small>}</>}</div></section>;
+}

@@ -26,7 +26,7 @@ function renderReply(topics, sections = []) {
   let stateIndex = 0;
   const data = { questions: [{ slotIndex: 0, questionNumber: 1, question: '我們還有緣分嗎？', itemCode: 'marriage-bazi', itemTitle: '感情運勢與關係合盤', profileName: '測試對象', profileLines: [], requestLines: [], manualOnly: false }], sections, topics, recommendedByQuestion: { 0: ['love'] }, recommendedBySection: {}, previousSummaries: [], questionReplies: {}, sectionReplies: {}, bookingNo: 'TEST', customerName: '測試', documentUrl: '#' };
   const mockReact = { ...React, useState: initial => { const index = stateIndex++; return [index === 0 ? data : index === 3 ? false : index === 4 ? 'question' : typeof initial === 'function' ? initial() : initial, () => {}]; }, useEffect: () => {}, useMemo: fn => fn(), useRef: value => ({ current: value }) };
-  const context = vm.createContext({ React, exports: {}, console, require: name => name === 'react' ? mockReact : name.includes('annual-fortune') ? { parseAnnual: () => ({}) } : { default: () => null } });
+  const context = vm.createContext({ React, exports: {}, console, require: name => name === 'react' ? mockReact : name.includes('useWritingDraft') ? {useWritingDraft:()=>({ready:true,status:'saved',problem:'',save:async()=>{},canProceed:()=>true})} : name.includes('annual-fortune') ? { parseAnnual: () => ({}) } : { default: () => null } });
   vm.runInContext(compile(ui), context);
   return renderToStaticMarkup(React.createElement(context.exports.default, { bookingNo: 'TEST', documentId: 'TEST', standalone: true, onClose: () => {} }));
 }

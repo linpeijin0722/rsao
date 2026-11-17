@@ -1,0 +1,92 @@
+[
+  {
+    "path": "app/staff/QuickConsultationReply.tsx",
+    "status": "modified",
+    "sha256": "2926f141bc2bead59a7eca0b62f0ad38baa1d79b18b6c6b198aa9b1018ecdfe6"
+  },
+  {
+    "path": "app/staff/page.tsx",
+    "status": "modified",
+    "sha256": "73e50484f89417e120137a25db1909e68f04a4b91a52893221d45fd169ae0faf"
+  },
+  {
+    "path": "app/staff/style.css",
+    "status": "modified",
+    "sha256": "ca66f2589374d3a70207951f4ee3962ed8256933cdd6e431afd01b02a1195404"
+  },
+  {
+    "path": "app/api/staff/bookings/route.ts",
+    "status": "modified",
+    "sha256": "281f85252a0c02e47bfcf7f181a58612623fde4191d62d07f753ff5f6e7184cb"
+  },
+  {
+    "path": "app/api/bank-transfer/route.ts",
+    "status": "modified",
+    "sha256": "a8f7d587769b93cd6b200a44c4039a210264e4c7a4eaeae9824007e76917e3a4"
+  },
+  {
+    "path": "lib/payment-mode.ts",
+    "status": "modified",
+    "sha256": "8ff52c4065b4e7e8f29f76a5b86d285f5987fd0468eda327c14139fd13554ee5"
+  },
+  {
+    "path": "tests/quick-reply-visibility.test.cjs",
+    "status": "modified",
+    "sha256": "55247f060e929a0124aac03ed643744864a114634c721697d5c9c422c5523ebf"
+  },
+  {
+    "path": "app/staff/useWritingDraft.ts",
+    "status": "new",
+    "sha256": "962dd133b23b329e3d030cd3f081743ad5a1afed47e3e48902e8d2ab4e9769fa"
+  },
+  {
+    "path": "app/api/staff/writing-draft/route.ts",
+    "status": "new",
+    "sha256": "3dd04e6092d4308e69cc3ce96f2667d46c42d689dcc83ff903e6103a638552b9"
+  },
+  {
+    "path": "lib/bank-account-security.ts",
+    "status": "new",
+    "sha256": "a8eb2009954e757d6e5bc1f48195dd2183d4a94966d006bff16fe3640b67def4"
+  },
+  {
+    "path": "app/api/staff/bank-accounts/route.ts",
+    "status": "new",
+    "sha256": "7cec8391ea62e4f801c7a29afc204dd780d61fcf1bdc46036691f5d4da5c3c00"
+  },
+  {
+    "path": "supabase/057_writing_drafts.sql",
+    "status": "new",
+    "sha256": "4b9266a8de19e2599db862ef14ff6de73e12ef1c52e1736b87d08cd4612f4822"
+  },
+  {
+    "path": "supabase/058_bank_account_management.sql",
+    "status": "new",
+    "sha256": "e232915ba2b78a15e45804e19952e12db2c0ee121cb93720e727c2a316f7ff39"
+  },
+  {
+    "path": "tests/staff-upgrade.test.cjs",
+    "status": "new",
+    "sha256": "e5de46ad9e64796f3852443da540dc0dfe0daa52faabd365a821e6db42059900"
+  },
+  {
+    "path": "lib/monthly-revenue.ts",
+    "status": "new",
+    "sha256": "aaeea38a7d3f6022be6d5d34f10ac93df15fbfcb7ae1d6137ff87da4ac3bcb18"
+  },
+  {
+    "path": "app/api/staff/monthly-revenue/route.ts",
+    "status": "new",
+    "sha256": "f2850997859400b45a2484c549c206478448874ed331457263773daf88da5d35"
+  },
+  {
+    "path": "app/staff/MonthlyRevenue.tsx",
+    "status": "new",
+    "sha256": "ed379252eba600439e33534eb71543829c687aa5aaa464e2198d0124b4aa47fa"
+  },
+  {
+    "path": "tests/monthly-revenue.test.cjs",
+    "status": "new",
+    "sha256": "50743b94fc2a8d9b6f5321084b46dad9254ef1353174d10325efbf61cdde1dc2"
+  }
+]

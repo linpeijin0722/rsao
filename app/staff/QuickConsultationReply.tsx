@@ -1,4 +1,5 @@
 "use client";
+import {useWritingDraft} from "./useWritingDraft";
 import AnnualFortuneEditor from "./AnnualFortuneEditor";
 import AiAnswerChoices from "./AiAnswerChoices";
 import { parseAnnual, type AnnualState } from "@/lib/annual-fortune";
@@ -214,11 +215,13 @@ export default function QuickConsultationReply({
       >
     >({});
   useEffect(() => {
+    let cancelled=false;setLoading(true);restoredFocus.current=false;
     fetch(
       `/api/staff/quick-reply?bookingNo=${encodeURIComponent(bookingNo)}&documentId=${encodeURIComponent(documentId)}&token=${encodeURIComponent(initialAccessToken)}&externalItemCode=${encodeURIComponent(externalItemCode)}&externalSlotIndex=${encodeURIComponent(String(externalSlotIndex))}`,
     )
       .then(async (r) => {
         const x = await r.json();
+        if(cancelled)return;
         if (!r.ok) throw new Error(x.error || "讀取失敗");
         setData(x);
         setAccessToken(x.accessToken || initialAccessToken);
@@ -257,10 +260,50 @@ export default function QuickConsultationReply({
         if (!(x.sections || []).some((s: Section) => !s.manualOnly))
           setView("question");
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "讀取失敗"))
-      .finally(() => setLoading(false));
-    return () => Object.values(sectionTimers.current).forEach(clearTimeout);
+      .catch((e) => {if(!cancelled)setError(e instanceof Error ? e.message : "讀取失敗")})
+      .finally(() => {if(!cancelled)setLoading(false)});
+    return () => {cancelled=true;Object.values(sectionTimers.current).forEach(clearTimeout);};
   }, [bookingNo, documentId, initialAccessToken, externalItemCode, externalSlotIndex]);
+  const [resumeField,setResumeField]=useState<number|null>(null),[expandedCards,setExpandedCards]=useState<number[]>([]);
+  const writingRoot=useRef<HTMLDivElement|null>(null),restoredFocus=useRef(false);
+  const writingPayload={version:1,documentShape:JSON.stringify({sections:(data?.sections||[]).map(s=>[s.slotIndex,s.itemCode,s.profileName,s.targetName]),questions:(data?.questions||[]).map(q=>[q.slotIndex,q.profileName,q.question])}),view,activeQuestion,activeSection,activeCategory,sectionCategory,locationMode,locationHall,reincarnatedAs,reincarnatedKind,reincarnatedPlace,reincarnatedAge,infantYears,dateResultRows,dateTimeSupplements,partner2Enabled,partner2Selections,romanceAges,divorceAges,customDeity,elementAccentSelections,spiritualDetails,worshipDeities,namingRows,openPanels,drafts,sectionDrafts,manualSectionReplies,activeInfantBySection,resumeField,expandedCards,sectionSelections:sectionSelections.current,deceasedDetails:deceasedDetails.current};
+  const writingDraft=useWritingDraft({bookingNo,documentId,scope:`${externalItemCode}:${externalSlotIndex}`,accessToken},writingPayload,Boolean(data)&&!loading,(value)=>{
+    if(Object.prototype.hasOwnProperty.call(value,"view"))setView(value.view);
+    if(Object.prototype.hasOwnProperty.call(value,"activeQuestion"))setActiveQuestion(value.activeQuestion);
+    if(Object.prototype.hasOwnProperty.call(value,"activeSection"))setActiveSection(value.activeSection);
+    if(Object.prototype.hasOwnProperty.call(value,"activeCategory"))setActiveCategory(value.activeCategory);
+    if(Object.prototype.hasOwnProperty.call(value,"sectionCategory"))setSectionCategory(value.sectionCategory);
+    if(Object.prototype.hasOwnProperty.call(value,"locationMode"))setLocationMode(value.locationMode);
+    if(Object.prototype.hasOwnProperty.call(value,"locationHall"))setLocationHall(value.locationHall);
+    if(Object.prototype.hasOwnProperty.call(value,"reincarnatedAs"))setReincarnatedAs(value.reincarnatedAs);
+    if(Object.prototype.hasOwnProperty.call(value,"reincarnatedKind"))setReincarnatedKind(value.reincarnatedKind);
+    if(Object.prototype.hasOwnProperty.call(value,"reincarnatedPlace"))setReincarnatedPlace(value.reincarnatedPlace);
+    if(Object.prototype.hasOwnProperty.call(value,"reincarnatedAge"))setReincarnatedAge(value.reincarnatedAge);
+    if(Object.prototype.hasOwnProperty.call(value,"infantYears"))setInfantYears(value.infantYears);
+    if(Object.prototype.hasOwnProperty.call(value,"dateResultRows"))setDateResultRows(value.dateResultRows);
+    if(Object.prototype.hasOwnProperty.call(value,"dateTimeSupplements"))setDateTimeSupplements(value.dateTimeSupplements);
+    if(Object.prototype.hasOwnProperty.call(value,"partner2Enabled"))setPartner2Enabled(value.partner2Enabled);
+    if(Object.prototype.hasOwnProperty.call(value,"partner2Selections"))setPartner2Selections(value.partner2Selections);
+    if(Object.prototype.hasOwnProperty.call(value,"romanceAges"))setRomanceAges(value.romanceAges);
+    if(Object.prototype.hasOwnProperty.call(value,"divorceAges"))setDivorceAges(value.divorceAges);
+    if(Object.prototype.hasOwnProperty.call(value,"customDeity"))setCustomDeity(value.customDeity);
+    if(Object.prototype.hasOwnProperty.call(value,"elementAccentSelections"))setElementAccentSelections(value.elementAccentSelections);
+    if(Object.prototype.hasOwnProperty.call(value,"spiritualDetails"))setSpiritualDetails(value.spiritualDetails);
+    if(Object.prototype.hasOwnProperty.call(value,"worshipDeities"))setWorshipDeities(value.worshipDeities);
+    if(Object.prototype.hasOwnProperty.call(value,"namingRows"))setNamingRows(value.namingRows);
+    if(Object.prototype.hasOwnProperty.call(value,"openPanels"))setOpenPanels(value.openPanels);
+    if(Object.prototype.hasOwnProperty.call(value,"drafts"))setDrafts(value.drafts);
+    if(Object.prototype.hasOwnProperty.call(value,"sectionDrafts"))setSectionDrafts(value.sectionDrafts);
+    if(Object.prototype.hasOwnProperty.call(value,"manualSectionReplies"))setManualSectionReplies(value.manualSectionReplies);
+    if(Object.prototype.hasOwnProperty.call(value,"activeInfantBySection"))setActiveInfantBySection(value.activeInfantBySection);
+    if(value.sectionSelections)sectionSelections.current=value.sectionSelections;
+    if(value.deceasedDetails)deceasedDetails.current=value.deceasedDetails;
+    if(value.elementAccentSelections)elementAccentSelectionsRef.current=value.elementAccentSelections;
+    if(typeof value.resumeField==='number')setResumeField(value.resumeField);
+    if(Array.isArray(value.expandedCards))setExpandedCards(value.expandedCards);
+  });
+  useEffect(()=>{if(!writingDraft.ready||restoredFocus.current)return;restoredFocus.current=true;const timer=setTimeout(()=>{writingRoot.current?.querySelectorAll('.quickReplySpecialField,.quickReplySpiritCard,.quickReplyHelpCard').forEach((card,index)=>{if(expandedCards.includes(index))card.classList.add('expanded');});if(resumeField!==null){const field=writingRoot.current?.querySelectorAll<HTMLElement>('textarea,input:not([type=hidden]),select')[resumeField];field?.focus();field?.scrollIntoView({block:'center'});}},100);return()=>clearTimeout(timer);},[writingDraft.ready,resumeField]);
+  const closeWithDraft=async()=>{await writingDraft.save();if(!writingDraft.canProceed()){window.alert('仍有未儲存內容，請確認存稿狀態後再離開。');return;}onClose();};
   const topicMap = useMemo(
       () => new Map((data?.topics || []).map((t) => [t.code, t])),
       [data],
@@ -1238,6 +1281,8 @@ export default function QuickConsultationReply({
     setBusy(true);
     setError("");
     try {
+      await writingDraft.save();
+      if(!writingDraft.canProceed())throw Error("草稿尚未安全儲存，請先處理存稿提示再寫入文件");
       await post({
         mode: "write",
         questionReplies: drafts,
@@ -1440,7 +1485,7 @@ export default function QuickConsultationReply({
     card.classList.toggle("expanded");
   };
   return (
-    <div className={`quickReplyBackdrop${standalone ? " standalone" : ""}${embedded ? " embedded" : ""}`}>
+    <div ref={writingRoot} onClickCapture={()=>setTimeout(()=>{const cards=Array.from(writingRoot.current?.querySelectorAll('.quickReplySpecialField,.quickReplySpiritCard,.quickReplyHelpCard')||[]);setExpandedCards(cards.flatMap((card,index)=>card.classList.contains('expanded')?[index]:[]));},0)} onFocusCapture={event=>{const field=event.target as HTMLElement;if(field.matches('textarea,input:not([type=hidden]),select'))setResumeField(Array.from(writingRoot.current?.querySelectorAll('textarea,input:not([type=hidden]),select')||[]).indexOf(field));}} className={`quickReplyBackdrop${standalone ? " standalone" : ""}${embedded ? " embedded" : ""}`}>
       <section className="quickReplyPanel" role="dialog" aria-modal="true">
         <header>
           <div>
@@ -1452,9 +1497,10 @@ export default function QuickConsultationReply({
             )}
           </div>
           {standalone && data?.documentUrl && <a className="quickReplyReturnDocument" href={data.documentUrl}>返回諮詢單</a>}
-          {!standalone && <button onClick={onClose}>×</button>}
+          {!standalone && <button onClick={()=>void closeWithDraft()}>×</button>}
         </header>
-        {loading ? (
+        {data&&<div className="writingDraftStatus" role="status"><strong>{writingDraft.status==='failed'?'草稿讀取／儲存失敗':!writingDraft.ready?'正在恢復草稿…':writingDraft.status==='saving'||writingDraft.status==='pending'?'儲存中…':'✓ 已儲存'}</strong>{writingDraft.problem&&<span>{writingDraft.problem}</span>}{writingDraft.status==='failed'&&!writingDraft.conflict&&<button onClick={()=>void writingDraft.retry()}>重試</button>}</div>}
+        {loading || (data&&!writingDraft.ready&&writingDraft.status!=='failed') ? (
           <div className="quickReplyStatus">正在讀取客人問題與句庫…</div>
         ) : error && !data ? (
           <div className="quickReplyStatus error">
@@ -1464,7 +1510,7 @@ export default function QuickConsultationReply({
           </div>
         ) : (
           data && (
-            <div className="quickReplyBody">
+            <div className="quickReplyBody" inert={!writingDraft.ready}>
               {sections.length > 0 && questionGroups.length > 0 && (
                 <nav className="quickReplySectionTabs" aria-label="回覆模式">
                   <button type="button" className={view === "section" ? "selected" : ""} onClick={() => pickTarget("section", activeSection)}>項目快速回覆</button>

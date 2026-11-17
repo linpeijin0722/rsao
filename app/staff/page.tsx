@@ -1,4 +1,6 @@
 "use client";
+import {revenueBookingEligible} from "@/lib/monthly-revenue";
+import MonthlyRevenue from "./MonthlyRevenue";
 import SubmissionStatus from "./SubmissionStatus";
 import LineWatchlist from "./LineWatchlist";
 import "./watchlist.css";
@@ -218,6 +220,10 @@ export default function Staff() {
     [paymentActionBusy,setPaymentActionBusy]=useState(false),
     [paymentSettings,setPaymentSettings]=useState<any>(null),
     [bankAccounts,setBankAccounts]=useState<any[]>([]),
+    [bankAction,setBankAction]=useState<any>(null),
+    [bankPassword,setBankPassword]=useState(""),
+    [bankActionBusy,setBankActionBusy]=useState(false),
+    [bankActionError,setBankActionError]=useState(""),
     [bankEditorOpen,setBankEditorOpen]=useState(false),
     [bankForm,setBankForm]=useState<any>({label:"",bank_name:"",bank_code:"",account_number:"",account_name:"",note:""}),
     [quickReplyTarget,setQuickReplyTarget]=useState<{bookingNo:string;documentId:string}|null>(null),
@@ -239,16 +245,18 @@ export default function Staff() {
     if(!confirm(`確定要將目前付款方式切換為「${labels[mode]}」嗎？`))return;
     const r=await staffPost({action:"set_payment_mode",mode}),j=await r.json();if(!r.ok)return alert(j.error);setPaymentSettings((current:any)=>({...current,payment_mode:mode}));
   }
-  async function selectBankAccount(account:any){
-    if(account.id===paymentSettings?.bank_account_key)return;
-    if(!confirm(`確定要切換成「${account.label}」嗎？\n${account.bank_name}（${account.bank_code}）\n戶名：${account.account_name}\n帳號末五碼：${String(account.account_number).slice(-5)}`))return;
-    const r=await staffPost({action:"select_bank_account",accountId:account.id}),j=await r.json();if(!r.ok)return alert(j.error);await load();
-  }
-  async function saveBankAccount(){
-    const r=await staffPost({action:"save_bank_account",account:bankForm}),j=await r.json();if(!r.ok)return alert(j.error);setBankEditorOpen(false);setBankForm({label:"",bank_name:"",bank_code:"",account_number:"",account_name:"",note:""});await load();
-  }
-  async function deleteBankAccount(account:any){
-    if(!confirm(`確定要刪除「${account.label}」嗎？`))return;const r=await staffPost({action:"delete_bank_account",accountId:account.id}),j=await r.json();if(!r.ok)return alert(j.error);await load();
+  function requestBankAction(action:any){setBankPassword("");setBankActionError("");setBankAction(action);}
+  async function selectBankAccount(account:any){if(account.id!==paymentSettings?.bank_account_key)requestBankAction({action:"select",accountId:account.id,label:account.label});}
+  async function saveBankAccount(){requestBankAction({action:"save",account:{...bankForm},label:bankForm.label||"新帳號"});}
+  async function deleteBankAccount(account:any){requestBankAction({action:"delete",accountId:account.id,label:account.label+"（末五碼 "+String(account.account_number).slice(-5)+"）"});}
+  async function confirmBankAction(){
+    if(bankActionBusy||!bankPassword||!bankAction)return;
+    setBankActionBusy(true);setBankActionError("");
+    try{
+      const response=await fetch('/api/staff/bank-accounts',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...bankAction,password:bankPassword})}),result=await response.json();
+      setBankPassword("");if(!response.ok)throw Error(result.error||"帳號更新失敗");
+      setBankAction(null);setBankEditorOpen(false);await load();
+    }catch(e){setBankPassword("");setBankActionError(e instanceof Error?e.message:"帳號更新失敗");}finally{setBankActionBusy(false);}
   }
   async function openLineAdminFromProfile(customer:any) {
     const name=String(customer?.line_display_name||"").trim();
@@ -603,7 +611,7 @@ export default function Staff() {
         ),
       ];
     }, [month]);
-  const isRevenueBooking=(booking:any)=>booking.payment_status==="paid"&&booking.status!=="cancelled";
+  const isRevenueBooking=revenueBookingEligible;
   const textRevenue=text.filter(isRevenueBooking).reduce((sum:number,booking:any)=>sum+Number(booking.total_price||0),0);
   const videoRevenue=video.filter(isRevenueBooking).reduce((sum:number,booking:any)=>{
     const amount=Number(booking.total_price||0),base=excludeVideoBase?Number(booking.consultation_methods?.base_price||0):0;
@@ -728,10 +736,12 @@ export default function Staff() {
     <main className={`staffPage returned-edit-${returnedEditMode}`}>
       {submissionActions&&<div className="modalBackdrop"><div className="modal" role="dialog" aria-modal="true" aria-label="資料回傳操作"><h2>資料回傳</h2><p>{submissionActions.customers?.full_name}・{submissionActions.booking_no}</p><p>若已在 LINE 收到問事資料，請選「已手動回傳」，系統便不再催填。</p><div className="returnedEditActions"><button disabled={submissionBusy} onClick={()=>{const x=submissionActions;setSubmissionActions(null);void remind(x.booking_no,x.customers)}}>發送填寫通知</button><button disabled={submissionBusy} onClick={async()=>{setSubmissionBusy(true);try{const r=await staffPost({action:"mark_manual_submission",bookingNo:submissionActions.booking_no}),data=await r.json();if(!r.ok)throw Error(data.error||"更新失敗");setSubmissionActions(null);await load()}catch(e){alert(e instanceof Error?e.message:"更新失敗")}finally{setSubmissionBusy(false)}}}>已手動回傳</button><button className="cancel" disabled={submissionBusy} onClick={()=>setSubmissionActions(null)}>取消</button></div></div></div>}
       <div className="staffPageHeading"><h1>預約工作後台</h1><div className="staffHeadingActions"><a className="lineAdminButton" href="https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/" target="_blank" rel="noreferrer">官方LINE後台</a><a className="videoCalendarButton" href={(()=>{const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(new Date());const year=parts.find((part)=>part.type==="year")?.value||String(taipeiYear());const month=parts.find((part)=>part.type==="month")?.value||String(Number(taipeiDateKey().slice(5,7)));return `https://calendar.google.com/calendar/u/4/r/month/${year}/${Number(month)}/1`;})()} target="_blank" rel="noreferrer" aria-label="開啟本月視訊諮詢 Google 行事曆">視訊諮詢行事曆</a><button className="manualBookingEntry" onClick={()=>setManualOpen(true)}>＋ 手動建立預約</button></div></div>
-      {paymentSettings&&<details className="staffPaymentControl"><summary><h2>目前付款方式</h2><strong>{paymentSettings.payment_mode==="bank_transfer"?"銀行轉帳":paymentSettings.payment_mode==="auto"?"自動判斷":"藍新金流"}</strong><span><i>展開設定</i><i>收合設定</i></span></summary><div className="staffPaymentControlBody"><div className="paymentModeChoices">{[["bank_transfer","銀行轉帳"],["auto","自動判斷"],["newebpay","藍新金流"]].map(([value,label])=><button key={value} className={paymentSettings.payment_mode===value?"active":""} onClick={()=>void changePaymentMode(value)}>{label}</button>)}</div><div className="bankAccountManager"><div className="bankAccountManagerTitle"><div><h3>固定收款帳號</h3><p>選定的帳號會自動顯示在用戶付款頁，切換前會再次確認。</p></div></div><div className="bankAccountList">{bankAccounts.map(account=><article key={account.id} className={account.id===paymentSettings.bank_account_key?"active":""}><div><b>{account.label}</b>{account.id===paymentSettings.bank_account_key&&<em>目前使用</em>}<p>{account.bank_name}（{account.bank_code}）{account.branch_name?` ${account.branch_name}`:""}　{account.account_number}</p><p>戶名：{account.account_name}</p></div><div><button onClick={()=>void selectBankAccount(account)} disabled={account.id===paymentSettings.bank_account_key}>{account.id===paymentSettings.bank_account_key?"使用中":"切換使用"}</button></div></article>)}</div></div></div></details>}
-      {bankEditorOpen&&<div className="modalBackdrop priorityModal" onClick={()=>setBankEditorOpen(false)}><div className="modal bankAccountEditor" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setBankEditorOpen(false)}>×</button><h2>{bankForm.id?"編輯收款帳號":"新增常用帳號"}</h2><div><label>帳號名稱<input value={bankForm.label||""} onChange={e=>setBankForm({...bankForm,label:e.target.value})} placeholder="例如：珮均常用帳號"/></label><label>銀行名稱<input value={bankForm.bank_name||""} onChange={e=>setBankForm({...bankForm,bank_name:e.target.value})} placeholder="例如：國泰世華"/></label><label>銀行代碼<input inputMode="numeric" maxLength={3} value={bankForm.bank_code||""} onChange={e=>setBankForm({...bankForm,bank_code:e.target.value.replace(/\D/g,"")})} placeholder="013"/></label><label>銀行帳號<input inputMode="numeric" value={bankForm.account_number||""} onChange={e=>setBankForm({...bankForm,account_number:e.target.value.replace(/\s/g,"")})}/></label><label>戶名<input value={bankForm.account_name||""} onChange={e=>setBankForm({...bankForm,account_name:e.target.value})}/></label><label>備註<input value={bankForm.note||""} onChange={e=>setBankForm({...bankForm,note:e.target.value})} placeholder="例如：媽媽的帳號"/></label></div><button className="bankAccountSave" onClick={()=>void saveBankAccount()}>儲存帳號</button></div></div>}
+      {paymentSettings&&<details className="staffPaymentControl"><summary><h2>目前付款方式</h2><strong>{paymentSettings.payment_mode==="bank_transfer"?"銀行轉帳":paymentSettings.payment_mode==="auto"?"自動判斷":"藍新金流"}</strong><span><i>展開設定</i><i>收合設定</i></span></summary><div className="staffPaymentControlBody"><div className="paymentModeChoices">{[["bank_transfer","銀行轉帳"],["auto","自動判斷"],["newebpay","藍新金流"]].map(([value,label])=><button key={value} className={paymentSettings.payment_mode===value?"active":""} onClick={()=>void changePaymentMode(value)}>{label}</button>)}</div><div className="bankAccountManager"><div className="bankAccountManagerTitle"><div><h3>收款帳號管理</h3><p>新增、修改、刪除及切換帳號，均須輸入管理密碼。舊訂單保留原收款資訊。</p></div><button type="button" onClick={()=>{setBankForm({label:"",bank_name:"",bank_code:"",branch_name:"",account_number:"",account_name:"",note:""});setBankEditorOpen(true);}}>＋新增收款帳號</button></div><div className="bankAccountList">{bankAccounts.map(account=><article key={account.id} className={account.id===paymentSettings.bank_account_key?"active":""}><div><b>{account.label}</b>{account.id===paymentSettings.bank_account_key&&<em>目前使用</em>}<p>{account.bank_name}（{account.bank_code}）{account.branch_name?` ${account.branch_name}`:""}　{account.account_number}</p><p>戶名：{account.account_name}</p></div><div><button onClick={()=>void selectBankAccount(account)} disabled={account.id===paymentSettings.bank_account_key}>{account.id===paymentSettings.bank_account_key?"使用中":"切換使用"}</button><button type="button" onClick={()=>{setBankForm({...account});setBankEditorOpen(true);}}>編輯</button><button type="button" disabled={account.id===paymentSettings.bank_account_key} onClick={()=>void deleteBankAccount(account)}>刪除</button></div></article>)}</div></div></div></details>}
+      {bankEditorOpen&&<div className="modalBackdrop priorityModal" onClick={()=>setBankEditorOpen(false)}><div className="modal bankAccountEditor" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setBankEditorOpen(false)}>×</button><h2>{bankForm.id?"編輯收款帳號":"新增常用帳號"}</h2><div><label>帳號名稱<input value={bankForm.label||""} onChange={e=>setBankForm({...bankForm,label:e.target.value})} placeholder="例如：珮均常用帳號"/></label><label>銀行名稱<input value={bankForm.bank_name||""} onChange={e=>setBankForm({...bankForm,bank_name:e.target.value})} placeholder="例如：國泰世華"/></label><label>銀行代碼<input inputMode="numeric" maxLength={3} value={bankForm.bank_code||""} onChange={e=>setBankForm({...bankForm,bank_code:e.target.value.replace(/\D/g,"")})} placeholder="013"/></label><label>分行<input value={bankForm.branch_name||""} onChange={e=>setBankForm({...bankForm,branch_name:e.target.value})}/></label><label>銀行帳號<input inputMode="numeric" value={bankForm.account_number||""} onChange={e=>setBankForm({...bankForm,account_number:e.target.value.replace(/\s/g,"")})}/></label><label>戶名<input value={bankForm.account_name||""} onChange={e=>setBankForm({...bankForm,account_name:e.target.value})}/></label><label>備註<input value={bankForm.note||""} onChange={e=>setBankForm({...bankForm,note:e.target.value})} placeholder="例如：媽媽的帳號"/></label></div><button className="bankAccountSave" onClick={()=>void saveBankAccount()}>儲存帳號</button></div></div>}
+      {bankAction&&<div className="modalBackdrop priorityModal bankPasswordBackdrop"><div className="modal bankPasswordModal" role="dialog" aria-modal="true" aria-labelledby="bankPasswordTitle"><h2 id="bankPasswordTitle">確認{bankAction.action==='delete'?'刪除':bankAction.action==='select'?'切換':'儲存'}收款帳號</h2><p>{bankAction.label}</p><p>請輸入收款帳號管理密碼（未另設時使用後台登入密碼）。</p><form onSubmit={event=>{event.preventDefault();void confirmBankAction();}}><label>管理密碼<input type="password" autoComplete="current-password" autoFocus value={bankPassword} disabled={bankActionBusy} onChange={e=>setBankPassword(e.target.value)}/></label>{bankActionError&&<p role="alert">{bankActionError}</p>}<button type="submit" disabled={!bankPassword||bankActionBusy}>{bankActionBusy?'驗證更新中…':'確認更新'}</button><button type="button" disabled={bankActionBusy} onClick={()=>{setBankPassword("");setBankAction(null);}}>取消</button></form></div></div>}
       {profileCopyToast&&<div className="profileCopyToast" role="status">✓ {profileCopyToast}</div>}
       {error && <div className="error">{error}</div>}
+      <MonthlyRevenue />
       <LineWatchlist />
       <PendingWork onPayment={setPaymentActions} bookings={rows} submissionStatus={submissionStatus} onManualResult={markManualResult} manualBusy={manualResultBusy} onViewUser={x=>setUserView({...x.customers,_booking:x})} documentActions={x=>documentActions(x,false,false)} onRefresh={load} warning={resultSyncWarning} loading={bookingsLoading}/>
       <section className="staffBookingSection videoBookingSection">
@@ -815,26 +825,26 @@ export default function Staff() {
                   status = statusText(x),
                   profiles = returnedData(x);
                 return (
-                  <article className={`staffTableRow ${new Date(x.slot_start).getTime()<Date.now()?"pastVideoRow":""}`} key={x.id}>
-                    <span className="staffPaidTime">{x.paid_at ? new Date(x.paid_at).toLocaleString("zh-TW", {timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}) : "尚未付款"}</span>
-                    <span className="staffVideoTime">
+                  <article className={`staffTableRow ${new Date(x.slot_start).getTime()<Date.now()?"pastVideoRow":""}`} key={x.id} data-mobile-kind="video">
+                    <span className="staffPaidTime" data-mobile-label="付款時間">{x.paid_at ? new Date(x.paid_at).toLocaleString("zh-TW", {timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}) : "尚未付款"}</span>
+                    <span className="staffVideoTime" data-mobile-label="視訊時間">
                       {videoDateTimeText(x.slot_start)}
                     </span>
                     <button
                       className="customerButton"
                       onClick={() => setUserView({...x.customers,_booking:x})}
-                    >
+                     data-mobile-label="用戶">
                       {x.customers?.line_picture_url && (
                         <img src={x.customers.line_picture_url} alt="" />
                       )}
                       <span>{[x.customers?.line_display_name,x.customers?.full_name].filter(Boolean).join("｜")}</span>
                     </button>
-                    <button className={`staffState staffStateButton ${statusKey(x)} ${x.transfer_status==="reported"?"transferWaiting":""}`} onClick={()=>setPaymentActions(x)}><span>{x.transfer_status==="reported"?`待核帳｜末五碼 ${x.transfer_account_last5}`:x.status!=="cancelled"&&paid?`已付款｜${paymentMethodText(x)}`:status}</span>{showVideoAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</button>
-                    {submissionStatus(x)}
-                    <div className="staffOrderCell"><small>{x.booking_no}</small>{showVideoItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-video-item-${index}`}>{line}</div>)}</div>}</div>
-                    <button onClick={() => openEdit(x)}>修改</button>
-                    {documentActions(x,false)}
-                    {showVideoReturn&&<ResultReturnStatus booking={x} warning={resultSyncWarning} onManual={markManualResult} busy={manualResultBusy}/>}
+                    <button className={`staffState staffStateButton ${statusKey(x)} ${x.transfer_status==="reported"?"transferWaiting":""}`} onClick={()=>setPaymentActions(x)} data-mobile-label="付款狀態"><span>{x.transfer_status==="reported"?`待核帳｜末五碼 ${x.transfer_account_last5}`:x.status!=="cancelled"&&paid?`已付款｜${paymentMethodText(x)}`:status}</span>{showVideoAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</button>
+                    <div data-mobile-label="問事資料">{submissionStatus(x)}</div>
+                    <div className="staffOrderCell" data-mobile-label="訂單與項目"><small>{x.booking_no}</small>{showVideoItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-video-item-${index}`}>{line}</div>)}</div>}</div>
+                    <button onClick={() => openEdit(x)} data-mobile-label="管理">修改</button>
+                    <div data-mobile-label="諮詢單">{documentActions(x,false)}</div>
+                    {showVideoReturn&&<div data-mobile-label="結果回傳"><ResultReturnStatus booking={x} warning={resultSyncWarning} onManual={markManualResult} busy={manualResultBusy}/></div>}
                   </article>
                 );
               })}
@@ -969,8 +979,8 @@ export default function Staff() {
             const complete = isComplete(x),
               paid = x.payment_status === "paid";
             return (
-              <article className="staffTableRow" key={x.id}>
-                <span>
+              <article className="staffTableRow" key={x.id} data-mobile-kind="text">
+                <span data-mobile-label="付款時間">
                   {new Date(x.paid_at || x.created_at).toLocaleString("zh-TW", {
                     timeZone: "Asia/Taipei",
                   })}
@@ -978,18 +988,18 @@ export default function Staff() {
                 <button
                   className="customerButton"
                   onClick={() => setUserView({...x.customers,_booking:x})}
-                >
+                 data-mobile-label="用戶">
                   {x.customers?.line_picture_url && (
                     <img src={x.customers.line_picture_url} alt="" />
                   )}
                   <span>{[x.customers?.line_display_name,x.customers?.full_name].filter(Boolean).join("｜")}</span>
                 </button>
-                <button className={`staffState staffStateButton ${statusKey(x)} ${x.transfer_status==="reported"?"transferWaiting":""}`} onClick={()=>setPaymentActions(x)}><span>{x.transfer_status==="reported"?`待核帳｜末五碼 ${x.transfer_account_last5}`:x.status!=="cancelled"&&paid?`已付款｜${paymentMethodText(x)}`:statusText(x)}</span>{showTextAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</button>
-                {submissionStatus(x)}
-                <div className="staffOrderCell"><small>{x.booking_no}</small>{showTextItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-item-${index}`}>{line}</div>)}</div>}</div>
-                <button onClick={() => openEdit(x)}>修改</button>
-                {documentActions(x)}
-                {showTextReturn&&<ResultReturnStatus booking={x} warning={resultSyncWarning} onManual={markManualResult} busy={manualResultBusy}/>}
+                <button className={`staffState staffStateButton ${statusKey(x)} ${x.transfer_status==="reported"?"transferWaiting":""}`} onClick={()=>setPaymentActions(x)} data-mobile-label="付款狀態"><span>{x.transfer_status==="reported"?`待核帳｜末五碼 ${x.transfer_account_last5}`:x.status!=="cancelled"&&paid?`已付款｜${paymentMethodText(x)}`:statusText(x)}</span>{showTextAmount&&<small className="staffOrderAmount">${Number(x.total_price||0).toLocaleString("en-US")}</small>}</button>
+                <div data-mobile-label="問事資料">{submissionStatus(x)}</div>
+                <div className="staffOrderCell" data-mobile-label="訂單與項目"><small>{x.booking_no}</small>{showTextItems&&<div className="staffOrderItems">{bookingItemLines(x).map((line:string,index:number)=><div key={`${x.id}-item-${index}`}>{line}</div>)}</div>}</div>
+                <button onClick={() => openEdit(x)} data-mobile-label="管理">修改</button>
+                <div data-mobile-label="諮詢單">{documentActions(x)}</div>
+                {showTextReturn&&<div data-mobile-label="結果回傳"><ResultReturnStatus booking={x} warning={resultSyncWarning} onManual={markManualResult} busy={manualResultBusy}/></div>}
               </article>
             );
           })}

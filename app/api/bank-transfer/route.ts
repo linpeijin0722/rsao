@@ -10,9 +10,11 @@ export async function GET(request:NextRequest){
     const lineUid=verifyLineSession((await cookies()).get("line_session")?.value);if(!lineUid)return NextResponse.json({error:"LINE 登入已失效"},{status:401});
     const bookingNo=request.nextUrl.searchParams.get("bookingNo")||"",db=adminSupabase();
     const {data:customer}=await db.from("customers").select("id").eq("line_user_id",lineUid).single();
-    const {data:booking,error}=await db.from("bookings").select("booking_no,total_price,payment_status,status,expires_at,transfer_account_last5,transfer_reported_at,transfer_time,transfer_amount,transfer_status").eq("booking_no",bookingNo).eq("customer_id",customer?.id||"").single();
+    const {data:booking,error}=await db.from("bookings").select("booking_no,total_price,payment_status,status,expires_at,transfer_account_last5,transfer_reported_at,transfer_time,transfer_amount,transfer_status,bank_account_snapshot").eq("booking_no",bookingNo).eq("customer_id",customer?.id||"").single();
     if(error||!booking)return NextResponse.json({error:"找不到這筆訂單"},{status:404});
-    const settings=await paymentSettings();return NextResponse.json({booking,settings});
+    const currentSettings=await paymentSettings();
+    const saved=booking.bank_account_snapshot;
+    const settings=saved?{...currentSettings,bank_name:[saved.bank_name,saved.branch_name].filter(Boolean).join(" "),bank_code:saved.bank_code,bank_account:saved.account_number,bank_account_name:saved.account_name,bank_note:saved.note}:currentSettings;return NextResponse.json({booking,settings});
   }catch(error){return NextResponse.json({error:error instanceof Error?error.message:"讀取轉帳資料失敗"},{status:500})}
 }
 export async function POST(request:NextRequest){

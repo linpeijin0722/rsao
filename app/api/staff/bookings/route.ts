@@ -13,7 +13,7 @@ export async function GET() {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))
     return NextResponse.json({ error: "未登入" }, { status: 401 });
   const db = adminSupabase();
-  const [{ data, error }, { data: customers, error: customerError }, { data: consultationProfiles, error: profileError }, {data:paymentSettings},{data:bankAccounts}] = await Promise.all([db
+  const [{ data, error }, { data: customers, error: customerError }, { data: consultationProfiles, error: profileError }, {data:paymentSettings},{data:bankAccounts,error:bankError}] = await Promise.all([db
     .from("bookings")
     .select(
       "id,booking_no,slot_start,total_price,payment_method,payment_status,collection_source,payment_provider,payment_provider_trade_no,payment_provider_type,payment_notification_status,payment_notification_error,payment_notification_attempts,payment_notification_last_attempt_at,payment_notification_next_retry_at,transfer_account_last5,transfer_reported_at,transfer_time,transfer_amount,transfer_status,data_submitted_at,data_submission_source,consultation_result_returned_at,consultation_result_detected_at,consultation_result_manual_at,status,cancellation_reason,paid_at,created_at,google_calendar_event_id,customers(id,line_user_id,line_display_name,line_picture_url,full_name,phone,gender,full_address,birth_date,lunar_birth_text,zodiac,birth_shichen),consultation_methods(id,code,title,base_price),booking_details(id,item_id,item_title,unit_price,quantity,line_total,google_document_id,google_document_url,google_document_created_at,google_sheet_url,booking_items(code),booking_detail_sub_items(sub_item_id,sub_item_title,unit_price,quantity,line_total),booking_detail_profiles(profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data)),booking_consultation_answers(id,profile_id,questions,extra_data,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data),booking_answer_participants(position,profile_id,consultation_profiles(id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data))))",
@@ -27,9 +27,9 @@ export async function GET() {
     .order("created_at", { ascending: false }), db
     .from("consultation_profiles")
     .select("id,customer_id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data")
-    .order("name", { ascending: true }),db.from("booking_system_settings").select("payment_mode,bank_account_key,gateway_disabled_until,gateway_failure_reason").eq("id",true).maybeSingle(),Promise.resolve({data:[{id:"cathay",label:"國泰世華常用帳號",bank_name:"國泰世華",bank_code:"013",branch_name:"營業部",account_number:"218700524294",account_name:"林珮均",note:""},{id:"esun",label:"玉山銀行公司帳號",bank_name:"玉山銀行",bank_code:"808",branch_name:"林口分行",account_number:"0886940043636",account_name:"林阿嫂有限公司",note:""}]})]);
-  if (error || customerError || profileError) {
-    const message = error?.message || customerError?.message || profileError?.message || "讀取訂單失敗";
+    .order("name", { ascending: true }),db.from("booking_system_settings").select("payment_mode,bank_account_key,gateway_disabled_until,gateway_failure_reason").eq("id",true).maybeSingle(),db.from("bank_accounts").select("*").eq("archived",false).order("label")]);
+  if (error || customerError || profileError || bankError) {
+    const message = error?.message || customerError?.message || profileError?.message || bankError?.message || "讀取訂單失敗";
     return NextResponse.json({ error: /data_submission_source|consultation_result_(?:returned|detected|manual)_at/.test(message)
       ? "資料庫尚未更新：請先在 Supabase 依序執行 052_pending_result_status.sql 與 053_manual_results_and_video_time_off.sql，再重新整理後台。" : message }, { status: 500 });
   }
@@ -104,10 +104,7 @@ export async function POST(request: NextRequest) {
     const {error}=await adminSupabase().from("booking_system_settings").upsert({id:true,payment_mode:mode,updated_at:new Date().toISOString()});
     if(error)return NextResponse.json({error:error.message},{status:500});return NextResponse.json({ok:true,mode});
   }
-  if(action==="select_bank_account"){
-    const id=String(body.accountId||"");if(!["cathay","esun"].includes(id))return NextResponse.json({error:"找不到這組收款帳號"},{status:404});const {error}=await adminSupabase().from("booking_system_settings").update({bank_account_key:id,updated_at:new Date().toISOString()}).eq("id",true);
-    if(error)return NextResponse.json({error:error.message},{status:500});return NextResponse.json({ok:true});
-  }
+  if(["select_bank_account","save_bank_account","delete_bank_account"].includes(action))return NextResponse.json({error:"請使用需要密碼驗證的帳號管理功能"},{status:403});
   if (action === "create_manual_booking") {
     const db = adminSupabase(), methodCode = body.methodCode === "video" ? "video" : "text",
       lines = Array.isArray(body.lines) ? body.lines : [];
