@@ -193,7 +193,15 @@ export async function deliverPreparedConsultationReturn(payload: PreparedConsult
 }
 
 export function assertReturnIdentity(items:{index:number;content:string;sourceContent?:string}[],fresh:{index:number;content:string;parseWarning?:string}[]){
- const headings=(value:string)=>Array.from(value.matchAll(/^\s*([^\n【《]+)【([^】\n]+)】/gm),match=>match[1].trim()+'【'+match[2].trim()+'】');
+ // Compare complete heading lines, not bracketed phrases inside an answer.
+ // Legacy forms may have a label without a name; the preview reader accepts these too.
+ const headings=(value:string)=>{
+  const clean=String(value).replace(/\r\n?/g,"\n").replace(/[\u200b\u200c\u200d\u2060\ufeff]/g,"");
+  const collect=(pattern:RegExp)=>Array.from(clean.matchAll(pattern),match=>
+   match[1].trim().replace(/[ \t\u00a0\u3000]+/g," ")+"【"+match[2].trim().replace(/[ \t\u00a0\u3000]+/g," ")+"】");
+  const square=collect(/^[ \t\u00a0\u3000]*([^\n【】《》]*?)【([^】\n]+)】[ \t\u00a0\u3000]*$/gm);
+  return square.length?square:collect(/^[ \t\u00a0\u3000]*([^\n【】《》]*?)《([^》\n]+)》[ \t\u00a0\u3000]*$/gm);
+ };
  for(const item of items){
   const source=fresh.find(row=>row.index===item.index);
   if(!source||source.parseWarning)throw Error(`項目 ${item.index} 的文件對應已改變，請重新整理並核對，未傳送。`);

@@ -839,7 +839,10 @@ export function consultationNotebookUpdate(document:any,documentId:string) {
     const lines=line.split("\n").map((value:string)=>value.trim()).filter(Boolean);
     if(!lines.some(isEntry))continue;
     const runs=elements.filter((e:any)=>e.textRun?.content?.trim());
-    if(!runs.length||!runs.every((e:any)=>{const rgb=e.textRun.textStyle?.foregroundColor?.color?.rgbColor;return rgb&&(rgb.red||0)>.7&&(rgb.green||0)<.3&&(rgb.blue||0)<.3;}))continue;
+    // An earlier link-only style request turned this exact document URL blue.
+    // Replace only its standalone paragraph; never remove mixed manual notes.
+    const ownDocumentLink=lines.length===1&&lines[0]===`https://docs.google.com/document/d/${documentId}/edit`;
+    if(!runs.length||(!ownDocumentLink&&!runs.every((e:any)=>{const rgb=e.textRun.textStyle?.foregroundColor?.color?.rgbColor;return rgb&&(rgb.red||0)>.7&&(rgb.green||0)<.3&&(rgb.blue||0)<.3;})))continue;
     if(!lines.every(isEntry))throw Error("紅字清單與人工備註位於同一段落，請先分段，未更新清單。");
     const startIndex=Number(block.startIndex??elements[0]?.startIndex),endIndex=Number(block.endIndex??elements.at(-1)?.endIndex);
     if(!Number.isInteger(startIndex)||!Number.isInteger(endIndex)||startIndex<1||endIndex<=startIndex)throw Error("無法確認紅字位置，未更新清單。");
@@ -851,7 +854,7 @@ export function consultationNotebookUpdate(document:any,documentId:string) {
   requests.push({insertText:{location:{index:1},text:text+"\n"}});
   requests.push({updateTextStyle:{range:{startIndex:1,endIndex:1+text.length},textStyle:{foregroundColor:{color:{rgbColor:{red:1,green:0,blue:0}}},backgroundColor:{color:{rgbColor:{red:1,green:1,blue:1}}},bold:false,underline:false,fontSize:{magnitude:12,unit:"PT"}},fields:"foregroundColor,backgroundColor,bold,underline,fontSize,link"}});
   const linkStart=1+text.lastIndexOf("\n")+1;
-  requests.push({updateTextStyle:{range:{startIndex:linkStart,endIndex:1+text.length},textStyle:{link:{url:`https://docs.google.com/document/d/${documentId}/edit`}},fields:"link"}});
+  requests.push({updateTextStyle:{range:{startIndex:linkStart,endIndex:1+text.length},textStyle:{link:{url:`https://docs.google.com/document/d/${documentId}/edit`},foregroundColor:{color:{rgbColor:{red:1,green:0,blue:0}}},underline:false},fields:"link,foregroundColor,underline"}});
   return {text,requests};
 }
 
