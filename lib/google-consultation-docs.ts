@@ -828,6 +828,14 @@ export function completeConsultationNotebook(document:any,documentId:string) {
   return labels.join("\n")+`\nhttps://docs.google.com/document/d/${documentId}/edit`;
 }
 
+// Restrict recognition to red text and blue hyperlink-style text, not all colours.
+function notebookTextColour(style:any) {
+ const rgb=style?.foregroundColor?.color?.rgbColor;
+ if(!rgb)return false;
+ const r=rgb.red||0,g=rgb.green||0,b=rgb.blue||0;
+ return (r>.7&&g<.3&&b<.3)||(b>.6&&r<.35&&g<.65&&b>g+.15);
+}
+
 export function consultationNotebookUpdate(document:any,documentId:string) {
   const text=completeConsultationNotebook(document,documentId),requests:any[]=[],ranges:{startIndex:number;endIndex:number}[]=[];
   const isEntry=(line:string)=>/^[^\n【《]+【[^】\n]+】$/u.test(line)||/^https:\/\/docs\.google\.com\/document\/d\/[\w-]+(?:\/[^\s]*)?$/u.test(line);
@@ -842,10 +850,12 @@ export function consultationNotebookUpdate(document:any,documentId:string) {
     // An earlier link-only style request turned this exact document URL blue.
     // Replace only its standalone paragraph; never remove mixed manual notes.
     const ownDocumentLink=lines.length===1&&lines[0]===`https://docs.google.com/document/d/${documentId}/edit`;
-    if(!runs.length||(!ownDocumentLink&&!runs.every((e:any)=>{const rgb=e.textRun.textStyle?.foregroundColor?.color?.rgbColor;return rgb&&(rgb.red||0)>.7&&(rgb.green||0)<.3&&(rgb.blue||0)<.3;})))continue;
-    if(!lines.every(isEntry))throw Error("紅字清單與人工備註位於同一段落，請先分段，未更新清單。");
+    const unrelatedLink=lines.some((value:string)=>/^https:\/\/docs\.google\.com\/document\/d\//u.test(value)&&value!==`https://docs.google.com/document/d/${documentId}/edit`);
+    if(unrelatedLink)continue;
+    if(!runs.length||(!ownDocumentLink&&!runs.every((e:any)=>notebookTextColour(e.textRun.textStyle))))continue;
+    if(!lines.every(isEntry))throw Error("紅字或藍字清單與人工備註位於同一段落，請先分段，未更新清單。");
     const startIndex=Number(block.startIndex??elements[0]?.startIndex),endIndex=Number(block.endIndex??elements.at(-1)?.endIndex);
-    if(!Number.isInteger(startIndex)||!Number.isInteger(endIndex)||startIndex<1||endIndex<=startIndex)throw Error("無法確認紅字位置，未更新清單。");
+    if(!Number.isInteger(startIndex)||!Number.isInteger(endIndex)||startIndex<1||endIndex<=startIndex)throw Error("無法確認清單位置，未更新清單。");
     old.push(...lines);ranges.push({startIndex,endIndex});
   }
   if(old.join("\n")===text)return {text,requests};
@@ -863,9 +873,9 @@ export async function refreshConsultationNotebook(documentId:string) {
   const document=await google(url,token),plan=consultationNotebookUpdate(document,documentId);
   if(plan.requests.length)await google(url+":batchUpdate",token,{method:"POST",body:JSON.stringify({requests:plan.requests,writeControl:{requiredRevisionId:document.revisionId}})});
   const verified=plan.requests.length?await google(url,token):document;
-  const redLines=consultationNotebookText(verified).split("\n").map(line=>line.trim());
+  const colouredLines=consultationNotebookText(verified).split("\n").map(line=>line.trim());
   const expected=plan.text.split("\n");let offset=0;
-  for(const line of redLines)if(line===expected[offset])offset++;
+  for(const line of colouredLines)if(line===expected[offset])offset++;
   if(completeConsultationNotebook(verified,documentId)!==plan.text||offset!==expected.length)throw Error("文件清單更新後核對未通過，未準備 LINE 記事本，請重新讀取確認。");
   return plan.text;
 }
@@ -878,17 +888,15 @@ export function consultationNotebookText(document:any) {
       const elements=block.paragraph?.elements||[];
       const line=elements.map((e:any)=>e.textRun?.content||"").join("");
       if(/項目\s*\d+\s*[（(]共/u.test(line)){finished=true;return;}
-      let redLine="";
-      for(const e of elements){
-        const run=e.textRun,rgb=run?.textStyle?.foregroundColor?.color?.rgbColor;
-        if(rgb&&(rgb.red||0)>0.7&&(rgb.green||0)<0.3&&(rgb.blue||0)<0.3)redLine+=run.content||"";
-      }
-      if(redLine.trim())result+=redLine.trimEnd()+"\n";
+      // Keep whitespace and run boundaries intact, and never concatenate only
+      // coloured fragments of a paragraph containing unrecognised body text.
+      const runs=elements.filter((e:any)=>e.textRun?.content?.trim());
+      if(runs.length&&runs.every((e:any)=>notebookTextColour(e.textRun.textStyle)))result+=line.trimEnd()+"\n";
       for(const row of block.table?.tableRows||[])for(const cell of row.tableCells||[])read(cell.content||[]);
     }
   }
   read(document.body?.content||[]);
-  if(!result.trim())throw new Error("文件項目上方沒有找到紅色記事本內容");
+  if(!result.trim())throw new Error("文件項目上方沒有找到紅色或藍色記事本內容");
   return result.trim();
 }
 

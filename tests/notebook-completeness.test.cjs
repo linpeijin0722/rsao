@@ -34,6 +34,28 @@ test('old blue self-link is replaced once, without leaving duplicate URLs',()=>{
 test('mixed blue link notes and unrelated blue links are never deleted',()=>{
  for(const value of ['https://docs.google.com/document/d/D/edit\n人工備註\n','https://docs.google.com/document/d/OTHER/edit\n']){
   const {c}=harness(),doc=fixture();doc.body.content[2].paragraph.elements[0].textRun.content=value;doc.body.content[2].paragraph.elements[0].textRun.textStyle={foregroundColor:{color:{rgbColor:{blue:1}}}};
-  const plan=c.consultationNotebookUpdate(doc,'D');assert.equal(plan.requests.filter(r=>r.deleteContentRange).length,2);
+  if(value.includes('人工備註'))assert.throws(()=>c.consultationNotebookUpdate(doc,'D'),/人工備註/);else{const plan=c.consultationNotebookUpdate(doc,'D');assert.equal(plan.requests.filter(r=>r.deleteContentRange).length,2);}
  }
+});
+
+const blue={foregroundColor:{color:{rgbColor:{red:17/255,green:85/255,blue:204/255}}}};
+function completeColoured(colour){const h=harness(),plan=h.c.consultationNotebookUpdate(fixture(),'D'),updated=apply(fixture(),plan.requests);for(const p of updated.body.content.slice(0,6)){for(const e of p.paragraph.elements)e.textRun.textStyle=colour;}return {h,updated,text:plan.text};}
+test('complete blue list and link read successfully with no unnecessary write',async()=>{
+ const {h,updated,text}=completeColoured(blue);assert.equal(h.c.consultationNotebookText(updated),text);assert.equal(h.c.consultationNotebookUpdate(updated,'D').requests.length,0);
+ const flow=harness(updated);assert.equal(await flow.c.refreshConsultationNotebook('D'),text);assert.equal(flow.calls.filter(x=>x.init).length,0);
+});
+test('red and blue runs can alternate within the same list line',()=>{
+ const {h,updated,text}=completeColoured(red);for(const p of updated.body.content.slice(0,6))p.paragraph.elements.forEach((e,i)=>{e.textRun.textStyle=i%2?blue:red;});assert.equal(h.c.consultationNotebookText(updated),text);
+});
+test('post-write readback may use blue hyperlink colours and still verify',async()=>{
+ const flow=harness();let stored=fixture();flow.c.google=async(url,token,init)=>{if(init){stored=apply(stored,JSON.parse(init.body).requests);for(const p of stored.body.content.slice(0,6))for(const e of p.paragraph.elements)e.textRun.textStyle=blue;return {};}return stored;};
+ assert.equal((await flow.c.refreshConsultationNotebook('D')).split('\n').length,6);
+});
+test('incomplete blue list still fails and blue body below item marker is ignored',async()=>{
+ const {h,updated,text}=completeColoured(blue);updated.body.content[0].paragraph.elements.forEach(e=>{e.textRun.textStyle={};});assert.notEqual(h.c.consultationNotebookText(updated),text);
+ const flow=harness();flow.c.google=async(url,token,init)=>init?{}:updated;await assert.rejects(()=>flow.c.refreshConsultationNotebook('D'),/核對未通過/);
+ const full=completeColoured(blue);full.updated.body.content.at(-1).paragraph.elements.forEach(e=>{e.textRun.textStyle=blue;});assert.equal(full.h.c.consultationNotebookText(full.updated),full.text);
+});
+test('mixed black text is never spliced into an apparently valid coloured heading',()=>{
+ const {h,updated}=completeColoured(blue);updated.body.content[0].paragraph.elements[1].textRun.textStyle={};assert.ok(!h.c.consultationNotebookText(updated).startsWith('甲【陽宅】'));
 });
