@@ -28,8 +28,8 @@ export async function GET() {
     .from("consultation_profiles")
     .select("id,customer_id,profile_type,relationship,relationship_detail,name,gender,birth_date,lunar_birth_text,zodiac,birth_shichen,address,death_date,lunar_death_text,death_shichen,notes,owner_profile_id,photo_data")
     .order("name", { ascending: true }),db.from("booking_system_settings").select("payment_mode,bank_account_key,gateway_disabled_until,gateway_failure_reason").eq("id",true).maybeSingle(),db.from("bank_accounts").select("*").eq("archived",false).order("label")]);
-  if (error || customerError || profileError || bankError) {
-    const message = error?.message || customerError?.message || profileError?.message || bankError?.message || "讀取訂單失敗";
+  if (error || customerError || profileError) {
+    const message = error?.message || customerError?.message || profileError?.message || "讀取訂單失敗";
     return NextResponse.json({ error: /data_submission_source|consultation_result_(?:returned|detected|manual)_at/.test(message)
       ? "資料庫尚未更新：請先在 Supabase 依序執行 052_pending_result_status.sql 與 053_manual_results_and_video_time_off.sql，再重新整理後台。" : message }, { status: 500 });
   }
@@ -75,7 +75,7 @@ export async function GET() {
   let resultSyncWarning = "";
   try { await syncReturnedStatus(db, bookings, listReturnedConsultationDocumentIds); }
   catch (error) { console.error("回傳資料夾同步失敗", error); resultSyncWarning = "已回傳資料夾暫時無法同步，請稍後重新整理；若持續發生，請確認 Google 服務帳號具有資料夾讀取權限"; }
-  return NextResponse.json({ resultSyncWarning, bookings, customers: customers || [], consultationProfiles: consultationProfiles || [],paymentSettings,bankAccounts:bankAccounts||[] });
+  return NextResponse.json({ bankAccountWarning:bankError?"收款帳號管理尚未就緒，請確認058資料庫更新；預約列表仍可正常查看。":"", resultSyncWarning, bookings, customers: customers || [], consultationProfiles: consultationProfiles || [],paymentSettings,bankAccounts:bankAccounts||[] });
 }
 export async function POST(request: NextRequest) {
   if (!isAdminSession((await cookies()).get("admin_session")?.value))

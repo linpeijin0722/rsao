@@ -10,7 +10,10 @@ export async function GET(request:NextRequest){
     const lineUid=verifyLineSession((await cookies()).get("line_session")?.value);if(!lineUid)return NextResponse.json({error:"LINE 登入已失效"},{status:401});
     const bookingNo=request.nextUrl.searchParams.get("bookingNo")||"",db=adminSupabase();
     const {data:customer}=await db.from("customers").select("id").eq("line_user_id",lineUid).single();
-    const {data:booking,error}=await db.from("bookings").select("booking_no,total_price,payment_status,status,expires_at,transfer_account_last5,transfer_reported_at,transfer_time,transfer_amount,transfer_status,bank_account_snapshot").eq("booking_no",bookingNo).eq("customer_id",customer?.id||"").single();
+    const columns="booking_no,total_price,payment_status,status,expires_at,transfer_account_last5,transfer_reported_at,transfer_time,transfer_amount,transfer_status";
+    const query=(withSnapshot:boolean)=>db.from("bookings").select(columns+(withSnapshot?",bank_account_snapshot":"")).eq("booking_no",bookingNo).eq("customer_id",customer?.id||"").single();
+    let {data:booking,error}=await query(true);
+    if(error&&["42703","PGRST204"].includes(error.code)&&String(error.message).includes("bank_account_snapshot"))({data:booking,error}=await query(false));
     if(error||!booking)return NextResponse.json({error:"找不到這筆訂單"},{status:404});
     const currentSettings=await paymentSettings();
     const saved=booking.bank_account_snapshot;
