@@ -1,0 +1,11 @@
+﻿Vercel 正式建置修正 2026-11-19
+
+只需把本包 app/api/bank-transfer/route.ts 覆蓋到 GitHub 相同路徑，提交後讓 Vercel 重新部署。不需要 SQL、環境變數或整包重傳。其他先前 UI、分頁、付款模式及回傳修改保留。
+
+本機重現的錯誤
+app/api/bank-transfer/route.ts(19,25): TS2339: Property bank_account_snapshot does not exist on type GenericStringError。
+舊資料庫缺少快照欄位時重試的查詢使用動態 select 字串，Supabase 的型別推斷無法辨識回傳欄位。修正加入 TransferBooking 明確型別，快照為選用欄位，並指定 single<TransferBooking>()。沒有停用 TypeScript 或繞過建置錯誤，也沒有改動付款、登入客戶與訂單篩選邏輯。
+
+驗證
+使用 package.json 的依賴版本範圍安裝後，在本機實際執行 pnpm build 完整成功，包含編譯、TypeScript、頁面資料收集與靜態頁面產生；Next.js 16.4.6、TypeScript 5.9.3。付款／帳號相容24項相關測試全部通過。
+沒有修改正式資料庫、替客人付款、發送LINE訊息或代為部署。Vercel CLI 因本機未登入無法取得 dpl_4PuBFG3jnac3S9L6Xc2WLuSdJwED 的紀錄，因此上述是本機確實重現及修復的錯誤，尚不能宣稱遠端重新部署已成功；若遠端另有不同錯誤，仍需看新的 Build Logs。
