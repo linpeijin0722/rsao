@@ -1,5 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),ts=require('typescript');
-const c=vm.createContext({exports:{},require:()=>({normalizeConsultationReturnText:s=>s.trim()})});vm.runInContext(ts.transpileModule(fs.readFileSync('lib/consultation-return-delivery.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}}).outputText,c);
+const helper=vm.createContext({exports:{}});vm.runInContext(ts.transpileModule(fs.readFileSync('lib/consultation-text.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}}).outputText,helper);
+const c=vm.createContext({exports:{},require:()=>({...helper.exports,normalizeConsultationReturnText:s=>s.trim()})});vm.runInContext(ts.transpileModule(fs.readFileSync('lib/consultation-return-delivery.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}}).outputText,c);
 const verify=c.exports.assertReturnIdentity;
 const fresh=[{index:1,content:'陳夢偲【前世】\n小時候被送養，成為童養媳。'},{index:2,content:'黃子芩【前世因果】\n小時候因為是女孩子，不被父母待見。'}];
 test('A15 item two cannot reuse item one name and answer',()=>{assert.throws(()=>verify([{index:2,content:fresh[0].content}],fresh),/姓名或項目標籤/)});
@@ -35,7 +36,7 @@ const makeFlow=(content)=>{
  let pushes=0;
  const booking={id:'test-booking',booking_no:'TEST',customers:{line_user_id:'MOCK-ONLY'},consultation_methods:{code:'text'},booking_details:[{google_document_id:'TEST-DOC'}]};
  const db={from:table=>({select(){return this},eq(){return this},single:async()=>({data:booking}),order:async()=>({data:[]})})};
- const imports={'@/lib/supabase':{adminSupabase:()=>db},'@/lib/google-consultation-docs':{normalizeConsultationReturnText:s=>s.trim(),getConsultationReturnPreview:async()=>[{index:1,itemTitle:'測試項目',content}]},'@/lib/line-message':{pushLineText:async()=>{pushes++;throw Error('MOCK_DELIVERY_REACHED_NO_NETWORK')},pushConsultationResultCarousel:async()=>{throw Error('Unexpected carousel')}}};
+ const imports={'@/lib/consultation-text':helper.exports,'@/lib/supabase':{adminSupabase:()=>db},'@/lib/google-consultation-docs':{normalizeConsultationReturnText:s=>s.trim(),getConsultationReturnPreview:async()=>[{index:1,itemTitle:'測試項目',content}]},'@/lib/line-message':{pushLineText:async()=>{pushes++;throw Error('MOCK_DELIVERY_REACHED_NO_NETWORK')},pushConsultationResultCarousel:async()=>{throw Error('Unexpected carousel')}}};
  const context=vm.createContext({exports:{},require:name=>{if(!imports[name])throw Error('Unexpected import '+name);return imports[name]},console});
  vm.runInContext(ts.transpileModule(fs.readFileSync('lib/consultation-return-delivery.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}}).outputText,context);
  return {api:context.exports,pushes:()=>pushes};
@@ -51,4 +52,15 @@ test('wrong person is rejected before the first mocked LINE call',async()=>{
  const flow=makeFlow('甲姓名【前世】\n原始內容');
  await assert.rejects(flow.api.deliverPreparedConsultationReturn({bookingNo:'TEST',documentId:'TEST-DOC',lineUserId:'MOCK-ONLY',items:[{index:1,content:'乙姓名【前世】\n錯誤內容'}]},'https://mock.invalid'),/姓名或項目標籤/);
  assert.equal(flow.pushes(),0);
+});
+
+test('bracketed advice is prose when a named main heading is present',()=>{
+ const source=[{index:4,content:'測試姓名【整體運勢】\n【不要正面衝突，保持冷靜。】\n《流年運勢》\n內容'}];
+ verify([{index:4,content:'測試姓名【整體運勢】\n不要正面衝突，保持冷靜。\n《流年運勢》\n內容',sourceContent:source[0].content}],source);
+ assert.throws(()=>verify([{index:4,content:'其他姓名【整體運勢】\n內容'}],source),/文件標題.*所選版本/);
+});
+
+test('normalizing empty Q/A never joins the next person/item heading into the answer',()=>{
+ assert.equal(helper.exports.normalizeConsultationText('A1:\n測試姓名【整體運勢】\n正文'),'A1:\n測試姓名【整體運勢】\n正文');
+ assert.equal(helper.exports.normalizeConsultationText('Q1:\n一般問題'),'Q1:一般問題');
 });

@@ -5,7 +5,7 @@ import ReturnScheduleStatus, {type ReturnSchedule} from "../ReturnScheduleStatus
 import {useReturnDraft} from "../useReturnDraft";
 import ConsultationIssueEditor from "../ConsultationIssueEditor";
 import HighlightedConsultation from "../HighlightedConsultation";
-import { normalizeConsultationText } from "@/lib/consultation-text";
+import { normalizeConsultationText, consultationReturnHeadings } from "@/lib/consultation-text";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type ReturnItem = { index:number; itemTitle:string; content:string; parseWarning?:string };
@@ -89,7 +89,13 @@ export default function ConsultationReturnPage(){
   const toggle=(index:number)=>setSelected(value=>value.includes(index)?value.filter(x=>x!==index):[...value,index].sort((a,b)=>a-b));
   const versionFor=(index:number)=>{const rows=versions[index]||[];return rows.find(version=>version.id===(activeVersionIds[index]||"original"))||rows[0]};
   const makeSnapshot=()=>data?data.items.filter(entry=>selectedSet.has(entry.index)).map(entry=>{const version=versionFor(entry.index);return{index:entry.index,itemTitle:entry.itemTitle,versionId:version?.id||"original",versionLabel:version?.label||"原始版本",content:normalizeDraft(version?.content||entry.content)}}):[];
-  const openFinalConfirmation=(mode:SendMode)=>{const snapshot=makeSnapshot();if(!snapshot.length)return alert("請至少選擇一個項目");setSendSnapshot(snapshot);setConfirmMode(mode)};
+  const identityProblem=(index:number,content:string)=>{
+    const source=data?.items.find(entry=>entry.index===index);
+    if(!source)return "找不到文件項目";
+    const expected=consultationReturnHeadings(source.content),actual=consultationReturnHeadings(content);
+    return expected.length&&JSON.stringify(expected)===JSON.stringify(actual)?"":`文件標題：${expected.join("、")||"未辨識"}；所選版本：${actual.join("、")||"未辨識"}`;
+  };
+  const openFinalConfirmation=(mode:SendMode)=>{const snapshot=makeSnapshot();if(!snapshot.length)return alert("請至少選擇一個項目");const blocked=snapshot.find(entry=>identityProblem(entry.index,entry.content));if(blocked){setActive(selectedItems.findIndex(entry=>entry.index===blocked.index));alert(`項目 ${blocked.index} 的所選版本需要核對。${identityProblem(blocked.index,blocked.content)}。請在版本選單切換原始版本，或修正姓名與正式項目標題後再確認；其他草稿會保留。`);return;}setSendSnapshot(snapshot);setConfirmMode(mode)};
   const updateActiveContent=(value:string,manual=true)=>{if(!item||!activeVersion)return;setVersions(current=>({...current,[item.index]:(current[item.index]||[]).map(version=>version.id===activeVersion.id?{...version,content:value,manuallyEdited:manual||version.manuallyEdited}:version)}))};
   const restoreIssue=(issueIndex:number)=>{if(!item||!activeVersion)return;const issue=activeVersion.suspectedIssues[issueIndex];if(!issue||issue.action!=="removed"||issue.restored)return;const restored=normalizeDraft(`${activeVersion.content}\n\n${issue.originalText}`);setVersions(current=>({...current,[item.index]:(current[item.index]||[]).map(version=>version.id===activeVersion.id?{...version,content:restored,manuallyEdited:true,suspectedIssues:version.suspectedIssues.map(entry=>entry===issue?{...entry,restored:true}:entry)}:version)}))};
   async function openLineCustomer(){if(!data)return;window.open("https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/","_blank","noopener,noreferrer");try{await navigator.clipboard.writeText(data.lineDisplayName||data.customerName)}catch{window.alert(`請複製 LINE 名稱：${data.lineDisplayName||data.customerName}`)}}

@@ -2,8 +2,6 @@
 import {revenueBookingEligible} from "@/lib/monthly-revenue";
 import MonthlyRevenue from "./MonthlyRevenue";
 import SubmissionStatus from "./SubmissionStatus";
-import LineWatchlist from "./LineWatchlist";
-import "./watchlist.css";
 import PendingWork, { ResultReturnStatus } from "./PendingWork";
 
 import { taipeiDateKey, taipeiDateTimeInput, taipeiYear } from "@/lib/taipei-time";
@@ -188,6 +186,8 @@ export default function Staff() {
     [showDocumentNumber,setShowDocumentNumber]=useState(false),
     [textPageSize,setTextPageSize]=useState(20),
     [textPage,setTextPage]=useState(1),
+    [staffMobile,setStaffMobile]=useState(false),
+    [videoPage,setVideoPage]=useState(1),
     [videoStatusFilter,setVideoStatusFilter]=useState("all"),
     [videoDataFilter,setVideoDataFilter]=useState("all"),
     [videoSortBy,setVideoSortBy]=useState("paid_desc"),
@@ -241,7 +241,7 @@ export default function Staff() {
     return response;
   }
   async function changePaymentMode(mode:string){
-    const labels:any={bank_transfer:"銀行轉帳",auto:"自動判斷",newebpay:"藍新金流"};
+    const labels:any={bank_transfer:"銀行轉帳",newebpay:"藍新金流"};
     if(!confirm(`確定要將目前付款方式切換為「${labels[mode]}」嗎？`))return;
     const r=await staffPost({action:"set_payment_mode",mode}),j=await r.json();if(!r.ok)return alert(j.error);setPaymentSettings((current:any)=>({...current,payment_mode:mode}));
   }
@@ -364,6 +364,12 @@ export default function Staff() {
     } catch {setError("訂單讀取失敗，請稍後重新整理");setResultSyncWarning("訂單更新失敗，目前顯示上次載入資料");}
     finally {setBookingsLoading(false);}
   }
+  useEffect(()=>{
+    const media=window.matchMedia("(max-width:760px)");
+    const update=()=>{setStaffMobile(media.matches);setTextPage(1);setVideoPage(1);};
+    update();media.addEventListener("change",update);return()=>media.removeEventListener("change",update);
+  },[]);
+  useEffect(()=>setVideoPage(1),[videoStatusFilter,videoDataFilter,videoSortBy,videoCustomerSearch,videoBookingSearch,videoDateFrom,videoDateTo,selectedDate,showUpcomingVideo,showNewVideo]);
   useEffect(() => {
     const saved=localStorage.getItem("lin_a_sao_staff_password");if(saved){setPassword(saved);setRememberPassword(true)}
     const savedSort=localStorage.getItem("lin_a_sao_staff_paid_sort");if(savedSort==="paid_asc"||savedSort==="paid_desc")setSortBy(savedSort);
@@ -582,8 +588,9 @@ export default function Staff() {
       () => filtered.filter((x) => x.consultation_methods?.code === "text"),
       [filtered],
     ),
-    textPageCount = Math.max(1, Math.ceil(text.length / textPageSize)),
-    visibleText = text.slice((textPage - 1) * textPageSize, textPage * textPageSize),
+    effectiveTextPageSize=staffMobile?5:textPageSize,
+    textPageCount = Math.max(1, Math.ceil(text.length / effectiveTextPageSize)),
+    visibleText = text.slice((Math.min(textPage,textPageCount) - 1) * effectiveTextPageSize, Math.min(textPage,textPageCount) * effectiveTextPageSize),
     bookedDates = new Set(
       video.filter((x) => x.slot_start).map((x) => key(x.slot_start)),
     ),
@@ -611,6 +618,8 @@ export default function Staff() {
         ),
       ];
     }, [month]);
+  const videoPageCount=Math.max(1,Math.ceil(daily.length/5));
+  const visibleDaily=staffMobile?daily.slice((Math.min(videoPage,videoPageCount)-1)*5,Math.min(videoPage,videoPageCount)*5):daily;
   const isRevenueBooking=revenueBookingEligible;
   const textRevenue=text.filter(isRevenueBooking).reduce((sum:number,booking:any)=>sum+Number(booking.total_price||0),0);
   const videoRevenue=video.filter(isRevenueBooking).reduce((sum:number,booking:any)=>{
@@ -736,13 +745,12 @@ export default function Staff() {
     <main className={`staffPage returned-edit-${returnedEditMode}`}>
       {submissionActions&&<div className="modalBackdrop"><div className="modal" role="dialog" aria-modal="true" aria-label="資料回傳操作"><h2>資料回傳</h2><p>{submissionActions.customers?.full_name}・{submissionActions.booking_no}</p><p>若已在 LINE 收到問事資料，請選「已手動回傳」，系統便不再催填。</p><div className="returnedEditActions"><button disabled={submissionBusy} onClick={()=>{const x=submissionActions;setSubmissionActions(null);void remind(x.booking_no,x.customers)}}>發送填寫通知</button><button disabled={submissionBusy} onClick={async()=>{setSubmissionBusy(true);try{const r=await staffPost({action:"mark_manual_submission",bookingNo:submissionActions.booking_no}),data=await r.json();if(!r.ok)throw Error(data.error||"更新失敗");setSubmissionActions(null);await load()}catch(e){alert(e instanceof Error?e.message:"更新失敗")}finally{setSubmissionBusy(false)}}}>已手動回傳</button><button className="cancel" disabled={submissionBusy} onClick={()=>setSubmissionActions(null)}>取消</button></div></div></div>}
       <div className="staffPageHeading"><h1>預約工作後台</h1><div className="staffHeadingActions"><a className="lineAdminButton" href="https://chat.line.biz/U7fdf75a6ae75028c4aa102f6b4ebbc7d/" target="_blank" rel="noreferrer">官方LINE後台</a><a className="videoCalendarButton" href={(()=>{const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(new Date());const year=parts.find((part)=>part.type==="year")?.value||String(taipeiYear());const month=parts.find((part)=>part.type==="month")?.value||String(Number(taipeiDateKey().slice(5,7)));return `https://calendar.google.com/calendar/u/4/r/month/${year}/${Number(month)}/1`;})()} target="_blank" rel="noreferrer" aria-label="開啟本月視訊諮詢 Google 行事曆">視訊諮詢行事曆</a><button className="manualBookingEntry" onClick={()=>setManualOpen(true)}>＋ 手動建立預約</button></div></div>
-      {paymentSettings&&<details className="staffPaymentControl"><summary><h2>目前付款方式</h2><strong>{paymentSettings.payment_mode==="bank_transfer"?"銀行轉帳":paymentSettings.payment_mode==="auto"?"自動判斷":"藍新金流"}</strong><span><i>展開設定</i><i>收合設定</i></span></summary><div className="staffPaymentControlBody"><div className="paymentModeChoices">{[["bank_transfer","銀行轉帳"],["auto","自動判斷"],["newebpay","藍新金流"]].map(([value,label])=><button key={value} className={paymentSettings.payment_mode===value?"active":""} onClick={()=>void changePaymentMode(value)}>{label}</button>)}</div><div className="bankAccountManager"><div className="bankAccountManagerTitle"><div><h3>收款帳號管理</h3><p>新增、修改、刪除及切換帳號，均須輸入管理密碼。舊訂單保留原收款資訊。</p></div><button type="button" onClick={()=>{setBankForm({label:"",bank_name:"",bank_code:"",branch_name:"",account_number:"",account_name:"",note:""});setBankEditorOpen(true);}}>＋新增收款帳號</button></div><div className="bankAccountList">{bankAccounts.map(account=><article key={account.id} className={account.id===paymentSettings.bank_account_key?"active":""}><div><b>{account.label}</b>{account.id===paymentSettings.bank_account_key&&<em>目前使用</em>}<p>{account.bank_name}（{account.bank_code}）{account.branch_name?` ${account.branch_name}`:""}　{account.account_number}</p><p>戶名：{account.account_name}</p></div><div><button onClick={()=>void selectBankAccount(account)} disabled={account.id===paymentSettings.bank_account_key}>{account.id===paymentSettings.bank_account_key?"使用中":"切換使用"}</button><button type="button" onClick={()=>{setBankForm({...account});setBankEditorOpen(true);}}>編輯</button><button type="button" disabled={account.id===paymentSettings.bank_account_key} onClick={()=>void deleteBankAccount(account)}>刪除</button></div></article>)}</div></div></div></details>}
+      {paymentSettings&&<details className="staffPaymentControl"><summary><h2>目前付款方式</h2><strong>{paymentSettings.payment_mode==="bank_transfer"?"銀行轉帳":"藍新金流"}</strong><span><i>展開設定</i><i>收合設定</i></span></summary><div className="staffPaymentControlBody"><div className="paymentModeChoices">{[["bank_transfer","銀行轉帳"],["newebpay","藍新金流"]].map(([value,label])=><button key={value} className={paymentSettings.payment_mode===value?"active":""} onClick={()=>void changePaymentMode(value)}>{label}</button>)}</div><div className="bankAccountManager"><div className="bankAccountManagerTitle"><div><h3>收款帳號管理</h3><p>新增、修改、刪除及切換帳號，均須輸入管理密碼。舊訂單保留原收款資訊。</p></div><button type="button" onClick={()=>{setBankForm({label:"",bank_name:"",bank_code:"",branch_name:"",account_number:"",account_name:"",note:""});setBankEditorOpen(true);}}>＋新增收款帳號</button></div><div className="bankAccountList">{bankAccounts.map(account=><article key={account.id} className={account.id===paymentSettings.bank_account_key?"active":""}><div><b>{account.label}</b>{account.id===paymentSettings.bank_account_key&&<em>目前使用</em>}<p>{account.bank_name}（{account.bank_code}）{account.branch_name?` ${account.branch_name}`:""}　{account.account_number}</p><p>戶名：{account.account_name}</p></div><div><button onClick={()=>void selectBankAccount(account)} disabled={account.id===paymentSettings.bank_account_key}>{account.id===paymentSettings.bank_account_key?"使用中":"切換使用"}</button><button type="button" onClick={()=>{setBankForm({...account});setBankEditorOpen(true);}}>編輯</button><button type="button" disabled={account.id===paymentSettings.bank_account_key} onClick={()=>void deleteBankAccount(account)}>刪除</button></div></article>)}</div></div></div></details>}
       {bankEditorOpen&&<div className="modalBackdrop priorityModal" onClick={()=>setBankEditorOpen(false)}><div className="modal bankAccountEditor" onClick={e=>e.stopPropagation()}><button className="staffModalClose" onClick={()=>setBankEditorOpen(false)}>×</button><h2>{bankForm.id?"編輯收款帳號":"新增常用帳號"}</h2><div><label>帳號名稱<input value={bankForm.label||""} onChange={e=>setBankForm({...bankForm,label:e.target.value})} placeholder="例如：珮均常用帳號"/></label><label>銀行名稱<input value={bankForm.bank_name||""} onChange={e=>setBankForm({...bankForm,bank_name:e.target.value})} placeholder="例如：國泰世華"/></label><label>銀行代碼<input inputMode="numeric" maxLength={3} value={bankForm.bank_code||""} onChange={e=>setBankForm({...bankForm,bank_code:e.target.value.replace(/\D/g,"")})} placeholder="013"/></label><label>分行<input value={bankForm.branch_name||""} onChange={e=>setBankForm({...bankForm,branch_name:e.target.value})}/></label><label>銀行帳號<input inputMode="numeric" value={bankForm.account_number||""} onChange={e=>setBankForm({...bankForm,account_number:e.target.value.replace(/\s/g,"")})}/></label><label>戶名<input value={bankForm.account_name||""} onChange={e=>setBankForm({...bankForm,account_name:e.target.value})}/></label><label>備註<input value={bankForm.note||""} onChange={e=>setBankForm({...bankForm,note:e.target.value})} placeholder="例如：媽媽的帳號"/></label></div><button className="bankAccountSave" onClick={()=>void saveBankAccount()}>儲存帳號</button></div></div>}
       {bankAction&&<div className="modalBackdrop priorityModal bankPasswordBackdrop"><div className="modal bankPasswordModal" role="dialog" aria-modal="true" aria-labelledby="bankPasswordTitle"><h2 id="bankPasswordTitle">確認{bankAction.action==='delete'?'刪除':bankAction.action==='select'?'切換':'儲存'}收款帳號</h2><p>{bankAction.label}</p><p>請輸入收款帳號管理密碼（未另設時使用後台登入密碼）。</p><form onSubmit={event=>{event.preventDefault();void confirmBankAction();}}><label>管理密碼<input type="password" autoComplete="current-password" autoFocus value={bankPassword} disabled={bankActionBusy} onChange={e=>setBankPassword(e.target.value)}/></label>{bankActionError&&<p role="alert">{bankActionError}</p>}<button type="submit" disabled={!bankPassword||bankActionBusy}>{bankActionBusy?'驗證更新中…':'確認更新'}</button><button type="button" disabled={bankActionBusy} onClick={()=>{setBankPassword("");setBankAction(null);}}>取消</button></form></div></div>}
       {profileCopyToast&&<div className="profileCopyToast" role="status">✓ {profileCopyToast}</div>}
       {error && <div className="error">{error}</div>}
       <MonthlyRevenue />
-      <LineWatchlist />
       <PendingWork onPayment={setPaymentActions} bookings={rows} submissionStatus={submissionStatus} onManualResult={markManualResult} manualBusy={manualResultBusy} onViewUser={x=>setUserView({...x.customers,_booking:x})} documentActions={x=>documentActions(x,false,false)} onRefresh={load} warning={resultSyncWarning} loading={bookingsLoading}/>
       <section className="staffBookingSection videoBookingSection">
         <h2 className="staffSectionTitle">視訊預約</h2>
@@ -819,7 +827,7 @@ export default function Staff() {
                 <b>諮詢單</b>
                 {showVideoReturn&&<b>諮詢結果回傳</b>}
               </div>
-              {daily.map((x) => {
+              {visibleDaily.map((x) => {
                 const complete = isComplete(x),
                   paid = x.payment_status === "paid",
                   status = statusText(x),
@@ -850,6 +858,7 @@ export default function Staff() {
               })}
               {!daily.length&&<div className="staffEmptyState">目前沒有符合條件的視訊預約</div>}
             </div>
+            {staffMobile&&<nav className="staffPagination" aria-label="視訊預約分頁"><span>每頁 5 筆・第 {Math.min(videoPage,videoPageCount)}／{videoPageCount} 頁・共 {daily.length} 筆</span><div><button disabled={videoPage<=1} onClick={()=>setVideoPage(page=>Math.max(1,page-1))}>‹ 上一頁</button><button disabled={videoPage>=videoPageCount} onClick={()=>setVideoPage(page=>Math.min(videoPageCount,page+1))}>下一頁 ›</button></div></nav>}
           </div>
         )}
         <div className="staffRevenueCard videoRevenueCard"><div><span>視訊預約已付款總計</span><small>{videoDateFrom||videoDateTo?`付款日期：${videoDateFrom||"最早"} ～ ${videoDateTo||"今天"}`:"全部付款日期"}・共 {videoRevenueCount} 筆</small></div><strong>NT$ {videoRevenue.toLocaleString("zh-TW")}</strong><label><input type="checkbox" checked={excludeVideoBase} onChange={event=>setExcludeVideoBase(event.target.checked)}/><span>不計入視訊費用（每筆依系統設定扣除 NT$ {Number(methods.find(method=>method.code==="video")?.base_price||1200).toLocaleString("zh-TW")}）</span></label></div>
@@ -1005,7 +1014,7 @@ export default function Staff() {
           })}
         </div>
         <nav className="staffPagination" aria-label="文字預約分頁">
-          <label>每頁顯示<select value={textPageSize} onChange={(event)=>setTextPageSize(Number(event.target.value))}>{[10,20,50,100].map(size=><option key={size} value={size}>{size} 筆</option>)}</select></label>
+          {staffMobile?<span>每頁 5 筆</span>:<label>每頁顯示<select value={textPageSize} onChange={(event)=>setTextPageSize(Number(event.target.value))}>{[10,20,50,100].map(size=><option key={size} value={size}>{size} 筆</option>)}</select></label>}
           <span>第 {Math.min(textPage,textPageCount)}／{textPageCount} 頁・共 {text.length} 筆</span>
           <div><button disabled={textPage<=1} onClick={()=>setTextPage(page=>Math.max(1,page-1))}>‹ 上一頁</button><button disabled={textPage>=textPageCount} onClick={()=>setTextPage(page=>Math.min(textPageCount,page+1))}>下一頁 ›</button></div>
         </nav>

@@ -33,6 +33,7 @@ export async function GET() {
     return NextResponse.json({ error: /data_submission_source|consultation_result_(?:returned|detected|manual)_at/.test(message)
       ? "資料庫尚未更新：請先在 Supabase 依序執行 052_pending_result_status.sql 與 053_manual_results_and_video_time_off.sql，再重新整理後台。" : message }, { status: 500 });
   }
+  if(paymentSettings?.payment_mode==="auto")paymentSettings.payment_mode="bank_transfer";
   const bookings:any[]=(data||[]) as any[];
   // LINE webhook 的聯絡人資料是改名後的最新顯示名稱；優先補回給後台搜尋／複製功能。
   const lineIds=[...new Set(bookings.map((b:any)=>{const c=Array.isArray(b.customers)?b.customers[0]:b.customers;return c?.line_user_id;}).filter(Boolean))];
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ok:true});
   }
   if(action==="set_payment_mode"){
-    const mode=String(body.mode||"");if(!["auto","newebpay","bank_transfer"].includes(mode))return NextResponse.json({error:"付款模式不正確"},{status:400});
+    const mode=String(body.mode||"");if(!["newebpay","bank_transfer"].includes(mode))return NextResponse.json({error:"付款模式不正確"},{status:400});
     const {error}=await adminSupabase().from("booking_system_settings").upsert({id:true,payment_mode:mode,updated_at:new Date().toISOString()});
     if(error)return NextResponse.json({error:error.message},{status:500});return NextResponse.json({ok:true,mode});
   }

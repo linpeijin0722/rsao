@@ -1,3 +1,4 @@
+import {consultationReturnHeadings} from "@/lib/consultation-text";
 import { adminSupabase } from "@/lib/supabase";
 import {
   getConsultationReturnPreview,
@@ -193,20 +194,12 @@ export async function deliverPreparedConsultationReturn(payload: PreparedConsult
 }
 
 export function assertReturnIdentity(items:{index:number;content:string;sourceContent?:string}[],fresh:{index:number;content:string;parseWarning?:string}[]){
- // Compare complete heading lines, not bracketed phrases inside an answer.
- // Legacy forms may have a label without a name; the preview reader accepts these too.
- const headings=(value:string)=>{
-  const clean=String(value).replace(/\r\n?/g,"\n").replace(/[\u200b\u200c\u200d\u2060\ufeff]/g,"");
-  const collect=(pattern:RegExp)=>Array.from(clean.matchAll(pattern),match=>
-   match[1].trim().replace(/[ \t\u00a0\u3000]+/g," ")+"【"+match[2].trim().replace(/[ \t\u00a0\u3000]+/g," ")+"】");
-  const square=collect(/^[ \t\u00a0\u3000]*([^\n【】《》]*?)【([^】\n]+)】[ \t\u00a0\u3000]*$/gm);
-  return square.length?square:collect(/^[ \t\u00a0\u3000]*([^\n【】《》]*?)《([^》\n]+)》[ \t\u00a0\u3000]*$/gm);
- };
+ const headings=consultationReturnHeadings;
  for(const item of items){
   const source=fresh.find(row=>row.index===item.index);
   if(!source||source.parseWarning)throw Error(`項目 ${item.index} 的文件對應已改變，請重新整理並核對，未傳送。`);
   const expected=headings(source.content),actual=headings(item.content);
-  if(expected.length===0||JSON.stringify(expected)!==JSON.stringify(actual))throw Error(`項目 ${item.index} 姓名或項目標籤與 Google 文件不符，未傳送。請改用最新文件版本。`);
+  if(expected.length===0||JSON.stringify(expected)!==JSON.stringify(actual))throw Error(`項目 ${item.index} 姓名或項目標籤與 Google 文件不符，未傳送。文件標題：${expected.join("、").slice(0,120)||"未辨識"}；所選版本：${actual.join("、").slice(0,120)||"未辨識"}。請切換原始版本或修正正式標題後再確認。`);
   if(item.sourceContent!==undefined&&normalizeConsultationReturnText(item.sourceContent)!==normalizeConsultationReturnText(source.content))throw Error(`項目 ${item.index} 的 Google 文件已更新，請取消舊排程並重新核對內容，未傳送。`);
  }
  for(let i=0;i<items.length;i++)for(let j=0;j<i;j++){

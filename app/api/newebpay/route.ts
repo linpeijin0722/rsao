@@ -64,24 +64,6 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    // In auto mode, a server-side gateway initialization failure temporarily
-    // falls back to bank transfer. The timeout lets the site retry NewebPay
-    // automatically after the transient failure has had time to clear.
-    try {
-      const db = adminSupabase();
-      const disabledUntil = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-      await db
-        .from("booking_system_settings")
-        .update({
-          gateway_disabled_until: disabledUntil,
-          gateway_failure_reason:
-            error instanceof Error ? error.message.slice(0, 500) : "無法啟動藍新付款",
-        })
-        .eq("id", true)
-        .eq("payment_mode", "auto");
-    } catch {
-      // Preserve the original payment error even if recording the fallback fails.
-    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "無法啟動藍新付款" },
       { status: 500 },
